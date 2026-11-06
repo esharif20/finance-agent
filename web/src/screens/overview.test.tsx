@@ -28,6 +28,10 @@ const spending: Spending = {
   month: "2026-02",
   currency: "GBP",
   total: m(200000),
+  unmatched_refunds: m(0),
+  refunds: m(0),
+  fees: m(0),
+  money_out: m(200000),
   categories: [
     cat("Housing", 90000),
     cat("Food & Drink", 40000),
@@ -120,6 +124,33 @@ describe("SpendingDonut", () => {
 
     expect(screen.getByRole("img", { name: /Housing 45%, Food & Drink 20%/ })).toBeInTheDocument();
     expect(screen.getByText("Spent").parentElement).toHaveTextContent("£2,000.00");
+  });
+
+  it("reconciles Money out from the API's parts and never draws a negative", () => {
+    const parts: Spending = {
+      ...spending,
+      total: m(90708),
+      refunds: m(1099),
+      fees: m(2298),
+      unmatched_refunds: m(-1099),
+      money_out: m(94105),
+      categories: [cat("Housing", 90000), cat("Uncategorised", 2807)],
+    };
+    // the parts the screen prints must add up to Money out
+    expect(parts.total.minor + parts.refunds.minor + parts.fees.minor).toBe(parts.money_out.minor);
+
+    render(<SpendingDonut spending={parts} />);
+
+    // <Money> repeats each amount once for screen readers; collapse that
+    const line = (screen.getByTestId("reconcile").textContent ?? "").replace(/(£[\d,.]+)\1/g, "$1");
+    expect(line).toBe(
+      "Money out £941.05 = £907.08 spending after refunds + £10.99 refunds received + £22.98 fees",
+    );
+    const row = screen.getByRole("row", { name: /Refunds \(unmatched\)/ });
+    expect(row).toHaveTextContent("−£10.99");
+    const ring = screen.getByRole("img", { name: /Spending by Category/ });
+    expect(ring.querySelectorAll("circle")).toHaveLength(2); // Housing + grey rest; no refund arc
+    expect(screen.getByRole("row", { name: /Uncategorised/ })).toHaveTextContent("£28.07");
   });
 
   it("says so when nothing was spent", () => {

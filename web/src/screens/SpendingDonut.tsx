@@ -108,10 +108,39 @@ export function SpendingDonut({ spending }: { spending: Spending }) {
                   </td>
                 </tr>
               ))}
+              {spending.unmatched_refunds.minor !== 0 && (
+                <tr className="h-11">
+                  <th scope="row" className="min-w-0 font-medium">
+                    <span className="flex items-center gap-3">
+                      <span aria-hidden="true" className="size-3 shrink-0 rounded-full border-2 border-dashed border-[var(--cat-other)]" />
+                      <span className="truncate">Refunds (unmatched)</span>
+                    </span>
+                  </th>
+                  <td className="pl-3 text-right">
+                    <Money value={spending.unmatched_refunds} />
+                  </td>
+                  <td className="w-12 pl-3" />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       )}
+
+      <p className="text-sm text-muted-foreground" data-testid="reconcile">
+        Money out <Money value={spending.money_out} className="font-semibold text-foreground" /> ={" "}
+        <Money value={spending.total} /> spending after refunds
+        {spending.refunds.minor !== 0 && (
+          <>
+            {" "}+ <Money value={spending.refunds} /> refunds received
+          </>
+        )}
+        {spending.fees.minor !== 0 && (
+          <>
+            {" "}+ <Money value={spending.fees} /> fees
+          </>
+        )}
+      </p>
     </Card>
   );
 }

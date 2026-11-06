@@ -147,9 +147,13 @@ export interface components {
             categories: components["schemas"]["CategorySpendOut"][];
             /** Currency */
             currency: string;
+            fees: components["schemas"]["Money"];
+            money_out: components["schemas"]["Money"];
             /** Month */
             month: string;
+            refunds: components["schemas"]["Money"];
             total: components["schemas"]["Money"];
+            unmatched_refunds: components["schemas"]["Money"];
         };
         /** SummaryOut */
         SummaryOut: {

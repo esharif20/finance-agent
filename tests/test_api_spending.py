@@ -1,6 +1,7 @@
 """GET /api/spending: the Overview's donut data, a thin adapter over the Ledger."""
 
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -10,7 +11,17 @@ from sqlalchemy import Engine
 
 from finance_agent import api, categorise, cli, identity
 from finance_agent.ledger import Ledger
-from synthetic_lloyds import generate_histories, render_export
+from synthetic_lloyds import History, Txn, generate_histories, render_export
+from synthetic_lloyds.generator import SORT_CODE, START
+
+
+def history(txns: list[tuple[int, str, str, int]]) -> History:
+    out: list[Txn] = []
+    bal = 100000
+    for day, typ, desc, amt in txns:
+        bal += amt
+        out.append(Txn(START + timedelta(days=day), typ, desc, amt, bal))
+    return History(SORT_CODE, "00000001", out)
 
 
 @pytest.fixture
@@ -34,7 +45,7 @@ def test_breakdown_is_the_ledgers_categories_in_minor_units(
     client: TestClient, engine: Engine, seeded: str
 ) -> None:
     with engine.begin() as conn:
-        want = Ledger(conn, 1).spending_by_category(seeded)
+        want = list(Ledger(conn, 1).category_breakdown(seeded).categories)
 
     body = client.get("/api/spending", params={"month": seeded}).json()
 
@@ -43,10 +54,12 @@ def test_breakdown_is_the_ledgers_categories_in_minor_units(
     assert [c["amount"] for c in body["categories"]] == [
         {"minor": int(s.amount * 100), "currency": "GBP"} for s in want
     ]
-    assert body["total"] == {
-        "minor": sum(int(s.amount * 100) for s in want),
-        "currency": "GBP",
-    }
+    parts = body["total"], body["refunds"], body["fees"]
+    assert body["money_out"]["minor"] == sum(p["minor"] for p in parts)
+    assert body["total"]["minor"] == (
+        sum(c["amount"]["minor"] for c in body["categories"])
+        + body["unmatched_refunds"]["minor"]
+    )
 
 
 def test_defaults_to_the_latest_month_and_validates_it(
@@ -109,3 +122,40 @@ def test_figures_equal_fa_summary_and_reconcile_with_the_breakdown(
 
     assert spending["total"]["minor"] == -minor("Spending") - minor("Refund")
     assert summary["money_out"]["minor"] == -minor("Spending") - minor("Fee")
+    # the parts the Overview prints add up to Money out exactly, as `fa summary` shows it
+    parts = spending["total"], spending["refunds"], spending["fees"]
+    assert sum(p["minor"] for p in parts) == cli_minor("Money out")
+    assert spending["money_out"]["minor"] == cli_minor("Money out")
+    assert spending["refunds"]["minor"] == minor("Refund")
+    assert spending["fees"]["minor"] == -minor("Fee")
+
+
+def test_a_refund_with_no_category_is_its_own_line_not_a_negative_category(
+    client: TestClient, engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    h = history(
+        [
+            (1, "DEB", "TESCO STORES 1234", -4000),
+            (2, "DEB", "XYZZY WIDGETS", -1500),
+            (5, "DEB", "XYZZY WIDGETS REFUND", 1099),
+            (6, "DEB", "MYSTERY SHOP", -700),
+        ]
+    )
+    with engine.begin() as conn:
+        Ledger(conn, 1).import_files([write_export(render_export(h, 0, 4).text)])
+        categorise.run(conn, 1)
+        month = Ledger(conn, 1).latest_month()
+    assert month
+
+    body = client.get("/api/spending", params={"month": month}).json()
+
+    by_name = {c["name"]: c["amount"]["minor"] for c in body["categories"]}
+    assert all(v > 0 for v in by_name.values())
+    assert body["unmatched_refunds"]["minor"] == -1099
+    assert by_name["Uncategorised"] == 1500 + 700
+    assert body["total"]["minor"] == 4000 + 1500 + 700 - 1099
+    assert body["total"]["minor"] == (
+        sum(by_name.values()) + body["unmatched_refunds"]["minor"]
+    )
+    assert body["money_out"]["minor"] == 4000 + 1500 + 700
+    assert body["refunds"]["minor"] == 1099

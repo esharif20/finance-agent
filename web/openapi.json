@@ -146,11 +146,23 @@
             "title": "Currency",
             "type": "string"
           },
+          "fees": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "money_out": {
+            "$ref": "#/components/schemas/Money"
+          },
           "month": {
             "title": "Month",
             "type": "string"
           },
+          "refunds": {
+            "$ref": "#/components/schemas/Money"
+          },
           "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "unmatched_refunds": {
             "$ref": "#/components/schemas/Money"
           }
         },
@@ -158,7 +170,11 @@
           "month",
           "currency",
           "total",
-          "categories"
+          "categories",
+          "unmatched_refunds",
+          "refunds",
+          "fees",
+          "money_out"
         ],
         "title": "SpendingOut",
         "type": "object"
