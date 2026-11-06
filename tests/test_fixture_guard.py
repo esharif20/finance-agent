@@ -123,3 +123,60 @@ def test_gitleaks_fails_on_planted_fake_secret(tmp_path: Path) -> None:
         text=True,
     )
     assert result.returncode == 1, result.stdout + result.stderr
+
+
+# Verifier adversarial cases (ticket #3).
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"\xef\xbb\xbf# synthetic\ndate\n",  # UTF-8 BOM before header
+        b" # synthetic\ndate\n",  # leading whitespace
+        b"\n# synthetic\ndate\n",  # header on line 2
+        b"# synthetic-ish real export\ndate\n",  # header as a prefix only
+        b"# SYNTHETIC\ndate\n",
+        b"",  # empty file
+    ],
+)
+def test_near_miss_headers_are_rejected(tmp_path: Path, content: bytes) -> None:
+    rel = write(tmp_path, "tests/fixtures/synthetic/a.csv", content)
+    assert find_violations(tmp_path, [rel]) == [
+        f"{rel}: synthetic fixture must start with '# synthetic'"
+    ]
+
+
+def test_crlf_header_is_accepted(tmp_path: Path) -> None:
+    rel = write(tmp_path, "tests/fixtures/synthetic/a.csv", b"# synthetic\r\nx\r\n")
+    assert find_violations(tmp_path, [rel]) == []
+
+
+def test_innocent_named_symlink_to_sqlite_is_rejected(tmp_path: Path) -> None:
+    target = write(tmp_path, "elsewhere/blob", SQLITE_MAGIC)
+    (tmp_path / "notes.md").symlink_to(tmp_path / target)
+    violations = find_violations(tmp_path, ["notes.md"])
+    assert violations == [f"notes.md: {OUTSIDE}"]
+
+
+def git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)  # noqa: S603, S607
+
+
+def test_force_added_gitignored_csv_is_rejected(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q")
+    write(tmp_path, ".gitignore", b"*.csv\n")
+    write(tmp_path, "real.csv", b"date,amount\n")
+    assert run_guard(tmp_path).returncode == 0  # ignored, cannot be committed
+    git(tmp_path, "add", "-f", "real.csv")
+    result = run_guard(tmp_path)
+    assert result.returncode == 1
+    assert "real.csv" in result.stderr
+
+
+def test_sqlite_renamed_and_committed_is_rejected(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q")
+    write(tmp_path, "docs/diagram.png", SQLITE_MAGIC)
+    git(tmp_path, "add", ".")
+    result = run_guard(tmp_path)
+    assert result.returncode == 1
+    assert "docs/diagram.png" in result.stderr
