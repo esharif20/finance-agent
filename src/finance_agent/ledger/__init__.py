@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import Connection, case, func, select
+from sqlalchemy import Connection, case, func
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
@@ -36,9 +36,42 @@ class ImportReport:
     already_known: int
     rejected: list[Rejection]  # one per refused file; nothing of it is stored
     accounts: list[AffectedAccount]  # Accounts that gained Transactions
+    # rows matched to stored rows that fit at more than one position, such as
+    # one row that is either of two twins (ADR 0006); the earliest is used
+    ambiguous: int = 0
 
 
 log = logging.getLogger(__name__)  # counts, IDs and timings only
+
+Identity = tuple[date, str, int, int]
+
+
+def row_identity(row: ingest.ParsedRow) -> Identity:
+    """ADR 0006: raw Bank fields as exported, never anything derived."""
+    return (row.posted_on, row.description, row.amount_minor, row.balance_minor)
+
+
+def _merge(a: list[int], b: list[int]) -> list[int] | None:
+    """Join two Bank-ordered runs of Transaction ids that overlap consistently."""
+    if b[0] in a:
+        i = a.index(b[0])
+        if a[i : i + len(b)] != b[: len(a) - i]:
+            return None
+        return a[:i] + b if i + len(b) > len(a) else a
+    return _merge(b, a) if a[0] in b else None
+
+
+def _best_overlaps(new: list[Identity], run: list[Identity]) -> tuple[int, list[int]]:
+    """Longest overlap of `new` with `run` as one contiguous block, and every
+    offset (new[i] is run[i + offset]) that achieves it."""
+    best, offsets = 0, list[int]()
+    for o in range(1 - len(new), len(run)):
+        lo, hi = max(0, -o), min(len(new), len(run) - o)
+        if hi - lo >= best and all(new[i] == run[i + o] for i in range(lo, hi)):
+            if hi - lo > best:
+                best, offsets = hi - lo, []
+            offsets.append(o)
+    return best, offsets
 
 
 @dataclass(frozen=True)
@@ -74,7 +107,7 @@ class Ledger:
         self._db = Scoped(conn, user_id)
 
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
-        added = known = 0
+        added = known = ambiguous = 0
         rejected: list[Rejection] = []
         accounts: dict[int, str] = {}
         for n, path in enumerate(paths, 1):
@@ -109,9 +142,17 @@ class Ledger:
             )
             bank_id = self._bank_id(parsed.bank)
             file_added = 0
+            by_account: dict[int, list[ingest.ParsedRow]] = {}
+            for row in parsed.rows:
+                by_account.setdefault(self._account_id(bank_id, row), []).append(row)
+            known_ids: dict[int, int] = {}  # row line -> stored Transaction id
+            for account_id, rows in by_account.items():
+                aligned, unsure = self._align(account_id, rows)
+                known_ids |= aligned
+                ambiguous += unsure
             for row in parsed.rows:
                 account_id = self._account_id(bank_id, row)
-                txn_id = self._known_transaction_id(account_id, row, import_id)
+                txn_id = known_ids.get(row.line)
                 if txn_id is None:
                     txn_id = self._db.insert(
                         schema.transaction,
@@ -147,6 +188,7 @@ class Ledger:
             known,
             rejected,
             [AffectedAccount(i, m) for i, m in sorted(accounts.items())],
+            ambiguous,
         )
 
     def transactions(self) -> list[Transaction]:
@@ -208,34 +250,77 @@ class Ledger:
             _decimal(ins - outs),
         )
 
-    def _known_transaction_id(
-        self, account_id: int, row: ingest.ParsedRow, import_id: int
-    ) -> int | None:
-        """ADR 0006 identity: (Account, date, description, amount, balance).
+    def _align(
+        self, account_id: int, rows: list[ingest.ParsedRow]
+    ) -> tuple[dict[int, int], int]:
+        """ADR 0006: place a new file's rows (one Account, Bank order) against the
+        stored runs. A file is a contiguous window of the Bank's history, so its
+        overlap with each run is one contiguous block; the longest consistent
+        block wins. Returns ({row line: Transaction id}, rows placed ambiguously)."""
+        new = [row_identity(r) for r in rows]
+        runs, identity = self._bank_order_runs(account_id)
+        found: list[tuple[int, int, list[int]]] = []
+        for n, run in enumerate(runs):
+            length, offsets = _best_overlaps(new, [identity[t] for t in run])
+            if length:
+                found.append((length, n, offsets))
+        placed: dict[int, int] = {}
+        unsure = 0
+        for length, n, offsets in sorted(found, key=lambda f: -f[0]):
+            run, o = runs[n], offsets[0]
+            span = range(max(0, -o), min(len(new), len(run) - o))
+            if any(i in placed for i in span):
+                continue  # a longer block already placed these rows
+            placed |= {i: run[i + o] for i in span}
+            if len(offsets) > 1:  # e.g. one row that is either of two twins
+                unsure += length
+        return {rows[i].line: t for i, t in placed.items()}, unsure
 
-        Rows within one file are distinct Transactions, so a match must not
-        already be linked to this import (keeps identical-key twins apart).
-        """
+    def _bank_order_runs(
+        self, account_id: int
+    ) -> tuple[list[list[int]], dict[int, Identity]]:
+        """The Account's stored Transactions as runs in Bank order: each Statement
+        Import's rows, joined where they share Transactions. Runs are separated
+        where no import covers the gap between them."""
         t, src = schema.transaction, schema.transaction_source
-        in_this_import = (
-            select(src.c.transaction_id)
-            .where(src.c.statement_import_id == import_id)
-            .where(src.c.transaction_id == t.c.id)
-        )
-        found = self._db.execute(
-            self._db.select(t, t.c.id)
-            .where(
-                t.c.account_id == account_id,
-                t.c.posted_on == row.posted_on,
-                t.c.description == row.description,
-                t.c.amount_minor == row.amount_minor,
-                t.c.running_balance_minor == row.balance_minor,
-                ~in_this_import.exists(),
+        links = self._db.execute(
+            self._db.select(
+                src,
+                src.c.statement_import_id,
+                t.c.id,
+                t.c.posted_on,
+                t.c.description,
+                t.c.amount_minor,
+                t.c.running_balance_minor,
             )
-            .order_by(t.c.id)
-            .limit(1)
-        ).scalar()
-        return None if found is None else int(found)
+            .join(t, t.c.id == src.c.transaction_id)
+            .where(t.c.account_id == account_id)
+            .order_by(src.c.statement_import_id, src.c.row_number)
+        ).all()
+        identity: dict[int, Identity] = {}
+        per_import: dict[int, list[int]] = {}
+        for r in links:
+            identity[r.id] = (
+                r.posted_on,
+                r.description,
+                r.amount_minor,
+                r.running_balance_minor,
+            )
+            per_import.setdefault(r.statement_import_id, []).append(r.id)
+        runs: list[list[int]] = []
+        for run in per_import.values():
+            merged = True
+            while merged:
+                merged = False
+                for other in runs:
+                    if (joined := _merge(other, run)) is not None:
+                        runs.remove(other)
+                        run, merged = joined, True
+                        break
+            runs.append(run)
+        # shortcut: rebuilt per file, O(stored rows x file rows); persist runs if
+        # imports get slow
+        return runs, identity
 
     def _bank_id(self, name: str) -> int:
         b = schema.bank

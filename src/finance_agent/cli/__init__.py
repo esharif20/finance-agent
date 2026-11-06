@@ -39,6 +39,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     f"{r.added} added, {r.already_known} already known, "
                     f"{len(r.rejected)} rejected"
                 )
+                if r.ambiguous:
+                    print(
+                        f"{r.ambiguous} matched where twins made the "
+                        "position uncertain; check them"
+                    )
                 if r.accounts:
                     masked = ", ".join(a.masked_number for a in r.accounts)
                     print(f"Accounts affected: {masked}")
