@@ -93,7 +93,7 @@ def test_hostile_csv_cells(ledger_for: LedgerFor, write_export: WriteExport) -> 
         )  # account number in desc
     )
     r = ledger_for(1).import_files([write_export(csv)])
-    assert r.added == 2 and [x.line for x in r.rejected] == [4]
+    assert r.added == 0 and [x.line for x in r.rejected] == [4]
     assert "12345678" not in repr(r) and "HYPERLINK" not in repr(r)
 
 

@@ -3,6 +3,8 @@ the API and the tests. Takes a connection from `storage.open_db` and a user_id;
 never returns floats."""
 
 import hashlib
+import logging
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -23,11 +25,20 @@ class Rejection:
 
 
 @dataclass(frozen=True)
+class AffectedAccount:
+    id: int
+    masked_number: str  # never the full number
+
+
+@dataclass(frozen=True)
 class ImportReport:
     added: int
     already_known: int
-    rejected: list[Rejection]
-    accounts: list[int]  # internal Account IDs touched
+    rejected: list[Rejection]  # one per refused file; nothing of it is stored
+    accounts: list[AffectedAccount]  # Accounts that gained Transactions
+
+
+log = logging.getLogger(__name__)  # counts, IDs and timings only
 
 
 @dataclass(frozen=True)
@@ -65,16 +76,29 @@ class Ledger:
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
         added = known = 0
         rejected: list[Rejection] = []
-        accounts: set[int] = set()
-        for path in paths:
+        accounts: dict[int, str] = {}
+        for n, path in enumerate(paths, 1):
+            started = time.perf_counter_ns()
             data = path.read_bytes()
-            parsed = ingest.parse(data)
+            try:
+                parsed = ingest.parse(data)
+            except ingest.UnreadableFile as e:
+                rejected.append(Rejection(path.name, e.line, e.reason))
+                log.info("import file=%d rejected=1", n)
+                continue
+            if parsed.rejected:  # one bad row refuses the whole file
+                rejected += [
+                    Rejection(path.name, r.line, r.reason) for r in parsed.rejected
+                ]
+                log.info("import file=%d rejected=%d", n, len(parsed.rejected))
+                continue
             digest = hashlib.sha256(data).hexdigest()
             si = schema.statement_import
             if self._db.execute(
                 self._db.select(si, si.c.id).where(si.c.file_hash == digest)
             ).first():
                 known += len(parsed.rows)
+                log.info("import file=%d already_known=%d", n, len(parsed.rows))
                 continue
             import_id = self._db.insert(
                 si,
@@ -84,9 +108,9 @@ class Ledger:
                 imported_at=datetime.now(UTC),
             )
             bank_id = self._bank_id(parsed.bank)
+            file_added = 0
             for row in parsed.rows:
                 account_id = self._account_id(bank_id, row)
-                accounts.add(account_id)
                 txn_id = self._known_transaction_id(account_id, row, import_id)
                 if txn_id is None:
                     txn_id = self._db.insert(
@@ -100,7 +124,8 @@ class Ledger:
                         running_balance_minor=row.balance_minor,
                         status="completed",
                     )
-                    added += 1
+                    accounts[account_id] = row.masked_number
+                    file_added += 1
                 else:
                     known += 1
                 self._db.insert(
@@ -109,10 +134,20 @@ class Ledger:
                     statement_import_id=import_id,
                     row_number=row.line,
                 )
-            rejected += [
-                Rejection(path.name, r.line, r.reason) for r in parsed.rejected
-            ]
-        return ImportReport(added, known, rejected, sorted(accounts))
+            added += file_added
+            log.info(
+                "import file=%d statement_import_id=%d added=%d ms=%d",
+                n,
+                import_id,
+                file_added,
+                (time.perf_counter_ns() - started) // 1_000_000,
+            )
+        return ImportReport(
+            added,
+            known,
+            rejected,
+            [AffectedAccount(i, m) for i, m in sorted(accounts.items())],
+        )
 
     def transactions(self) -> list[Transaction]:
         """Every stored Transaction, oldest first."""
