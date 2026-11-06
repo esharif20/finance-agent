@@ -10,11 +10,15 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import Connection, case, func, select
+from sqlalchemy import Connection, Select, case, func, select, union
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
+
+TRANSFER_TYPES = ("TFR",)  # Lloyds Transaction Type of own-account moves
+TRANSFER_DAYS = 3  # the two legs post at most this many days apart
 
 
 @dataclass(frozen=True)
@@ -42,12 +46,35 @@ log = logging.getLogger(__name__)  # counts, IDs and timings only
 
 
 @dataclass(frozen=True)
+class Categorisation:
+    kind: str  # Spending, Income, Transfer, Refund or Fee
+    merchant: str | None
+    category: tuple[str, str] | None  # (top level, subcategory)
+    source: str  # "merchant:<name>", "rule:<id>", "none"; "" without a Category
+    taxonomy_version: int
+
+
+@dataclass(frozen=True)
 class Transaction:
     posted_on: date
     description: str
     amount: Decimal
     running_balance: Decimal
     statement_imports: frozenset[str]  # file hashes of every import it appeared in
+    id: int = 0
+    bank_type: str = ""  # the Bank's Transaction Type code; not the Kind
+    transfer_with: int | None = None  # the other leg of an own-account Transfer
+    categorisation: Categorisation | None = None  # None until `categorise.run`
+
+
+@dataclass(frozen=True)
+class Spend:
+    """Spending minus Refunds in one Category, Subcategory or Merchant;
+    negative when Refunds received exceed spending (ADR 0004)."""
+
+    name: str
+    amount: Decimal
+    children: tuple["Spend", ...] = ()
 
 
 @dataclass(frozen=True)
@@ -142,6 +169,8 @@ class Ledger:
                 file_added,
                 (time.perf_counter_ns() - started) // 1_000_000,
             )
+        if added:
+            self._link_transfers()
         return ImportReport(
             added,
             known,
@@ -164,8 +193,11 @@ class Ledger:
                 t.c.description,
                 t.c.amount_minor,
                 t.c.running_balance_minor,
+                t.c.bank_type,
             ).order_by(t.c.posted_on, t.c.id)
         ).all()
+        other_leg = self._transfer_legs()
+        cats = self._categorisations()
         hashes: dict[int, set[str]] = {}
         for link in self._db.execute(
             self._db.select(src, src.c.transaction_id, si.c.file_hash).join(
@@ -180,9 +212,80 @@ class Ledger:
                 _decimal(r.amount_minor),
                 _decimal(r.running_balance_minor),
                 frozenset(hashes.get(r.id, ())),
+                r.id,
+                r.bank_type,
+                other_leg.get(r.id),
+                cats.get(r.id),
             )
             for r in rows
         ]
+
+    def spending_by_category(self, month: str) -> list[Spend]:
+        """Spending minus Refunds received in `month` (ADR 0004), by Category,
+        then Subcategory, then Merchant ("Unknown" when none), largest first."""
+        start, end = _month_bounds(month)
+        t = schema.transaction
+        amounts: dict[int, int] = {
+            r.id: r.amount_minor
+            for r in self._db.execute(
+                self._db.select(t, t.c.id, t.c.amount_minor).where(
+                    t.c.posted_on >= start,
+                    t.c.posted_on < end,
+                    t.c.currency == "GBP",  # shortcut: as in summarise_month
+                )
+            )
+        }
+        tree: dict[str, dict[str, dict[str, int]]] = {}
+        for txn_id, c in self._categorisations().items():
+            if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
+                top, sub = c.category
+                merchants = tree.setdefault(top, {}).setdefault(sub, {})
+                key = c.merchant or "Unknown"
+                merchants[key] = merchants.get(key, 0) - amounts[txn_id]
+
+        def level(nodes: dict[str, Any]) -> tuple[Spend, ...]:
+            out: list[Spend] = []
+            for name, v in nodes.items():
+                if isinstance(v, int):  # a Merchant's minor-unit total
+                    out.append(Spend(name, _decimal(v)))
+                else:
+                    kids = level(v)
+                    total = sum((k.amount for k in kids), Decimal(0))
+                    out.append(Spend(name, total, kids))
+            return tuple(sorted(out, key=lambda s: (-s.amount, s.name)))
+
+        return list(level(tree))
+
+    def _categorisations(self) -> dict[int, Categorisation]:
+        c, sub, top = (
+            schema.categorisation,
+            schema.category.alias("sub"),
+            schema.category.alias("top"),
+        )
+        rows = self._db.execute(
+            self._db.select(
+                c,
+                c.c.transaction_id,
+                c.c.kind,
+                c.c.merchant,
+                c.c.source,
+                c.c.taxonomy_version,
+                top.c.name.label("top"),
+                sub.c.name.label("sub"),
+            )
+            .outerjoin(sub, sub.c.id == c.c.category_id)
+            .outerjoin(top, top.c.id == sub.c.parent_id)
+        )
+        return {
+            r.transaction_id: Categorisation(
+                r.kind,
+                r.merchant,
+                (r.top, r.sub) if r.sub is not None else None,
+                r.source,
+                r.taxonomy_version,
+            )
+            for r in rows
+        }
 
     def summarise_month(self, month: str) -> MonthSummary:
         start, end = _month_bounds(month)
@@ -197,6 +300,7 @@ class Ledger:
             t.c.posted_on < end,
             # shortcut: GBP only until FX conversion lands; then sum gbp_minor
             t.c.currency == "GBP",
+            t.c.id.not_in(self._transfer_ids()),  # neither spending nor income
         )
         row = self._db.execute(stmt).one()
         ins, outs = (int(v) for v in row)
@@ -207,6 +311,82 @@ class Ledger:
             _decimal(outs),
             _decimal(ins - outs),
         )
+
+    def _transfer_ids(self) -> Select[Any]:
+        """Ids of every Transaction that is one leg of a Transfer."""
+        tl = schema.transfer_link
+        return (
+            union(
+                self._db.select(tl, tl.c.from_transaction_id),
+                self._db.select(tl, tl.c.to_transaction_id),
+            )
+            .subquery()
+            .select()
+        )
+
+    def _transfer_legs(self) -> dict[int, int]:
+        tl = schema.transfer_link
+        legs: dict[int, int] = {}
+        for r in self._db.execute(
+            self._db.select(tl, tl.c.from_transaction_id, tl.c.to_transaction_id)
+        ):
+            a, b = int(r.from_transaction_id), int(r.to_transaction_id)
+            legs[a], legs[b] = b, a
+        return legs
+
+    def _link_transfers(self) -> None:
+        """Pair unlinked own-account Transfer legs (both Type TFR, opposite
+        sign, same amount, other Account, dates within TRANSFER_DAYS).
+        Identical descriptions, then the closest date, break ties.
+
+        Uses raw Bank fields only. shortcut: own-account moves sent as FPO/FPI
+        are not detected; widen TRANSFER_TYPES once a real export shows them.
+        """
+        t = schema.transaction
+        linked = self._transfer_legs()
+        rows = [
+            r
+            for r in self._db.execute(
+                self._db.select(
+                    t,
+                    t.c.id,
+                    t.c.account_id,
+                    t.c.posted_on,
+                    t.c.description,
+                    t.c.amount_minor,
+                )
+                .where(t.c.bank_type.in_(TRANSFER_TYPES))
+                .order_by(t.c.posted_on, t.c.id)
+            )
+            if r.id not in linked
+        ]
+        incoming: dict[int, list[Any]] = {}
+        for r in rows:
+            if r.amount_minor > 0:
+                incoming.setdefault(r.amount_minor, []).append(r)
+        for out in (r for r in rows if r.amount_minor < 0):
+            candidates = [
+                r
+                for r in incoming.get(-out.amount_minor, [])
+                if r.account_id != out.account_id
+                and abs((r.posted_on - out.posted_on).days) <= TRANSFER_DAYS
+            ]
+            if not candidates:
+                continue
+            best = min(
+                candidates,
+                key=lambda r: (
+                    r.description != out.description,
+                    abs((r.posted_on - out.posted_on).days),
+                    r.id,
+                ),
+            )
+            incoming[-out.amount_minor].remove(best)
+            self._db.insert(
+                schema.transfer_link,
+                from_transaction_id=out.id,
+                to_transaction_id=best.id,
+            )
 
     def _known_transaction_id(
         self, account_id: int, row: ingest.ParsedRow, import_id: int

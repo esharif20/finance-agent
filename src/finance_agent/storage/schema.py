@@ -104,3 +104,46 @@ transaction_source = Table(
     ),
     Column("row_number", Integer, primary_key=True),
 )
+
+# Own-account Transfer pairs: from = the outgoing (negative) leg. Bank rows are
+# never deleted or changed; both legs stay and are linked (ADR 0001).
+transfer_link = Table(
+    "transfer_link",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "from_transaction_id", Integer, ForeignKey("transaction.id"), primary_key=True
+    ),
+    Column(
+        "to_transaction_id",
+        Integer,
+        ForeignKey("transaction.id"),
+        nullable=False,
+        unique=True,
+    ),
+)
+
+# Seeded from `categorise.TAXONOMY` per user and taxonomy version.
+category = Table(
+    "category",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("parent_id", Integer, ForeignKey("category.id")),
+    Column("name", String(64), nullable=False),
+    Column("taxonomy_version", Integer, nullable=False),
+)
+
+# Derived, recomputed by `categorise.run`; never edited by hand (Corrections are
+# a separate overlay, ADR 0001).
+categorisation = Table(
+    "categorisation",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("transaction_id", Integer, ForeignKey("transaction.id"), primary_key=True),
+    Column("kind", String(16), nullable=False),
+    Column("merchant", String(64)),
+    Column("category_id", Integer, ForeignKey("category.id")),
+    Column("source", String(64), nullable=False),
+    Column("taxonomy_version", Integer, nullable=False),
+)
