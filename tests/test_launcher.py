@@ -123,3 +123,15 @@ def test_fa_with_no_arguments_and_fa_stop_use_the_launcher(
 
     assert calls == ["start", "stop"]
     assert "not running" in capsys.readouterr().out
+
+
+def test_fa_no_browser_env_keeps_the_browser_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("FA_DB_PATH", str(tmp_path / "ledger.db"))
+    monkeypatch.setenv("FA_NO_BROWSER", "1")
+    monkeypatch.setattr(
+        launcher.webbrowser, "open", lambda url: pytest.fail("opened " + url)
+    )
+
+    launcher.default()._open("http://127.0.0.1:1/")  # noqa: SLF001

@@ -44,6 +44,11 @@ def _kill(pid: int) -> None:
     os.kill(pid, signal.SIGTERM)
 
 
+def _open_browser(url: str) -> None:
+    if not os.environ.get("FA_NO_BROWSER"):  # set by the smoke test
+        webbrowser.open(url)
+
+
 class Launcher:
     def __init__(
         self,
@@ -52,7 +57,7 @@ class Launcher:
         probe: Callable[[int], bool] = _probe,
         spawn: Callable[[int], int] = _spawn,
         kill: Callable[[int], None] = _kill,
-        open_url: Callable[[str], object] = webbrowser.open,
+        open_url: Callable[[str], object] = _open_browser,
         wait: int = 15,
     ) -> None:
         self.pid_file, self.port, self.wait = pid_file, port, wait
@@ -89,4 +94,5 @@ def default() -> Launcher:
     return Launcher(
         default_db_path().parent / "server.pid",
         int(os.environ.get("FA_PORT", DEFAULT_PORT)),
+        open_url=_open_browser,
     )
