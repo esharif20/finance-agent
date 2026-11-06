@@ -72,7 +72,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | --- | --- | --- |
 | `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id` | nothing |
 | `ingest` | One parser per Bank, the `Importer` interface, duplicate detection (ADR 0006), account-number masking | `storage` |
-| `ledger` | Transactions, Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage` |
+| `ledger` | Transactions, Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage`, `ingest` |
 | `categorise` | Taxonomy (versioned), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger` |
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry | `ledger`, `categorise`, `memory` |
 | `memory` | Memories, Proposals, feedback, retention | `storage` |
