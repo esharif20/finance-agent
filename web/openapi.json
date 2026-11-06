@@ -50,6 +50,23 @@
         "title": "AccountOut",
         "type": "object"
       },
+      "CategorySpendOut": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "amount"
+        ],
+        "title": "CategorySpendOut",
+        "type": "object"
+      },
       "GapOut": {
         "properties": {
           "amount": {
@@ -114,6 +131,52 @@
           "currency"
         ],
         "title": "Money",
+        "type": "object"
+      },
+      "SpendingOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategorySpendOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "fees": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "money_out": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "refunds": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "unmatched_refunds": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "month",
+          "currency",
+          "total",
+          "categories",
+          "unmatched_refunds",
+          "refunds",
+          "fees",
+          "money_out"
+        ],
+        "title": "SpendingOut",
         "type": "object"
       },
       "SummaryOut": {
@@ -240,6 +303,75 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/months": {
+      "get": {
+        "operationId": "months_api_months_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Months Api Months Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Months"
+      }
+    },
+    "/api/spending": {
+      "get": {
+        "operationId": "spending_api_spending_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Spending"
       }
     },
     "/api/summary": {

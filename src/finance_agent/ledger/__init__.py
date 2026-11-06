@@ -7,7 +7,7 @@ import logging
 import time
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -160,6 +160,18 @@ class AccountBalance:
 
 
 @dataclass(frozen=True)
+class Breakdown:
+    """A month's spending by Category and what separates it from Money out:
+    money_out == spending_after_refunds + refunds + fees (ADR 0004)."""
+
+    categories: tuple[Spend, ...]  # Uncategorised is gross; never negative here
+    unmatched_refunds: Decimal  # <= 0: Refunds with no Category, kept off the ring
+    spending_after_refunds: Decimal  # == sum(categories) + unmatched_refunds
+    refunds: Decimal  # all Refunds received in the month
+    fees: Decimal
+
+
+@dataclass(frozen=True)
 class MonthSummary:
     month: str  # YYYY-MM
     currency: str
@@ -180,6 +192,9 @@ class BankOrderRow:
 
 def _decimal(minor: int) -> Decimal:
     return Decimal(minor).scaleb(-2)
+
+
+_UNCATEGORISED = "Uncategorised"  # the categorise module's name; it imports us
 
 
 def _month_bounds(month: str) -> tuple[date, date]:
@@ -362,6 +377,30 @@ class Ledger:
             return tuple(sorted(out, key=lambda s: (-s.amount, s.name)))
 
         return list(level(tree))
+
+    def category_breakdown(self, month: str) -> Breakdown:
+        start, end = _month_bounds(month)
+        spends = self.spending_by_category(month)
+        refunds = fees = unmatched = Decimal(0)
+        for t in self.transactions():
+            c = t.categorisation
+            if c is None or not start <= t.posted_on < end:
+                continue
+            if c.kind == "Fee":
+                fees -= t.amount
+            elif c.kind == "Refund":
+                refunds += t.amount
+                if c.category and c.category[0] == _UNCATEGORISED:
+                    unmatched -= t.amount
+        cats: list[Spend] = []
+        for sp in spends:
+            if sp.name == _UNCATEGORISED:
+                sp = replace(sp, amount=sp.amount - unmatched)
+                if sp.amount == 0:
+                    continue
+            cats.append(sp)
+        total = sum((sp.amount for sp in spends), Decimal(0))
+        return Breakdown(tuple(cats), unmatched, total, refunds, fees)
 
     def merchants(self) -> list[Merchant]:
         """Every Merchant of this user with its default Category, by name."""
@@ -587,6 +626,12 @@ class Ledger:
         t = schema.transaction
         newest = self._db.execute(self._db.select(t, func.max(t.c.posted_on))).scalar()
         return None if newest is None else f"{newest:%Y-%m}"
+
+    def months(self) -> list[str]:
+        """Months (YYYY-MM) that have Transactions, newest first."""
+        t = schema.transaction
+        days = self._db.execute(self._db.select(t, t.c.posted_on).distinct()).scalars()
+        return sorted({f"{d:%Y-%m}" for d in days}, reverse=True)
 
     def accounts(self) -> list[AccountBalance]:
         """Accounts with Bank and Ledger balances; an empty Account is skipped."""
