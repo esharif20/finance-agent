@@ -19,6 +19,12 @@
   --warning-fg: #8a4b00;
   --spent: #3b4045;
   --ring: #0b66c3;
+  --glow-a: rgb(11 102 195 / 0.17);
+  --glow-b: rgb(16 160 140 / 0.13);
+  --glass-bg: rgb(255 255 255 / 0.58);
+  --glass-edge: rgb(255 255 255 / 0.75);
+  --glass-shadow: 0 8px 24px rgb(27 29 31 / 0.08);
+  --grain: 0.035;
   --radius: 20px;
   color-scheme: light;
 }
@@ -41,6 +47,12 @@
     --warning-fg: #f5c27a;
     --spent: #c9cdd2;
     --ring: #7da2f7;
+    --glow-a: rgb(30 120 225 / 0.34);
+    --glow-b: rgb(20 170 150 / 0.22);
+    --glass-bg: rgb(40 44 48 / 0.5);
+    --glass-edge: rgb(255 255 255 / 0.16);
+    --glass-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+    --grain: 0.05;
     color-scheme: dark;
   }
 }
@@ -77,17 +89,65 @@
     -webkit-font-smoothing: antialiased;
     min-height: 100dvh;
   }
+  body {
+    position: relative;
+    isolation: isolate;
+  }
+  /* Static depth: a soft glow behind the header and hero card (blue and teal, outside the violet band). */
+  body::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: min(760px, 100%);
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 55% 60% at 22% 0%, var(--glow-a), transparent 70%),
+      radial-gradient(ellipse 40% 50% at 88% 6%, var(--glow-b), transparent 70%);
+  }
+  /* Film grain over everything, 3-5%. Never intercepts input. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    opacity: var(--grain);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1.4 -0.2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 }
 
+/* Glass: chrome only (header, pills, tab bar). Figures, charts and lists stay on solid cards. */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Privacy mode (H): blur every amount; text can't be selected or copied out. */
+html[data-private] .money {
+  filter: blur(8px);
+  user-select: none;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 1ms !important;
     transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
 }
