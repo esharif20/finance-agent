@@ -50,6 +50,8 @@ export async function postCorrection(body: {
 }
 export const fetchSpending = (month: string) => get<Spending>(`/api/spending?month=${month}`);
 export const fetchMonths = () => get<string[]>("/api/months");
+export type MonthTotals = components["schemas"]["MonthTotalsOut"];
+export const fetchMonthSeries = () => get<MonthTotals[]>("/api/month-series?limit=12");
 
 export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
 export const fetchCategory = (name: string, month: string) =>
