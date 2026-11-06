@@ -6,12 +6,18 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 
 from finance_agent.ingest import lloyds
 from finance_agent.ledger import Ledger
-from synthetic_lloyds import MAX_ROWS, History, generate_histories, render_export
+from synthetic_lloyds import (
+    MAX_ROWS,
+    History,
+    generate_histories,
+    overlapping_windows,
+    render_export,
+)
 from test_dedupe import temp_ledger, windowed
 
 LedgerFor = Callable[[int], Ledger]
@@ -28,8 +34,12 @@ def export_rows(ledger: Ledger, d: Path, h: History, start: int, end: int) -> No
     ledger.import_files(paths)
 
 
+_SPLIT_TWINS = generate_histories(29, 150)[0]  # #34: twins split across windows
+
+
 @settings(max_examples=25, deadline=None)
 @given(windowed())
+@example((_SPLIT_TWINS, overlapping_windows(len(_SPLIT_TWINS.txns), 40, 39)))
 def test_a_complete_history_has_no_gaps_and_sums_equal_the_balance_change(
     case: tuple[History, list[tuple[int, int]]],
 ) -> None:
@@ -316,3 +326,33 @@ def test_a_newest_first_export_reconciles_in_bank_order(
         ledger.import_files([newest_first(s, s + 12)])
 
     assert ledger.gaps() == []
+
+
+def test_accounts_report_bank_and_ledger_balances_that_differ_by_the_gaps(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=30)
+    ledger = ledger_for(1)
+    ledger.import_files(
+        [write_export(render_export(h, 0, 40, gap_at=20, gap_minor=1234).text)]
+    )
+
+    [acct] = ledger.accounts()
+
+    assert acct.masked_number.endswith(h.account_number[-4:])
+    assert acct.bank_balance == Decimal(h.txns[39].balance_minor + 1234) / 100
+    assert acct.bank_balance - acct.ledger_balance == Decimal("12.34")
+    assert [g.amount for g in acct.gaps] == [Decimal("12.34")]
+
+
+def test_a_complete_account_has_equal_balances_and_no_gaps(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=30)
+    ledger = ledger_for(1)
+    ledger.import_files([write_export(render_export(h, 0, 40).text)])
+
+    [acct] = ledger.accounts()
+
+    assert acct.bank_balance == acct.ledger_balance
+    assert acct.gaps == []
