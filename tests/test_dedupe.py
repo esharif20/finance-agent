@@ -169,17 +169,17 @@ def test_fa_import_takes_several_files_in_one_command(
 def test_twins_with_the_same_balance_survive_any_import_order(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    # seed 21 rows 113-115: SPOTIFY -10.99, REFUND +10.99, SPOTIFY -10.99 on one
+    # seed 31 rows 69-71: SPOTIFY -10.99, REFUND +10.99, SPOTIFY -10.99 on one
     # day, so both purchases share date, description, amount and balance
-    h, _ = generate_histories(seed=21, days=60)
-    assert key(h.txns[113]) == key(h.txns[115])
-    only_second = write_export(render_export(h, 114, 130).text)
-    both = write_export(render_export(h, 100, 120).text)
+    h, _ = generate_histories(seed=31, days=60)
+    assert key(h.txns[69]) == key(h.txns[71])
+    only_second = write_export(render_export(h, 70, 86).text)
+    both = write_export(render_export(h, 56, 76).text)
     ledger = ledger_for(1)
 
     ledger.import_files([only_second, both])
 
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])
 
 
 # --- Verifier: multiset semantics over arbitrary (overlapping) imports ---------
@@ -292,11 +292,11 @@ def test_same_rows_under_another_name_and_bytes_do_not_duplicate(
 def test_twins_split_across_files_by_a_one_row_overlap(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 are twins, 114 refund
-    first = write_export(render_export(h, 100, 115).text)
-    second = write_export(render_export(h, 114, 130).text)
+    h, _ = generate_histories(seed=31, days=60)  # rows 69/71 are twins, 70 refund
+    first = write_export(render_export(h, 56, 71).text)
+    second = write_export(render_export(h, 70, 86).text)
     ledger = ledger_for(1)
 
     ledger.import_files([first, second])
 
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])

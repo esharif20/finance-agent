@@ -1,0 +1,93 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope";
+
+/* Pocket tokens (docs/design/DIRECTIONS.md). Light first; true black in dark. */
+:root {
+  --background: #f3f5f7;
+  --card: #ffffff;
+  --raised: #f2f6fb;
+  --active: #e7eaee;
+  --border: #e4e7ea;
+  --control: #d6d9dd;
+  --foreground: #1b1d1f;
+  --muted-foreground: #5c6064;
+  --accent: #0b66c3;
+  --primary: #1b1d1f;
+  --primary-foreground: #ffffff;
+  --positive: #2f7a45;
+  --warning-bg: #fff4e0;
+  --warning-fg: #8a4b00;
+  --spent: #3b4045;
+  --ring: #0b66c3;
+  --radius: 20px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #000000;
+    --card: #111111;
+    --raised: #1c1c1c;
+    --active: #23262a;
+    --border: #1f2225;
+    --control: #3a3e43;
+    --foreground: #f4f5f6;
+    --muted-foreground: #a9aeb4;
+    --accent: #7da2f7;
+    --primary: #f4f5f6;
+    --primary-foreground: #111214;
+    --positive: #5ccf86;
+    --warning-bg: #3a2a12;
+    --warning-fg: #f5c27a;
+    --spent: #c9cdd2;
+    --ring: #7da2f7;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-active: var(--active);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-positive: var(--positive);
+  --color-warning: var(--warning-bg);
+  --color-warning-foreground: var(--warning-fg);
+  --color-spent: var(--spent);
+  --color-ring: var(--ring);
+  --radius-card: var(--radius);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

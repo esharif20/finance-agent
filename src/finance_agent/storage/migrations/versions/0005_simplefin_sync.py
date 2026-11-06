@@ -1,15 +1,15 @@
 """simplefin sync: synced_key, sync_anchor, sync_gap, possible_duplicate;
 nullable running balance
 
-Revision ID: 0003
-Revises: 0002
+Revision ID: 0005
+Revises: 0004
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0003"
-down_revision = "0002"
+revision = "0005"
+down_revision = "0004"
 branch_labels = None
 depends_on = None
 

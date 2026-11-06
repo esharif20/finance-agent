@@ -52,3 +52,23 @@ def test_refuses_a_database_inside_the_repo(
     monkeypatch.setenv("FA_DB_PATH", str(Path(__file__).parent / "ledger.db"))
     assert main(["summary", "2026-01"]) == 1
     assert "inside a repository" in capsys.readouterr().err
+
+
+def test_fa_summary_warns_when_a_gap_touches_the_month(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FA_DB_PATH", str(tmp_path / "ledger.db"))
+    h, _ = generate_histories(seed=3, days=60)
+    early, late = tmp_path / "early.csv", tmp_path / "late.csv"
+    early.write_text(render_export(h, 0, 20).text)
+    late.write_text(render_export(h, 30, len(h.txns)).text)  # rows 20-29 missing
+    main(["import", str(early), str(late)])
+    capsys.readouterr()
+
+    assert main(["summary", h.txns[25].date.strftime("%Y-%m")]) == 0
+    out = capsys.readouterr().out
+    assert "Reconciliation Gap" in out
+    assert "••••0001" in out
+
+    assert main(["summary", "2025-12"]) == 0
+    assert "Reconciliation Gap" not in capsys.readouterr().out

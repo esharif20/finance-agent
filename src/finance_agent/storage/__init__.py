@@ -142,7 +142,7 @@ class Scoped:
         return update(table).where(table.c.user_id == self.user_id)
 
     def delete(self, table: Table) -> Delete:
-        """A user-scoped DELETE; add `.where(...)` to narrow it."""
+        """A DELETE of this user's rows only; narrow it further with .where()."""
         return delete(table).where(table.c.user_id == self.user_id)
 
     def execute(self, stmt: Executable) -> CursorResult[Any]:

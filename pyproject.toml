@@ -4,16 +4,25 @@ version = "0.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.1",
+    "fastapi>=0.162.0",
     "keyring>=25.7.0",
     "sqlalchemy>=2.1.8",
     "sqlcipher3-wheels>=0.5.7",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
 fa = "finance_agent.cli:main"
 
 [dependency-groups]
-dev = ["pytest", "hypothesis", "ruff", "pyright", "import-linter"]
+dev = [
+    "pytest",
+    "hypothesis",
+    "ruff",
+    "pyright",
+    "import-linter",
+    "httpx2>=2.16.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -46,13 +55,15 @@ root_package = "finance_agent"
 
 # ledger calls ingest's parsers; ingest (untrusted input) touches neither the
 # database nor the Ledger, so full account numbers cannot leak past it.
+# categorise reads through the Ledger and writes only its derived tables.
 [[tool.importlinter.contracts]]
-name = "cli -> ledger -> ingest | storage"
+name = "cli | api -> categorise -> ledger -> ingest | storage"
 type = "layers"
 layers = [
-    "finance_agent.cli",
+    "finance_agent.cli | finance_agent.api",
+    "finance_agent.categorise",
     "finance_agent.ledger",
-    "finance_agent.ingest | finance_agent.storage",
+    "finance_agent.ingest | finance_agent.storage | finance_agent.identity",
 ]
 
 [[tool.importlinter.contracts]]
@@ -60,6 +71,7 @@ name = "nothing imports cli or api"
 type = "forbidden"
 source_modules = [
     "finance_agent.storage",
+    "finance_agent.identity",
     "finance_agent.ingest",
     "finance_agent.ledger",
     "finance_agent.categorise",
