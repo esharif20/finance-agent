@@ -245,6 +245,36 @@
   }
 }
 
+/* Month bars: one series in its polarity hue (money in green, money out ink). The chosen
+   month is full strength, the others a pale step of the same hue. A month the Ledger has
+   not reached the end of is hatched: it reads as "so far", not as a drop. */
+.month-bar {
+  --bar: var(--spent);
+  background: color-mix(in oklab, var(--bar) 30%, var(--card));
+  transition: background-color 160ms ease;
+}
+.month-bar.is-in {
+  --bar: var(--positive);
+}
+.group:hover .month-bar:not([data-selected]) {
+  background: color-mix(in oklab, var(--bar) 48%, var(--card));
+}
+.month-bar[data-selected] {
+  background: var(--bar);
+}
+.month-bar[data-partial] {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--bar) 30%, var(--card)) 0 3px,
+    transparent 3px 6px
+  );
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--bar) 45%, var(--card));
+}
+.month-bar[data-partial][data-selected] {
+  background: repeating-linear-gradient(135deg, var(--bar) 0 3px, color-mix(in oklab, var(--bar) 35%, var(--card)) 3px 6px);
+  box-shadow: none;
+}
+
 /* Privacy mode (H): blur every amount; text can't be selected or copied out. */
 html[data-private] .money {
   filter: blur(8px);

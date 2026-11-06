@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/categories/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Category */
+        get: operations["category_api_categories__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/corrections": {
         parameters: {
             query?: never;
@@ -64,6 +81,26 @@ export interface paths {
         };
         /** Health */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/month-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Month Series
+         * @description Newest `limit` months, oldest first; each is `summarise_month`.
+         */
+        get: operations["month_series_api_month_series_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -161,6 +198,24 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CategoryDetailOut */
+        CategoryDetailOut: {
+            /** Currency */
+            currency: string;
+            /** Merchants */
+            merchants: components["schemas"]["CategorySpendOut"][];
+            /** Month */
+            month: string;
+            /** Name */
+            name: string;
+            /** Subcategories */
+            subcategories: components["schemas"]["CategorySpendOut"][];
+            total: components["schemas"]["Money"];
+            /** Transactions */
+            transactions: components["schemas"]["CategoryTxnOut"][];
+            /** Trend */
+            trend: components["schemas"]["TrendPointOut"][];
+        };
         /** CategoryOut */
         CategoryOut: {
             /** Name */
@@ -173,6 +228,20 @@ export interface components {
             amount: components["schemas"]["Money"];
             /** Name */
             name: string;
+        };
+        /** CategoryTxnOut */
+        CategoryTxnOut: {
+            amount: components["schemas"]["Money"];
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Merchant */
+            merchant: string | null;
+            /** Posted On */
+            posted_on: string;
+            /** Subcategory */
+            subcategory: string | null;
         };
         /** CorrectionIn */
         CorrectionIn: {
@@ -214,6 +283,15 @@ export interface components {
             currency: string;
             /** Minor */
             minor: number;
+        };
+        /** MonthTotalsOut */
+        MonthTotalsOut: {
+            /** Currency */
+            currency: string;
+            money_in: components["schemas"]["Money"];
+            money_out: components["schemas"]["Money"];
+            /** Month */
+            month: string;
         };
         /** SpendingOut */
         SpendingOut: {
@@ -269,6 +347,12 @@ export interface components {
             items: components["schemas"]["TransactionOut"][];
             /** Total */
             total: number;
+        };
+        /** TrendPointOut */
+        TrendPointOut: {
+            amount: components["schemas"]["Money"];
+            /** Month */
+            month: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -332,6 +416,39 @@ export interface operations {
             };
         };
     };
+    category_api_categories__name__get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     correct_api_corrections_post: {
         parameters: {
             query?: never;
@@ -381,6 +498,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    month_series_api_month_series_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthTotalsOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

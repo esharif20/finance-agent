@@ -3,6 +3,7 @@ import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { groupSpending } from "@/lib/categories";
+import { categoryHref } from "@/lib/route";
 import "./categories.css";
 
 type Spending = components["schemas"]["SpendingOut"];
@@ -65,6 +66,11 @@ export function SpendingDonut({ spending }: { spending: Spending }) {
                     fill="none"
                     stroke={s.colour}
                     strokeWidth={STROKE}
+                    // pointer shortcut; keyboard and screen readers use the legend links
+                    style={s.key === "other" ? undefined : { cursor: "pointer" }}
+                    onClick={() => {
+                      if (s.key !== "other") window.location.hash = categoryHref(s.name, spending.month);
+                    }}
                     initial={reduce ? false : { strokeDasharray: `0 ${C}`, strokeDashoffset: -a.start }}
                     animate={{ strokeDasharray: dash, strokeDashoffset: -a.start }}
                     transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
@@ -97,7 +103,12 @@ export function SpendingDonut({ spending }: { spending: Spending }) {
                         className="size-3 shrink-0 rounded-full"
                         style={{ background: r.colour }}
                       />
-                      <span className="truncate">{r.name}</span>
+                      <a
+                        href={categoryHref(r.name, spending.month)}
+                        className="truncate rounded-md underline-offset-4 hover:underline"
+                      >
+                        {r.name}
+                      </a>
                     </span>
                   </th>
                   <td className="pl-3 text-right">

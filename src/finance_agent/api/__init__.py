@@ -19,9 +19,11 @@ from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     AccountBalance,
     Breakdown,
+    CategoryDetail,
     Gap,
     Ledger,
     MonthSummary,
+    Spend,
     Transaction,
     UnknownTarget,
 )
@@ -111,6 +113,38 @@ class SpendingOut(BaseModel):
     refunds: Money  # all Refunds received
     fees: Money
     money_out: Money  # == total + refunds + fees
+
+
+class MonthTotalsOut(BaseModel):
+    month: str
+    currency: str
+    money_in: Money
+    money_out: Money
+
+
+class TrendPointOut(BaseModel):
+    month: str
+    amount: Money
+
+
+class CategoryTxnOut(BaseModel):
+    id: int
+    posted_on: str
+    description: str
+    amount: Money  # signed as the Bank has it: spending negative
+    merchant: str | None
+    subcategory: str | None
+
+
+class CategoryDetailOut(BaseModel):
+    name: str
+    month: str
+    currency: str
+    total: Money  # spending after refunds, as on the donut
+    subcategories: list[CategorySpendOut]
+    merchants: list[CategorySpendOut]  # top 5 across Subcategories
+    trend: list[TrendPointOut]  # trailing 6 months, oldest first
+    transactions: list[CategoryTxnOut]  # newest first
 
 
 class HealthOut(BaseModel):
@@ -212,6 +246,36 @@ def _spending(month: str, b: Breakdown, money_out: Decimal) -> SpendingOut:
     )
 
 
+def _txn(t: Transaction) -> CategoryTxnOut:
+    c = t.categorisation
+    return CategoryTxnOut(
+        id=t.id,
+        posted_on=t.posted_on.isoformat(),
+        description=t.description,
+        amount=_money(t.amount, "GBP"),
+        merchant=c.merchant if c else None,
+        subcategory=c.category[1] if c and c.category else None,
+    )
+
+
+def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
+    c = "GBP"
+
+    def spends(xs: tuple[Spend, ...]) -> list[CategorySpendOut]:
+        return [CategorySpendOut(name=x.name, amount=_money(x.amount, c)) for x in xs]
+
+    return CategoryDetailOut(
+        name=d.name,
+        month=month,
+        currency=c,
+        total=_money(d.total, c),
+        subcategories=spends(d.subcategories),
+        merchants=spends(d.merchants),
+        trend=[TrendPointOut(month=m, amount=_money(a, c)) for m, a in d.trend],
+        transactions=[_txn(t) for t in d.transactions],
+    )
+
+
 def _ledger(request: Request) -> Iterator[Ledger]:
     engine: Engine = request.app.state.engine
     with engine.begin() as conn:
@@ -258,9 +322,44 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
 
+    @app.get("/api/categories/{name}")
+    def category(
+        led: Led,
+        name: str,
+        month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    ) -> CategoryDetailOut:
+        month = month or led.latest_month()
+        if month is None:
+            raise HTTPException(404, "No transactions yet. Run `fa import` first.")
+        try:
+            detail = led.category_detail(name, month)
+        except ValueError:
+            raise HTTPException(422, "month must be a real YYYY-MM") from None
+        if detail is None:
+            raise HTTPException(404, "No spending in that Category this month.")
+        return _category(month, detail)
+
     @app.get("/api/months")
     def months(led: Led) -> list[str]:
         return led.months()
+
+    @app.get("/api/month-series")
+    def month_series(
+        led: Led, limit: Annotated[int, Query(ge=1, le=60)] = 12
+    ) -> list[MonthTotalsOut]:
+        """Newest `limit` months, oldest first; each is `summarise_month`."""
+        out: list[MonthTotalsOut] = []
+        for m in reversed(led.months()[:limit]):
+            s = led.summarise_month(m)
+            out.append(
+                MonthTotalsOut(
+                    month=m,
+                    currency=s.currency,
+                    money_in=_money(s.money_in, s.currency),
+                    money_out=_money(s.money_out, s.currency),
+                )
+            )
+        return out
 
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:

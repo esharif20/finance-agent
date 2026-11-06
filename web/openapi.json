@@ -50,6 +50,65 @@
         "title": "AccountOut",
         "type": "object"
       },
+      "CategoryDetailOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "merchants": {
+            "items": {
+              "$ref": "#/components/schemas/CategorySpendOut"
+            },
+            "title": "Merchants",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "subcategories": {
+            "items": {
+              "$ref": "#/components/schemas/CategorySpendOut"
+            },
+            "title": "Subcategories",
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTxnOut"
+            },
+            "title": "Transactions",
+            "type": "array"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/TrendPointOut"
+            },
+            "title": "Trend",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "month",
+          "currency",
+          "total",
+          "subcategories",
+          "merchants",
+          "trend",
+          "transactions"
+        ],
+        "title": "CategoryDetailOut",
+        "type": "object"
+      },
       "CategoryOut": {
         "properties": {
           "name": {
@@ -86,6 +145,57 @@
           "amount"
         ],
         "title": "CategorySpendOut",
+        "type": "object"
+      },
+      "CategoryTxnOut": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "posted_on": {
+            "title": "Posted On",
+            "type": "string"
+          },
+          "subcategory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subcategory"
+          }
+        },
+        "required": [
+          "id",
+          "posted_on",
+          "description",
+          "amount",
+          "merchant",
+          "subcategory"
+        ],
+        "title": "CategoryTxnOut",
         "type": "object"
       },
       "CorrectionIn": {
@@ -210,6 +320,32 @@
           "currency"
         ],
         "title": "Money",
+        "type": "object"
+      },
+      "MonthTotalsOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "money_in": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "money_out": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "currency",
+          "money_in",
+          "money_out"
+        ],
+        "title": "MonthTotalsOut",
         "type": "object"
       },
       "SpendingOut": {
@@ -412,6 +548,23 @@
         "title": "TransactionsOut",
         "type": "object"
       },
+      "TrendPointOut": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "amount"
+        ],
+        "title": "TrendPointOut",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -504,6 +657,62 @@
         "summary": "Categories"
       }
     },
+    "/api/categories/{name}": {
+      "get": {
+        "operationId": "category_api_categories__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Category"
+      }
+    },
     "/api/corrections": {
       "post": {
         "operationId": "correct_api_corrections_post",
@@ -558,6 +767,53 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/month-series": {
+      "get": {
+        "description": "Newest `limit` months, oldest first; each is `summarise_month`.",
+        "operationId": "month_series_api_month_series_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MonthTotalsOut"
+                  },
+                  "title": "Response Month Series Api Month Series Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Month Series"
       }
     },
     "/api/months": {

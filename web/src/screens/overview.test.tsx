@@ -229,6 +229,10 @@ describe("Overview", () => {
     summary: { ...summary, month: "2026-01", money_in: m(50000), money_out: m(30000), net: m(20000) },
     spending: { ...spending, month: "2026-01", total: m(30000), categories: [cat("Rent", 30000)] },
   };
+  const series = [
+    { month: "2026-01", currency: "GBP", money_in: m(50000), money_out: m(30000) },
+    { month: "2026-02", currency: "GBP", money_in: m(341250), money_out: m(247560) },
+  ];
   const stubApi = () =>
     vi.stubGlobal(
       "fetch",
@@ -236,6 +240,7 @@ describe("Overview", () => {
         const jan = url.includes("month=2026-01");
         if (url.startsWith("/api/summary")) return Response.json(jan ? january.summary : summary);
         if (url.startsWith("/api/spending")) return Response.json(jan ? january.spending : spending);
+        if (url.startsWith("/api/month-series")) return Response.json(series);
         if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
         return Response.json([account()]);
       }),
@@ -269,12 +274,87 @@ describe("Overview", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Previous month" }));
 
-    expect(await screen.findByText("£500.00")).toBeInTheDocument(); // January's Money in
+    expect((await screen.findAllByText("£500.00")).length).toBeGreaterThan(0); // January's Money in
     expect(screen.getByLabelText("Net")).toHaveTextContent("+£200.00");
     expect(screen.getByLabelText("Money out")).toHaveTextContent("£300.00");
     expect(await screen.findByText("Rent")).toBeInTheDocument(); // January's only Category
     expect(screen.queryByText("Housing")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous month" })).toBeDisabled();
+  });
+
+  it("picks a month from the comparison bars, by keyboard, and toggles in/out", async () => {
+    stubApi();
+    renderOverview();
+    await screen.findByLabelText("Net");
+    const jan = await screen.findByRole("button", { name: /January 2026.*£300\.00/ });
+    expect(jan).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /February 2026/ })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Money in" }));
+    expect(await screen.findByRole("button", { name: /January 2026.*£500\.00/ })).toBeInTheDocument();
+
+    screen.getByRole("button", { name: /January 2026/ }).focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(await screen.findByText("Rent")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /January 2026/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("table", { name: /by month/i })).toBeInTheDocument();
+  });
+
+  it("marks the newest month as so far when the Ledger stops before its end", async () => {
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.startsWith("/api/transactions"))
+        return Response.json({ items: [{ id: 1, posted_on: "2026-02-14" }], total: 1 });
+      if (url.startsWith("/api/summary")) return Response.json(summary);
+      if (url.startsWith("/api/spending")) return Response.json(spending);
+      if (url.startsWith("/api/month-series")) return Response.json(series);
+      if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+      return Response.json([account()]);
+    });
+    vi.stubGlobal("fetch", fetcher);
+    renderOverview();
+    const feb = await screen.findByRole("button", { name: /February 2026 so far, to 14 Feb/ });
+    expect(feb.querySelector("[data-partial]")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /January 2026/ }).querySelector("[data-partial]")).toBeNull();
+    expect(screen.getByText(/Feb so far, to 14 Feb/)).toBeInTheDocument();
+  });
+
+  it("does not mark a month that the Ledger covers to its last day", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.startsWith("/api/transactions"))
+          return Response.json({ items: [{ id: 1, posted_on: "2026-02-28" }], total: 1 });
+        if (url.startsWith("/api/summary")) return Response.json(summary);
+        if (url.startsWith("/api/spending")) return Response.json(spending);
+        if (url.startsWith("/api/month-series")) return Response.json(series);
+        if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+        return Response.json([account()]);
+      }),
+    );
+    renderOverview();
+    await screen.findByRole("button", { name: /January 2026/ });
+    await screen.findByLabelText("Net");
+    expect(screen.queryByText(/so far/)).not.toBeInTheDocument();
+  });
+
+  it("keeps amounts out of the bar labels in privacy mode", async () => {
+    stubApi();
+    localStorage.setItem("fa-private", "1");
+    try {
+      render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <PrivacyProvider>
+            <Overview />
+          </PrivacyProvider>
+        </QueryClientProvider>,
+      );
+      const jan = await screen.findByRole("button", { name: /January 2026/ });
+      expect(jan.getAttribute("aria-label")).toMatch(/amount hidden/);
+      expect(jan.getAttribute("aria-label")).not.toMatch(/£/);
+    } finally {
+      localStorage.removeItem("fa-private");
+    }
   });
 
   it("invites an import when the Ledger is empty", async () => {
