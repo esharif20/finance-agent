@@ -14,7 +14,7 @@ from pathlib import Path
 from sqlalchemy import Connection, case, func, select
 
 from finance_agent import ingest
-from finance_agent.storage import Scoped, schema
+from finance_agent.storage import Scoped, keyed_ref, schema
 
 
 @dataclass(frozen=True)
@@ -248,15 +248,16 @@ class Ledger:
 
     def _account_id(self, bank_id: int, row: ingest.ParsedRow) -> int:
         a = schema.account
+        ref = keyed_ref(row.account_ref)
         found = self._db.execute(
-            self._db.select(a, a.c.id).where(a.c.external_ref == row.account_ref)
+            self._db.select(a, a.c.id).where(a.c.external_ref == ref)
         ).scalar()
         if found is not None:
             return int(found)
         new = self._db.insert(
             a,
             bank_id=bank_id,
-            external_ref=row.account_ref,
+            external_ref=ref,
             name=f"Account {row.masked_number}",
             kind="current",
             masked_number=row.masked_number,
