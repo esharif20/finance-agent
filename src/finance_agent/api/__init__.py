@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine
 
-from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent import categorise
+from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     AccountBalance,
     Gap,
@@ -250,11 +250,14 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         try:
             if body.transaction_id is not None:
                 k = led.correct_transaction(body.transaction_id, cat)
-            else:
-                assert body.merchant_id is not None
+            elif body.merchant_id is not None:
                 k = led.correct_merchant(body.merchant_id, cat)
+            else:  # unreachable: checked above
+                raise HTTPException(422, "no target")
         except UnknownTarget:
-            raise HTTPException(404, "no such Transaction, Merchant or Category") from None
+            raise HTTPException(
+                404, "no such Transaction, Merchant or Category"
+            ) from None
         return CorrectionOut(id=k.id, ledger_version=led.ledger_version())
 
     dist = web_dir or WEB_DIST

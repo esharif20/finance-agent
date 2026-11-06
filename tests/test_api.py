@@ -197,9 +197,7 @@ def test_correction_round_trip_changes_category_and_totals(
 def test_correction_for_a_merchant_covers_all_its_transactions(
     client: TestClient, categorised: str
 ) -> None:
-    spending = [
-        t for t in _all(client) if t["kind"] == "Spending" and t["merchant_id"]
-    ]
+    spending = [t for t in _all(client) if t["kind"] == "Spending" and t["merchant_id"]]
     mid = next(
         t["merchant_id"]
         for t in spending
