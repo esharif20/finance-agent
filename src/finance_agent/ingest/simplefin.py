@@ -33,6 +33,8 @@ HOST = "www.lunchflow.app"  # the one allowlisted aggregator host (ADR 0013)
 WINDOW_DAYS = 730
 FIRST_SYNC_DAYS = 730
 OVERLAP_DAYS = 7  # re-fetch so late-posting rows are caught
+CONSENT_DAYS = 90  # GoCardless bank consent; the bank re-asks after this
+CONSENT_WARN_DAYS = 14  # warn this far ahead of expiry
 MAX_REQUESTS = 5  # per run; firefly-iii#12538 hit the bridge's daily quota
 # Spike: balance == available-balance even with a pending row, and balance-date is
 # the fetch time, so the feed cannot say whether balance includes pending rows.

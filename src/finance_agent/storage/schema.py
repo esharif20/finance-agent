@@ -227,6 +227,21 @@ sync_gap = Table(
     Column("amount_minor", BigInteger, nullable=False),
 )
 
+# #28 one row per user: freshness, the last failure (class and count only) and
+# the bank consent renewal date. `notified` is the last alert already shown, so a
+# repeating state is not announced on every scheduled run.
+sync_status = Table(
+    "sync_status",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("last_success_ts", BigInteger),
+    Column("last_failure_ts", BigInteger),
+    Column("failure_class", String(64)),
+    Column("failures_in_a_row", Integer, nullable=False, server_default="0"),
+    Column("consent_renewed_on", Date),
+    Column("notified", String(64)),
+)
+
 # ADR 0014 Possible Duplicates from the provider: (a) one purchase under several
 # IDs in one response, (b) a re-issued ID. Kept and surfaced, never merged.
 possible_duplicate = Table(

@@ -10,7 +10,7 @@ from pathlib import Path
 from finance_agent import categorise
 from finance_agent.cli import launcher
 from finance_agent.identity import current_user
-from finance_agent.ledger import Ledger
+from finance_agent.ledger import Ledger, SyncStatus
 from finance_agent.storage import open_db
 
 LOCAL_USER = current_user()
@@ -18,6 +18,27 @@ LOCAL_USER = current_user()
 
 def gbp(amount: Decimal) -> str:
     return f"{'-' if amount < 0 else ''}£{abs(amount):,.2f}"
+
+
+def _print_status(st: SyncStatus) -> None:
+    if st.last_sync_at:
+        print(f"Last sync  {st.last_sync_at:%Y-%m-%d %H:%M} UTC")
+    if st.failure_class and st.last_failure_at:
+        print(
+            f"Warning: last sync failed at {st.last_failure_at:%Y-%m-%d %H:%M} UTC "
+            f"({st.failure_class}, {st.failures_in_a_row} in a row); "
+            "these figures may be stale"
+        )
+    if st.consent_expires_on and st.consent_days_left is not None:
+        left = st.consent_days_left
+        if left < 0:
+            print(
+                f"Warning: bank consent expired {-left} days ago "
+                f"({st.consent_expires_on})"
+            )
+        else:
+            warn = "Warning: bank" if st.consent_warning else "Bank"
+            print(f"{warn} consent expires {st.consent_expires_on} (in {left} days)")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -35,9 +56,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     wsub.add_parser("remove", help="remove the launchd agent")
     wr = wsub.add_parser("run", help="import the folder now (launchd calls this)")
     wr.add_argument("folder", type=Path)
-    sub.add_parser("connect", help="connect a SimpleFIN aggregator (setup token)")
+    con = sub.add_parser("connect", help="connect a SimpleFIN aggregator (setup token)")
+    con.add_argument(
+        "--renewed",
+        action="store_true",
+        help="record that the bank consent was renewed",
+    )
     sub.add_parser("disconnect", help="remove the SimpleFIN access URL")
-    sub.add_parser("sync", help="fetch new Transactions from SimpleFIN")
+    sy = sub.add_parser("sync", help="fetch new Transactions from SimpleFIN")
+    mode = sy.add_mutually_exclusive_group()
+    mode.add_argument("--install", action="store_true", help="run daily (launchd)")
+    mode.add_argument("--uninstall", action="store_true", help="stop the daily run")
+    mode.add_argument("--notify", action="store_true", help="alert on trouble")
     args = parser.parse_args(argv)
 
     if args.command in ("connect", "disconnect", "sync"):
@@ -47,9 +77,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             if args.command == "disconnect":
                 return bank.disconnect()
-            return (bank.connect if args.command == "connect" else bank.sync)(
-                LOCAL_USER
-            )
+            if args.command == "connect":
+                return bank.connect(LOCAL_USER, args.renewed)
+            if args.install or args.uninstall:
+                from finance_agent.cli import schedule
+
+                if args.install:
+                    print(f"Installed {schedule.install()}")
+                else:
+                    schedule.remove()
+                    print("Removed")
+                return 0
+            from finance_agent.cli import watch
+
+            return bank.sync(LOCAL_USER, watch.osascript if args.notify else None)
         except (OSError, ValueError, SimpleFINError) as e:
             print(f"fa: {e}", file=sys.stderr)  # messages never carry the URL
             return 1
@@ -114,6 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"Money in   {gbp(s.money_in)}")
                 print(f"Money out  {gbp(s.money_out)}")
                 print(f"Net        {gbp(s.net)}")
+                _print_status(ledger.sync_status())
                 for g in s.gaps:
                     print(
                         f"Warning: Reconciliation Gap on {g.account.masked_number} "
