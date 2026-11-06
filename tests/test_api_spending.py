@@ -122,7 +122,7 @@ def test_figures_equal_fa_summary_and_reconcile_with_the_breakdown(
 
     assert spending["total"]["minor"] == -minor("Spending") - minor("Refund")
     assert summary["money_out"]["minor"] == -minor("Spending") - minor("Fee")
-    # the parts the Overview prints add up to Money out exactly, as `fa summary` shows it
+    # the parts the Overview prints add up to the Money out `fa summary` shows
     parts = spending["total"], spending["refunds"], spending["fees"]
     assert sum(p["minor"] for p in parts) == cli_minor("Money out")
     assert spending["money_out"]["minor"] == cli_minor("Money out")
