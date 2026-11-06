@@ -6,6 +6,8 @@ export type Txn = components["schemas"]["TransactionOut"];
 export type TxnPage = components["schemas"]["TransactionsOut"];
 export type CategoryGroup = components["schemas"]["CategoryOut"];
 
+export type Spending = components["schemas"]["SpendingOut"];
+
 export class NoData extends Error {}
 
 async function get<T>(url: string): Promise<T> {
@@ -46,3 +48,5 @@ export async function postCorrection(body: {
   });
   if (!res.ok) throw new Error(`correction: ${res.status}`);
 }
+export const fetchSpending = (month: string) => get<Spending>(`/api/spending?month=${month}`);
+export const fetchMonths = () => get<string[]>("/api/months");

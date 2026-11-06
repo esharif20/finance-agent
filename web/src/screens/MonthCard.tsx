@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Slice } from "@/lib/categories";
 import { PoundStrip } from "./PoundStrip";
 
 type Summary = components["schemas"]["SummaryOut"];
@@ -15,7 +16,7 @@ export function monthLabel(month: string): string {
   });
 }
 
-export function MonthCard({ summary }: { summary: Summary }) {
+export function MonthCard({ summary, slices }: { summary: Summary; slices?: Slice[] }) {
   const { money_in, money_out, net, gaps } = summary;
   const overspent = net.minor < 0;
   return (
@@ -49,7 +50,7 @@ export function MonthCard({ summary }: { summary: Summary }) {
         </div>
       </dl>
 
-      <PoundStrip inMinor={money_in.minor} outMinor={money_out.minor} />
+      <PoundStrip inMinor={money_in.minor} outMinor={money_out.minor} slices={slices} />
 
       {gaps.length > 0 && (
         <p

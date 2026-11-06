@@ -72,6 +72,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Months */
+        get: operations["months_api_months_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spending */
+        get: operations["spending_api_spending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/summary": {
         parameters: {
             query?: never;
@@ -134,6 +168,12 @@ export interface components {
             /** Subs */
             subs: string[];
         };
+        /** CategorySpendOut */
+        CategorySpendOut: {
+            amount: components["schemas"]["Money"];
+            /** Name */
+            name: string;
+        };
         /** CorrectionIn */
         CorrectionIn: {
             /** Category */
@@ -174,6 +214,20 @@ export interface components {
             currency: string;
             /** Minor */
             minor: number;
+        };
+        /** SpendingOut */
+        SpendingOut: {
+            /** Categories */
+            categories: components["schemas"]["CategorySpendOut"][];
+            /** Currency */
+            currency: string;
+            fees: components["schemas"]["Money"];
+            money_out: components["schemas"]["Money"];
+            /** Month */
+            month: string;
+            refunds: components["schemas"]["Money"];
+            total: components["schemas"]["Money"];
+            unmatched_refunds: components["schemas"]["Money"];
         };
         /** SummaryOut */
         SummaryOut: {
@@ -327,6 +381,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    months_api_months_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+        };
+    };
+    spending_api_spending_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpendingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -18,6 +18,7 @@ from finance_agent import categorise
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     AccountBalance,
+    Breakdown,
     Gap,
     Ledger,
     MonthSummary,
@@ -94,6 +95,22 @@ class CorrectionIn(BaseModel):
 class CorrectionOut(BaseModel):
     id: int
     ledger_version: int
+
+
+class CategorySpendOut(BaseModel):
+    name: str
+    amount: Money
+
+
+class SpendingOut(BaseModel):
+    month: str
+    currency: str
+    total: Money  # spending after refunds
+    categories: list[CategorySpendOut]  # Uncategorised is gross
+    unmatched_refunds: Money  # <= 0: Refunds with no Category
+    refunds: Money  # all Refunds received
+    fees: Money
+    money_out: Money  # == total + refunds + fees
 
 
 class HealthOut(BaseModel):
@@ -178,6 +195,23 @@ def _matches(
     )
 
 
+def _spending(month: str, b: Breakdown, money_out: Decimal) -> SpendingOut:
+    c = "GBP"
+    return SpendingOut(
+        month=month,
+        currency=c,
+        total=_money(b.spending_after_refunds, c),
+        categories=[
+            CategorySpendOut(name=s.name, amount=_money(s.amount, c))
+            for s in b.categories
+        ],
+        unmatched_refunds=_money(b.unmatched_refunds, c),
+        refunds=_money(b.refunds, c),
+        fees=_money(b.fees, c),
+        money_out=_money(money_out, c),
+    )
+
+
 def _ledger(request: Request) -> Iterator[Ledger]:
     engine: Engine = request.app.state.engine
     with engine.begin() as conn:
@@ -207,6 +241,26 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             return _summary(led.summarise_month(month))
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
+
+    @app.get("/api/spending")
+    def spending(
+        led: Led, month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None
+    ) -> SpendingOut:
+        month = month or led.latest_month()
+        if month is None:
+            raise HTTPException(404, "No transactions yet. Run `fa import` first.")
+        try:
+            return _spending(
+                month,
+                led.category_breakdown(month),
+                led.summarise_month(month).money_out,
+            )
+        except ValueError:
+            raise HTTPException(422, "month must be a real YYYY-MM") from None
+
+    @app.get("/api/months")
+    def months(led: Led) -> list[str]:
+        return led.months()
 
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:
