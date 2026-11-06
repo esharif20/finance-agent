@@ -21,6 +21,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Categories */
+        get: operations["categories_api_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Correct */
+        post: operations["correct_api_corrections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -55,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Transactions */
+        get: operations["transactions_api_transactions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -75,6 +126,29 @@ export interface components {
             masked_number: string;
             /** Name */
             name: string;
+        };
+        /** CategoryOut */
+        CategoryOut: {
+            /** Name */
+            name: string;
+            /** Subs */
+            subs: string[];
+        };
+        /** CorrectionIn */
+        CorrectionIn: {
+            /** Category */
+            category: string[];
+            /** Merchant Id */
+            merchant_id?: number | null;
+            /** Transaction Id */
+            transaction_id?: number | null;
+        };
+        /** CorrectionOut */
+        CorrectionOut: {
+            /** Id */
+            id: number;
+            /** Ledger Version */
+            ledger_version: number;
         };
         /** GapOut */
         GapOut: {
@@ -112,6 +186,35 @@ export interface components {
             /** Month */
             month: string;
             net: components["schemas"]["Money"];
+        };
+        /** TransactionOut */
+        TransactionOut: {
+            /** Account Id */
+            account_id: number;
+            amount: components["schemas"]["Money"];
+            /** Category */
+            category: string[] | null;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string | null;
+            /** Merchant */
+            merchant: string | null;
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Posted On */
+            posted_on: string;
+            /** Source */
+            source: string | null;
+        };
+        /** TransactionsOut */
+        TransactionsOut: {
+            /** Items */
+            items: components["schemas"]["TransactionOut"][];
+            /** Total */
+            total: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -155,6 +258,59 @@ export interface operations {
             };
         };
     };
+    categories_api_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"][];
+                };
+            };
+        };
+    };
+    correct_api_corrections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -193,6 +349,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transactions_api_transactions_get: {
+        parameters: {
+            query?: {
+                account_id?: number | null;
+                kind?: string | null;
+                category?: string | null;
+                month?: string | null;
+                q?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionsOut"];
                 };
             };
             /** @description Validation Error */

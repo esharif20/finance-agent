@@ -1,14 +1,16 @@
 """The API is a thin adapter over the Ledger interface (FastAPI test client)."""
 
 from collections.abc import Callable, Iterator
+from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from finance_agent import api, identity
+from finance_agent import api, categorise, identity
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import generate_histories, render_export
 
@@ -106,3 +108,130 @@ def test_the_built_web_app_is_served_when_present(
     with TestClient(api.create_app(engine, web_dir=tmp_path)) as c:
         assert "hello" in c.get("/").text
         assert c.get("/api/health").status_code == 200
+
+
+@pytest.fixture
+def categorised(engine: Engine, seeded: str) -> str:
+    with engine.begin() as conn:
+        categorise.run(conn, identity.current_user())
+    return seeded
+
+
+def _all(client: TestClient) -> list[dict[str, Any]]:
+    res = client.get("/api/transactions", params={"limit": 500}).json()
+    return res["items"]  # type: ignore[no-any-return]
+
+
+def test_transactions_list_newest_first_and_filter(
+    client: TestClient, categorised: str
+) -> None:
+    body = client.get("/api/transactions", params={"limit": 500}).json()
+    dates = [t["posted_on"] for t in body["items"]]
+    assert dates == sorted(dates, reverse=True) and body["total"] == len(dates)
+    assert all(isinstance(t["amount"]["minor"], int) for t in body["items"])
+
+    month = client.get("/api/transactions", params={"month": categorised}).json()
+    assert month["items"]
+    assert all(t["posted_on"].startswith(categorised) for t in month["items"])
+
+    kind = client.get("/api/transactions", params={"kind": "Income"}).json()
+    assert kind["items"] and {t["kind"] for t in kind["items"]} == {"Income"}
+
+    top = next(t["category"][0] for t in body["items"] if t["category"])
+    cat = client.get("/api/transactions", params={"category": top}).json()
+    assert cat["items"] and {t["category"][0] for t in cat["items"]} == {top}
+
+    acct = body["items"][0]["account_id"]
+    acc = client.get("/api/transactions", params={"account_id": acct}).json()
+    assert {t["account_id"] for t in acc["items"]} == {acct}
+
+    page = client.get("/api/transactions", params={"limit": 3, "offset": 1}).json()
+    assert [t["id"] for t in page["items"]] == [t["id"] for t in body["items"][1:4]]
+    assert page["total"] == body["total"]
+
+
+def test_transaction_search_matches_description_and_merchant(
+    client: TestClient, categorised: str
+) -> None:
+    target = next(t for t in _all(client) if t["merchant"])
+    word = target["merchant"].split()[0].lower()
+    hits = client.get("/api/transactions", params={"q": word, "limit": 500}).json()
+    assert target["id"] in {t["id"] for t in hits["items"]}
+    assert all(
+        word in (t["description"] + (t["merchant"] or "")).lower()
+        for t in hits["items"]
+    )
+    assert client.get("/api/transactions", params={"q": "zzzqqq"}).json()["total"] == 0
+
+
+def test_correction_round_trip_changes_category_and_totals(
+    client: TestClient, engine: Engine, categorised: str
+) -> None:
+    spend = next(
+        t
+        for t in _all(client)
+        if t["kind"] == "Spending" and t["posted_on"].startswith(categorised)
+    )
+    new = ["Entertainment", "Games"]
+    if spend["category"] == new:
+        new = ["Housing", "Rent"]
+    with engine.begin() as conn:
+        before = Ledger(conn, 1).spending_by_category(categorised)
+
+    res = client.post(
+        "/api/corrections", json={"transaction_id": spend["id"], "category": new}
+    )
+
+    assert res.status_code == 201 and res.json()["ledger_version"] >= 1
+    row = next(t for t in _all(client) if t["id"] == spend["id"])
+    assert row["category"] == new and row["source"] == "correction"
+    with engine.begin() as conn:
+        after = Ledger(conn, 1).spending_by_category(categorised)
+    assert after != before
+    assert sum((s.amount for s in after), Decimal(0)) == sum(
+        (s.amount for s in before), Decimal(0)
+    )
+
+
+def test_correction_for_a_merchant_covers_all_its_transactions(
+    client: TestClient, categorised: str
+) -> None:
+    spending = [
+        t for t in _all(client) if t["kind"] == "Spending" and t["merchant_id"]
+    ]
+    mid = next(
+        t["merchant_id"]
+        for t in spending
+        if sum(1 for u in spending if u["merchant_id"] == t["merchant_id"]) > 1
+    )
+    new = ["Entertainment", "Games"]
+
+    res = client.post("/api/corrections", json={"merchant_id": mid, "category": new})
+
+    assert res.status_code == 201
+    assert {
+        tuple(t["category"])
+        for t in _all(client)
+        if t["merchant_id"] == mid and t["kind"] == "Spending"
+    } == {tuple(new)}
+
+
+@pytest.mark.parametrize(
+    "body,status",
+    [
+        ({"category": ["Entertainment", "Games"]}, 422),  # no target
+        ({"transaction_id": 1, "merchant_id": 1, "category": ["Housing", "Rent"]}, 422),
+        ({"transaction_id": 1, "category": ["Housing"]}, 422),
+        ({"transaction_id": 10**9, "category": ["Housing", "Rent"]}, 404),
+        ({"transaction_id": 1, "category": ["Nope", "Nope"]}, 404),
+    ],
+)
+def test_bad_corrections_are_refused(
+    client: TestClient, categorised: str, body: dict[str, object], status: int
+) -> None:
+    assert client.post("/api/corrections", json=body).status_code == status
+
+
+def test_categories_list_the_taxonomy(client: TestClient) -> None:
+    body = client.get("/api/categories").json()
+    assert {c["name"]: tuple(c["subs"]) for c in body} == categorise.TAXONOMY
