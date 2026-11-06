@@ -123,6 +123,7 @@ class Transaction:
     bank_type: str = ""  # the Bank's Transaction Type code; not the Kind
     transfer_with: int | None = None  # the other leg of an own-account Transfer
     categorisation: Categorisation | None = None  # None until `categorise.run`
+    account_id: int = 0
 
 
 @dataclass(frozen=True)
@@ -322,6 +323,7 @@ class Ledger:
                 t.c.amount_minor,
                 t.c.running_balance_minor,
                 t.c.bank_type,
+                t.c.account_id,
             ).order_by(t.c.posted_on, t.c.id)
         ).all()
         other_leg = self._transfer_legs()
@@ -344,6 +346,7 @@ class Ledger:
                 r.bank_type,
                 other_leg.get(r.id),
                 cats.get(r.id),
+                r.account_id,
             )
             for r in rows
         ]

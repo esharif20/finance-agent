@@ -11,11 +11,20 @@ from typing import Annotated
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import Engine
 
+from finance_agent import categorise
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
-from finance_agent.ledger import AccountBalance, Breakdown, Gap, Ledger, MonthSummary
+from finance_agent.ledger import (
+    AccountBalance,
+    Breakdown,
+    Gap,
+    Ledger,
+    MonthSummary,
+    Transaction,
+    UnknownTarget,
+)
 from finance_agent.storage import open_db
 
 # shortcut: located relative to the source tree, so only a checkout serves the UI
@@ -52,6 +61,41 @@ class AccountOut(BaseModel):
     bank_balance: Money
     ledger_balance: Money
     gaps: list[GapOut]
+
+
+class TransactionOut(BaseModel):
+    id: int
+    posted_on: str
+    description: str
+    amount: Money
+    account_id: int
+    kind: str | None
+    merchant_id: int | None
+    merchant: str | None
+    category: list[str] | None  # [top, sub]
+    source: str | None
+
+
+class TransactionsOut(BaseModel):
+    items: list[TransactionOut]
+    total: int  # matching rows before the limit
+
+
+class CategoryOut(BaseModel):
+    name: str
+    subs: list[str]
+
+
+class CorrectionIn(BaseModel):
+    # exactly one target: this Transaction, or every Transaction of its Merchant
+    transaction_id: int | None = None
+    merchant_id: int | None = None
+    category: list[str] = Field(min_length=2, max_length=2)
+
+
+class CorrectionOut(BaseModel):
+    id: int
+    ledger_version: int
 
 
 class CategorySpendOut(BaseModel):
@@ -109,6 +153,47 @@ def _account(a: AccountBalance) -> AccountOut:
         bank_balance=_money(a.bank_balance, a.currency),
         ledger_balance=_money(a.ledger_balance, a.currency),
         gaps=[_gap(g, a.currency) for g in a.gaps],
+    )
+
+
+def _transaction(t: Transaction) -> TransactionOut:
+    c = t.categorisation
+    return TransactionOut(
+        id=t.id,
+        posted_on=t.posted_on.isoformat(),
+        description=t.description,
+        amount=_money(t.amount, "GBP"),  # shortcut: GBP only, as in summarise_month
+        account_id=t.account_id,
+        kind=c.kind if c else None,
+        merchant_id=c.merchant_id if c else None,
+        merchant=c.merchant if c else None,
+        category=list(c.category) if c and c.category else None,
+        source=c.source if c else None,
+    )
+
+
+def _matches(
+    t: Transaction,
+    account_id: int | None,
+    kind: str | None,
+    category: str | None,
+    month: str | None,
+    needle: str,
+) -> bool:
+    c = t.categorisation
+    return (
+        (account_id is None or t.account_id == account_id)
+        and (month is None or t.posted_on.strftime("%Y-%m") == month)
+        and (kind is None or (c is not None and c.kind == kind))
+        and (
+            category is None
+            or (c is not None and c.category is not None and c.category[0] == category)
+        )
+        and (
+            not needle
+            or needle in t.description.lower()
+            or needle in ((c.merchant if c else None) or "").lower()
+        )
     )
 
 
@@ -194,6 +279,54 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:
         return [_account(a) for a in led.accounts()]
+
+    @app.get("/api/categories")
+    def categories() -> list[CategoryOut]:
+        return [
+            CategoryOut(name=n, subs=list(subs))
+            for n, subs in categorise.TAXONOMY.items()
+        ]
+
+    @app.get("/api/transactions")
+    def transactions(
+        led: Led,
+        account_id: int | None = None,
+        kind: str | None = None,
+        category: str | None = None,  # top-level name
+        month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+        q: Annotated[str | None, Query(max_length=100)] = None,
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> TransactionsOut:
+        needle = q.strip().lower() if q else ""
+        # shortcut: filters in Python over every row; fine for one person's Ledger
+        rows = [
+            t
+            for t in reversed(led.transactions())
+            if _matches(t, account_id, kind, category, month, needle)
+        ]
+        return TransactionsOut(
+            items=[_transaction(t) for t in rows[offset : offset + limit]],
+            total=len(rows),
+        )
+
+    @app.post("/api/corrections", status_code=201)
+    def correct(led: Led, body: CorrectionIn) -> CorrectionOut:
+        if (body.transaction_id is None) == (body.merchant_id is None):
+            raise HTTPException(422, "give exactly one of transaction_id, merchant_id")
+        cat = (body.category[0], body.category[1])
+        try:
+            if body.transaction_id is not None:
+                k = led.correct_transaction(body.transaction_id, cat)
+            elif body.merchant_id is not None:
+                k = led.correct_merchant(body.merchant_id, cat)
+            else:  # unreachable: checked above
+                raise HTTPException(422, "no target")
+        except UnknownTarget:
+            raise HTTPException(
+                404, "no such Transaction, Merchant or Category"
+            ) from None
+        return CorrectionOut(id=k.id, ledger_version=led.ledger_version())
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
