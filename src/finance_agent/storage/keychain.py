@@ -11,10 +11,17 @@ HMAC_SERVICE = "finance-agent.account-hmac"
 ACCOUNT = "finance-agent"
 
 
-def secret(service: str) -> bytes:
-    """The 32-byte secret for `service`, generated on first use."""
+class MissingKey(LookupError):
+    pass
+
+
+def secret(service: str, *, create: bool = False) -> bytes:
+    """The 32-byte secret for `service`. Generated only when `create` (a new
+    database); otherwise a missing item fails closed rather than re-keying."""
     stored = keyring.get_password(service, ACCOUNT)
     if stored is None:
+        if not create:
+            raise MissingKey(f"no Keychain item for {service}")
         stored = secrets.token_hex(32)
         keyring.set_password(service, ACCOUNT, stored)
     return bytes.fromhex(stored)

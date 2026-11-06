@@ -27,6 +27,7 @@ from sqlalchemy import (
 from sqlcipher3 import dbapi2 as sqlcipher  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
 from finance_agent.storage import keychain, schema
+from finance_agent.storage.keychain import MissingKey as MissingKey
 
 DB_ENV = "FA_DB_PATH"
 DEFAULT_DB = Path.home() / "Library/Application Support/FinanceAgent/ledger.db"
@@ -80,10 +81,13 @@ def open_db(path: Path | None = None) -> Engine:
     path = path or default_db_path()
     if _inside_repo(path):
         raise UnsafeDatabasePath("refusing to open a database inside a repository")
-    if path.exists() and path.stat().st_size and not is_encrypted(path):
+    fresh = not path.exists() or not path.stat().st_size
+    if not fresh and not is_encrypted(path):
         raise UnencryptedDatabase("refusing to open an unencrypted database")
+    # Keys are created only alongside a new database; a lost key never re-keys.
+    key = keychain.secret(keychain.DB_SERVICE, create=fresh).hex()
+    keychain.secret(keychain.HMAC_SERVICE, create=fresh)
     path.parent.mkdir(parents=True, exist_ok=True)
-    key = keychain.secret(keychain.DB_SERVICE).hex()
 
     def keyed_connect(dbapi_conn: Any, _record: Any) -> None:
         # Raw 256-bit key: no passphrase KDF. Must be the first statement.
@@ -95,12 +99,14 @@ def open_db(path: Path | None = None) -> Engine:
     cfg = Config()
     cfg.set_main_option("script_location", str(_MIGRATIONS))
     try:
-        with engine.begin() as conn:
-            cfg.attributes["connection"] = conn
-            command.upgrade(cfg, "head")
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SELECT count(*) FROM sqlite_master").scalar()
     except exc.DatabaseError:
         engine.dispose()
         raise WrongDatabaseKey("the Keychain key does not open this database") from None
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "head")
     return engine
 
 

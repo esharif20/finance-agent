@@ -74,7 +74,7 @@ def test_cli_import_refuses_an_unencrypted_database(
 def test_a_different_key_cannot_open_the_database(tmp_path: Path) -> None:
     path = tmp_path / "ledger.db"
     open_db(path).dispose()
-    keyring.delete_password(keychain.DB_SERVICE, keychain.ACCOUNT)
+    keyring.set_password(keychain.DB_SERVICE, keychain.ACCOUNT, "ab" * 32)
 
     with pytest.raises(WrongDatabaseKey):
         open_db(path)
@@ -122,6 +122,6 @@ def test_account_ref_is_an_hmac_not_the_unkeyed_digest(
 
 def test_secret_is_generated_once_and_reused() -> None:
     keyring.delete_password(keychain.HMAC_SERVICE, keychain.ACCOUNT)
-    first = keychain.secret(keychain.HMAC_SERVICE)
+    first = keychain.secret(keychain.HMAC_SERVICE, create=True)
     assert len(first) == 32
     assert keychain.secret(keychain.HMAC_SERVICE) == first
