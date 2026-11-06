@@ -44,6 +44,7 @@ class SummaryOut(BaseModel):
 
 class AccountOut(BaseModel):
     id: int
+    bank: str
     masked_number: str
     name: str
     kind: str
@@ -100,6 +101,7 @@ def _summary(s: MonthSummary) -> SummaryOut:
 def _account(a: AccountBalance) -> AccountOut:
     return AccountOut(
         id=a.id,
+        bank=a.bank,
         masked_number=a.masked_number,
         name=a.name,
         kind=a.kind,
@@ -134,6 +136,12 @@ def _ledger(request: Request) -> Iterator[Ledger]:
 
 
 Led = Annotated[Ledger, Depends(_ledger)]
+AccountId = Annotated[int | None, Query()]
+
+
+def _known(led: Ledger, account_id: int | None) -> None:
+    if account_id is not None and account_id not in {a.id for a in led.accounts()}:
+        raise HTTPException(404, "No such account.")
 
 
 def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
@@ -147,28 +155,34 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
 
     @app.get("/api/summary")
     def summary(
-        led: Led, month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None
+        led: Led,
+        month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+        account_id: AccountId = None,
     ) -> SummaryOut:
+        _known(led, account_id)
         month = month or led.latest_month()
         if month is None:
             raise HTTPException(404, "No transactions yet. Run `fa import` first.")
         try:
-            return _summary(led.summarise_month(month))
+            return _summary(led.summarise_month(month, account_id))
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
 
     @app.get("/api/spending")
     def spending(
-        led: Led, month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None
+        led: Led,
+        month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+        account_id: AccountId = None,
     ) -> SpendingOut:
+        _known(led, account_id)
         month = month or led.latest_month()
         if month is None:
             raise HTTPException(404, "No transactions yet. Run `fa import` first.")
         try:
             return _spending(
                 month,
-                led.category_breakdown(month),
-                led.summarise_month(month).money_out,
+                led.category_breakdown(month, account_id),
+                led.summarise_month(month, account_id).money_out,
             )
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None

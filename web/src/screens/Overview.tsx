@@ -3,7 +3,7 @@ import { useState } from "react";
 import { NoData, fetchAccounts, fetchMonths, fetchSpending, fetchSummary } from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AccountsCard } from "./AccountsCard";
+import { AccountStack } from "./AccountStack";
 import { groupSpending } from "@/lib/categories";
 import { MonthCard } from "./MonthCard";
 import { MonthSwitcher } from "./MonthSwitcher";
@@ -12,15 +12,16 @@ import { SpendingDonut } from "./SpendingDonut";
 export function Overview() {
   // undefined = the newest month; the switcher sets it
   const [chosen, setChosen] = useState<string>();
+  const [account, setAccount] = useState<number>(); // undefined = All accounts
   const summary = useQuery({
-    queryKey: ["summary", chosen],
-    queryFn: () => fetchSummary(chosen),
+    queryKey: ["summary", chosen, account],
+    queryFn: () => fetchSummary(chosen, account),
     placeholderData: keepPreviousData,
   });
   const month = chosen ?? summary.data?.month;
   const spending = useQuery({
-    queryKey: ["spending", month],
-    queryFn: () => fetchSpending(month as string),
+    queryKey: ["spending", month, account],
+    queryFn: () => fetchSpending(month as string, account),
     enabled: !!month,
     placeholderData: keepPreviousData,
   });
@@ -76,7 +77,7 @@ export function Overview() {
           <MonthCard summary={summary.data} slices={slices} />
           <SpendingDonut spending={spending.data} />
         </div>
-        <AccountsCard accounts={accounts.data} />
+        <AccountStack accounts={accounts.data} selected={account} onSelect={setAccount} />
       </div>
     </div>
   );
