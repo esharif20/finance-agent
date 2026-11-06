@@ -1,0 +1,32 @@
+# Public repo: never commit real financial data or secrets.
+*.csv
+!tests/fixtures/synthetic/**/*.csv
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+exports/
+.env
+.env.*
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+
+# OS / tooling
+.DS_Store
+.scratch/**/*.local.md
