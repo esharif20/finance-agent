@@ -31,6 +31,7 @@ select = ["E", "F", "I", "UP", "B", "S"]
 include = ["src", "tests", "scripts"]
 extraPaths = ["scripts"]
 typeCheckingMode = "strict"
+extraPaths = ["tests"]
 
 # Later tickets extend the contracts; docs/ARCHITECTURE.md "Modules" is the source.
 [tool.importlinter]
