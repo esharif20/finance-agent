@@ -74,3 +74,17 @@ def test_migrations_upgrade_from_0003_to_head(tmp_path: Path) -> None:
         assert {"merchant", "categorisation"} <= set(inspect(conn).get_table_names())
         assert compare_metadata(MigrationContext.configure(conn), schema.metadata) == []
     eng.dispose()
+
+
+def test_tests_can_never_open_the_real_data_directory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(storage.DB_ENV, raising=False)
+    with pytest.raises(pytest.fail.Exception, match="real data directory"):
+        open_db()
+    with pytest.raises(pytest.fail.Exception, match="real data directory"):
+        open_db(storage.DEFAULT_DB.parent / "other.db")
+
+
+def test_tests_default_to_a_temporary_database() -> None:
+    assert not storage.default_db_path().is_relative_to(storage.DEFAULT_DB.parent)

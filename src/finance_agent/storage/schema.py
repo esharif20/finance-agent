@@ -6,6 +6,7 @@ Migrations in `migrations/versions/` must produce exactly this schema
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    text,
 )
 
 metadata = MetaData()
@@ -26,6 +28,8 @@ user = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # bumped by every import and Correction; caches key off it (ADR 0010)
+    Column("ledger_version", Integer, nullable=False, server_default="0"),
 )
 
 bank = Table(
@@ -175,4 +179,23 @@ categorisation = Table(
     Column("category_id", Integer, ForeignKey("category.id")),
     Column("source", String(64), nullable=False),
     Column("taxonomy_version", Integer, nullable=False),
+)
+
+# User Corrections (ADR 0001): never edited or deleted, only reverted, so they
+# are an audit trail. Exactly one target: one Transaction or every Transaction
+# of a Merchant. Read-time overlay on `categorisation`; rules never see them.
+correction = Table(
+    "correction",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("transaction_id", Integer, ForeignKey("transaction.id")),
+    Column("merchant_id", Integer, ForeignKey("merchant.id")),
+    Column("category_id", Integer, ForeignKey("category.id"), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("reverted_at", DateTime(timezone=True)),
+    CheckConstraint(
+        text("(transaction_id IS NULL) != (merchant_id IS NULL)"),
+        name="ck_correction_one_target",
+    ),
 )
