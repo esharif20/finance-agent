@@ -10,7 +10,7 @@
   --border: #e4e7ea;
   --control: #d6d9dd;
   --foreground: #1b1d1f;
-  --muted-foreground: #5c6064;
+  --muted-foreground: #53575b;
   --accent: #0b66c3;
   --primary: #1b1d1f;
   --primary-foreground: #ffffff;
@@ -19,8 +19,11 @@
   --warning-fg: #8a4b00;
   --spent: #3b4045;
   --ring: #0b66c3;
-  --glow-a: rgb(11 102 195 / 0.17);
-  --glow-b: rgb(16 160 140 / 0.13);
+  /* Ambient fields: blue 210, teal 172, sky 198, apricot 22. None in 235-290. */
+  --field-a: rgb(40 128 222 / 0.24);
+  --field-b: rgb(22 176 152 / 0.2);
+  --field-c: rgb(60 170 230 / 0.18);
+  --field-d: rgb(255 168 120 / 0.14);
   --glass-bg: rgb(255 255 255 / 0.58);
   --glass-edge: rgb(255 255 255 / 0.75);
   --glass-shadow: 0 8px 24px rgb(27 29 31 / 0.08);
@@ -47,8 +50,10 @@
     --warning-fg: #f5c27a;
     --spent: #c9cdd2;
     --ring: #7da2f7;
-    --glow-a: rgb(30 120 225 / 0.34);
-    --glow-b: rgb(20 170 150 / 0.22);
+    --field-a: rgb(30 110 220 / 0.36);
+    --field-b: rgb(16 160 136 / 0.28);
+    --field-c: rgb(40 150 210 / 0.26);
+    --field-d: rgb(214 120 80 / 0.16);
     --glass-bg: rgb(40 44 48 / 0.5);
     --glass-edge: rgb(255 255 255 / 0.16);
     --glass-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
@@ -75,35 +80,53 @@
   --color-spent: var(--spent);
   --color-ring: var(--ring);
   --radius-card: var(--radius);
+
+  /* Type scale (docs/design/DIRECTIONS.md, "Type"). Six sizes: 12 / 13 / 15 / 17 / 28 / 40.
+     Figures are set lighter and tighter than headings, as calm money screens do. */
+  --text-hero: clamp(2.125rem, 1.7rem + 1.3vw, 2.5rem);
+  --text-hero--line-height: 1.05;
+  --text-hero--letter-spacing: -0.035em;
+  --text-hero--font-weight: 500;
+  --text-figure: 1.75rem;
+  --text-figure--line-height: 1.15;
+  --text-figure--letter-spacing: -0.028em;
+  --text-figure--font-weight: 500;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.03em;
+  --text-title--font-weight: 650;
+  --text-heading: 1.0625rem;
+  --text-heading--line-height: 1.4;
+  --text-heading--letter-spacing: -0.015em;
+  --text-heading--font-weight: 650;
+  --text-row: 0.9375rem;
+  --text-row--line-height: 1.45;
+  --text-row--letter-spacing: -0.006em;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.35;
+  --text-meta--letter-spacing: 0.005em;
+  --text-meta--font-weight: 500;
 }
 
 @layer base {
   * {
     border-color: var(--border);
   }
-  body {
+  html {
     background: var(--background);
+  }
+  body {
+    background: transparent;
     color: var(--foreground);
     font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     min-height: 100dvh;
-  }
-  body {
     position: relative;
     isolation: isolate;
-  }
-  /* Static depth: a soft glow behind the header and hero card (blue and teal, outside the violet band). */
-  body::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: min(760px, 100%);
-    z-index: -1;
-    pointer-events: none;
-    background:
-      radial-gradient(ellipse 55% 60% at 22% 0%, var(--glow-a), transparent 70%),
-      radial-gradient(ellipse 40% 50% at 88% 6%, var(--glow-b), transparent 70%);
   }
   /* Film grain over everything, 3-5%. Never intercepts input. */
   body::after {
@@ -119,6 +142,91 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+}
+
+/* Ambient: four large soft colour fields drifting on 37-59s loops (unequal, so the pattern
+   never visibly repeats). Fixed to the viewport, so it covers the whole document in both
+   schemes with no seam. Transform only: compositor work, no repaint per frame. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.ambient i {
+  position: absolute;
+  width: 78vmax;
+  height: 78vmax;
+  border-radius: 50%;
+  will-change: transform;
+  animation: 47s ease-in-out infinite alternate both;
+}
+.ambient i:nth-child(1) {
+  left: -26vmax;
+  top: -34vmax;
+  background: radial-gradient(closest-side, var(--field-a), transparent);
+  animation-name: drift-1;
+}
+.ambient i:nth-child(2) {
+  right: -30vmax;
+  top: -22vmax;
+  background: radial-gradient(closest-side, var(--field-b), transparent);
+  animation-name: drift-2;
+  animation-duration: 59s;
+}
+.ambient i:nth-child(3) {
+  left: 4vmax;
+  bottom: -34vmax;
+  background: radial-gradient(closest-side, var(--field-c), transparent);
+  animation-name: drift-3;
+  animation-duration: 53s;
+}
+.ambient i:nth-child(4) {
+  right: -18vmax;
+  bottom: -26vmax;
+  width: 62vmax;
+  height: 62vmax;
+  background: radial-gradient(closest-side, var(--field-d), transparent);
+  animation-name: drift-4;
+  animation-duration: 37s;
+}
+@keyframes drift-1 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(24vmax, 14vmax, 0) scale(1.12); }
+  100% { transform: translate3d(10vmax, 30vmax, 0) scale(0.94); }
+}
+@keyframes drift-2 {
+  0% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-22vmax, 20vmax, 0) scale(0.92); }
+  100% { transform: translate3d(-8vmax, 40vmax, 0) scale(1.1); }
+}
+@keyframes drift-3 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(26vmax, -18vmax, 0) scale(1.15); }
+  100% { transform: translate3d(44vmax, -6vmax, 0) scale(0.95); }
+}
+@keyframes drift-4 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-30vmax, -14vmax, 0) scale(1.18); }
+  100% { transform: translate3d(-12vmax, -32vmax, 0) scale(1); }
+}
+.ambient[data-paused] i {
+  animation-play-state: paused;
+}
+
+/* Figures. Big standalone amounts use proportional digits (tabular ones look loose at
+   display sizes); columns keep the body's tabular digits. Pence a step smaller and
+   lighter, never under 11px. */
+.figure {
+  font-variant-numeric: proportional-nums;
+}
+.money-minor {
+  font-size: max(0.58em, 11px);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
 }
 
 /* Glass: chrome only (header, pills, tab bar). Figures, charts and lists stay on solid cards. */
@@ -143,6 +251,9 @@ html[data-private] .money {
   user-select: none;
 }
 @media (prefers-reduced-motion: reduce) {
+  .ambient i {
+    animation: none !important;
+  }
   *,
   *::before,
   *::after {

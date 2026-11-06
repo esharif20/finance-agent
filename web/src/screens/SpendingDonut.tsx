@@ -73,8 +73,8 @@ export function SpendingDonut({ spending }: { spending: Spending }) {
               })}
             </svg>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-sm text-muted-foreground">Spent</span>
-              <Money value={spending.total} className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+              <span className="text-label text-muted-foreground">Spent</span>
+              <Money value={spending.total} className="figure text-figure" />
             </div>
           </div>
 

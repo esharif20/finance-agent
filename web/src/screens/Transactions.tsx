@@ -148,7 +148,7 @@ export function Transactions() {
 
       {page.error ? (
         <Card role="alert">
-          <h2 className="text-[18px] font-semibold">Can't load transactions</h2>
+          <h2 className="text-heading">Can't load transactions</h2>
           <p className="mt-2 text-muted-foreground">Run `fa` in a terminal to start the local server, then try again.</p>
         </Card>
       ) : !page.data ? (
@@ -166,12 +166,12 @@ export function Transactions() {
                 aria-label={`${t.description}, ${day(t.posted_on)}`}
                 className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised sm:grid-cols-[96px_1fr_auto_auto]"
               >
-                <time dateTime={t.posted_on} className="order-3 text-sm text-muted-foreground sm:order-none">
+                <time dateTime={t.posted_on} className="order-3 text-label text-muted-foreground sm:order-none">
                   {day(t.posted_on)}
                 </time>
                 <div className="order-1 min-w-0 sm:order-none">
-                  <p className="truncate font-medium">{t.merchant ?? t.description}</p>
-                  <p className="truncate text-sm text-muted-foreground">
+                  <p className="truncate text-row font-semibold">{t.merchant ?? t.description}</p>
+                  <p className="truncate text-label font-normal text-muted-foreground">
                     {t.merchant ? `${t.description} · ` : ""}
                     {accountName(t.account_id)?.masked_number}
                   </p>
@@ -180,7 +180,7 @@ export function Transactions() {
                   <Money
                     value={t.amount}
                     sign
-                    className={`font-semibold ${t.amount.minor > 0 ? "text-positive" : ""}`}
+                    className={`text-row font-semibold tracking-[-0.01em] ${t.amount.minor > 0 ? "text-positive" : ""}`}
                   />
                 </div>
                 <div className="order-4 justify-self-end sm:order-none sm:min-w-44 sm:justify-self-start">
@@ -192,7 +192,7 @@ export function Transactions() {
                       onChange={(c, all) => save(t, c, all)}
                     />
                   ) : (
-                    <span className="text-sm text-muted-foreground">{t.kind}</span>
+                    <span className="text-label text-muted-foreground">{t.kind}</span>
                   )}
                 </div>
               </li>
