@@ -27,3 +27,13 @@ _Avoid_: Database, history
 **Correction**:
 A timestamped change the user makes on top of a Transaction (a new Category, a transfer link) that never alters the Transaction itself.
 _Avoid_: Edit, override, fix
+
+## Categorisation
+
+**Category**:
+A node in a small two-level spending taxonomy (such as Food & Drink → Groceries) that a Transaction belongs to; the unit charts and budgets are built on.
+_Avoid_: Tag, label, bucket
+
+**Merchant**:
+The normalised party a Transaction is with (raw "TESCO STORES 3021" → Tesco). Never a Category; a Merchant has a default Category that a Correction can override per Transaction. Transfers between the user's own Accounts have no Merchant.
+_Avoid_: Payee, vendor, shop, counterparty
