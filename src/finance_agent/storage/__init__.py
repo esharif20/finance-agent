@@ -14,15 +14,19 @@ from alembic.config import Config
 from sqlalchemy import (
     Connection,
     CursorResult,
+    Delete,
     Engine,
     Executable,
     Select,
     Table,
+    Update,
     create_engine,
+    delete,
     event,
     exc,
     insert,
     select,
+    update,
 )
 from sqlcipher3 import dbapi2 as sqlcipher  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
@@ -132,6 +136,14 @@ class Scoped:
         res = self.conn.execute(insert(table).values(user_id=self.user_id, **values))
         key: tuple[Any, ...] = tuple(res.inserted_primary_key or ())
         return int(key[0])
+
+    def update(self, table: Table) -> Update:
+        """A user-scoped UPDATE; add `.where(...)` and `.values(...)`."""
+        return update(table).where(table.c.user_id == self.user_id)
+
+    def delete(self, table: Table) -> Delete:
+        """A user-scoped DELETE; add `.where(...)` to narrow it."""
+        return delete(table).where(table.c.user_id == self.user_id)
 
     def execute(self, stmt: Executable) -> CursorResult[Any]:
         return self.conn.execute(stmt)

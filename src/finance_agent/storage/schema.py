@@ -49,7 +49,10 @@ account = Table(
     Column("kind", String(16), nullable=False),
     Column("masked_number", String(16), nullable=False),
     Column("currency", String(3), nullable=False),
+    # keyed ref of the SimpleFIN account id once synced or linked (ADR 0014)
+    Column("provider_ref", String(64)),
     UniqueConstraint("user_id", "external_ref"),
+    Index("ux_account_provider_ref", "user_id", "provider_ref", unique=True),
 )
 
 statement_import = Table(
@@ -76,8 +79,10 @@ transaction = Table(
     Column("description", String(256), nullable=False),
     Column("amount_minor", BigInteger, nullable=False),
     Column("currency", String(3), nullable=False),
-    Column("running_balance_minor", BigInteger, nullable=False),
+    Column("running_balance_minor", BigInteger),  # NULL for synced rows
     Column("status", String(16), nullable=False),
+    # "csv" or "simplefin": the source that created it (ADR 0014 matching)
+    Column("origin", String(16), nullable=False, server_default="csv"),
     # ADR 0006 identity; not unique: a purchase, refund, same purchase again
     # on one day repeats the key, and both are real Transactions
     Index(
@@ -103,4 +108,45 @@ transaction_source = Table(
         primary_key=True,
     ),
     Column("row_number", Integer, primary_key=True),
+)
+
+# ADR 0014 identity: (Account, provider transaction ID), raw synced fields as
+# first received. Points at the Transaction it created or was matched to.
+synced_key = Table(
+    "synced_key",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("account_id", Integer, ForeignKey("account.id"), primary_key=True),
+    Column("provider_id", String(256), primary_key=True),
+    Column("transaction_id", Integer, ForeignKey("transaction.id"), nullable=False),
+    Column("posted_ts", BigInteger, nullable=False),  # unix seconds
+    Column("transacted_ts", BigInteger),
+    Column("amount_minor", BigInteger, nullable=False),
+    Column("description", String(256), nullable=False),
+)
+
+# ADR 0014 Reconciliation: the first sync's balance, then one row per non-zero Gap.
+sync_anchor = Table(
+    "sync_anchor",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("account_id", Integer, ForeignKey("account.id"), primary_key=True),
+    Column("balance_minor", BigInteger, nullable=False),
+    Column("balance_ts", BigInteger, nullable=False),
+)
+
+sync_gap = Table(
+    "sync_gap",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("account_id", Integer, ForeignKey("account.id"), nullable=False),
+    Column(
+        "statement_import_id",
+        Integer,
+        ForeignKey("statement_import.id"),
+        nullable=False,
+    ),
+    Column("balance_ts", BigInteger, nullable=False),
+    Column("amount_minor", BigInteger, nullable=False),
 )
