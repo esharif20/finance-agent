@@ -136,6 +136,20 @@ class Spend:
 
 
 @dataclass(frozen=True)
+class CategoryDetail:
+    """One Category in one month: its Subcategories, top Merchants (across
+    Subcategories), spending per month for the trailing `trend` months (oldest
+    first, ending at `month`) and the month's Spending and Refund Transactions."""
+
+    name: str
+    total: Decimal
+    subcategories: tuple[Spend, ...]
+    merchants: tuple[Spend, ...]
+    trend: tuple[tuple[str, Decimal], ...]
+    transactions: tuple[Transaction, ...]
+
+
+@dataclass(frozen=True)
 class Gap:
     """A Reconciliation Gap: the Bank's balance disagrees with the Ledger's
     between two Transactions. The Bank is truth, so `amount` is the net of
@@ -377,6 +391,51 @@ class Ledger:
             return tuple(sorted(out, key=lambda s: (-s.amount, s.name)))
 
         return list(level(tree))
+
+    def category_detail(
+        self, name: str, month: str, trend: int = 6, top_merchants: int = 5
+    ) -> CategoryDetail | None:
+        """None when the month has nothing in Category `name`."""
+        start, end = _month_bounds(month)
+
+        def total_in(m: str) -> Spend | None:
+            return next(
+                (s for s in self.spending_by_category(m) if s.name == name), None
+            )
+
+        here = total_in(month)
+        if here is None:
+            return None
+        merchants: dict[str, Decimal] = {}
+        for sub in here.children:
+            for m in sub.children:
+                merchants[m.name] = merchants.get(m.name, Decimal(0)) + m.amount
+        ranked = sorted(merchants.items(), key=lambda kv: (-kv[1], kv[0]))
+        months = [
+            f"{(end.year * 12 + end.month - 2 - i) // 12}-"
+            f"{(end.month - 2 - i) % 12 + 1:02d}"
+            for i in range(trend - 1, -1, -1)
+        ]
+        series = tuple(
+            (m, s.amount if (s := total_in(m)) else Decimal(0)) for m in months
+        )
+        txns = tuple(
+            t
+            for t in reversed(self.transactions())
+            if start <= t.posted_on < end
+            and (c := t.categorisation)
+            and c.kind in ("Spending", "Refund")
+            and c.category
+            and c.category[0] == name
+        )
+        return CategoryDetail(
+            name,
+            here.amount,
+            here.children,
+            tuple(Spend(n, a) for n, a in ranked[:top_merchants]),
+            series,
+            txns,
+        )
 
     def category_breakdown(self, month: str) -> Breakdown:
         start, end = _month_bounds(month)

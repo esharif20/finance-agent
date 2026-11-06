@@ -137,6 +137,11 @@
   }
 }
 
+/* The canvas takes the ground colour too, so no seam shows below short pages in dark. */
+html {
+  background: var(--background);
+}
+
 /* Privacy mode (H): blur every amount; text can't be selected or copied out. */
 html[data-private] .money {
   filter: blur(8px);

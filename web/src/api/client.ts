@@ -19,3 +19,7 @@ export const fetchSummary = (month?: string) =>
 export const fetchAccounts = () => get<Account[]>("/api/accounts");
 export const fetchSpending = (month: string) => get<Spending>(`/api/spending?month=${month}`);
 export const fetchMonths = () => get<string[]>("/api/months");
+
+export type CategoryDetail = components["schemas"]["CategoryOut"];
+export const fetchCategory = (name: string, month: string) =>
+  get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}?month=${month}`);

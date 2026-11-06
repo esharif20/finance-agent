@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Eye, EyeOff, LayoutDashboard } from "lucide-react";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
+import { useRoute } from "@/lib/route";
+import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Overview } from "@/screens/Overview";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,7 @@ function HideAmounts() {
 }
 
 export function App() {
+  const route = useRoute();
   return (
     <QueryClientProvider client={queryClient}>
       <PrivacyProvider>
@@ -45,16 +48,22 @@ export function App() {
           <HideAmounts />
         </header>
         <main>
-          <h1 className="mb-6 text-[28px] leading-9 font-semibold tracking-[-0.01em]">Overview</h1>
-          <Overview />
+          {route.name === "category" ? (
+            <CategoryScreen key={route.category} category={route.category} month={route.month} />
+          ) : (
+            <>
+              <h1 className="mb-6 text-[28px] leading-9 font-semibold tracking-[-0.01em]">Overview</h1>
+              <Overview />
+            </>
+          )}
         </main>
         <nav
           aria-label="Main"
           className="glass fixed inset-x-4 bottom-3 z-20 flex justify-center rounded-full p-1.5 sm:hidden"
         >
           <a
-            href="/"
-            aria-current="page"
+            href="#overview"
+            aria-current={route.name === "overview" ? "page" : undefined}
             className="inline-flex min-h-11 items-center gap-2 rounded-full bg-foreground/10 px-5 text-sm font-semibold"
           >
             <LayoutDashboard className="size-4" aria-hidden="true" />
