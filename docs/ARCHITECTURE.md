@@ -21,6 +21,7 @@ flowchart TB
   subgraph Core["Local process: trusted core"]
     ING[ingest: parsers + Importer interface]
     LED[(ledger: Statement Imports, Transactions, Corrections)]
+    LI[Ledger application interface]
     CAT[categorise: Corrections, rules, ML]
     ENG[engine: detectors, forecasts, preferences, planning]
     MEM[(memory: Memories, Proposals, feedback)]
@@ -54,10 +55,13 @@ flowchart TB
   G --> GC
   G <--> C
   G -.placeholders only.-> GW --> LLM
+  LI --> LED
+  API --> LI
   API --> ENG
   API --> G
   WEB[React app] --> API
-  CLI[fa CLI] --> API
+  CLI[fa CLI] -->|fa import, fa summary, in process| LI
+  CLI -->|fa opens dashboard| API
 ```
 
 ## Modules
@@ -75,9 +79,22 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `assistant` | The LangGraph graph, tool allowlist, grounding check, answer cache (ADR 0010), `ChatModel` interface and adapters | `engine`, `ledger` (read-only views), `memory` |
 | `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0012). No database access. | nothing except the payload it is handed |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
-| `cli` | The `fa` command | `api` (in-process) |
+| `cli` | The `fa` command. `fa import` and `fa summary` call the Ledger interface in process; `fa` (open dashboard) talks to the running server | `ledger`, `categorise` (in-process); `api` only over HTTP |
 
 Dependency direction is enforced by an import-linter check in CI: nothing imports `assistant` except `api`, and `gateway` imports nothing from the core.
+
+## Ledger application interface
+
+The main seam of the core (spec #1). It is the in-process interface that the CLI, the API and the tests all call. The API is a thin adapter over it, so no figure is computed in a route handler. It takes a `user_id` and a connection from the `storage` factory, and it never returns floats.
+
+Operations:
+
+- **Import** Statement Import file(s) and return an import report: rows added, rows already known, rejected rows with line numbers, and the Accounts affected.
+- **List Accounts** with the Bank-reported balance, the Ledger-implied balance and any open Reconciliation Gaps.
+- **Summarise a month**: money in, money out, net, and the Reconciliation Gaps touching that month.
+- **Spending by Category** for a month, with drill-down to subcategories and Merchants.
+- **List and search Transactions** with filters.
+- **Record a Correction** for one Transaction, or for every Transaction with a Merchant.
 
 ## How data moves
 
@@ -85,7 +102,7 @@ Dependency direction is enforced by an import-linter check in CI: nothing import
 2. **Reconcile.** The Bank's running balance is checked against the Ledger; a difference becomes a Reconciliation Gap. Only completed Transactions count.
 3. **Classify.** Each Transaction gets a Kind, then (for Spending and Refund) a Merchant and Category from Corrections, rules or ML, with a confidence and its source. Low confidence goes to the Review Queue.
 4. **Analyse.** The Engine recomputes baselines, detectors and forecasts after each import, producing Insights with £ impact, confidence and evidence links.
-5. **Present.** The API serves aggregates to the React app and the CLI.
+5. **Present.** The API serves aggregates to the React app. The CLI reads the same aggregates in process through the Ledger interface, so the figures match.
 6. **Converse.** The Assistant routes a question to a sub-graph, calls tools that return aggregates and Insights (at most 20 rows, evidence IDs attached), runs the grounding check, and replies. Any change it suggests is a Proposal that waits for a confirm click.
 
 ## Database: core entities
