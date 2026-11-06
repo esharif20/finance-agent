@@ -44,11 +44,13 @@ root_package = "finance_agent"
 
 # ledger calls ingest's parsers; ingest (untrusted input) touches neither the
 # database nor the Ledger, so full account numbers cannot leak past it.
+# categorise reads through the Ledger and writes only its derived tables.
 [[tool.importlinter.contracts]]
-name = "cli -> ledger -> ingest | storage"
+name = "cli -> categorise -> ledger -> ingest | storage"
 type = "layers"
 layers = [
     "finance_agent.cli",
+    "finance_agent.categorise",
     "finance_agent.ledger",
     "finance_agent.ingest | finance_agent.storage",
 ]
