@@ -8,7 +8,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from finance_agent import api, identity, storage
+from finance_agent import api, identity
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import generate_histories, render_export
 
@@ -31,16 +31,14 @@ def seeded(engine: Engine, write_export: Callable[[str], Path]) -> str:
         return ledger.transactions()[-1].posted_on.strftime("%Y-%m")
 
 
-def test_server_binds_to_localhost_only(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv(storage.DB_ENV, str(tmp_path / "db" / "ledger.db"))
+def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict[str, object]] = []
 
     def fake_run(app: object, **kwargs: object) -> None:
         calls.append(kwargs)
 
     monkeypatch.setattr(uvicorn, "run", fake_run)
+    monkeypatch.setattr(api, "open_db", lambda: None)  # binding needs no database
 
     api.serve(port=9999)
 

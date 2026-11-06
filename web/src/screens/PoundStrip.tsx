@@ -1,15 +1,19 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useId } from "react";
+import { usePrivacy } from "@/lib/privacy";
 import { poundStrip } from "@/lib/strip";
 
 /** One bar that answers "where did my income go?": spent, then the hatched part kept. */
 export function PoundStrip({ inMinor, outMinor }: { inMinor: number; outMinor: number }) {
   const reduce = useReducedMotion();
+  const { hidden } = usePrivacy();
   const pattern = `hatch-${useId().replace(/:/g, "")}`;
   const strip = poundStrip(inMinor, outMinor);
   if (!strip) return null;
 
-  const label = strip.overspent
+  const label = hidden
+    ? "Amounts hidden."
+    : strip.overspent
     ? "More went out than came in this month."
     : `Of every £1 that came in, ${strip.spentPence}p went out and ${strip.keptPence}p stayed.`;
   const grow = reduce
@@ -53,11 +57,11 @@ export function PoundStrip({ inMinor, outMinor }: { inMinor: number; outMinor: n
       </div>
       <p className="mt-3 text-sm text-muted-foreground">
         {strip.overspent ? (
-          label
+          <span className="money">{label}</span>
         ) : (
           <>
-            <span className="font-semibold text-foreground">{strip.spentPence}p</span> of every £1 went out,{" "}
-            <span className="font-semibold text-foreground">{strip.keptPence}p</span> stayed.
+            <span className="money font-semibold text-foreground">{strip.spentPence}p</span> of every £1 went out,{" "}
+            <span className="money font-semibold text-foreground">{strip.keptPence}p</span> stayed.
           </>
         )}
       </p>

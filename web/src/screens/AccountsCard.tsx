@@ -3,7 +3,6 @@ import { useId } from "react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/lib/money";
 
 type Account = components["schemas"]["AccountOut"];
 
@@ -47,9 +46,7 @@ function AccountRow({ account }: { account: Account }) {
             {account.gaps.map((g) => (
               <li key={`${g.from_date}-${g.to_date}`}>
                 Between {day(g.from_date)} and {day(g.to_date)} your bank shows{" "}
-                <span className="font-semibold text-foreground">
-                  {formatMoney(g.amount)}
-                </span>{" "}
+                <Money value={g.amount} className="font-semibold text-foreground" />{" "}
                 {g.amount.minor > 0 ? "more" : "less"} than your ledger. Import the statement
                 covering those dates.
               </li>
