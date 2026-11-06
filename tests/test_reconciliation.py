@@ -6,12 +6,18 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 
 from finance_agent.ingest import lloyds
 from finance_agent.ledger import Ledger
-from synthetic_lloyds import MAX_ROWS, History, generate_histories, render_export
+from synthetic_lloyds import (
+    MAX_ROWS,
+    History,
+    generate_histories,
+    overlapping_windows,
+    render_export,
+)
 from test_dedupe import temp_ledger, windowed
 
 LedgerFor = Callable[[int], Ledger]
@@ -28,8 +34,12 @@ def export_rows(ledger: Ledger, d: Path, h: History, start: int, end: int) -> No
     ledger.import_files(paths)
 
 
+_SPLIT_TWINS = generate_histories(29, 150)[0]  # #34: twins split across windows
+
+
 @settings(max_examples=25, deadline=None)
 @given(windowed())
+@example((_SPLIT_TWINS, overlapping_windows(len(_SPLIT_TWINS.txns), 40, 39)))
 def test_a_complete_history_has_no_gaps_and_sums_equal_the_balance_change(
     case: tuple[History, list[tuple[int, int]]],
 ) -> None:
@@ -281,12 +291,11 @@ def test_same_day_rows_keep_the_files_order_not_a_sort(
     assert ledger.gaps() == []
 
 
-def test_split_twins_from_issue_34_surface_as_a_gap(
+def test_split_twins_from_issue_34_leave_no_gap(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    """#34 limit: the second twin is merged into the first. The Ledger then
-    misses a real Transaction, and reconciliation catches it as a Gap of the
-    twin's amount rather than hiding it."""
+    """#34: twins split across files that overlap only at the refund are both
+    kept (sequence alignment), so the running balance has no break."""
     h, _ = generate_histories(seed=31, days=60)  # rows 69/71 twins, 70 refund
     ledger = ledger_for(1)
 
@@ -297,7 +306,7 @@ def test_split_twins_from_issue_34_surface_as_a_gap(
         ]
     )
 
-    assert [g.amount for g in ledger.gaps()] == [Decimal(h.txns[71].amount_minor) / 100]
+    assert ledger.gaps() == []
 
 
 def test_a_newest_first_export_reconciles_in_bank_order(
