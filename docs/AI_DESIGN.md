@@ -1,0 +1,104 @@
+# AI design
+
+Status: draft for review. Decisions: ADRs 0005, 0007–0012.
+
+## Principle
+
+The LLM is never the source of financial truth. The Intelligence Engine computes; the Assistant explains (ADR 0007).
+
+## The Assistant
+
+One LangGraph graph (ADR 0008):
+
+```mermaid
+flowchart LR
+  Q[Message] --> C{Cache hit?}
+  C -- yes --> R[Reply]
+  C -- no --> RT[Router]
+  RT --> A[Ask]
+  RT --> P[Plan]
+  RT --> M[Memory]
+  RT --> K[Correct]
+  A & P & M & K --> G[Grounding check]
+  G --> H{Proposal?}
+  H -- yes --> U[Confirm card]
+  H -- no --> R
+  U --> R
+```
+
+| Sub-graph | Does | Tools |
+| --- | --- | --- |
+| Ask | Answers questions, explains Insights | `spending_summary`, `category_trend`, `list_insights`, `explain_insight`, `list_subscriptions`, `goal_status` |
+| Plan | Allocation Plans, what-if simulations, trade-offs | `allocation_plan`, `simulate_purchase`, `goal_status`, `forecast_cashflow` |
+| Memory | Elicits preferences, proposes Memories, re-checks conflicts | `list_memories`, `propose_memory` |
+| Correct | Proposes Corrections (recategorise, mark transfer) | `find_transactions`, `propose_correction` |
+
+Rules:
+
+- Tools are read-only, Pydantic-typed and allowlisted per sub-graph. The only writes are Proposals, which do nothing until the user confirms.
+- Tool results are aggregates, at most 20 rows, each with an evidence ID. Descriptions are marked as data, truncated to 60 characters, instruction-like text stripped.
+- **Grounding check**: every £ figure, percentage and date in a reply must match a value from a tool result in that turn. Fails → regenerate once → deterministic fallback.
+- Graph checkpoints live in the encrypted database. No LangSmith, no external tracing; CI egress test.
+
+## Models
+
+`ChatModel` interface with adapters: Ollama now, cloud later through the gateway. Model choice is benchmark-driven (see `ML_EVALUATIONS.md`). Candidates: `qwen3.5:9b` and one ~4B model. Note: community reports describe a qwen3.5 tool-call printing bug in some Ollama versions; the benchmark must catch it.
+
+Routing per request: cache → local model → cloud only with per-conversation opt-in → deterministic tables. The UI always shows which path answered.
+
+## Context engineering
+
+Each turn's context is assembled, never accumulated:
+
+| Slot | Contents | Budget |
+| --- | --- | --- |
+| System | Role, rules, tool schemas for the routed sub-graph only | fixed |
+| Memories | Relevant confirmed Memories, selected by type and tag in SQL | ≤ 800 tokens |
+| Conversation | Last few turns of this session | ≤ 1,500 tokens |
+| Session summary | Short summary of recent sessions | ≤ 300 tokens |
+| Tool results | This turn's results | ≤ 2,500 tokens |
+| Knowledge | Cited guidance passages (when relevant) | ≤ 600 tokens |
+
+Financial facts never enter context except as this turn's tool results.
+
+## Memory
+
+Five stores: financial facts (never memorised, always recomputed), Memories (confirmed preferences, goals, constraints), conversation (session only), session summaries (90 days), feedback (kept).
+
+A Memory exists only through a confirmed Proposal. It carries provenance (turn, date, the user's words), a type and a review date. Patterns in spending become Insights, never Memories. When behaviour contradicts a Memory, the Assistant asks.
+
+## Answer cache
+
+Keyed by (intent, tool calls with arguments, Ledger version), stored encrypted. Embedding similarity only maps wording to intent, never returns a cached answer (ADR 0010).
+
+## Privacy gateway
+
+Separate module, no database access. Placeholders replace figures, merchants and personal values; only allowlisted fields leave; per-conversation opt-in; every payload logged and viewable; replies validated before placeholders are filled locally; hard £7 monthly cap (ADR 0011, ADR 0012).
+
+## Intelligence Engine
+
+**Detectors** (pure functions, Hypothesis-tested): recurring payments, price increases, Category spikes against personal baseline, unused subscriptions, upcoming renewals, cash-flow shortfall risk, life changes (change-point on income and essentials).
+
+**Ranking**: impact × confidence × relevance, then a feasibility filter against Memories and constraints. Baseline to beat: rank by £ impact alone.
+
+**Forecasting**: recurring payments from their schedule; discretionary spending per Category via exponential smoothing (ETS) with prediction intervals; cash flow combines both.
+
+**Allocation Plans**: the Plan sub-graph gathers constraints and priorities as Memory Proposals; a linear program (`scipy.optimize`, OR-Tools only if needed) splits income with constraints as hard limits and weights from learned preferences; compared with a 50/30/20 baseline; explained with trade-offs.
+
+**Knowledge base**: a small, user-approved set of guidance documents (MoneyHelper, gov.uk), stored with source URL, fetch date and version, embedded locally (Ollama embeddings + `sqlite-vec`). Cited when used; never supplies figures.
+
+## Learning about the user
+
+Layered, each step shipped only if it beats the previous one on evaluations:
+
+1. Supervised categorisation from Corrections.
+2. Personal baselines (seasonal, payday cycle).
+3. Beta-Bernoulli relevance per Insight type and Category.
+4. Weekly worth-it / regret review.
+5. Pairwise "which would you cut" questions: Bradley-Terry with active learning.
+6. Thompson-sampling contextual bandit for what to suggest and when (from ~50 ratings).
+7. Change-point detection resets baselines after confirmed life changes.
+
+Not planned: full reinforcement learning (insufficient data), fine-tuning on real data (ADR 0009). LoRA via MLX only on synthetic tool-calling data if the benchmark shows a gap.
+
+New model versions run in shadow, compared on the most recent month, promoted only if better, with one-click rollback via the model registry.

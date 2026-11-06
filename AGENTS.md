@@ -1,6 +1,36 @@
 # AGENTS.md
 
-Engineering rules for this project are still being designed (see `/grill-with-docs` output). Until they land: no real financial data in commits, fixtures, issues or logs.
+Read `GLOSSARY.md` and the relevant `docs/adr/` before working. Design docs: `docs/ARCHITECTURE.md`, `docs/AI_DESIGN.md`, `docs/THREAT_MODEL.md`, `docs/DATA_POLICY.md`, `docs/ML_EVALUATIONS.md`, `docs/FRONTEND.md`, `docs/ROADMAP.md`.
+
+## Hard rules
+
+- **No real financial data** in commits, fixtures, issues, PRs, logs or traces. Fixtures live only in `tests/fixtures/synthetic/` and start with `# synthetic`.
+- **Money is `Decimal` or integer minor units.** Never `float` in `ledger`, `engine` or `api`.
+- **The LLM never computes a figure.** Every figure in an Assistant reply comes from a tool result (ADR 0007).
+- **No write paths for the Assistant** except Proposals that the user confirms.
+- **No network egress** except `localhost` Ollama, and the privacy gateway when the user opts in. No LangSmith or third-party tracing.
+- **Logs never contain** amounts, descriptions, account fields or Memory text.
+- **No payments or transfers**, ever.
+- Respect module boundaries in `docs/ARCHITECTURE.md`; the import-linter contract enforces them.
+
+## How to build
+
+- Python via `uv` only (`uv run`, `uv add`). Lint `ruff`, types `pyright`, tests `pytest` + Hypothesis.
+- Test-first (`/tdd`). Financial invariants get property tests.
+- Intelligence work writes its evaluation first: dataset, metric, baseline (`docs/ML_EVALUATIONS.md`).
+- Small vertical slices; one ticket at a time unless running `/implement-spec`.
+- No new infrastructure, service or dependency without a reason in the ticket or an ADR.
+- Every PR must pass CI (ruff, pyright, pytest, gitleaks, fixture guard, OpenAPI type sync) before merging; `main` is protected.
+
+## Model per ticket and verification
+
+`/to-tickets` labels each ticket with one model:
+
+- `model:opus`: money calculations, Ledger invariants, security, privacy gateway, ML evaluation design, anything that changes an ADR, core logic.
+- `model:sonnet`: well-specified endpoints, importers following an existing pattern, UI components, tests.
+- `model:haiku`: only tiny tasks such as docs, config and renames.
+
+When running `/implement-spec`, start each implementer subagent with the model on its ticket's label, in its own worktree. For `model:opus` tickets only, a fresh Opus verifier subagent (no access to the implementer's reasoning) runs `/code-review` and adds at least one adversarial test (a property test or a malicious input); the ticket merges only when the verifier approves and CI passes. `model:sonnet` and `model:haiku` tickets merge on CI. A ticket that fails review twice moves up one model.
 
 ## Frontend work: required skills
 
