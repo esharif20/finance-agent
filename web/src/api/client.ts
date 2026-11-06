@@ -3,6 +3,8 @@ import type { components } from "./schema";
 export type Summary = components["schemas"]["SummaryOut"];
 export type Account = components["schemas"]["AccountOut"];
 
+export type Spending = components["schemas"]["SpendingOut"];
+
 export class NoData extends Error {}
 
 async function get<T>(url: string): Promise<T> {
@@ -15,3 +17,5 @@ async function get<T>(url: string): Promise<T> {
 export const fetchSummary = (month?: string) =>
   get<Summary>(month ? `/api/summary?month=${month}` : "/api/summary");
 export const fetchAccounts = () => get<Account[]>("/api/accounts");
+export const fetchSpending = (month: string) => get<Spending>(`/api/spending?month=${month}`);
+export const fetchMonths = () => get<string[]>("/api/months");

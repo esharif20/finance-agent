@@ -391,6 +391,12 @@ class Ledger:
         newest = self._db.execute(self._db.select(t, func.max(t.c.posted_on))).scalar()
         return None if newest is None else f"{newest:%Y-%m}"
 
+    def months(self) -> list[str]:
+        """Months (YYYY-MM) that have Transactions, newest first."""
+        t = schema.transaction
+        days = self._db.execute(self._db.select(t, t.c.posted_on).distinct()).scalars()
+        return sorted({f"{d:%Y-%m}" for d in days}, reverse=True)
+
     def accounts(self) -> list[AccountBalance]:
         """Accounts with Bank and Ledger balances; an empty Account is skipped."""
         a = schema.account

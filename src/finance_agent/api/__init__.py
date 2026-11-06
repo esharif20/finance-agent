@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy import Engine
 
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
-from finance_agent.ledger import AccountBalance, Gap, Ledger, MonthSummary
+from finance_agent.ledger import AccountBalance, Gap, Ledger, MonthSummary, Spend
 from finance_agent.storage import open_db
 
 # shortcut: located relative to the source tree, so only a checkout serves the UI
@@ -51,6 +51,18 @@ class AccountOut(BaseModel):
     bank_balance: Money
     ledger_balance: Money
     gaps: list[GapOut]
+
+
+class CategorySpendOut(BaseModel):
+    name: str
+    amount: Money
+
+
+class SpendingOut(BaseModel):
+    month: str
+    currency: str
+    total: Money
+    categories: list[CategorySpendOut]
 
 
 class HealthOut(BaseModel):
@@ -94,6 +106,19 @@ def _account(a: AccountBalance) -> AccountOut:
     )
 
 
+def _spending(month: str, spends: list[Spend], currency: str = "GBP") -> SpendingOut:
+    total = sum((s.amount for s in spends), Decimal(0))
+    return SpendingOut(
+        month=month,
+        currency=currency,
+        total=_money(total, currency),
+        categories=[
+            CategorySpendOut(name=s.name, amount=_money(s.amount, currency))
+            for s in spends
+        ],
+    )
+
+
 def _ledger(request: Request) -> Iterator[Ledger]:
     engine: Engine = request.app.state.engine
     with engine.begin() as conn:
@@ -123,6 +148,22 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             return _summary(led.summarise_month(month))
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
+
+    @app.get("/api/spending")
+    def spending(
+        led: Led, month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None
+    ) -> SpendingOut:
+        month = month or led.latest_month()
+        if month is None:
+            raise HTTPException(404, "No transactions yet. Run `fa import` first.")
+        try:
+            return _spending(month, led.spending_by_category(month))
+        except ValueError:
+            raise HTTPException(422, "month must be a real YYYY-MM") from None
+
+    @app.get("/api/months")
+    def months(led: Led) -> list[str]:
+        return led.months()
 
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:

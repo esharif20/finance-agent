@@ -29,6 +29,8 @@ fa();
 try {
   const summary = await (await fetch(`${base}/api/summary`)).json();
   const accounts = await (await fetch(`${base}/api/accounts`)).json();
+  const spending = await (await fetch(`${base}/api/spending`)).json();
+  const months = await (await fetch(`${base}/api/months`)).json();
   const browser = await webkit.launch();
   for (const [scheme, name, viewport] of [
     ["light", "desktop", { width: 1280, height: 860 }],
@@ -52,6 +54,17 @@ try {
         failed = true;
       }
     }
+    const donut = (await page.getByRole("region", { name: "Where it went" }).innerText()).replace(/\s+/g, "");
+    if (!donut.includes(gbp(spending.total.minor))) {
+      console.error(`FAIL ${scheme} ${name}: donut total is not ${gbp(spending.total.minor)}`);
+      failed = true;
+    }
+    for (const c of spending.categories) {
+      if (!donut.includes(gbp(c.amount.minor))) {
+        console.error(`FAIL ${scheme} ${name}: ${c.name} amount missing from the legend`);
+        failed = true;
+      }
+    }
     const body = await page.locator("main").innerText();
     for (const a of accounts) {
       if (!body.includes(gbp(a.bank_balance.minor).replace(/\.\d\d$/, ""))) {
@@ -66,6 +79,19 @@ try {
     }
     await page.waitForTimeout(500); // let the strip finish drawing in
     if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}.png`, fullPage: true });
+    if (months.length > 1) {
+      // step back a month: every Overview figure must follow the API for that month
+      const prev = months[1];
+      const sum = await (await fetch(`${base}/api/summary?month=${prev}`)).json();
+      await page.getByRole("button", { name: "Previous month" }).click();
+      await page.waitForTimeout(700);
+      const got = await text("Net");
+      if (!got.includes(gbp(sum.net.minor, true))) {
+        console.error(`FAIL ${scheme} ${name}: after switching to ${prev}, Net shows ${got}`);
+        failed = true;
+      }
+      if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}-prev.png`, fullPage: true });
+    }
     await page.close();
   }
   await browser.close();
