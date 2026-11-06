@@ -1,6 +1,6 @@
 ---
 area: system
-status: accepted
+status: superseded by ADR 0013
 ---
 # Paid services run under a hard £7 monthly cap, spent mostly on synthetic data
 

@@ -1,6 +1,6 @@
 # AI design
 
-Status: draft for review. Decisions: ADRs 0005, 0007–0012.
+Status: draft for review. Decisions: ADRs 0005, 0007–0013.
 
 ## Principle
 
@@ -73,7 +73,7 @@ Keyed by (intent, tool calls with arguments, Ledger version), stored encrypted. 
 
 ## Privacy gateway
 
-Separate module, no database access. Placeholders replace figures, merchants and personal values; only allowlisted fields leave; per-conversation opt-in; every payload logged and viewable; replies validated before placeholders are filled locally; hard £7 monthly cap (ADR 0011, ADR 0012).
+Separate module, no database access. Placeholders replace figures, merchants and personal values; only allowlisted fields leave; per-conversation opt-in; every payload logged and viewable; replies validated before placeholders are filled locally; hard £9 monthly cap shared with the aggregator (ADR 0011, ADR 0013).
 
 ## Intelligence Engine
 
