@@ -73,7 +73,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id` | nothing |
 | `ingest` | One parser per Bank, the `Importer` interface, duplicate detection (ADR 0006), account-number masking | `storage` |
 | `ledger` | Transactions, Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage`, `ingest` |
-| `categorise` | Taxonomy (versioned), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger` |
+| `categorise` | Taxonomy (versioned), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger`, `storage` (its own derived tables) |
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry | `ledger`, `categorise`, `memory` |
 | `memory` | Memories, Proposals, feedback, retention | `storage` |
 | `assistant` | The LangGraph graph, tool allowlist, grounding check, answer cache (ADR 0010), `ChatModel` interface and adapters | `engine`, `ledger` (read-only views), `memory` |
@@ -123,7 +123,7 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 | `correction` | id, user_id, transaction_id, field, new_value, origin (ui, chat), created_at, superseded_by |
 | `categorisation` | transaction_id, category_id, kind, source (correction, rule, model), confidence, model_version |
 | `transfer_link` | from_transaction_id, to_transaction_id, confidence, confirmed |
-| `reconciliation_gap` | account_id, as_of, bank_balance_minor, ledger_balance_minor |
+| `reconciliation_gap` | account_id, from_date, to_date, amount_minor (Bank minus Ledger; rebuilt after every import) |
 | `insight` | id, user_id, type, impact_minor, confidence, relevance, evidence (JSON of ids), created_at, status |
 | `feedback` | insight_id or transaction_id, signal (accept, dismiss, worth_it, regret, pairwise), created_at |
 | `memory` | id, user_id, type (preference, goal, constraint), text, tags, provenance (turn id, quote, date), review_on, status |
