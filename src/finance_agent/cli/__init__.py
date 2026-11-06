@@ -23,7 +23,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     imp.add_argument("files", nargs="+", type=Path)
     summ = sub.add_parser("summary", help="money in, out and net for a month")
     summ.add_argument("month", metavar="YYYY-MM")
+    w = sub.add_parser("watch", help="auto-import a watched folder (launchd)")
+    wsub = w.add_subparsers(dest="watch_command", required=True)
+    wi = wsub.add_parser("install", help="install the launchd agent")
+    wi.add_argument("folder", type=Path)
+    wsub.add_parser("remove", help="remove the launchd agent")
+    wr = wsub.add_parser("run", help="import the folder now (launchd calls this)")
+    wr.add_argument("folder", type=Path)
     args = parser.parse_args(argv)
+
+    if args.command == "watch":
+        from finance_agent.cli import watch
+
+        if args.watch_command == "install":
+            print(f"Installed {watch.install(args.folder)}")
+        elif args.watch_command == "remove":
+            watch.remove()
+            print("Removed")
+        else:
+            return watch.run(args.folder)
+        return 0
 
     try:
         engine = open_db()
