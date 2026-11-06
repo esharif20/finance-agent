@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { components } from "@/api/schema";
-import { AccountsCard } from "./AccountsCard";
 import { PrivacyProvider } from "@/lib/privacy";
 import { MonthCard } from "./MonthCard";
 import { SpendingDonut } from "./SpendingDonut";
@@ -46,6 +45,7 @@ const spending: Spending = {
 
 const account = (over: Partial<Account> = {}): Account => ({
   id: 1,
+  bank: "Lloyds",
   masked_number: "••••0001",
   name: "Everyday current",
   kind: "current",
@@ -180,48 +180,6 @@ describe("SpendingDonut", () => {
   });
 });
 
-describe("AccountsCard", () => {
-  it("marks a reconciled account 'Matches ledger'", () => {
-    render(<AccountsCard accounts={[account()]} />);
-
-    const row = screen.getByRole("listitem", { name: /Everyday current/ });
-    expect(within(row).getByText("Matches ledger")).toBeInTheDocument();
-    expect(row).toHaveTextContent("£1,179.79");
-    expect(row).toHaveTextContent("••••0001");
-    expect(within(row).queryByText("Find it")).not.toBeInTheDocument();
-  });
-
-  it("marks an account with a Gap 'Find it' and explains it on request", async () => {
-    render(
-      <AccountsCard
-        accounts={[
-          account({
-            ledger_balance: m(116739),
-            gaps: [
-              { from_date: "2026-02-03", to_date: "2026-02-05", amount: m(1240) },
-            ],
-          }),
-        ]}
-      />,
-    );
-
-    const row = screen.getByRole("listitem", { name: /Everyday current/ });
-    expect(within(row).queryByText("Matches ledger")).not.toBeInTheDocument();
-    const find = within(row).getByText("Find it");
-    expect(row).toHaveTextContent("£12.40");
-
-    await userEvent.click(find);
-
-    expect(row).toHaveTextContent("3 Feb");
-    expect(row).toHaveTextContent("5 Feb");
-  });
-
-  it("says there are no accounts yet", () => {
-    render(<AccountsCard accounts={[]} />);
-    expect(screen.getByText(/fa import/)).toBeInTheDocument();
-  });
-});
-
 describe("Overview", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -261,7 +219,7 @@ describe("Overview", () => {
     renderOverview();
 
     expect(await screen.findByLabelText("Net")).toHaveTextContent("+£936.90");
-    expect(await screen.findByText("Matches ledger")).toBeInTheDocument();
+    expect((await screen.findAllByText("Matches ledger")).length).toBe(2); // All accounts + the one
     expect(await screen.findByText("Housing")).toBeInTheDocument();
   });
 

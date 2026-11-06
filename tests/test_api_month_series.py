@@ -53,3 +53,20 @@ def test_limit_is_bounded_and_empty_ledger_is_an_empty_list(
     assert client.get("/api/month-series").json() == []
     assert client.get("/api/month-series", params={"limit": 0}).status_code == 422
     assert client.get("/api/month-series", params={"limit": 61}).status_code == 422
+
+
+def test_account_filter_matches_the_ledger_and_unknown_is_404(
+    client: TestClient, engine: Engine, seeded: None
+) -> None:
+    with engine.connect() as conn:
+        led = Ledger(conn, identity.current_user())
+        acc = led.accounts()[0].id
+        month = led.months()[0]
+        want = led.summarise_month(month, acc)
+    body = client.get(
+        "/api/month-series", params={"limit": 1, "account_id": acc}
+    ).json()
+    assert body[0]["money_out"]["minor"] == int(want.money_out * 100)
+    assert (
+        client.get("/api/month-series", params={"account_id": 9999}).status_code == 404
+    )

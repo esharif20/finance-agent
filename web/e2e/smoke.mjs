@@ -79,7 +79,7 @@ try {
         console.error(`FAIL ${scheme} ${name}: balance of ${a.masked_number} missing`);
         failed = true;
       }
-      const row = await page.getByRole("listitem", { name: a.name }).first().innerText();
+      const row = await page.getByRole("button", { name: new RegExp(a.masked_number) }).first().innerText();
       if (!row.includes(a.gaps.length ? "Find it" : "Matches ledger")) {
         console.error(`FAIL ${scheme} ${name}: status of ${a.masked_number} wrong`);
         failed = true;

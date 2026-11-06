@@ -17,9 +17,18 @@ async function get<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export const fetchSummary = (month?: string) =>
-  get<Summary>(month ? `/api/summary?month=${month}` : "/api/summary");
+const query = (month?: string, accountId?: number) => {
+  const q = new URLSearchParams();
+  if (month) q.set("month", month);
+  if (accountId !== undefined) q.set("account_id", String(accountId));
+  return q.size ? `?${q}` : "";
+};
+
+export const fetchSummary = (month?: string, accountId?: number) =>
+  get<Summary>(`/api/summary${query(month, accountId)}`);
 export const fetchAccounts = () => get<Account[]>("/api/accounts");
+export const fetchSpending = (month: string, accountId?: number) =>
+  get<Spending>(`/api/spending${query(month, accountId)}`);
 
 export type TxnFilters = {
   account_id?: string;
@@ -48,10 +57,12 @@ export async function postCorrection(body: {
   });
   if (!res.ok) throw new Error(`correction: ${res.status}`);
 }
-export const fetchSpending = (month: string) => get<Spending>(`/api/spending?month=${month}`);
 export const fetchMonths = () => get<string[]>("/api/months");
 export type MonthTotals = components["schemas"]["MonthTotalsOut"];
-export const fetchMonthSeries = () => get<MonthTotals[]>("/api/month-series?limit=12");
+export const fetchMonthSeries = (accountId?: number) =>
+  get<MonthTotals[]>(
+    `/api/month-series?limit=12${accountId === undefined ? "" : `&account_id=${accountId}`}`,
+  );
 
 export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
 export const fetchCategory = (name: string, month: string) =>

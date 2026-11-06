@@ -3,6 +3,10 @@
     "schemas": {
       "AccountOut": {
         "properties": {
+          "bank": {
+            "title": "Bank",
+            "type": "string"
+          },
           "bank_balance": {
             "$ref": "#/components/schemas/Money"
           },
@@ -39,6 +43,7 @@
         },
         "required": [
           "id",
+          "bank",
           "masked_number",
           "name",
           "kind",
@@ -785,6 +790,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
           }
         ],
         "responses": {
@@ -858,6 +879,22 @@
               ],
               "title": "Month"
             }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
           }
         ],
         "responses": {
@@ -904,6 +941,22 @@
                 }
               ],
               "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
             }
           }
         ],
