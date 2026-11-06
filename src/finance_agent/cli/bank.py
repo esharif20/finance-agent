@@ -93,9 +93,11 @@ def _print(r: SyncReport) -> None:
             f"  {r.rejected_accounts} Accounts refused: one ID sent with different rows"
         )
     if r.provider_duplicates:
-        print(f"  {r.provider_duplicates} rows look like provider duplicates; kept")
+        print(
+            f"  {r.provider_duplicates} rows are Possible Duplicates; kept, not merged"
+        )
     if r.pending_explained:
-        print(f"  {r.pending_explained} balance differences equal pending rows")
+        print(f"  {r.pending_explained} Gaps equal the pending rows' total")
     if r.provider_errors:
         print(f"  the provider reported {r.provider_errors} messages")
     for g in r.gaps:

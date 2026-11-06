@@ -150,3 +150,20 @@ sync_gap = Table(
     Column("balance_ts", BigInteger, nullable=False),
     Column("amount_minor", BigInteger, nullable=False),
 )
+
+# ADR 0014 Possible Duplicates from the provider: (a) one purchase under several
+# IDs in one response, (b) a re-issued ID. Kept and surfaced, never merged.
+possible_duplicate = Table(
+    "possible_duplicate",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("group_id", Integer, primary_key=True),
+    Column("transaction_id", Integer, ForeignKey("transaction.id"), primary_key=True),
+    Column("account_id", Integer, ForeignKey("account.id"), nullable=False),
+    Column(
+        "statement_import_id",
+        Integer,
+        ForeignKey("statement_import.id"),
+        nullable=False,
+    ),
+)

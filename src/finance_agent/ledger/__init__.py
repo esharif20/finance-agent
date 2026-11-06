@@ -70,8 +70,8 @@ class SyncReport:
     already_known: int
     changed_known: int  # known IDs arriving with other fields; stored rows unchanged
     rejected_accounts: int  # one ID with differing rows: that Account's rows refused
-    provider_duplicates: int  # same date, amount and text under distinct IDs: kept
-    pending_explained: int  # Gaps equal to the pending sum, not opened as Gaps
+    provider_duplicates: int  # rows in new Possible Duplicates (ADR 0014 (a), (b))
+    pending_explained: int  # Gaps equal to the pending sum (still opened)
     provider_errors: int
     gaps: list[SyncGap]
     accounts: list[AffectedAccount]
@@ -301,7 +301,11 @@ class Ledger:
                 rejected += 1
                 continue
             account_id, masked = self._synced_account(acc)
-            dupes += self._provider_duplicates(account_id, acc)
+            new_ids = {
+                row.provider_id
+                for row in acc.rows
+                if self._synced_key(account_id, row.provider_id) is None
+            }
             for row in acc.rows:
                 position += 1
                 found = self._synced_key(account_id, row.provider_id)
@@ -346,10 +350,11 @@ class Ledger:
                     row_number=position,
                 )
             self._match(account_id)
+            dupes += self._record_duplicates(account_id, import_id, acc, new_ids)
             gap = self._reconcile(account_id, masked, acc)
             if gap is not None and gap.amount == _decimal(acc.pending_minor):
-                pending_explained += 1
-            elif gap is not None:
+                pending_explained += 1  # a hint only: ADR 0014 opens every Gap
+            if gap is not None:
                 self._db.insert(
                     schema.sync_gap,
                     account_id=account_id,
@@ -406,6 +411,7 @@ class Ledger:
                 schema.synced_key,
                 schema.sync_anchor,
                 schema.sync_gap,
+                schema.possible_duplicate,
             ):
                 self._db.execute(
                     self._db.update(table)
@@ -418,8 +424,8 @@ class Ledger:
         )
         self._match(account_id)
 
-    def possible_duplicates(self) -> list[frozenset[int]]:
-        """ADR 0014 ambiguous components: Transaction ids kept apart, surfaced."""
+    def ambiguous_matches(self) -> list[frozenset[int]]:
+        """ADR 0014 ambiguous CSV-to-sync components, re-evaluated each import."""
         a = schema.account
         out: list[frozenset[int]] = []
         for (account_id,) in self._db.execute(
@@ -427,6 +433,18 @@ class Ledger:
         ):
             out += self._match(account_id, merge=False)
         return out
+
+    def possible_duplicates(self) -> list[frozenset[int]]:
+        """ADR 0014 Possible Duplicates: ambiguous matching components, then
+        provider duplicates (a) and re-issued IDs (b). Kept apart, surfaced."""
+        out = self.ambiguous_matches()
+        pd = schema.possible_duplicate
+        groups: dict[int, set[int]] = defaultdict(set)
+        for r in self._db.execute(
+            self._db.select(pd, pd.c.group_id, pd.c.transaction_id)
+        ):
+            groups[int(r.group_id)].add(int(r.transaction_id))
+        return out + [frozenset(g) for _, g in sorted(groups.items())]
 
     def sync_gaps(self) -> list[SyncGap]:
         g, a = schema.sync_gap, schema.account
@@ -449,7 +467,13 @@ class Ledger:
         """First day to fetch: the last synced posted date minus an overlap, or
         the provider's history on a first sync."""
         k = schema.synced_key
-        last = self._db.execute(self._db.select(k, func.max(k.c.posted_ts))).scalar()
+        newest = (
+            self._db.select(k, func.max(k.c.posted_ts).label("ts"))
+            .group_by(k.c.account_id)
+            .subquery()
+        )
+        # the stalest Account decides, so no Account's late rows fall outside
+        last = self._db.execute(select(func.min(newest.c.ts))).scalar()
         if last is None:
             return today - timedelta(days=simplefin.FIRST_SYNC_DAYS)
         posted = datetime.fromtimestamp(int(last), simplefin.LONDON).date()
@@ -484,22 +508,85 @@ class Ledger:
             ).where(k.c.account_id == account_id, k.c.provider_id == provider_id)
         ).first()
 
-    def _provider_duplicates(
-        self, account_id: int, acc: simplefin.SyncedAccount
+    def _record_duplicates(
+        self,
+        account_id: int,
+        import_id: int,
+        acc: simplefin.SyncedAccount,
+        new: set[str],
     ) -> int:
-        """Rows in this response sharing date, amount and text under distinct IDs,
-        at least one of them new: kept, counted for the report (ADR 0014 (a))."""
-        groups: dict[tuple[date, int, str], list[str]] = defaultdict(list)
+        """ADR 0014 Possible Duplicates for rows new in this response, kept and
+        surfaced, never merged: (a) same date, amount and raw text under distinct
+        IDs in this response; (b) same amount and text within MATCH_DAYS of a
+        known row whose ID is absent although this response covers its date
+        (a re-issued ID). Call after `_match`, so ids are final. Returns rows."""
+        if not new or not acc.rows:
+            return 0
+        k = schema.synced_key
+        txn_of = {
+            str(r.provider_id): int(r.transaction_id)
+            for r in self._db.execute(
+                self._db.select(k, k.c.provider_id, k.c.transaction_id).where(
+                    k.c.account_id == account_id
+                )
+            )
+        }
+        groups: list[set[int]] = []
+        same: dict[tuple[date, int, str], list[str]] = defaultdict(list)
         for row in acc.rows:
-            groups[(row.posted_on, row.amount_minor, row.description)].append(
+            same[(row.posted_on, row.amount_minor, row.description)].append(
                 row.provider_id
             )
-        return sum(
-            len(ids)
-            for ids in groups.values()
-            if len(ids) > 1
-            and any(self._synced_key(account_id, i) is None for i in ids)
-        )
+        groups += [
+            {txn_of[i] for i in ids}
+            for ids in same.values()
+            if len(ids) > 1 and new.intersection(ids)
+        ]
+        seen = {row.provider_id for row in acc.rows}
+        lo = min(row.posted_on for row in acc.rows)
+        hi = max(row.posted_on for row in acc.rows)
+        absent = [
+            r
+            for r in self._db.execute(
+                self._db.select(k, k.c.provider_id, k.c.transaction_id, k.c.posted_ts)
+                .add_columns(k.c.amount_minor, k.c.description)
+                .where(k.c.account_id == account_id)
+            )
+            if r.provider_id not in seen
+        ]
+        for row in acc.rows:
+            if row.provider_id not in new:
+                continue
+            for r in absent:
+                on = datetime.fromtimestamp(int(r.posted_ts), simplefin.LONDON).date()
+                if (
+                    lo <= on <= hi
+                    and (r.amount_minor, r.description)
+                    == (row.amount_minor, row.description)
+                    and abs((on - row.posted_on).days) <= MATCH_DAYS
+                ):
+                    groups.append({int(r.transaction_id), txn_of[row.provider_id]})
+        pd = schema.possible_duplicate
+        rows = 0
+        for g in groups:
+            if len(g) < 2:
+                continue  # both rows matched into one CSV Transaction
+            group_id = 1 + int(
+                self._db.execute(
+                    self._db.select(pd, func.coalesce(func.max(pd.c.group_id), 0))
+                ).scalar()
+                or 0
+            )
+            for txn_id in g:
+                self._db.insert(
+                    pd,
+                    group_id=group_id,
+                    transaction_id=txn_id,
+                    account_id=account_id,
+                    statement_import_id=import_id,
+                )
+            rows += len(g)
+        return rows
 
     def _match(self, account_id: int, *, merge: bool = True) -> list[frozenset[int]]:
         """ADR 0014 CSV-to-sync matching over the Account's unmatched rows.
@@ -561,7 +648,11 @@ class Ledger:
         """A matched pair becomes one Transaction: the CSV one stays and takes the
         synced key and sources; the just-synced copy goes (it has no Corrections)."""
         t = schema.transaction
-        for table in (schema.synced_key, schema.transaction_source):
+        for table in (
+            schema.synced_key,
+            schema.transaction_source,
+            schema.possible_duplicate,
+        ):
             self._db.execute(
                 self._db.update(table)
                 .where(table.c.transaction_id == synced_id)

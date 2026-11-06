@@ -16,6 +16,7 @@ import base64
 import binascii
 import json
 import re
+import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -37,6 +38,10 @@ MAX_REQUESTS = 5  # per run; firefly-iii#12538 hit the bridge's daily quota
 # the fetch time, so the feed cannot say whether balance includes pending rows.
 # The Ledger reports a Gap equal to the pending sum as "pending" instead.
 TIMEOUT_S = 30
+MAX_RESPONSE_BYTES = 32 * 1024 * 1024  # spike: ~24 months of 2 Accounts is far less
+MAX_TEXT = 1024  # characters in any text field; longer refuses the response
+MAX_MINOR = 10**15  # |amount| in minor units; keeps BigInteger and Decimal sane
+MAX_TS = 4_102_444_800  # 2100-01-01; past datetime's range is not a timestamp
 LONDON = ZoneInfo("Europe/London")
 
 _AMOUNT = re.compile(r"-?\d+(\.\d+)?", re.ASCII)
@@ -98,32 +103,34 @@ def _str(obj: dict[str, Any], key: str, *, required: bool = True) -> str:
     v = obj.get(key)
     if v is None and not required:
         return ""
-    if not isinstance(v, str):
+    if not isinstance(v, str) or len(v) > MAX_TEXT:
         raise UnreadableResponse(f"field {key} is not text")
     return v
 
 
 def _ts(obj: dict[str, Any], key: str) -> int:
     v = obj.get(key)
-    if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+    if not isinstance(v, int) or isinstance(v, bool) or not 0 <= v <= MAX_TS:
         raise UnreadableResponse(f"field {key} is not a timestamp")
     return v
 
 
 def _minor(obj: dict[str, Any], key: str) -> int:
     text = _str(obj, key)
-    if not _AMOUNT.fullmatch(text):
+    if len(text) > 32 or not _AMOUNT.fullmatch(text):
         raise UnreadableResponse(f"field {key} is not a decimal amount")
     # shortcut: assumes a 2-digit minor unit (GBP, EUR, USD); JPY/KWD need ISO 4217
     minor = Decimal(text).scaleb(2)
     if minor != minor.to_integral_value():
         raise UnreadableResponse(f"field {key} has sub-minor-unit digits")
+    if abs(minor) >= MAX_MINOR:
+        raise UnreadableResponse(f"field {key} is out of range")
     return int(minor)
 
 
 def _row(t: dict[str, Any]) -> tuple[bool, SyncedRow]:
     pid = _str(t, "id")
-    if not pid:
+    if not pid or len(pid) > 256:  # synced_key.provider_id
         raise UnreadableResponse("transaction id is empty")
     posted = _ts(t, "posted")
     pending = t.get("pending") is True or posted == 0
@@ -149,7 +156,7 @@ def _text(t: dict[str, Any]) -> str:
 def _account(a: dict[str, Any]) -> SyncedAccount:
     pid = _str(a, "id")
     currency = _str(a, "currency")
-    if not pid or not _CURRENCY.fullmatch(currency):
+    if not pid or len(pid) > 256 or not _CURRENCY.fullmatch(currency):
         raise UnreadableResponse("account id or currency is malformed")
     org = _obj(a.get("org", {}), "org")
     # spike: org.domain is always null; name, then id, identifies the Bank
@@ -179,12 +186,18 @@ def _account(a: dict[str, Any]) -> SyncedAccount:
     )
 
 
+_BAD = object()
+
+
 def parse(data: bytes) -> SyncResponse:
+    # Decimal for any JSON number so no float is ever created; amounts must be text.
+    # The raise sits outside `except`: the decode error quotes the response.
     try:
-        # Decimal for any JSON number so no float is ever created; amounts must be text.
         doc = json.loads(data, parse_float=Decimal)
     except (ValueError, RecursionError):
-        raise UnreadableResponse("response is not JSON") from None
+        doc = _BAD
+    if doc is _BAD:
+        raise UnreadableResponse("response is not JSON")
     top = _obj(doc, "response")
     accounts = [
         _account(_obj(a, "account")) for a in _list(top.get("accounts"), "accounts")
@@ -198,12 +211,16 @@ def parse(data: bytes) -> SyncResponse:
 
 def _check(url: str, *, credentials: bool) -> tuple[str, str]:
     """Refuse anything but https on HOST; returns (url without userinfo, userinfo)."""
+    # Raises sit outside `except`: urllib's errors quote the URL.
     try:
         u = urlsplit(url)
-        host, has_creds = u.hostname, bool(u.username and u.password)
+        parts = (u, u.hostname, u.port, bool(u.username and u.password))
     except ValueError:
-        raise SimpleFINError("the SimpleFIN URL is malformed") from None
-    if u.scheme != "https" or host != HOST or u.port not in (None, 443):
+        parts = None
+    if parts is None:
+        raise SimpleFINError("the SimpleFIN URL is malformed")
+    u, host, port, has_creds = parts
+    if u.scheme != "https" or host != HOST or port not in (None, 443):
         raise SimpleFINError(f"only https://{HOST} is allowlisted (ADR 0013)")
     if has_creds != credentials or u.fragment:
         raise SimpleFINError("the SimpleFIN URL is malformed")
@@ -215,28 +232,36 @@ def _call(
     transport: Transport, method: str, url: str, headers: dict[str, str]
 ) -> bytes:
     try:
-        status, body = transport(
-            method, url, headers, b"" if method == "POST" else None
-        )
-    except Exception:  # HTTP client errors often embed the URL: never chain them
-        raise SimpleFINError("could not reach the SimpleFIN provider") from None
+        reply = transport(method, url, headers, b"" if method == "POST" else None)
+    except Exception:  # HTTP client errors embed the URL: raise outside, unchained
+        reply = None
+    if reply is None:
+        raise SimpleFINError("could not reach the SimpleFIN provider")
+    status, body = reply
     if status != 200:
         raise SimpleFINError(f"the SimpleFIN provider answered HTTP {status}")
+    if len(body) > MAX_RESPONSE_BYTES:
+        raise SimpleFINError("the SimpleFIN response is too large")
     return body
 
 
 def claim(setup_token: str, transport: Transport) -> str:
     """Exchange a one-time setup token for the access URL (holds credentials)."""
+    # Raises sit outside `except`: decode errors keep the decoded bytes.
     try:
         claim_url = base64.b64decode(setup_token.strip(), validate=True).decode("ascii")
     except (binascii.Error, ValueError):
-        raise SimpleFINError("that is not a SimpleFIN setup token") from None
+        claim_url = None
+    if claim_url is None:
+        raise SimpleFINError("that is not a SimpleFIN setup token")
     _check(claim_url, credentials=False)
     body = _call(transport, "POST", claim_url, {"Content-Length": "0"})
     try:
         access = body.decode("ascii").strip()
     except UnicodeDecodeError:
-        raise SimpleFINError("the provider returned no access URL") from None
+        access = None
+    if access is None:
+        raise SimpleFINError("the provider returned no access URL")
     _check(access, credentials=True)
     return access
 
@@ -269,7 +294,7 @@ def windows(since: date, until: date) -> list[tuple[date, date]]:
     return out[::-1]
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
+class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *_: Any, **__: Any) -> None:
         return None  # a redirect could leave the allowlisted host
 
@@ -279,11 +304,15 @@ def urllib_transport(
 ) -> tuple[int, bytes]:
     """The real transport: allowlisted host only, no proxies, no redirects."""
     _check(url, credentials=False)
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        NoRedirect,
+    )
     req = urllib.request.Request(url, data=body, headers=headers, method=method)  # noqa: S310
     try:
         with opener.open(req, timeout=TIMEOUT_S) as resp:
-            return resp.status, resp.read()
+            return resp.status, resp.read(MAX_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as e:
         return e.code, b""
 

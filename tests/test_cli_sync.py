@@ -171,3 +171,24 @@ def test_sync_refuses_a_response_it_cannot_read_and_stores_nothing(
     capsys.readouterr()
     assert main(["sync"]) == 0
     assert "10 added" in capsys.readouterr().out
+
+
+def test_a_failing_claim_leaks_nothing_to_output_logs_or_files(
+    env: dict[str, Any],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    env["t"].fail = OSError(f"POST {env['claim']} -> {env['access']} failed")
+    assert main(["connect"]) == 1
+    assert keyring.get_password(SERVICE, keychain.ACCOUNT) is None
+    env["t"].fail = None
+    assert main(["connect"]) == 0
+    assert main(["sync"]) == 0
+    out = capsys.readouterr()
+    seen = (out.out + out.err + caplog.text).encode()
+    seen += b"".join(p.read_bytes() for p in tmp_path.rglob("*") if p.is_file())
+    access = env["access"]
+    for secret in (access, access.split("@")[0], env["claim"], env["token"]):
+        assert secret.encode() not in seen

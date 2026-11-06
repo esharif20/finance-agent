@@ -1,4 +1,5 @@
-"""simplefin sync: synced_key, sync_anchor, sync_gap; nullable running balance
+"""simplefin sync: synced_key, sync_anchor, sync_gap, possible_duplicate;
+nullable running balance
 
 Revision ID: 0003
 Revises: 0002
@@ -71,8 +72,30 @@ def upgrade() -> None:
         sa.Column("amount_minor", sa.BigInteger, nullable=False),
     )
 
+    op.create_table(
+        "possible_duplicate",
+        sa.Column("user_id", sa.Integer, sa.ForeignKey("user.id"), primary_key=True),
+        sa.Column("group_id", sa.Integer, primary_key=True),
+        sa.Column(
+            "transaction_id",
+            sa.Integer,
+            sa.ForeignKey("transaction.id"),
+            primary_key=True,
+        ),
+        sa.Column(
+            "account_id", sa.Integer, sa.ForeignKey("account.id"), nullable=False
+        ),
+        sa.Column(
+            "statement_import_id",
+            sa.Integer,
+            sa.ForeignKey("statement_import.id"),
+            nullable=False,
+        ),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("possible_duplicate")
     op.drop_table("sync_gap")
     op.drop_table("sync_anchor")
     op.drop_table("synced_key")
