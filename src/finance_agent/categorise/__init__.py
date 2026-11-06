@@ -1,6 +1,7 @@
 """Categorisation: the versioned taxonomy, Merchant normalisation and the
 rule chain of ADR 0005 (Merchant default Category -> descriptor rules ->
-Uncategorised). Corrections (#10) and ML come later, in front of / after rules.
+Uncategorised). Corrections are a Ledger overlay applied on read, in front of
+every rule (ADR 0001); ML comes later, after rules.
 """
 
 import logging
@@ -101,8 +102,8 @@ class Classification:
     kind: str  # Spending, Income, Transfer, Refund or Fee
     merchant: str | None  # a Merchant name from `normalise`
     category: tuple[str, str] | None  # (top level, subcategory)
-    # how it was decided: "merchant:<name>", "rule:<id>" or "default"
-    # (Corrections, #10, will add "correction")
+    # how it was decided: "merchant:<name>", "rule:<id>" or "default"; the Ledger
+    # reports "correction" when a user Correction overrides it
     source: str
 
 
