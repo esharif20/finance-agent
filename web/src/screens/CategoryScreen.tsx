@@ -60,8 +60,8 @@ function Trend({ data, colour }: { data: CategoryDetail; colour: string }) {
                 className="w-full rounded-t-lg"
                 style={{
                   height: `${Math.max(width(p.amount.minor, max), p.amount.minor > 0 ? 4 : 1)}%`,
-                  background: colour,
-                  opacity: current ? 1 : 0.4,
+                  // a pale step of the hue, not opacity: opacity muddies it over the dark card
+                  background: current ? colour : `color-mix(in oklab, ${colour} 34%, var(--card))`,
                 }}
               />
             </div>

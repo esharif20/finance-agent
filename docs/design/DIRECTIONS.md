@@ -28,8 +28,8 @@ Mocks, shared data and palettes live in the scratchpad (not in the repo):
 - **Stack mapping:** each token below maps to a shadcn CSS variable (`--background` = ground, `--card` = surface, `--foreground` = text, `--muted-foreground` = muted, `--primary`, `--border`, `--ring`). Extend shadcn's `--chart-1..5` to `--cat-<id>` for the 11 categories so Recharts `<Cell fill="var(--cat-groceries)">` works in both themes. Dark mode uses the `class` strategy and `prefers-color-scheme` as the default. Self-host fonts with `@fontsource-variable/*`.
 - **Motion budget, app:** 120-220ms, `ease-out` (`[0.2, 0.8, 0.2, 1]`), exits about 70% of the entry time. No entrance choreography on cards. Motion only answers an action: a popover opens from its chip, a recategorised row's chip changes colour, the donut segments re-flow (`motion/react` `layout` and `AnimatePresence`), a number cross-fades when the month changes. Under `useReducedMotion()`: no transforms, opacity changes of 100ms or less, the blur toggle snaps.
 - **Motion, landing only:** large display type and scroll-driven storytelling. All of it is skipped under reduced motion, where each act renders in its final state as an ordinary section.
-- **Ambient background (M7, landing and demo only):** a slow-drifting field of large blurred colour blobs on a 40-60s loop, low opacity, animating only transform and opacity, paused when the tab is hidden, off under reduced motion. App screens keep the static glow and grain from #15 (no motion; glow hue outside 235-290).
-- **Glass (app chrome, #15):** a frosted look (translucent fill, `backdrop-filter: blur(20px) saturate(1.6)`, 1px light edge with an inner top highlight) on chrome only: the sticky header pill, action pills, the month switcher track and the phone bottom tab bar (`.glass` in `index.css`). Content cards (figures, charts, transaction lists) stay solid for legibility. `prefers-reduced-transparency: reduce` falls back to the solid card colour. Text on glass keeps WCAG AA in both themes, checked over the brightest part of the glow. Glow and glass tints stay outside hue 235-290 (accent blue about 210 and teal about 172 only). No 3D charts; static, no motion beyond the app budget.
+- **Ambient background (app screens since #55, and the landing page):** a slow-drifting field of large soft colour fields behind every screen. Superseded for app screens: they no longer keep a static glow. The user asked for a background that is visibly alive but calm, and the static glow sat only in the top two corners and stopped at viewport height in dark mode. See "Ambient background (#55)" below.
+- **Glass (app chrome, #15):** a frosted look (translucent fill, `backdrop-filter: blur(20px) saturate(1.6)`, 1px light edge with an inner top highlight) on chrome only: the sticky header pill, action pills, the month switcher track and the phone bottom tab bar (`.glass` in `index.css`). Content cards (figures, charts, transaction lists) stay solid for legibility. `prefers-reduced-transparency: reduce` falls back to the solid card colour. Text on glass keeps WCAG AA in both themes, checked over the brightest part of the glow. Glow and glass tints stay outside hue 235-290 (accent blue about 210 and teal about 172 only). No 3D charts. The glass itself does not move; the fields behind it drift (#55).
 - **3D hero candidate (M7):** ThreeUI (github.com/MengTo/threeui, Community components MIT, three.js). Evaluate a hero or background from it when the landing page starts: check the licence of the exact component, lazy-load it, render a static image under reduced motion or on weak GPUs, and keep its colours inside the palette rules (no hue in 235-290). Not used on app screens. No new dependency before then.
 - **Landing story (scroll-craft beats):** 1 Recognition (a month of raw statement lines) → 2 Turn (lines get sorted into categories) → 3 Substance (categories become the donut, the totals and the gap check) → 4 Commitment ("Open demo" → `/app`). The numbers on the landing page come from the same `data.js` and are labelled sample data. No invented user counts.
 - **Charts:** the composition donut is the one multi-hue chart. Every other chart (monthly trend, merchant ranking) is one series in the direction's data hue, with the current month marked.
@@ -229,3 +229,43 @@ Before building, open questions for the user: Manrope or Geist (the sheet dealt 
 - Font: **Manrope**, tabular figures.
 - Donut: colour the **top 5 Categories**, grey the rest; the table lists every Category.
 - Landing page: one true-black screen of large type, then the light sort-and-strip scroll story ending in "Open demo".
+
+## Design refresh (#55): ambient background and type
+
+Research: Linear, Stripe, Mercury, Raycast, Wise, Vercel, Monzo and Apple Card were opened in WebKit and their type measured (sizes, weights, tracking). Stills are in the session scratchpad (`screens/55/research/`). Three things carried over:
+
+- Stripe sets display type at weight 300 and Mercury at about 480: large figures read calmer when they are lighter than the headings around them.
+- Linear tracks display type at about -0.022em, Vercel at -0.06em. Tight tracking is what makes a big figure look set rather than typed.
+- Wise sets the pence of a large amount at about half size in a lighter weight. We already did the size step; it now has a floor of 11px and a fixed weight.
+
+We take their type scales, tracking, weights and numeral handling only, not their brands. Revolut stays the structural reference (pills, 20px cards, true black), still with no Revolut name, logo, `#494fdf` or Aeonik Pro.
+
+### Type
+
+One family (Manrope Variable) and six sizes. Each role is a Tailwind token in `index.css` (`text-hero`, `text-figure`, `text-title`, `text-heading`, `text-row`, `text-label`, `text-meta`), so new screens and components (#44 account cards, #47 bars) pick them up instead of setting one-off sizes. `cn()` knows these names (`lib/utils.ts`), so `text-label text-muted-foreground` keeps both classes.
+
+| Role | Token | Size / line / weight / tracking | Used for |
+| --- | --- | --- | --- |
+| Answer figure | `text-hero` + `.figure` | 34-40px (fluid) / 1.05 / 500 / -0.035em | Net, a Category's total |
+| Sibling figure | `text-figure` + `.figure` | 28 / 1.15 / 500 / -0.028em | Money in, Money out, donut centre |
+| Page title | `text-title` | 28 / 1.15 / 650 / -0.03em | h1 |
+| Card title | `text-heading` | 17 / 1.4 / 650 / -0.015em | CardTitle |
+| Row | `text-row` | 15 / 1.45 / (400-600) / -0.006em | Merchant names and row amounts |
+| Label | `text-label` | 13 / 1.4 / 500 | Labels above figures, descriptors, chips |
+| Meta | `text-meta` | 12 / 1.35 / 500 / +0.005em | Axis labels, footnotes |
+
+Why: the answer figure is 1.43 times the page title and 1.43 times its siblings, so the screen has one lead number (the app-screen rule is 30-40px and at least 1.3 times the siblings; nothing reaches 48px). Figures are set at 500 and headings at 650: weight marks structure, size marks importance, and the money stays calm. Big standalone figures use proportional digits (`.figure`), because tabular digits look loose at display sizes. Columns, rows and anything that must line up keep the body's tabular digits. Pence (`.money-minor`) are 0.58em at weight 500 in the muted ink, never under 11px.
+
+### Ambient background (#55)
+
+- `components/Ambient.tsx` plus `.ambient` in `index.css`: four large radial colour fields (blue 210, teal 172, sky 198 and a faint apricot 22; none in 235-290) on a fixed full-viewport layer behind everything. They drift on unequal 37, 47, 53 and 59s alternating loops with `ease-in-out`, moving up to about 40vmax and scaling between 0.92 and 1.18. Over 10-15 seconds the movement is easy to see, and it never pulls attention from a figure.
+- CSS keyframes on `transform` only. The gradients are painted once and the compositor moves them, so there is no repaint per frame. Measured in WebKit, frame timing was the same with the fields running and paused. No WebGL and no new dependency.
+- Covers the whole document in light and dark at any scroll height (fixed layer, plus `html` takes the ground colour), so the dark seam is gone.
+- Paused while the tab is hidden (`data-paused` on `visibilitychange`). Fully static under `prefers-reduced-motion` (no animation is created; the fields stay in their first-frame positions).
+- Contrast: text that sits straight on the fields or on glass was measured at six points of the loop (0-45s) in both schemes, against the worst background pixel under each line. The lowest was 7.5:1 (dark header pill), and every line passed AA with a wide margin. The light muted ink moved from `#5c6064` to `#53575b` to keep that margin over the deepest field.
+- Alternatives considered: a `@property` conic-gradient "aurora" (it repaints the whole layer every frame) and two Stripe-like diagonal ribbons (they read as a marketing hero behind working screens). Stills are in the scratchpad (`screens/55/alt-*.png`).
+
+### Charts
+
+- Single-series charts take the data hue `--data` (`#0e6f8a` light, `#5cc3dc` dark, hue about 195, between the ambient blue and teal). Money in takes `--positive`. The chosen month is at full strength and the others are a pale step of the same hue (`color-mix`, not opacity, which muddies it on the dark card).
+- If the Ledger's newest Transaction falls before the last day of the newest month, that month's bar is hatched and the footnote says "Jul so far, to 19 Jul". A partial month no longer reads as a drop.

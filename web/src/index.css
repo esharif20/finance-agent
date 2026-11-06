@@ -18,6 +18,7 @@
   --warning-bg: #fff4e0;
   --warning-fg: #8a4b00;
   --spent: #3b4045;
+  --data: #0e6f8a; /* single-series chart hue, 195: between the ambient blue and teal */
   --ring: #0b66c3;
   /* Ambient fields: blue 210, teal 172, sky 198, apricot 22. None in 235-290. */
   --field-a: rgb(40 128 222 / 0.24);
@@ -49,6 +50,7 @@
     --warning-bg: #3a2a12;
     --warning-fg: #f5c27a;
     --spent: #c9cdd2;
+    --data: #5cc3dc;
     --ring: #7da2f7;
     --field-a: rgb(30 110 220 / 0.36);
     --field-b: rgb(16 160 136 / 0.28);
@@ -245,11 +247,11 @@
   }
 }
 
-/* Month bars: one series in its polarity hue (money in green, money out ink). The chosen
+/* Month bars: one series in its polarity hue (money in green, money out the data hue). The chosen
    month is full strength, the others a pale step of the same hue. A month the Ledger has
    not reached the end of is hatched: it reads as "so far", not as a drop. */
 .month-bar {
-  --bar: var(--spent);
+  --bar: var(--data);
   background: color-mix(in oklab, var(--bar) 30%, var(--card));
   transition: background-color 160ms ease;
 }
