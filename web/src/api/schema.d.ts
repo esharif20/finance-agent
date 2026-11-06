@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Categories */
+        get: operations["categories_api_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/categories/{name}": {
         parameters: {
             query?: never;
@@ -32,6 +49,23 @@ export interface paths {
         get: operations["category_api_categories__name__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Correct */
+        post: operations["correct_api_corrections_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -106,6 +140,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Transactions */
+        get: operations["transactions_api_transactions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -127,8 +178,8 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** CategoryOut */
-        CategoryOut: {
+        /** CategoryDetailOut */
+        CategoryDetailOut: {
             /** Currency */
             currency: string;
             /** Merchants */
@@ -144,6 +195,13 @@ export interface components {
             transactions: components["schemas"]["CategoryTxnOut"][];
             /** Trend */
             trend: components["schemas"]["TrendPointOut"][];
+        };
+        /** CategoryOut */
+        CategoryOut: {
+            /** Name */
+            name: string;
+            /** Subs */
+            subs: string[];
         };
         /** CategorySpendOut */
         CategorySpendOut: {
@@ -164,6 +222,22 @@ export interface components {
             posted_on: string;
             /** Subcategory */
             subcategory: string | null;
+        };
+        /** CorrectionIn */
+        CorrectionIn: {
+            /** Category */
+            category: string[];
+            /** Merchant Id */
+            merchant_id?: number | null;
+            /** Transaction Id */
+            transaction_id?: number | null;
+        };
+        /** CorrectionOut */
+        CorrectionOut: {
+            /** Id */
+            id: number;
+            /** Ledger Version */
+            ledger_version: number;
         };
         /** GapOut */
         GapOut: {
@@ -216,6 +290,35 @@ export interface components {
             month: string;
             net: components["schemas"]["Money"];
         };
+        /** TransactionOut */
+        TransactionOut: {
+            /** Account Id */
+            account_id: number;
+            amount: components["schemas"]["Money"];
+            /** Category */
+            category: string[] | null;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string | null;
+            /** Merchant */
+            merchant: string | null;
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Posted On */
+            posted_on: string;
+            /** Source */
+            source: string | null;
+        };
+        /** TransactionsOut */
+        TransactionsOut: {
+            /** Items */
+            items: components["schemas"]["TransactionOut"][];
+            /** Total */
+            total: number;
+        };
         /** TrendPointOut */
         TrendPointOut: {
             amount: components["schemas"]["Money"];
@@ -264,6 +367,26 @@ export interface operations {
             };
         };
     };
+    categories_api_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"][];
+                };
+            };
+        };
+    };
     category_api_categories__name__get: {
         parameters: {
             query?: {
@@ -283,7 +406,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CategoryOut"];
+                    "application/json": components["schemas"]["CategoryDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_api_corrections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -386,6 +542,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transactions_api_transactions_get: {
+        parameters: {
+            query?: {
+                account_id?: number | null;
+                kind?: string | null;
+                category?: string | null;
+                month?: string | null;
+                q?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionsOut"];
                 };
             };
             /** @description Validation Error */

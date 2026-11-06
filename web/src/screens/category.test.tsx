@@ -6,7 +6,7 @@ import { PrivacyProvider } from "@/lib/privacy";
 import { categoryHref, parseHash } from "@/lib/route";
 import { CategoryScreen } from "./CategoryScreen";
 
-type Detail = components["schemas"]["CategoryOut"];
+type Detail = components["schemas"]["CategoryDetailOut"];
 const m = (minor: number) => ({ minor, currency: "GBP" });
 
 const detail: Detail = {
