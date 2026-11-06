@@ -40,6 +40,10 @@ _Avoid_: Uncleared, authorisation
 A difference between the balance a Bank reports for an Account and the balance the Ledger implies; the Bank's figure is treated as truth.
 _Avoid_: Discrepancy, drift
 
+**Possible Duplicate**:
+A group of Transactions that may record the same movement of money, such as a CSV row and a synced row that cannot be paired with certainty. Each stays its own Transaction until the user decides.
+_Avoid_: Conflict, clash
+
 **Correction**:
 A timestamped change the user makes on top of a Transaction (a new Category, a transfer link) that never alters the Transaction itself.
 _Avoid_: Edit, override, fix
