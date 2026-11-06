@@ -145,5 +145,18 @@ class Scoped:
         """A DELETE of this user's rows only; narrow it further with .where()."""
         return delete(table).where(table.c.user_id == self.user_id)
 
+    def ledger_version(self) -> int:
+        u = schema.user
+        stmt = select(u.c.ledger_version).where(u.c.id == self.user_id)
+        return int(self.conn.execute(stmt).scalar_one())
+
+    def bump_ledger_version(self) -> None:
+        u = schema.user
+        self.conn.execute(
+            update(u)
+            .where(u.c.id == self.user_id)
+            .values(ledger_version=u.c.ledger_version + 1)
+        )
+
     def execute(self, stmt: Executable) -> CursorResult[Any]:
         return self.conn.execute(stmt)

@@ -52,6 +52,18 @@ def test_posted_rows_enter_the_ledger_and_pending_rows_do_not(
     assert jan.net == Decimal(expected).scaleb(-2)
 
 
+def test_a_stored_sync_bumps_the_ledger_version_and_a_repeat_does_not(
+    ledger_for: LedgerFor,
+) -> None:
+    led = ledger_for(1)
+    raw = response(H, 0, 5)
+    version = led.ledger_version()
+    led.apply_sync(raw)
+    assert led.ledger_version() == version + 1
+    led.apply_sync(raw)  # same bytes: nothing stored
+    assert led.ledger_version() == version + 1
+
+
 def test_a_known_id_never_changes_and_is_reported(ledger_for: LedgerFor) -> None:
     led = ledger_for(1)
     raw = response(H, 0, 5)
