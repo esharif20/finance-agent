@@ -4,14 +4,23 @@ version = "0.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.1",
+    "fastapi>=0.162.0",
     "sqlalchemy>=2.1.8",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
 fa = "finance_agent.cli:main"
 
 [dependency-groups]
-dev = ["pytest", "hypothesis", "ruff", "pyright", "import-linter"]
+dev = [
+    "pytest",
+    "hypothesis",
+    "ruff",
+    "pyright",
+    "import-linter",
+    "httpx2>=2.16.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -49,6 +58,7 @@ name = "cli -> ledger -> ingest | storage"
 type = "layers"
 layers = [
     "finance_agent.cli",
+    "finance_agent.api",
     "finance_agent.ledger",
     "finance_agent.ingest | finance_agent.storage",
 ]

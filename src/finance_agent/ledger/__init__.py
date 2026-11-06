@@ -63,6 +63,18 @@ class Gap:
 
 
 @dataclass(frozen=True)
+class AccountBalance:
+    id: int
+    masked_number: str
+    name: str
+    kind: str
+    currency: str
+    bank_balance: Decimal  # the Bank's last running balance (the truth)
+    ledger_balance: Decimal  # opening balance plus every Transaction we hold
+    gaps: list[Gap]  # bank_balance - ledger_balance == sum of these amounts
+
+
+@dataclass(frozen=True)
 class MonthSummary:
     month: str  # YYYY-MM
     currency: str
@@ -232,6 +244,40 @@ class Ledger:
             _decimal(ins - outs),
             [g for g in self.gaps() if g.from_date < end and g.to_date >= start],
         )
+
+    def latest_month(self) -> str | None:
+        """The month (YYYY-MM) of the newest Transaction, or None if empty."""
+        t = schema.transaction
+        newest = self._db.execute(self._db.select(t, func.max(t.c.posted_on))).scalar()
+        return None if newest is None else f"{newest:%Y-%m}"
+
+    def accounts(self) -> list[AccountBalance]:
+        """Accounts with Bank and Ledger balances; an empty Account is skipped."""
+        a = schema.account
+        gaps = self.gaps()
+        out: list[AccountBalance] = []
+        for r in self._db.execute(
+            self._db.select(
+                a, a.c.id, a.c.masked_number, a.c.name, a.c.kind, a.c.currency
+            ).order_by(a.c.id)
+        ).all():
+            rows = self._transactions_in_bank_order(r.id)
+            if not rows:
+                continue
+            opening = rows[0].running_balance_minor - rows[0].amount_minor
+            out.append(
+                AccountBalance(
+                    r.id,
+                    r.masked_number,
+                    r.name,
+                    r.kind,
+                    r.currency,
+                    _decimal(rows[-1].running_balance_minor),
+                    _decimal(opening + sum(x.amount_minor for x in rows)),
+                    [g for g in gaps if g.account.id == r.id],
+                )
+            )
+        return out
 
     def gaps(self) -> list[Gap]:
         """Open Reconciliation Gaps, by Account then date."""

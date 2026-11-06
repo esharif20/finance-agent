@@ -1,0 +1,108 @@
+"""The API is a thin adapter over the Ledger interface (FastAPI test client)."""
+
+from collections.abc import Callable, Iterator
+from pathlib import Path
+
+import pytest
+import uvicorn
+from fastapi.testclient import TestClient
+from sqlalchemy import Engine
+
+from finance_agent import api
+from finance_agent.ledger import Ledger
+from synthetic_lloyds import generate_histories, render_export
+
+
+@pytest.fixture
+def client(engine: Engine) -> Iterator[TestClient]:
+    with TestClient(api.create_app(engine)) as c:
+        yield c
+
+
+@pytest.fixture
+def seeded(engine: Engine, write_export: Callable[[str], Path]) -> str:
+    """Imports a synthetic history with a 12.40 gap; returns its latest month."""
+    h, _ = generate_histories(seed=8, days=60)
+    with engine.begin() as conn:
+        ledger = Ledger(conn, api.current_user())
+        ledger.import_files(
+            [write_export(render_export(h, 0, 120, gap_at=60, gap_minor=1240).text)]
+        )
+        return ledger.transactions()[-1].posted_on.strftime("%Y-%m")
+
+
+def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_run(app: object, **kwargs: object) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+
+    api.serve(port=9999)
+
+    assert calls[0]["host"] == "127.0.0.1"
+    assert api.HOST == "127.0.0.1"
+
+
+def test_current_user_is_the_single_local_user() -> None:
+    assert api.current_user() == 1
+
+
+def test_health_identifies_the_app(client: TestClient) -> None:
+    assert client.get("/api/health").json() == {"app": "finance-agent"}
+
+
+def test_summary_returns_what_the_ledger_returns_in_minor_units(
+    client: TestClient, engine: Engine, seeded: str
+) -> None:
+    with engine.begin() as conn:
+        expected = Ledger(conn, 1).summarise_month(seeded)
+
+    body = client.get("/api/summary", params={"month": seeded}).json()
+
+    assert body["month"] == seeded
+    assert body["money_in"] == {
+        "minor": int(expected.money_in * 100),
+        "currency": "GBP",
+    }
+    assert body["money_out"]["minor"] == int(expected.money_out * 100)
+    assert body["net"]["minor"] == int(expected.net * 100)
+    assert isinstance(body["net"]["minor"], int)
+
+
+def test_summary_defaults_to_the_latest_month_with_data(
+    client: TestClient, seeded: str
+) -> None:
+    assert client.get("/api/summary").json()["month"] == seeded
+
+
+def test_a_bad_month_is_a_422_and_an_empty_ledger_has_no_summary(
+    client: TestClient,
+) -> None:
+    assert client.get("/api/summary", params={"month": "nope"}).status_code == 422
+    assert client.get("/api/summary").status_code == 404
+
+
+def test_accounts_carry_balances_and_gaps(
+    client: TestClient, engine: Engine, seeded: str
+) -> None:
+    with engine.begin() as conn:
+        [want] = Ledger(conn, 1).accounts()
+
+    [acct] = client.get("/api/accounts").json()
+
+    assert acct["masked_number"] == want.masked_number
+    assert acct["bank_balance"]["minor"] == int(want.bank_balance * 100)
+    assert acct["ledger_balance"]["minor"] == int(want.ledger_balance * 100)
+    assert acct["gaps"][0]["amount"]["minor"] == 1240
+    assert acct["bank_balance"]["minor"] - acct["ledger_balance"]["minor"] == 1240
+
+
+def test_the_built_web_app_is_served_when_present(
+    engine: Engine, tmp_path: Path
+) -> None:
+    (tmp_path / "index.html").write_text("<html>hello</html>")
+    with TestClient(api.create_app(engine, web_dir=tmp_path)) as c:
+        assert "hello" in c.get("/").text
+        assert c.get("/api/health").status_code == 200
