@@ -24,6 +24,22 @@ _Avoid_: Payment, entry, record
 The complete set of Transactions across all Accounts; the single source of financial truth.
 _Avoid_: Database, history
 
+**Kind**:
+What sort of money movement a Transaction is: Spending, Income, Transfer, Refund or Fee. Only Spending and Refund carry a Category.
+_Avoid_: Type (the bank's own "Transaction Type" column is a different thing)
+
+**Transfer**:
+A Transaction moving money between two of the user's own Accounts; it is neither spending nor income.
+_Avoid_: Internal payment, top-up
+
+**Pending Transaction**:
+A Transaction the Bank has not yet completed. Shown as provisional and excluded from every total until it completes; a reverted one is recorded but never counted.
+_Avoid_: Uncleared, authorisation
+
+**Reconciliation Gap**:
+A difference between the balance a Bank reports for an Account and the balance the Ledger implies; the Bank's figure is treated as truth.
+_Avoid_: Discrepancy, drift
+
 **Correction**:
 A timestamped change the user makes on top of a Transaction (a new Category, a transfer link) that never alters the Transaction itself.
 _Avoid_: Edit, override, fix
@@ -37,3 +53,7 @@ _Avoid_: Tag, label, bucket
 **Merchant**:
 The normalised party a Transaction is with (raw "TESCO STORES 3021" → Tesco). Never a Category; a Merchant has a default Category that a Correction can override per Transaction. Transfers between the user's own Accounts have no Merchant.
 _Avoid_: Payee, vendor, shop, counterparty
+
+**Review Queue**:
+The Transactions whose Category could not be assigned with enough confidence and are waiting for the user to decide.
+_Avoid_: Inbox, uncategorised
