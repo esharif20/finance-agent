@@ -104,3 +104,16 @@ transaction_source = Table(
     ),
     Column("row_number", Integer, primary_key=True),
 )
+
+# derived: recomputed from the Ledger after every import, never edited by hand
+reconciliation_gap = Table(
+    "reconciliation_gap",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("account_id", Integer, ForeignKey("account.id"), nullable=False),
+    Column("from_date", Date, nullable=False),
+    Column("to_date", Date, nullable=False),
+    # Bank's balance minus the Ledger's: the net of the missing Transactions
+    Column("amount_minor", BigInteger, nullable=False),
+)
