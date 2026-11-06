@@ -13,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Connection, Select, case, func, union
+from sqlalchemy import ColumnElement, Connection, Select, case, func, union
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
@@ -172,6 +172,7 @@ class AccountBalance:
     bank_balance: Decimal  # the Bank's last running balance (the truth)
     ledger_balance: Decimal  # opening balance plus every Transaction we hold
     gaps: list[Gap]  # bank_balance - ledger_balance == sum of these amounts
+    bank: str = ""  # the Bank's name, e.g. "Lloyds"
 
 
 @dataclass(frozen=True)
@@ -210,6 +211,11 @@ def _decimal(minor: int) -> Decimal:
 
 
 _UNCATEGORISED = "Uncategorised"  # the categorise module's name; it imports us
+
+
+def _only(account_id: int | None) -> list[ColumnElement[bool]]:
+    """WHERE terms narrowing a Transaction query to one Account, if given."""
+    return [] if account_id is None else [schema.transaction.c.account_id == account_id]
 
 
 def _month_bounds(month: str) -> tuple[date, date]:
@@ -359,7 +365,9 @@ class Ledger:
             for r in rows
         ]
 
-    def spending_by_category(self, month: str) -> list[Spend]:
+    def spending_by_category(
+        self, month: str, account_id: int | None = None
+    ) -> list[Spend]:
         """Spending minus Refunds received in `month` (ADR 0004), by Category,
         then Subcategory, then Merchant ("Unknown" when none), largest first."""
         start, end = _month_bounds(month)
@@ -371,6 +379,7 @@ class Ledger:
                     t.c.posted_on >= start,
                     t.c.posted_on < end,
                     t.c.currency == "GBP",  # shortcut: as in summarise_month
+                    *_only(account_id),
                 )
             )
         }
@@ -440,13 +449,25 @@ class Ledger:
             txns,
         )
 
-    def category_breakdown(self, month: str) -> Breakdown:
+    def category_breakdown(
+        self, month: str, account_id: int | None = None
+    ) -> Breakdown:
         start, end = _month_bounds(month)
-        spends = self.spending_by_category(month)
+        spends = self.spending_by_category(month, account_id)
         refunds = fees = unmatched = Decimal(0)
+        mine = None
+        if account_id is not None:
+            tt = schema.transaction
+            mine = set(
+                self._db.execute(
+                    self._db.select(tt, tt.c.id).where(*_only(account_id))
+                ).scalars()
+            )
         for t in self.transactions():
             c = t.categorisation
             if c is None or not start <= t.posted_on < end:
+                continue
+            if mine is not None and t.id not in mine:
                 continue
             if c.kind == "Fee":
                 fees -= t.amount
@@ -628,7 +649,9 @@ class Ledger:
             raise UnknownTarget("unknown target")
         return int(row[0])
 
-    def summarise_month(self, month: str) -> MonthSummary:
+    def summarise_month(
+        self, month: str, account_id: int | None = None
+    ) -> MonthSummary:
         start, end = _month_bounds(month)
         t = schema.transaction
         amt = t.c.amount_minor
@@ -642,6 +665,7 @@ class Ledger:
             # shortcut: GBP only until FX conversion lands; then sum gbp_minor
             t.c.currency == "GBP",
             t.c.id.not_in(self._transfer_ids()),  # neither spending nor income
+            *_only(account_id),
         )
         row = self._db.execute(stmt).one()
         ins, outs = (int(v) for v in row)
@@ -651,7 +675,13 @@ class Ledger:
             _decimal(ins),
             _decimal(outs),
             _decimal(ins - outs),
-            [g for g in self.gaps() if g.from_date < end and g.to_date >= start],
+            [
+                g
+                for g in self.gaps()
+                if g.from_date < end
+                and g.to_date >= start
+                and account_id in (None, g.account.id)
+            ],
         )
 
     def _align(
@@ -702,8 +732,16 @@ class Ledger:
         out: list[AccountBalance] = []
         for r in self._db.execute(
             self._db.select(
-                a, a.c.id, a.c.masked_number, a.c.name, a.c.kind, a.c.currency
-            ).order_by(a.c.id)
+                a,
+                a.c.id,
+                a.c.masked_number,
+                a.c.name,
+                a.c.kind,
+                a.c.currency,
+                schema.bank.c.name.label("bank"),
+            )
+            .join(schema.bank, schema.bank.c.id == a.c.bank_id)
+            .order_by(a.c.id)
         ).all():
             rows = self._transactions_in_bank_order(r.id)
             if not rows:
@@ -719,6 +757,7 @@ class Ledger:
                     _decimal(rows[-1].running_balance_minor),
                     _decimal(opening + sum(x.amount_minor for x in rows)),
                     [g for g in gaps if g.account.id == r.id],
+                    r.bank,
                 )
             )
         return out

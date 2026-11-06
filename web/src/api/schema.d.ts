@@ -183,6 +183,8 @@ export interface components {
     schemas: {
         /** AccountOut */
         AccountOut: {
+            /** Bank */
+            bank: string;
             bank_balance: components["schemas"]["Money"];
             /** Currency */
             currency: string;
@@ -506,6 +508,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                account_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -557,6 +560,7 @@ export interface operations {
         parameters: {
             query?: {
                 month?: string | null;
+                account_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -588,6 +592,7 @@ export interface operations {
         parameters: {
             query?: {
                 month?: string | null;
+                account_id?: number | null;
             };
             header?: never;
             path?: never;

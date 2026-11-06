@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { fetchMonthSeries } from "@/api/client";
@@ -18,11 +18,22 @@ const short = (month: string) =>
   new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
 
 /** Last 12 months of money in or out. A bar picks the Overview month; figures come from the API. */
-export function MonthBars({ month, onChange }: { month: string; onChange: (month: string) => void }) {
+export function MonthBars({
+  month,
+  account,
+  onChange,
+}: {
+  month: string;
+  account?: number;
+  onChange: (month: string) => void;
+}) {
   const [side, setSide] = useState<Side>("money_out");
   const reduce = useReducedMotion();
   const { hidden } = usePrivacy();
-  const series = useQuery({ queryKey: ["month-series"], queryFn: fetchMonthSeries });
+  const series = useQuery({ queryKey: ["month-series", account],
+    queryFn: () => fetchMonthSeries(account),
+    placeholderData: keepPreviousData,
+  });
   if (!series.data || series.data.length < 2) return null; // one month has nothing to compare
   const rows = series.data;
   const max = Math.max(...rows.map((r) => r[side].minor), 1);

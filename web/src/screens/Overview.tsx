@@ -3,7 +3,7 @@ import { useState } from "react";
 import { NoData, fetchAccounts, fetchMonths, fetchSpending, fetchSummary } from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AccountsCard } from "./AccountsCard";
+import { AccountStack } from "./AccountStack";
 import { groupSpending } from "@/lib/categories";
 import { MonthBars } from "./MonthBars";
 import { MonthCard } from "./MonthCard";
@@ -13,15 +13,16 @@ import { SpendingDonut } from "./SpendingDonut";
 export function Overview() {
   // undefined = the newest month; the switcher sets it
   const [chosen, setChosen] = useState<string>();
+  const [account, setAccount] = useState<number>(); // undefined = All accounts
   const summary = useQuery({
-    queryKey: ["summary", chosen],
-    queryFn: () => fetchSummary(chosen),
+    queryKey: ["summary", chosen, account],
+    queryFn: () => fetchSummary(chosen, account),
     placeholderData: keepPreviousData,
   });
   const month = chosen ?? summary.data?.month;
   const spending = useQuery({
-    queryKey: ["spending", month],
-    queryFn: () => fetchSpending(month as string),
+    queryKey: ["spending", month, account],
+    queryFn: () => fetchSpending(month as string, account),
     enabled: !!month,
     placeholderData: keepPreviousData,
   });
@@ -72,13 +73,13 @@ export function Overview() {
   return (
     <div className="flex flex-col gap-6">
       <MonthSwitcher months={months.data} month={summary.data.month} onChange={setChosen} />
-      <MonthBars month={summary.data.month} onChange={setChosen} />
+      <MonthBars month={summary.data.month} account={account} onChange={setChosen} />
       <div className="grid items-start gap-6 lg:grid-cols-[7fr_5fr]">
         <div className="flex flex-col gap-6">
           <MonthCard summary={summary.data} slices={slices} />
           <SpendingDonut spending={spending.data} />
         </div>
-        <AccountsCard accounts={accounts.data} />
+        <AccountStack accounts={accounts.data} selected={account} onSelect={setAccount} />
       </div>
     </div>
   );
