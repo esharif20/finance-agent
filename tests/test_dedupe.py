@@ -448,3 +448,132 @@ def test_identity_uses_only_the_raw_bank_fields(
         row.amount_minor,
         row.balance_minor,
     )
+
+
+# --- Verifier (#34): adversarial placements -----------------------------------
+def _twin_rows(pattern: str) -> list[Txn]:
+    """w, then P/R as written (P purchase, R its refund, all on one day), then x."""
+    rows: list[Txn] = []
+    bal = 100000
+    for c in "w" + pattern + "x":
+        desc, amt = {
+            "w": ("SYNTH BEFORE", -100),
+            "P": ("SYNTH TWIN 01", -450),
+            "R": ("SYNTH TWIN REFUND", 450),
+            "x": ("SYNTH AFTER", -200),
+        }[c]
+        bal += amt
+        rows.append(Txn(START, "DEB", desc, amt, bal))
+    return rows
+
+
+def _export(rows: list[Txn], s: int, e: int) -> str:
+    return render_export(History(SORT_CODE, "00000001", rows), s, e).text
+
+
+def test_a_repeated_twin_block_cannot_be_resolved_so_it_is_flagged(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    # w P R P R P x and w P R P x give byte-identical exports
+    # [w P R P] and [P R P x]: no method using the rows alone can tell them
+    # apart, so the import must say it is unsure rather than resolve silently
+    long, short = _twin_rows("PRPRP"), _twin_rows("PRP")
+    assert _export(long, 0, 4) == _export(short, 0, 4)
+    assert _export(long, 3, 7) == _export(short, 1, 5)
+    ledger = ledger_for(1)
+    ledger.import_files([write_export(_export(long, 0, 4))])
+
+    report = ledger.import_files([write_export(_export(long, 3, 7))])
+
+    assert report.ambiguous >= 1
+
+
+def test_one_row_matching_twins_in_two_disjoint_runs_is_flagged(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    rows = _twin_rows("PRP")  # w P R P x
+    ledger = ledger_for(1)
+    # [w P R] and [P x] abut without sharing a row, so the two stored runs do
+    # not join, and each holds one twin
+    ledger.import_files([write_export(_export(rows, 0, 3))])
+    ledger.import_files([write_export(_export(rows, 3, 5))])
+    assert len(ledger.transactions()) == 5
+
+    report = ledger.import_files([write_export(_export(rows, 1, 2))])
+
+    assert (report.added, report.already_known, report.ambiguous) == (0, 1, 1)
+
+
+def test_an_export_inside_stored_history_adds_nothing(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 twins, 114 refund
+    ledger = ledger_for(1)
+    ledger.import_files([write_export(render_export(h, 100, 130).text)])
+
+    for s, e in [(112, 117), (113, 116), (114, 116), (113, 114), (101, 129)]:
+        report = ledger.import_files([write_export(render_export(h, s, e).text)])
+        assert report.added == 0, (s, e)
+    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+
+
+def test_an_export_bridging_two_stored_runs_joins_them(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=21, days=60)
+    ledger = ledger_for(1)
+    ledger.import_files(
+        [
+            write_export(render_export(h, 100, 112).text),
+            write_export(render_export(h, 118, 130).text),
+        ]
+    )
+
+    bridge = ledger.import_files([write_export(render_export(h, 110, 120).text)])
+    # the twins' refund and second twin, now inside one joined run
+    again = ledger.import_files([write_export(render_export(h, 114, 116).text)])
+
+    assert bridge.added == 6
+    assert (again.added, again.ambiguous) == (0, 0)
+    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+
+
+def test_split_twins_in_newest_first_exports_are_both_kept(
+    ledger_for: LedgerFor, write_export: WriteExport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from finance_agent.ingest import lloyds
+
+    monkeypatch.setattr(lloyds, "OLDEST_FIRST", False)
+    h, _ = generate_histories(seed=21, days=60)
+    ledger = ledger_for(1)
+
+    def newest_first(s: int, e: int) -> Path:
+        lines = render_export(h, s, e).text.splitlines()
+        return write_export("\n".join(lines[:2] + lines[:1:-1]) + "\n")
+
+    ledger.import_files([newest_first(100, 115), newest_first(114, 130)])
+
+    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+
+
+def test_import_against_5000_stored_rows_stays_fast(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    import time
+
+    h, _ = generate_histories(seed=3, days=3000)
+    n = min(len(h.txns), 5200)
+    assert n >= 5000
+    ledger = ledger_for(1)
+    paths = [
+        write_export(render_export(h, s, min(n, s + MAX_ROWS)).text)
+        for s in range(0, n, MAX_ROWS - 10)
+    ]
+    ledger.import_files(paths)
+
+    t0 = time.perf_counter()
+    report = ledger.import_files([write_export(render_export(h, 2500, 2650).text)])
+    elapsed = time.perf_counter() - t0
+
+    assert report.added == 0
+    assert elapsed < 0.5, elapsed

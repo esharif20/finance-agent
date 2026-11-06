@@ -5,6 +5,7 @@ never returns floats."""
 import hashlib
 import logging
 import time
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -36,8 +37,9 @@ class ImportReport:
     already_known: int
     rejected: list[Rejection]  # one per refused file; nothing of it is stored
     accounts: list[AffectedAccount]  # Accounts that gained Transactions
-    # rows matched to stored rows that fit at more than one position, such as
-    # one row that is either of two twins (ADR 0006); the earliest is used
+    # rows matched to stored rows where another consistent placement also fits,
+    # such as one row that is either of two twins (ADR 0006); longest, then
+    # earliest, is used
     ambiguous: int = 0
 
 
@@ -61,17 +63,15 @@ def _merge(a: list[int], b: list[int]) -> list[int] | None:
     return _merge(b, a) if a[0] in b else None
 
 
-def _best_overlaps(new: list[Identity], run: list[Identity]) -> tuple[int, list[int]]:
-    """Longest overlap of `new` with `run` as one contiguous block, and every
-    offset (new[i] is run[i + offset]) that achieves it."""
-    best, offsets = 0, list[int]()
+def _overlaps(new: list[Identity], run: list[Identity]) -> list[tuple[int, int]]:
+    """Every (length, offset) at which `new` overlaps `run` as one contiguous,
+    consistent, non-empty block (new[i] is run[i + offset]), earliest first."""
+    out: list[tuple[int, int]] = []
     for o in range(1 - len(new), len(run)):
         lo, hi = max(0, -o), min(len(new), len(run) - o)
-        if hi - lo >= best and all(new[i] == run[i + o] for i in range(lo, hi)):
-            if hi - lo > best:
-                best, offsets = hi - lo, []
-            offsets.append(o)
-    return best, offsets
+        if all(new[i] == run[i + o] for i in range(lo, hi)):
+            out.append((hi - lo, o))
+    return out
 
 
 @dataclass(frozen=True)
@@ -284,21 +284,20 @@ class Ledger:
         block wins. Returns ({row line: Transaction id}, rows placed ambiguously)."""
         new = [row_identity(r) for r in rows]
         runs, identity = self._bank_order_runs(account_id)
-        found: list[tuple[int, int, list[int]]] = []
-        for n, run in enumerate(runs):
-            length, offsets = _best_overlaps(new, [identity[t] for t in run])
-            if length:
-                found.append((length, n, offsets))
+        found = [
+            (length, run, o, range(max(0, -o), max(0, -o) + length))
+            for run in runs
+            for length, o in _overlaps(new, [identity[t] for t in run])
+        ]
+        # a row that another consistent placement also covers may be the other
+        # twin; with P R P R P even a unique longest overlap is unsure (ADR 0006)
+        cover = Counter(i for *_, span in found for i in span)
         placed: dict[int, int] = {}
-        unsure = 0
-        for length, n, offsets in sorted(found, key=lambda f: -f[0]):
-            run, o = runs[n], offsets[0]
-            span = range(max(0, -o), min(len(new), len(run) - o))
+        for _, run, o, span in sorted(found, key=lambda f: -f[0]):  # stable
             if any(i in placed for i in span):
-                continue  # a longer block already placed these rows
+                continue  # a longer or earlier block already placed these rows
             placed |= {i: run[i + o] for i in span}
-            if len(offsets) > 1:  # e.g. one row that is either of two twins
-                unsure += length
+        unsure = sum(cover[i] > 1 for i in placed)
         return {rows[i].line: t for i, t in placed.items()}, unsure
 
     def gaps(self) -> list[Gap]:
