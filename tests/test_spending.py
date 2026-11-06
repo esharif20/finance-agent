@@ -161,3 +161,31 @@ def test_identity_ignores_kind_merchant_and_category(
         again = ledger.import_files([write_export(render_export(h, 10, 70).text)])
 
         assert (again.added, again.already_known) == (10, 50)
+
+
+def test_a_refund_in_a_later_month_reduces_that_month_and_can_go_negative(
+    engine: Engine, write_export: WriteExport
+) -> None:
+    # ADR 0004: January keeps the purchase; February's Groceries go negative
+    h = history(
+        [
+            (5, "DEB", "TESCO STORES 3021", -2000),
+            (35, "DEB", "TESCO STORES 3021", -500),
+            (40, "DEB", "TESCO REFUND", 2000),
+        ]
+    )
+    with engine.begin() as conn:
+        ledger = Ledger(conn, 1)
+        ledger.import_files([write_export(render_export(h, 0, 9).text)])
+        categorise.run(conn, 1)
+
+        jan, feb = (ledger.spending_by_category(m) for m in ("2026-01", "2026-02"))
+        assert [(s.name, s.amount) for s in jan] == [("Food & Drink", Decimal("20.00"))]
+        assert [(s.name, s.amount) for s in feb] == [
+            ("Food & Drink", Decimal("-15.00"))
+        ]
+        groceries = feb[0].children[0]
+        assert (groceries.name, groceries.children) == (
+            "Groceries",
+            (Spend("Tesco", Decimal("-15.00")),),
+        )

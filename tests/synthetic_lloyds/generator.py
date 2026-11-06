@@ -95,10 +95,16 @@ def generate_histories(seed: int, days: int = 60) -> tuple[History, History]:
             a.append((d, "DEB", "PRET A MANGER 0231", -450))
             a.append((d, "DEB", "PRET A MANGER 0231", -450))
             a.append((d, "DEB", "AMAZON.CO.UK REFUND", 1999))
+        # own-account moves; amounts above any purchase so no card payment
+        # can pass for a Transfer leg
         if i % 10 == 2:
-            amt = rng.randint(1000, 20000)
+            amt = rng.randint(10000, 20000)
             a.append((d, "TFR", "TO SYNTH SAVER 00000002", -amt))
             b.append((d, "TFR", "FROM SYNTH CURRENT 00000001", amt))
+        if i % 10 == 7:  # the same move sent as a Faster Payment
+            amt = rng.randint(10000, 20000)
+            a.append((d, "FPO", "SYNTH SAVER 00000002", -amt))
+            b.append((d, "FPI", "SYNTH CURRENT 00000001", amt))
     return (
         History(SORT_CODE, "00000001", _with_balances(a, 100000)),
         History(SORT_CODE, "00000002", _with_balances(b, 500000)),

@@ -17,7 +17,7 @@ from sqlalchemy import Connection, Select, case, func, select, union
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
 
-TRANSFER_TYPES = ("TFR",)  # Lloyds Transaction Type of own-account moves
+TRANSFER_TYPES = ("TFR",)  # Lloyds Type that favours a pair; not required
 TRANSFER_DAYS = 3  # the two legs post at most this many days apart
 
 
@@ -335,12 +335,12 @@ class Ledger:
         return legs
 
     def _link_transfers(self) -> None:
-        """Pair unlinked own-account Transfer legs (both Type TFR, opposite
-        sign, same amount, other Account, dates within TRANSFER_DAYS).
-        Identical descriptions, then the closest date, break ties.
+        """Pair unlinked own-account Transfer legs: same amount and currency,
+        opposite sign, another of this user's Accounts, dates within
+        TRANSFER_DAYS. Among candidates, Type TFR on both legs, then identical
+        descriptions, then the closest date win; each leg pairs at most once.
 
-        Uses raw Bank fields only. shortcut: own-account moves sent as FPO/FPI
-        are not detected; widen TRANSFER_TYPES once a real export shows them.
+        Uses raw Bank fields only.
         """
         t = schema.transaction
         linked = self._transfer_legs()
@@ -352,40 +352,47 @@ class Ledger:
                     t.c.id,
                     t.c.account_id,
                     t.c.posted_on,
+                    t.c.bank_type,
                     t.c.description,
                     t.c.amount_minor,
-                )
-                .where(t.c.bank_type.in_(TRANSFER_TYPES))
-                .order_by(t.c.posted_on, t.c.id)
+                    t.c.currency,
+                ).order_by(t.c.posted_on, t.c.id)
             )
             if r.id not in linked
         ]
-        incoming: dict[int, list[Any]] = {}
+        incoming: dict[tuple[str, int], list[Any]] = {}
         for r in rows:
             if r.amount_minor > 0:
-                incoming.setdefault(r.amount_minor, []).append(r)
-        for out in (r for r in rows if r.amount_minor < 0):
-            candidates = [
-                r
-                for r in incoming.get(-out.amount_minor, [])
-                if r.account_id != out.account_id
-                and abs((r.posted_on - out.posted_on).days) <= TRANSFER_DAYS
-            ]
-            if not candidates:
-                continue
-            best = min(
-                candidates,
-                key=lambda r: (
-                    r.description != out.description,
-                    abs((r.posted_on - out.posted_on).days),
-                    r.id,
+                incoming.setdefault((r.currency, r.amount_minor), []).append(r)
+        candidates = [
+            (
+                (
+                    not (
+                        o.bank_type in TRANSFER_TYPES and i.bank_type in TRANSFER_TYPES
+                    ),
+                    o.description != i.description,
+                    abs((i.posted_on - o.posted_on).days),
+                    o.id,
+                    i.id,
                 ),
+                o.id,
+                i.id,
             )
-            incoming[-out.amount_minor].remove(best)
+            for o in rows
+            if o.amount_minor < 0
+            for i in incoming.get((o.currency, -o.amount_minor), [])
+            if i.account_id != o.account_id
+            and abs((i.posted_on - o.posted_on).days) <= TRANSFER_DAYS
+        ]
+        used: set[int] = set()
+        for _, out_id, in_id in sorted(candidates):  # best pairs claim legs first
+            if out_id in used or in_id in used:
+                continue
+            used |= {out_id, in_id}
             self._db.insert(
                 schema.transfer_link,
-                from_transaction_id=out.id,
-                to_transaction_id=best.id,
+                from_transaction_id=out_id,
+                to_transaction_id=in_id,
             )
 
     def _known_transaction_id(
