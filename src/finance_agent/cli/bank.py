@@ -49,19 +49,17 @@ def _encrypted_db() -> Engine:
 def _adopt_spike_item() -> str | None:
     """Move the access URL the #26 spike stored under the legacy Keychain account
     to the app's account. Returns it, or None when there is nothing to adopt.
-    A failed move deletes the legacy item best-effort and raises ValueError."""
+    A failed move keeps the legacy item (the setup token is already spent, so it
+    is the only copy) and raises ValueError."""
     legacy = keychain.legacy_text(SERVICE)
     if legacy is None:
         return None
     try:
         keychain.set_text(SERVICE, legacy)
     except (OSError, KeyringError):
-        try:
-            keychain.delete_legacy(SERVICE)
-        except (OSError, KeyringError):
-            pass
-        print(LEGACY_HINT, file=sys.stderr)
-        raise ValueError("could not move the old Keychain item") from None
+        raise ValueError(
+            "could not move the old Keychain item; it is untouched, try again"
+        ) from None
     try:
         keychain.delete_legacy(SERVICE)
     except (OSError, KeyringError):

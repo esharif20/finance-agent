@@ -220,7 +220,7 @@ def test_connect_adopts_the_spike_item_without_a_token(
     assert st.consent_renewed_on == datetime.now(simplefin.LONDON).date()
 
 
-def test_failed_adoption_deletes_legacy_and_prints_the_hint(
+def test_failed_adoption_keeps_the_only_copy_of_the_access_url(
     env: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -234,8 +234,6 @@ def test_failed_adoption_deletes_legacy_and_prints_the_hint(
     assert main(["connect"]) == 1
     captured = capsys.readouterr()
     assert env["access"] not in captured.out + captured.err
-    assert (
-        "security delete-generic-password -s finance-agent.simplefin-access "
-        "-a lunchflow" in captured.err + captured.out
-    )
-    assert keyring.get_password(SERVICE, keychain.LEGACY_ACCOUNT) is None
+    # the setup token is already spent, so the legacy item is the only copy
+    assert keyring.get_password(SERVICE, keychain.LEGACY_ACCOUNT) == env["access"]
+    assert [m for m, _ in env["t"].calls] == []
