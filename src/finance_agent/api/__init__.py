@@ -69,6 +69,13 @@ class SpendingOut(BaseModel):
     money_out: Money  # == total + refunds + fees
 
 
+class MonthTotalsOut(BaseModel):
+    month: str
+    currency: str
+    money_in: Money
+    money_out: Money
+
+
 class HealthOut(BaseModel):
     app: str
 
@@ -176,6 +183,24 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.get("/api/months")
     def months(led: Led) -> list[str]:
         return led.months()
+
+    @app.get("/api/month-series")
+    def month_series(
+        led: Led, limit: Annotated[int, Query(ge=1, le=60)] = 12
+    ) -> list[MonthTotalsOut]:
+        """Newest `limit` months, oldest first; each is `summarise_month`."""
+        out: list[MonthTotalsOut] = []
+        for m in reversed(led.months()[:limit]):
+            s = led.summarise_month(m)
+            out.append(
+                MonthTotalsOut(
+                    month=m,
+                    currency=s.currency,
+                    money_in=_money(s.money_in, s.currency),
+                    money_out=_money(s.money_out, s.currency),
+                )
+            )
+        return out
 
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:

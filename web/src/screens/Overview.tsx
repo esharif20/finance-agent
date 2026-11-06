@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountsCard } from "./AccountsCard";
 import { groupSpending } from "@/lib/categories";
+import { MonthBars } from "./MonthBars";
 import { MonthCard } from "./MonthCard";
 import { MonthSwitcher } from "./MonthSwitcher";
 import { SpendingDonut } from "./SpendingDonut";
@@ -71,6 +72,7 @@ export function Overview() {
   return (
     <div className="flex flex-col gap-6">
       <MonthSwitcher months={months.data} month={summary.data.month} onChange={setChosen} />
+      <MonthBars month={summary.data.month} onChange={setChosen} />
       <div className="grid items-start gap-6 lg:grid-cols-[7fr_5fr]">
         <div className="flex flex-col gap-6">
           <MonthCard summary={summary.data} slices={slices} />

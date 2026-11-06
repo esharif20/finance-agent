@@ -133,6 +133,32 @@
         "title": "Money",
         "type": "object"
       },
+      "MonthTotalsOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "money_in": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "money_out": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "currency",
+          "money_in",
+          "money_out"
+        ],
+        "title": "MonthTotalsOut",
+        "type": "object"
+      },
       "SpendingOut": {
         "properties": {
           "categories": {
@@ -303,6 +329,53 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/month-series": {
+      "get": {
+        "description": "Newest `limit` months, oldest first; each is `summarise_month`.",
+        "operationId": "month_series_api_month_series_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MonthTotalsOut"
+                  },
+                  "title": "Response Month Series Api Month Series Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Month Series"
       }
     },
     "/api/months": {

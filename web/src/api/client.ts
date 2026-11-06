@@ -19,3 +19,5 @@ export const fetchSummary = (month?: string) =>
 export const fetchAccounts = () => get<Account[]>("/api/accounts");
 export const fetchSpending = (month: string) => get<Spending>(`/api/spending?month=${month}`);
 export const fetchMonths = () => get<string[]>("/api/months");
+export type MonthTotals = components["schemas"]["MonthTotalsOut"];
+export const fetchMonthSeries = () => get<MonthTotals[]>("/api/month-series?limit=12");

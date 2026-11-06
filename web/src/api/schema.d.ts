@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/month-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Month Series
+         * @description Newest `limit` months, oldest first; each is `summarise_month`.
+         */
+        get: operations["month_series_api_month_series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/months": {
         parameters: {
             query?: never;
@@ -141,6 +161,15 @@ export interface components {
             /** Minor */
             minor: number;
         };
+        /** MonthTotalsOut */
+        MonthTotalsOut: {
+            /** Currency */
+            currency: string;
+            money_in: components["schemas"]["Money"];
+            money_out: components["schemas"]["Money"];
+            /** Month */
+            month: string;
+        };
         /** SpendingOut */
         SpendingOut: {
             /** Categories */
@@ -225,6 +254,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    month_series_api_month_series_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthTotalsOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
