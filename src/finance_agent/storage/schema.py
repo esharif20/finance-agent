@@ -102,7 +102,10 @@ transaction_source = Table(
         ForeignKey("statement_import.id"),
         primary_key=True,
     ),
-    Column("row_number", Integer, primary_key=True),
+    Column("row_number", Integer, primary_key=True),  # physical line, for provenance
+    # index in the file's Bank order (oldest first); differs from row_number
+    # when the Bank lists newest first
+    Column("bank_position", Integer, nullable=False, server_default="0"),
 )
 
 # derived: recomputed from the Ledger after every import, never edited by hand

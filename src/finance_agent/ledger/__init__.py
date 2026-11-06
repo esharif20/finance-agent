@@ -131,7 +131,7 @@ class Ledger:
             )
             bank_id = self._bank_id(parsed.bank)
             file_added = 0
-            for row in parsed.rows:
+            for position, row in enumerate(parsed.rows):
                 account_id = self._account_id(bank_id, row)
                 txn_id = self._known_transaction_id(account_id, row, import_id)
                 if txn_id is None:
@@ -155,6 +155,7 @@ class Ledger:
                     transaction_id=txn_id,
                     statement_import_id=import_id,
                     row_number=row.line,
+                    bank_position=position,
                 )
             added += file_added
             log.info(
@@ -312,7 +313,7 @@ class Ledger:
         for link in self._db.execute(
             self._db.select(src, src.c.transaction_id, src.c.statement_import_id)
             .where(src.c.transaction_id.in_(rows))
-            .order_by(src.c.statement_import_id, src.c.row_number)
+            .order_by(src.c.statement_import_id, src.c.bank_position, src.c.row_number)
         ):
             before = last.get(link.statement_import_id)
             if before is not None and link.transaction_id not in after[before]:
@@ -321,13 +322,14 @@ class Ledger:
             last[link.statement_import_id] = link.transaction_id
         ready = {i for i, n in preds.items() if n == 0}
         out: list[BankOrderRow] = []
+        placed: set[int] = set()
         balance: int | None = None
         follows: set[int] = set()  # rows listed right after the last pick
         while len(out) < len(rows):
             if not ready:  # shortcut: inconsistent files form a cycle; break it
                 ready = {
                     min(
-                        set(rows) - {r.id for r in out},
+                        set(rows) - placed,
                         key=lambda i: (rows[i].posted_on, i),
                     )
                 }
@@ -341,12 +343,13 @@ class Ledger:
                 ),
             )
             ready.discard(pick)
+            placed.add(pick)
             out.append(rows[pick])
             balance = rows[pick].running_balance_minor
             follows = after[pick]
             for nxt in after[pick]:
                 preds[nxt] -= 1
-                if preds[nxt] == 0:
+                if preds[nxt] == 0 and nxt not in placed:  # a cycle break placed it
                     ready.add(nxt)
         return out
 

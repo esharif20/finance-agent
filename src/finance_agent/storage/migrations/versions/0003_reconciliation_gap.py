@@ -25,7 +25,14 @@ def upgrade() -> None:
         sa.Column("to_date", sa.Date, nullable=False),
         sa.Column("amount_minor", sa.BigInteger, nullable=False),
     )
+    # rows imported before this get 0; Bank order then falls back to row_number
+    op.add_column(
+        "transaction_source",
+        sa.Column("bank_position", sa.Integer, nullable=False, server_default="0"),
+    )
 
 
 def downgrade() -> None:
+    with op.batch_alter_table("transaction_source") as b:
+        b.drop_column("bank_position")
     op.drop_table("reconciliation_gap")

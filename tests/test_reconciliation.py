@@ -5,9 +5,11 @@ from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
+from finance_agent.ingest import lloyds
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import MAX_ROWS, History, generate_histories, render_export
 from test_dedupe import temp_ledger, windowed
@@ -117,3 +119,203 @@ def test_a_month_summary_lists_the_gaps_touching_it(
         Decimal("5.00")
     ]
     assert ledger.summarise_month("2026-03").gaps == []
+
+
+# --- verifier: adversarial cases -------------------------------------------
+
+
+def _missing(h: History, a: int, b: int) -> Decimal:
+    return Decimal(sum(t.amount_minor for t in h.txns[a:b])) / 100
+
+
+def test_the_first_row_has_no_anchor_until_earlier_rows_arrive(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=30)
+    ledger = ledger_for(1)
+
+    # a balance offset from the very first row is no break: nothing precedes it
+    ledger.import_files(
+        [write_export(render_export(h, 5, 20, gap_at=0, gap_minor=999).text)]
+    )
+    assert ledger.gaps() == []
+
+    # earlier rows now anchor row 5; its printed balance is off by 9.99 plus
+    # the two rows (3, 4) that are still missing
+    ledger.import_files([write_export(render_export(h, 0, 3).text)])
+    [gap] = ledger.gaps()
+    assert (gap.from_date, gap.to_date) == (h.txns[2].date, h.txns[5].date)
+    assert gap.amount == _missing(h, 3, 5) + Decimal("9.99")
+
+
+def test_two_separate_gaps_in_one_account(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=60)
+    assert _missing(h, 10, 15) != 0 and _missing(h, 30, 35) != 0
+    ledger = ledger_for(1)
+
+    for s, e in [(0, 10), (15, 30), (35, 50)]:
+        ledger.import_files([write_export(render_export(h, s, e).text)])
+
+    assert [(g.from_date, g.to_date, g.amount) for g in ledger.gaps()] == [
+        (h.txns[9].date, h.txns[15].date, _missing(h, 10, 15)),
+        (h.txns[29].date, h.txns[35].date, _missing(h, 30, 35)),
+    ]
+
+
+def test_a_gap_across_a_month_boundary_touches_both_months(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=60)
+    i = next(i for i, t in enumerate(h.txns) if t.date.month == 2)
+    assert h.txns[i - 3].date.month == 1 and h.txns[i + 2].date.month == 2
+    ledger = ledger_for(1)
+
+    ledger.import_files(
+        [
+            write_export(render_export(h, 0, i - 2).text),
+            write_export(render_export(h, i + 2, len(h.txns)).text),
+        ]
+    )
+
+    [gap] = ledger.gaps()
+    assert gap.amount == _missing(h, i - 2, i + 2)
+    assert ledger.summarise_month("2026-01").gaps == [gap]
+    assert ledger.summarise_month("2026-02").gaps == [gap]
+    assert ledger.summarise_month("2026-03").gaps == []
+
+
+def test_rows_imported_into_the_middle_split_then_close_a_gap(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=60)
+    ledger = ledger_for(1)
+
+    def imp(s: int, e: int) -> list[tuple[int, int, Decimal]]:
+        ledger.import_files([write_export(render_export(h, s, e).text)])
+        return [
+            (g.from_date.toordinal(), g.to_date.toordinal(), g.amount)
+            for g in ledger.gaps()
+        ]
+
+    def span(a: int, b: int) -> tuple[int, int, Decimal]:
+        return (
+            h.txns[a - 1].date.toordinal(),
+            h.txns[b].date.toordinal(),
+            _missing(h, a, b),
+        )
+
+    imp(0, 10)
+    assert imp(30, 50) == [span(10, 30)]
+    assert imp(15, 20) == [span(10, 15), span(20, 30)]
+    assert imp(10, 15) == [span(20, 30)]
+    assert imp(20, 30) == []
+
+
+def test_a_running_balance_that_changes_sign(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=60)
+    # shift every printed balance so it crosses zero mid-history (overdrawn)
+    shift = -h.txns[30].balance_minor
+    signs = {(t.balance_minor + shift) > 0 for t in h.txns[:60]}
+    assert signs == {True, False}
+    ledger = ledger_for(1)
+
+    ledger.import_files(
+        [
+            write_export(render_export(h, 0, 25, gap_at=0, gap_minor=shift).text),
+            write_export(render_export(h, 35, 60, gap_at=0, gap_minor=shift).text),
+        ]
+    )
+    [gap] = ledger.gaps()
+    assert gap.amount == _missing(h, 25, 35)
+
+    ledger.import_files(
+        [write_export(render_export(h, 25, 35, gap_at=0, gap_minor=shift).text)]
+    )
+    assert ledger.gaps() == []
+
+
+def test_gaps_belong_to_one_user(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=8, days=60)
+    alice, bob = ledger_for(1), ledger_for(2)
+
+    alice.import_files(
+        [
+            write_export(render_export(h, 0, 10).text),
+            write_export(render_export(h, 20, 40).text),
+        ]
+    )
+    # Bob's import recomputes Bob's Gaps only, and his rows don't close Alice's
+    bob.import_files([write_export(render_export(h, 0, 40).text)])
+    assert bob.gaps() == []
+    assert [g.amount for g in alice.gaps()] == [_missing(h, 10, 20)]
+    assert bob.summarise_month("2026-01").gaps == []
+
+    bob.import_files([write_export(render_export(h, 50, 60).text)])
+    alice.import_files([write_export(render_export(h, 10, 20).text)])
+    assert alice.gaps() == []
+    assert [g.amount for g in bob.gaps()] == [_missing(h, 40, 50)]
+
+
+def test_same_day_rows_keep_the_files_order_not_a_sort(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    """Rows on one day that a sort by (date, description, amount, id) would
+    reorder still reconcile, because Bank order comes from the file."""
+    h, _ = generate_histories(seed=8, days=60)
+    days: dict[object, int] = {}
+    for t in h.txns:
+        days[t.date] = days.get(t.date, 0) + 1
+    assert max(days.values()) >= 2  # the history has busy days
+    ledger = ledger_for(1)
+
+    # newest rows first: storage ids no longer follow Bank order
+    for s in range(50, -1, -10):
+        ledger.import_files([write_export(render_export(h, s, s + 12).text)])
+
+    assert ledger.gaps() == []
+
+
+def test_split_twins_from_issue_34_surface_as_a_gap(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    """#34 limit: the second twin is merged into the first. The Ledger then
+    misses a real Transaction, and reconciliation catches it as a Gap of the
+    twin's amount rather than hiding it."""
+    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 twins, 114 refund
+    ledger = ledger_for(1)
+
+    ledger.import_files(
+        [
+            write_export(render_export(h, 100, 115).text),
+            write_export(render_export(h, 114, 130).text),
+        ]
+    )
+
+    assert [g.amount for g in ledger.gaps()] == [
+        Decimal(h.txns[115].amount_minor) / 100
+    ]
+
+
+def test_a_newest_first_export_reconciles_in_bank_order(
+    ledger_for: LedgerFor, write_export: WriteExport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If Lloyds files list newest first, Bank order must still come from the
+    file (reversed), not from its physical line numbers."""
+    monkeypatch.setattr(lloyds, "OLDEST_FIRST", False)
+    h, _ = generate_histories(seed=8, days=60)
+    ledger = ledger_for(1)
+
+    def newest_first(s: int, e: int) -> Path:
+        lines = render_export(h, s, e).text.splitlines()
+        return write_export("\n".join(lines[:2] + lines[:1:-1]) + "\n")
+
+    for s in range(0, 60, 10):
+        ledger.import_files([newest_first(s, s + 12)])
+
+    assert ledger.gaps() == []
