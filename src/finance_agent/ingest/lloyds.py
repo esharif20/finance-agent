@@ -27,8 +27,9 @@ DATE_FORMAT = "%d/%m/%Y"
 OLDEST_FIRST = True  # row order; the Ledger stores rows in Bank order
 CURRENCY = "GBP"
 
-_AMOUNT = re.compile(r"\d+(\.\d{1,2})?")
-_BALANCE = re.compile(r"-?\d+(\.\d{1,2})?")
+# ASCII only: `\d` would accept other scripts' digits, which Decimal then converts.
+_AMOUNT = re.compile(r"\d+(\.\d{1,2})?", re.ASCII)
+_BALANCE = re.compile(r"-?\d+(\.\d{1,2})?", re.ASCII)
 
 
 def _minor(text: str) -> int:
@@ -104,14 +105,16 @@ class Lloyds:
         skip, lines = _body(text)
         rows: list[ParsedRow] = []
         rejected: list[RejectedRow] = []
-        for i, cells in enumerate(csv.reader(lines[1:])):
-            line = skip + 2 + i  # 1-based, after the header line
+        reader = csv.reader(lines[1:])
+        line = skip + 2  # 1-based physical line where the next record starts
+        for cells in reader:
+            line, start = skip + 2 + reader.line_num, line
             if not any(c.strip() for c in cells):
                 continue
             try:
-                rows.append(_parse_row(cells, line))
+                rows.append(_parse_row(cells, start))
             except _Malformed as e:
-                rejected.append(RejectedRow(line, str(e)))
+                rejected.append(RejectedRow(start, str(e)))
         if not OLDEST_FIRST:
             rows.reverse()
         return ParsedFile(self.bank, rows, rejected)
