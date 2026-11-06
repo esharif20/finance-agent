@@ -2,6 +2,8 @@
 data-access layer. Nothing outside this module builds an engine or an
 unscoped query."""
 
+import hashlib
+import hmac
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,19 +20,50 @@ from sqlalchemy import (
     Table,
     create_engine,
     event,
+    exc,
     insert,
     select,
 )
+from sqlcipher3 import dbapi2 as sqlcipher  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
-from finance_agent.storage import schema
+from finance_agent.storage import keychain, schema
 
 DB_ENV = "FA_DB_PATH"
 DEFAULT_DB = Path.home() / "Library/Application Support/FinanceAgent/ledger.db"
 _MIGRATIONS = Path(__file__).parent / "migrations"
 
 
+_PLAINTEXT_HEADER = b"SQLite format 3\x00"
+
+
 class UnsafeDatabasePath(ValueError):
     pass
+
+
+class UnencryptedDatabase(ValueError):
+    pass
+
+
+class WrongDatabaseKey(ValueError):
+    pass
+
+
+def is_encrypted(path: Path) -> bool:
+    """True if `path` holds a non-empty database without SQLite's plaintext
+    header. Commands that bring in real data (connect, sync) must check this."""
+    try:
+        with path.open("rb") as f:
+            head = f.read(len(_PLAINTEXT_HEADER))
+    except FileNotFoundError:
+        return False
+    return bool(head) and head != _PLAINTEXT_HEADER
+
+
+def keyed_ref(ref: str) -> str:
+    """HMAC-SHA256 of an ingest account ref under the Keychain-held key, so the
+    stored value cannot be brute-forced from sort code and number alone."""
+    key = keychain.secret(keychain.HMAC_SERVICE)
+    return hmac.new(key, ref.encode(), hashlib.sha256).hexdigest()
 
 
 def default_db_path() -> Path:
@@ -42,26 +75,33 @@ def _inside_repo(path: Path) -> bool:
 
 
 def open_db(path: Path | None = None) -> Engine:
-    """The connection factory: validate the path, create it, migrate to head.
-
-    Swap point for SQLCipher in M3 (ADR 0002).
-    """
+    """The connection factory: validate the path, open it with SQLCipher using
+    the Keychain key (ADR 0002), migrate to head. Refuses plaintext databases."""
     path = path or default_db_path()
     if _inside_repo(path):
         raise UnsafeDatabasePath("refusing to open a database inside a repository")
+    if path.exists() and path.stat().st_size and not is_encrypted(path):
+        raise UnencryptedDatabase("refusing to open an unencrypted database")
     path.parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(f"sqlite:///{path}")
-    event.listen(engine, "connect", _sqlite_pragmas)
+    key = keychain.secret(keychain.DB_SERVICE).hex()
+
+    def keyed_connect(dbapi_conn: Any, _record: Any) -> None:
+        # Raw 256-bit key: no passphrase KDF. Must be the first statement.
+        dbapi_conn.execute(f"PRAGMA key = \"x'{key}'\"")
+        dbapi_conn.execute("PRAGMA foreign_keys = ON")
+
+    engine = create_engine(f"sqlite:///{path}", module=sqlcipher)
+    event.listen(engine, "connect", keyed_connect, insert=True)
     cfg = Config()
     cfg.set_main_option("script_location", str(_MIGRATIONS))
-    with engine.begin() as conn:
-        cfg.attributes["connection"] = conn
-        command.upgrade(cfg, "head")
+    try:
+        with engine.begin() as conn:
+            cfg.attributes["connection"] = conn
+            command.upgrade(cfg, "head")
+    except exc.DatabaseError:
+        engine.dispose()
+        raise WrongDatabaseKey("the Keychain key does not open this database") from None
     return engine
-
-
-def _sqlite_pragmas(dbapi_conn: Any, _record: Any) -> None:
-    dbapi_conn.execute("PRAGMA foreign_keys = ON")
 
 
 class Scoped:

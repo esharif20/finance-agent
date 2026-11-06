@@ -1,11 +1,35 @@
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import keyring
+import keyring.backend
 import pytest
 from sqlalchemy import Engine
 
 from finance_agent.ledger import Ledger
 from finance_agent.storage import open_db
+
+
+class MemoryKeyring(keyring.backend.KeyringBackend):
+    """In-memory stand-in for the macOS Keychain; tests never touch the real one."""
+
+    priority = 1  # pyright: ignore[reportAssignmentType]
+
+    def __init__(self) -> None:
+        self.items: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service: str, username: str) -> str | None:
+        return self.items.get((service, username))
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        self.items[(service, username)] = password
+
+    def delete_password(self, service: str, username: str) -> None:
+        self.items.pop((service, username), None)
+
+
+# Installed at import, before any test or fixture can reach keyring's default.
+keyring.set_keyring(MemoryKeyring())
 
 
 @pytest.fixture
