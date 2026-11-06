@@ -90,6 +90,7 @@ class Scoped:
         return int(key[0])
 
     def delete(self, table: Table) -> Delete:
+        """A DELETE of this user's rows only; narrow it further with .where()."""
         return delete(table).where(table.c.user_id == self.user_id)
 
     def execute(self, stmt: Executable) -> CursorResult[Any]:

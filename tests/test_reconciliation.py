@@ -287,19 +287,17 @@ def test_split_twins_from_issue_34_surface_as_a_gap(
     """#34 limit: the second twin is merged into the first. The Ledger then
     misses a real Transaction, and reconciliation catches it as a Gap of the
     twin's amount rather than hiding it."""
-    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 twins, 114 refund
+    h, _ = generate_histories(seed=31, days=60)  # rows 69/71 twins, 70 refund
     ledger = ledger_for(1)
 
     ledger.import_files(
         [
-            write_export(render_export(h, 100, 115).text),
-            write_export(render_export(h, 114, 130).text),
+            write_export(render_export(h, 56, 71).text),
+            write_export(render_export(h, 70, 86).text),
         ]
     )
 
-    assert [g.amount for g in ledger.gaps()] == [
-        Decimal(h.txns[115].amount_minor) / 100
-    ]
+    assert [g.amount for g in ledger.gaps()] == [Decimal(h.txns[71].amount_minor) / 100]
 
 
 def test_a_newest_first_export_reconciles_in_bank_order(

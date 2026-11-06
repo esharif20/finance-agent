@@ -61,7 +61,8 @@ class Launcher:
         wait: int = 15,
     ) -> None:
         self.pid_file, self.port, self.wait = pid_file, port, wait
-        self._probe, self._spawn, self._kill, self._open = probe, spawn, kill, open_url
+        self._probe, self._spawn, self._kill = probe, spawn, kill
+        self.open_url = open_url
 
     def start(self) -> None:
         """Start the server unless ours already answers, then open the browser."""
@@ -74,7 +75,7 @@ class Launcher:
                 if time.monotonic() >= deadline:
                     raise ServerDidNotStart("the server did not answer in time")
                 time.sleep(0.2)
-        self._open(f"http://{HOST}:{self.port}/")
+        self.open_url(f"http://{HOST}:{self.port}/")
 
     def stop(self) -> bool:
         """Stop the recorded server. Returns False if none was running."""

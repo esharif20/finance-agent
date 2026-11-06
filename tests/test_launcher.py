@@ -1,5 +1,6 @@
 """`fa` / `fa stop`: no real server, browser or process is ever started here."""
 
+import webbrowser
 from pathlib import Path
 
 import pytest
@@ -130,8 +131,10 @@ def test_fa_no_browser_env_keeps_the_browser_closed(
 ) -> None:
     monkeypatch.setenv("FA_DB_PATH", str(tmp_path / "ledger.db"))
     monkeypatch.setenv("FA_NO_BROWSER", "1")
-    monkeypatch.setattr(
-        launcher.webbrowser, "open", lambda url: pytest.fail("opened " + url)
-    )
 
-    launcher.default()._open("http://127.0.0.1:1/")  # noqa: SLF001
+    def fail(url: str) -> bool:
+        pytest.fail("opened " + url)
+
+    monkeypatch.setattr(webbrowser, "open", fail)
+
+    launcher.default().open_url("http://127.0.0.1:1/")
