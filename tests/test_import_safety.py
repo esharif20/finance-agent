@@ -122,3 +122,52 @@ def test_injection_like_descriptors_are_stored_as_plain_data(
         t = schema.transaction
         assert conn.execute(select(t.c.description)).scalars().all() == [desc]
     eng.dispose()
+
+
+# --- Verifier: adversarial cases -------------------------------------------
+
+
+@pytest.mark.parametrize("amount", ["1e3", "NaN", "Infinity", "∞", "٥.00", "５.00"])
+def test_amounts_outside_plain_ascii_decimals_are_rejected(
+    ledger_for: LedgerFor, write_export: WriteExport, amount: str
+) -> None:
+    r = ledger_for(1).import_files([write_export(HEAD + row("A") + row("B", amount))])
+    assert [(x.line, x.reason) for x in r.rejected] == [(4, "invalid amount")]
+    assert r.added == 0
+
+
+def test_line_numbers_count_physical_lines_after_a_multiline_description(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    # Header is line 2; the quoted description spans lines 3-4; BROKEN is line 6.
+    text = HEAD + row('"TWO\nLINES"') + row("B") + BROKEN.rstrip("\n")
+    r = ledger_for(1).import_files([write_export(text)])
+    assert [x.line for x in r.rejected] == [6]
+
+
+def test_bad_middle_file_does_not_disturb_dedup_between_its_neighbours(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    first = write_export(HEAD + row("A") + row("B"))
+    bad = write_export(HEAD + row("A") + BROKEN)
+    third = write_export(HEAD + row("A") + row("B"))  # same bytes as `first`
+    r = ledger_for(1).import_files([first, bad, third])
+    assert (r.added, r.already_known) == (2, 2)
+    assert [(x.file, x.line) for x in r.rejected] == [(bad.name, 4)]
+
+
+def test_account_details_inside_a_description_stay_out_of_report_and_logs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setenv("FA_DB_PATH", str(tmp_path / "db" / "ledger.db"))
+    f = tmp_path / "a.csv"
+    f.write_text(HEAD + row("TO 99-88-77 13572468", number="24681357") + BROKEN)
+    assert main(["import", str(f)]) == 1
+    out = capsys.readouterr()
+    seen = out.out + out.err + "\n".join(r.getMessage() for r in caplog.records)
+    for leak in ("99-88-77", "13572468", "24681357", "11-22-33"):
+        assert leak not in seen
