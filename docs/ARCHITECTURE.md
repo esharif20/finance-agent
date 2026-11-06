@@ -77,7 +77,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry | `ledger`, `categorise`, `memory` |
 | `memory` | Memories, Proposals, feedback, retention | `storage` |
 | `assistant` | The LangGraph graph, tool allowlist, grounding check, answer cache (ADR 0010), `ChatModel` interface and adapters | `engine`, `ledger` (read-only views), `memory` |
-| `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0012). No database access. | nothing except the payload it is handed |
+| `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0013). No database access. | nothing except the payload it is handed |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
 | `cli` | The `fa` command. `fa import` and `fa summary` call the Ledger interface in process; `fa` (open dashboard) talks to the running server | `ledger`, `categorise` (in-process); `api` only over HTTP |
 
