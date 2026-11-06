@@ -50,11 +50,12 @@ def test_every_transaction_gets_a_kind_and_spending_a_recorded_category(
             assert c.kind in KINDS
             assert c.taxonomy_version == categorise.TAXONOMY_VERSION
             assert (c.kind == "Transfer") == (t.transfer_with is not None)
+            assert c.source.split(":")[0] in ("merchant", "rule", "default")
             if c.kind in ("Spending", "Refund"):
                 assert c.category is not None
-                assert c.source
+                assert (c.merchant is None) == (c.merchant_id is None)
             else:
-                assert (c.category, c.merchant) == (None, None)
+                assert (c.category, c.merchant, c.merchant_id) == (None, None, None)
         assert {t.categorisation.kind for t in txns if t.categorisation} >= {
             "Spending",
             "Income",
@@ -95,14 +96,60 @@ def test_spending_by_category_drills_down_to_subcategory_and_merchant(
         Spend(
             "Transport",
             d("8.00"),
-            (Spend("Parking", d("8.00"), (Spend("Unknown", d("8.00")),)),),
+            (Spend("Parking", d("8.00"), (Spend("NCP CAR PARKING", d("8.00")),)),),
         ),
         Spend(
             "Uncategorised",
             d("3.00"),
-            (Spend("Uncategorised", d("3.00"), (Spend("Unknown", d("3.00")),)),),
+            (
+                Spend(
+                    "Uncategorised",
+                    d("3.00"),
+                    (Spend("UNHEARD-OF SHOP", d("3.00")),),
+                ),
+            ),
         ),
     ]
+
+
+def merchant_ids(ledger: Ledger) -> dict[str, int | None]:
+    return {
+        t.description: t.categorisation.merchant_id
+        for t in ledger.transactions()
+        if t.categorisation
+    }
+
+
+def test_merchants_are_stable_rows_with_a_default_category(
+    engine: Engine, write_export: WriteExport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows = [
+        (1, "DEB", "TESCO STORES 3021", -1250),
+        (2, "DEB", "NCP CAR PARKING 12", -800),
+        (3, "DEB", "TESCO EXP 0042", -750),
+    ]
+    h = history(rows)
+    later = history([*rows, (9, "DEB", "NCP CAR PARKING 77 LONDON", -400)])
+    with engine.begin() as conn:
+        ledger = Ledger(conn, 1)
+        ledger.import_files([write_export(render_export(h, 0, 9).text)])
+        categorise.run(conn, 1)
+        first = merchant_ids(ledger)
+
+        monkeypatch.setattr(categorise, "RULES", ())  # rules change
+        ledger.import_files([write_export(render_export(later, 0, 9).text)])
+        categorise.run(conn, 1)
+        second = merchant_ids(ledger)
+
+        merchants = {m.name: m for m in ledger.merchants()}
+
+    assert first["TESCO STORES 3021"] == first["TESCO EXP 0042"]
+    assert second.items() >= first.items()
+    assert second["NCP CAR PARKING 77 LONDON"] == first["NCP CAR PARKING 12"]
+    assert set(merchants) == set(categorise.MERCHANTS) | {"NCP CAR PARKING"}
+    assert merchants["Tesco"].default_category == ("Food & Drink", "Groceries")
+    assert merchants["NCP CAR PARKING"].default_category is None
+    assert merchants["Tesco"].id == first["TESCO STORES 3021"]
 
 
 def totals(ledger: Ledger, month: str) -> dict[str, Decimal]:

@@ -5,6 +5,7 @@ Uncategorised). Corrections (#10) and ML come later, in front of / after rules.
 
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -46,9 +47,29 @@ MERCHANTS: dict[str, tuple[re.Pattern[str], tuple[str, str]]] = {
 
 
 def merchant_for(description: str) -> str | None:
-    """The normalised Merchant for a raw Bank descriptor, if one is known."""
+    """The seeded Merchant a raw Bank descriptor is an alias of, if any."""
     d = description.upper()
     return next((m for m, (p, _) in MERCHANTS.items() if p.search(d)), None)
+
+
+# Tokens that say where, not who. shortcut: a short list; extend from real exports.
+LOCATIONS = frozenset({"GB", "GBR", "UK", "LONDON", "MANCHESTER", "BIRMINGHAM"})
+
+
+def normalise(description: str) -> str:
+    """The Merchant name for a descriptor: a seeded alias, else the descriptor
+    without store numbers, payment references, locations and "REFUND".
+    Deterministic, so the same shop maps to the same Merchant row on every
+    import; "" when nothing is left to name."""
+    known = merchant_for(description)
+    if known is not None:
+        return known
+    words = [
+        w
+        for w in re.split(r"[\s*]+", description.upper())
+        if w and w != "REFUND" and w not in LOCATIONS and not re.search(r"\d", w)
+    ]
+    return " ".join(words)[:64]
 
 
 # Descriptor rules for when no Merchant matches: (rule id, pattern, Category).
@@ -72,35 +93,49 @@ REFUND = re.compile(r"\bREFUND\b")
 @dataclass(frozen=True)
 class Classification:
     kind: str  # Spending, Income, Transfer, Refund or Fee
-    merchant: str | None
+    merchant: str | None  # a Merchant name from `normalise`
     category: tuple[str, str] | None  # (top level, subcategory)
-    source: str  # "merchant:<name>", "rule:<id>", "none"; "" when no Category
+    # how it was decided: "merchant:<name>", "rule:<id>" or "default"
+    # (Corrections, #10, will add "correction")
+    source: str
+
+
+SEED_DEFAULTS: dict[str, tuple[str, str] | None] = {
+    m: cat for m, (_, cat) in MERCHANTS.items()
+}
 
 
 def classify(
-    description: str, amount: int | Decimal, bank_type: str, *, transfer: bool
+    description: str,
+    amount: int | Decimal,
+    bank_type: str,
+    *,
+    transfer: bool,
+    defaults: Mapping[str, tuple[str, str] | None] = SEED_DEFAULTS,
 ) -> Classification:
-    """Kind first; then, for Spending and Refunds only, Merchant and Category.
+    """Kind first; then, for Spending and Refunds only, Merchant and Category:
+    the Merchant's default (`defaults`, from the merchant table), then
+    descriptor rules, then Uncategorised.
 
     `transfer` comes from the Ledger's Transfer links; Kind is never the Bank's
     Transaction Type (a TFR row to someone else is Spending).
     """
     d = description.upper()
     if transfer:
-        return Classification("Transfer", None, None, "")
+        return Classification("Transfer", None, None, "rule:transfer")
     if bank_type.upper() in FEE_TYPES:
-        return Classification("Fee", None, None, "")
-    merchant = merchant_for(d)
-    if amount > 0 and merchant is None and not REFUND.search(d):
-        return Classification("Income", None, None, "")
+        return Classification("Fee", None, None, "rule:fee")
+    if amount > 0 and merchant_for(d) is None and not REFUND.search(d):
+        return Classification("Income", None, None, "default")
     kind = "Spending" if amount <= 0 else "Refund"
-    if merchant is not None:
-        category = MERCHANTS[merchant][1]
+    merchant = normalise(d) or None
+    category = defaults.get(merchant) if merchant else None
+    if merchant and category:
         return Classification(kind, merchant, category, f"merchant:{merchant}")
     for rule_id, pattern, category in RULES:
         if pattern.search(d):
-            return Classification(kind, None, category, f"rule:{rule_id}")
-    return Classification(kind, None, UNCATEGORISED, "none")
+            return Classification(kind, merchant, category, f"rule:{rule_id}")
+    return Classification(kind, merchant, UNCATEGORISED, "default")
 
 
 def _seed_taxonomy(db: Scoped) -> dict[tuple[str, str], int]:
@@ -131,18 +166,38 @@ def run(conn: Connection, user_id: int) -> int:
     make it incremental by ledger_version if it gets slow.
     """
     db = Scoped(conn, user_id)
+    ledger = Ledger(conn, user_id)
     ids = _seed_taxonomy(db)
+    merchant_ids = {m.name: m.id for m in ledger.merchants()}
+    for name, (_, category) in MERCHANTS.items():
+        if name not in merchant_ids:
+            merchant_ids[name] = db.insert(
+                schema.merchant, name=name, default_category_id=ids[category]
+            )
+    # the merchant table is the source of defaults; one from a retired taxonomy
+    # version no longer names a current Category, so rules decide instead
+    defaults = {
+        m.name: m.default_category
+        for m in ledger.merchants()
+        if m.default_category in ids
+    }
     db.execute(db.delete(schema.categorisation))
-    txns = Ledger(conn, user_id).transactions()
+    txns = ledger.transactions()
     for t in txns:
         c = classify(
-            t.description, t.amount, t.bank_type, transfer=t.transfer_with is not None
+            t.description,
+            t.amount,
+            t.bank_type,
+            transfer=t.transfer_with is not None,
+            defaults=defaults,
         )
+        if c.merchant and c.merchant not in merchant_ids:
+            merchant_ids[c.merchant] = db.insert(schema.merchant, name=c.merchant)
         db.insert(
             schema.categorisation,
             transaction_id=t.id,
             kind=c.kind,
-            merchant=c.merchant,
+            merchant_id=merchant_ids[c.merchant] if c.merchant else None,
             category_id=ids[c.category] if c.category else None,
             source=c.source,
             taxonomy_version=TAXONOMY_VERSION,

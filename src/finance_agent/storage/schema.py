@@ -102,7 +102,23 @@ transaction_source = Table(
         ForeignKey("statement_import.id"),
         primary_key=True,
     ),
-    Column("row_number", Integer, primary_key=True),
+    Column("row_number", Integer, primary_key=True),  # physical line, for provenance
+    # index in the file's Bank order (oldest first); differs from row_number
+    # when the Bank lists newest first
+    Column("bank_position", Integer, nullable=False, server_default="0"),
+)
+
+# derived: recomputed from the Ledger after every import, never edited by hand
+reconciliation_gap = Table(
+    "reconciliation_gap",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("account_id", Integer, ForeignKey("account.id"), nullable=False),
+    Column("from_date", Date, nullable=False),
+    Column("to_date", Date, nullable=False),
+    # Bank's balance minus the Ledger's: the net of the missing Transactions
+    Column("amount_minor", BigInteger, nullable=False),
 )
 
 # Own-account Transfer pairs: from = the outgoing (negative) leg. Bank rows are
@@ -134,15 +150,28 @@ category = Table(
     Column("taxonomy_version", Integer, nullable=False),
 )
 
+# One row per normalised Merchant name, never deleted, so its id is stable across
+# imports and rule changes (Corrections in #10 target it). Seeded Merchants carry
+# a default Category; others get NULL until a Correction sets one.
+merchant = Table(
+    "merchant",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("name", String(64), nullable=False),
+    Column("default_category_id", Integer, ForeignKey("category.id")),
+    UniqueConstraint("user_id", "name"),
+)
+
 # Derived, recomputed by `categorise.run`; never edited by hand (Corrections are
-# a separate overlay, ADR 0001).
+# a separate overlay, ADR 0001). Not part of the duplicate key (ADR 0006).
 categorisation = Table(
     "categorisation",
     metadata,
     Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
     Column("transaction_id", Integer, ForeignKey("transaction.id"), primary_key=True),
     Column("kind", String(16), nullable=False),
-    Column("merchant", String(64)),
+    Column("merchant_id", Integer, ForeignKey("merchant.id")),
     Column("category_id", Integer, ForeignKey("category.id")),
     Column("source", String(64), nullable=False),
     Column("taxonomy_version", Integer, nullable=False),
