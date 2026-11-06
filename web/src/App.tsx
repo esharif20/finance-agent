@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Eye, EyeOff, LayoutDashboard, ListOrdered } from "lucide-react";
-import { useEffect, useState } from "react";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
+import { useRoute } from "@/lib/route";
+import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Overview } from "@/screens/Overview";
 import { Transactions } from "@/screens/Transactions";
 
@@ -41,17 +42,6 @@ const TABS = [
   { id: "transactions", label: "Transactions", Icon: ListOrdered },
 ] as const;
 
-function useTab() {
-  const read = () => (location.hash === "#transactions" ? "transactions" : "overview");
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(read);
-  useEffect(() => {
-    const on = () => setTab(read());
-    window.addEventListener("hashchange", on);
-    return () => window.removeEventListener("hashchange", on);
-  }, []);
-  return tab;
-}
-
 function Tabs({ tab, className, item }: { tab: string; className: string; item: string }) {
   return (
     <nav aria-label="Main" className={className}>
@@ -71,7 +61,8 @@ function Tabs({ tab, className, item }: { tab: string; className: string; item: 
 }
 
 export function App() {
-  const tab = useTab();
+  const route = useRoute();
+  const tab = route.name === "transactions" ? "transactions" : "overview";
   return (
     <QueryClientProvider client={queryClient}>
       <PrivacyProvider>
@@ -87,10 +78,16 @@ export function App() {
           <HideAmounts />
         </header>
         <main>
-          <h1 className="mb-6 text-[28px] leading-9 font-semibold tracking-[-0.01em]">
-            {TABS.find((t) => t.id === tab)?.label}
-          </h1>
-          {tab === "overview" ? <Overview /> : <Transactions />}
+          {route.name === "category" ? (
+            <CategoryScreen key={route.category} category={route.category} month={route.month} />
+          ) : (
+            <>
+              <h1 className="mb-6 text-[28px] leading-9 font-semibold tracking-[-0.01em]">
+                {TABS.find((t) => t.id === tab)?.label}
+              </h1>
+              {route.name === "transactions" ? <Transactions /> : <Overview />}
+            </>
+          )}
         </main>
         <Tabs
           tab={tab}
