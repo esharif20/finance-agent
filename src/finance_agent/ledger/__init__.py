@@ -50,9 +50,26 @@ class Categorisation:
     kind: str  # Spending, Income, Transfer, Refund or Fee
     merchant: str | None
     category: tuple[str, str] | None  # (top level, subcategory)
-    source: str  # "merchant:<name>", "rule:<id>" or "default"
+    source: str  # "correction", "merchant:<name>", "rule:<id>" or "default"
     taxonomy_version: int
     merchant_id: int | None = None
+
+
+@dataclass(frozen=True)
+class Correction:
+    """A user's Category for one Transaction or for every Transaction of a
+    Merchant (ADR 0001). The Transaction itself never changes."""
+
+    id: int
+    transaction_id: int | None
+    merchant_id: int | None
+    category: tuple[str, str]
+    created_at: datetime
+    reverted_at: datetime | None
+
+
+class UnknownTarget(ValueError):
+    """No such Transaction, Merchant, Category or Correction for this user."""
 
 
 @dataclass(frozen=True)
@@ -132,6 +149,7 @@ class Ledger:
 
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
         added = known = 0
+        stored = False
         rejected: list[Rejection] = []
         accounts: dict[int, str] = {}
         for n, path in enumerate(paths, 1):
@@ -157,6 +175,7 @@ class Ledger:
                 known += len(parsed.rows)
                 log.info("import file=%d already_known=%d", n, len(parsed.rows))
                 continue
+            stored = True
             import_id = self._db.insert(
                 si,
                 source="csv",
@@ -202,6 +221,8 @@ class Ledger:
             )
         if added:
             self._link_transfers()
+        if stored:
+            self._db.bump_ledger_version()
         self._recompute_gaps()
         return ImportReport(
             added,
@@ -335,17 +356,122 @@ class Ledger:
             .outerjoin(sub, sub.c.id == c.c.category_id)
             .outerjoin(top, top.c.id == sub.c.parent_id)
         )
-        return {
-            r.transaction_id: Categorisation(
-                r.kind,
-                r.merchant,
-                (r.top, r.sub) if r.sub is not None else None,
-                r.source,
-                r.taxonomy_version,
+        by_txn: dict[int, tuple[str, str]] = {}
+        by_merchant: dict[int, tuple[str, str]] = {}
+        for k in self.corrections():  # oldest first: the latest active one wins
+            if k.reverted_at is None and k.transaction_id is not None:
+                by_txn[k.transaction_id] = k.category
+            elif k.reverted_at is None and k.merchant_id is not None:
+                by_merchant[k.merchant_id] = k.category
+        out: dict[int, Categorisation] = {}
+        for r in rows:
+            category = (r.top, r.sub) if r.sub is not None else None
+            source = r.source
+            # Corrections beat every rule (ADR 0005); Kinds without a Category
+            # (Income, Transfer, Fee) ignore them
+            fix = by_txn.get(r.transaction_id) or by_merchant.get(r.merchant_id)
+            if fix and r.kind in ("Spending", "Refund"):
+                category, source = fix, "correction"
+            out[r.transaction_id] = Categorisation(
+                r.kind, r.merchant, category, source, r.taxonomy_version, r.merchant_id
+            )
+        return out
+
+    def ledger_version(self) -> int:
+        """Bumped by every import that stores a file and every Correction."""
+        return self._db.ledger_version()
+
+    def correct_transaction(
+        self, transaction_id: int, category: tuple[str, str]
+    ) -> Correction:
+        """Give one Transaction this Category, over any rule or Merchant."""
+        t = schema.transaction
+        self._exists(self._db.select(t, t.c.id).where(t.c.id == transaction_id))
+        return self._correct(category, transaction_id=transaction_id)
+
+    def correct_merchant(
+        self, merchant_id: int, category: tuple[str, str]
+    ) -> Correction:
+        """Give every Transaction of this Merchant (now and future) this Category;
+        a Correction for one Transaction still beats it."""
+        m = schema.merchant
+        self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
+        return self._correct(category, merchant_id=merchant_id)
+
+    def revert_correction(self, correction_id: int) -> None:
+        """Undo a Correction; it stays in the history, marked reverted."""
+        k = schema.correction
+        res = self._db.execute(
+            self._db.update(k)
+            .where(k.c.id == correction_id, k.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active Correction")
+        self._db.bump_ledger_version()
+
+    def corrections(self) -> list[Correction]:
+        """Every Correction, reverted ones included, oldest first."""
+        k, sub, top = (
+            schema.correction,
+            schema.category.alias("sub"),
+            schema.category.alias("top"),
+        )
+        rows = self._db.execute(
+            self._db.select(
+                k,
+                k.c.id,
+                k.c.transaction_id,
+                k.c.merchant_id,
+                top.c.name.label("top"),
+                sub.c.name.label("sub"),
+                k.c.created_at,
+                k.c.reverted_at,
+            )
+            .join(sub, sub.c.id == k.c.category_id)
+            .join(top, top.c.id == sub.c.parent_id)
+            .order_by(k.c.id)
+        )
+        return [
+            Correction(
+                r.id,
+                r.transaction_id,
                 r.merchant_id,
+                (r.top, r.sub),
+                r.created_at,
+                r.reverted_at,
             )
             for r in rows
-        }
+        ]
+
+    def _correct(self, category: tuple[str, str], **target: int) -> Correction:
+        sub, top = schema.category, schema.category.alias("top")
+        latest = self._db.execute(
+            self._db.select(sub, func.max(sub.c.taxonomy_version))
+        ).scalar()
+        category_id = self._exists(  # a leaf of the current taxonomy version only
+            self._db.select(sub, sub.c.id)
+            .join(top, top.c.id == sub.c.parent_id)
+            .where(
+                top.c.name == category[0],
+                sub.c.name == category[1],
+                sub.c.taxonomy_version == latest,
+            )
+        )
+        cid = self._db.insert(
+            schema.correction,
+            category_id=category_id,
+            created_at=datetime.now(UTC),
+            **target,
+        )
+        self._db.bump_ledger_version()
+        return next(k for k in self.corrections() if k.id == cid)
+
+    def _exists(self, stmt: Select[Any]) -> int:
+        row = self._db.execute(stmt).first()
+        if row is None:
+            raise UnknownTarget("unknown target")
+        return int(row[0])
 
     def summarise_month(self, month: str) -> MonthSummary:
         start, end = _month_bounds(month)
