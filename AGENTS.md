@@ -2,6 +2,18 @@
 
 Engineering rules for this project are still being designed (see `/grill-with-docs` output). Until they land: no real financial data in commits, fixtures, issues or logs.
 
+## Frontend work: required skills
+
+Any task that touches the frontend (components, screens, styling, charts, motion, the demo landing page) must load these skills first:
+
+- `frontend-design:frontend-design`: aesthetic direction, avoiding templated defaults.
+- `ui-ux-pro-max`: UX guidelines, accessibility, chart and colour choices.
+- `vercel-plugin:shadcn` (or `shadcn`): adding and composing shadcn/ui components.
+- `design-taste-frontend`: anti-slop house style; also its gallery research when choosing a direction.
+- `nateherk-design:scroll-craft`: scroll-driven motion. Use it for the public demo landing page; app screens keep motion restrained.
+
+Visual reference: `~/.claude/skill-library/awesome-design-md/design-md/revolut/DESIGN.md`. Follow its structure (type scale, spacing, radii, pill buttons, dark/light surfaces), not its brand: no Revolut name, logo, exact primary colour or the commercial Aeonik Pro font. Revolut is one of the user's banks, and a look-alike would read as impersonation in a public demo.
+
 ## Agent skills
 
 ### Issue tracker
