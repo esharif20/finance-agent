@@ -136,6 +136,20 @@ class SyncGap:
 
 
 @dataclass(frozen=True)
+class SyncStatus:
+    """Freshness of the feed. Failures carry an error class and a count only."""
+
+    last_sync_at: datetime | None  # UTC
+    last_failure_at: datetime | None  # UTC; cleared by the next success
+    failure_class: str | None
+    failures_in_a_row: int
+    consent_renewed_on: date | None
+    consent_expires_on: date | None
+    consent_days_left: int | None  # negative once expired
+    consent_warning: bool  # inside the warning window, or expired
+
+
+@dataclass(frozen=True)
 class SyncReport:
     added: int  # new Transactions, after matching
     matched: int  # synced rows merged into an existing CSV Transaction
@@ -597,6 +611,67 @@ class Ledger:
             )
             for r in rows
         ]
+
+    def _status_row(self) -> Any:
+        t = schema.sync_status
+        return self._db.execute(self._db.select(t)).first()
+
+    def _set_status(self, **values: Any) -> None:
+        t = schema.sync_status
+        if self._status_row() is None:
+            self._db.insert(t, **values)
+        else:
+            self._db.execute(self._db.update(t).values(**values))
+
+    def record_sync_success(self, now: datetime) -> None:
+        self._set_status(
+            last_success_ts=int(now.timestamp()),
+            last_failure_ts=None,
+            failure_class=None,
+            failures_in_a_row=0,
+        )
+
+    def record_sync_failure(self, error_class: str, now: datetime) -> None:
+        """Only the exception class name is kept: messages may quote data."""
+        row = self._status_row()
+        self._set_status(
+            last_failure_ts=int(now.timestamp()),
+            failure_class=error_class[:64],
+            failures_in_a_row=(row.failures_in_a_row if row else 0) + 1,
+        )
+
+    def record_consent_renewed(self, on: date) -> None:
+        self._set_status(consent_renewed_on=on)
+
+    def sync_status(self, today: date | None = None) -> SyncStatus:
+        today = today or datetime.now(simplefin.LONDON).date()
+        row = self._status_row()
+
+        def at(ts: int | None) -> datetime | None:
+            return None if ts is None else datetime.fromtimestamp(ts, UTC)
+
+        renewed = row.consent_renewed_on if row else None
+        expires = renewed + timedelta(days=simplefin.CONSENT_DAYS) if renewed else None
+        left = (expires - today).days if expires else None
+        return SyncStatus(
+            last_sync_at=at(row.last_success_ts if row else None),
+            last_failure_at=at(row.last_failure_ts if row else None),
+            failure_class=row.failure_class if row else None,
+            failures_in_a_row=row.failures_in_a_row if row else 0,
+            consent_renewed_on=renewed,
+            consent_expires_on=expires,
+            consent_days_left=left,
+            consent_warning=left is not None and left <= simplefin.CONSENT_WARN_DAYS,
+        )
+
+    def alert_is_new(self, key: str | None) -> bool:
+        """Remember the alert last shown; True only when `key` differs from it,
+        so an unchanged problem is not announced again on every run."""
+        row = self._status_row()
+        if (row.notified if row else None) == key:
+            return False
+        self._set_status(notified=key)
+        return True
 
     def sync_since(self, today: date) -> date:
         """First day to fetch: the last synced posted date minus an overlap, or

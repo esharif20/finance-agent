@@ -4,9 +4,12 @@ The access URL lives only in the Keychain; it is read here and handed to the
 ingest client, and never printed, logged or put in an error message."""
 
 import getpass
+import logging
 import sys
-from datetime import datetime
+from collections.abc import Callable
+from datetime import UTC, datetime
 
+from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
 from finance_agent.cli import gbp
@@ -14,6 +17,14 @@ from finance_agent.ingest import simplefin
 from finance_agent.ledger import Ledger, SyncReport
 from finance_agent.storage import default_db_path, is_encrypted, keychain, open_db
 
+log = logging.getLogger(__name__)
+Notifier = Callable[[str, str], None]
+TITLE = "Finance Agent"
+LEGACY_HINT = (
+    "fa: remove the old Keychain item yourself: "
+    f"security delete-generic-password -s {keychain.SIMPLEFIN_ACCESS_SERVICE} "
+    f"-a {keychain.LEGACY_ACCOUNT}"
+)
 SERVICE = keychain.SIMPLEFIN_ACCESS_SERVICE
 REVOKE = (
     "To revoke access at the provider too, remove this connection in your "
@@ -35,20 +46,51 @@ def _encrypted_db() -> Engine:
     return engine
 
 
-def connect(user_id: int) -> int:
+def _adopt_spike_item() -> str | None:
+    """Move the access URL the #26 spike stored under the legacy Keychain account
+    to the app's account. Returns it, or None when there is nothing to adopt.
+    A failed move deletes the legacy item best-effort and raises ValueError."""
+    legacy = keychain.legacy_text(SERVICE)
+    if legacy is None:
+        return None
+    try:
+        keychain.set_text(SERVICE, legacy)
+    except (OSError, KeyringError):
+        try:
+            keychain.delete_legacy(SERVICE)
+        except (OSError, KeyringError):
+            pass
+        print(LEGACY_HINT, file=sys.stderr)
+        raise ValueError("could not move the old Keychain item") from None
+    try:
+        keychain.delete_legacy(SERVICE)
+    except (OSError, KeyringError):
+        print(LEGACY_HINT, file=sys.stderr)
+    return legacy
+
+
+def connect(user_id: int, renewed: bool = False) -> int:
     engine = _encrypted_db()
     try:
+        today = datetime.now(simplefin.LONDON).date()
+        if renewed:  # the bank consent was renewed: just reset the 90-day clock
+            with engine.begin() as conn:
+                Ledger(conn, user_id).record_consent_renewed(today)
+            print("Bank consent renewal recorded.")
+            return 0
         if keychain.get_text(SERVICE) is not None:
             return _err("already connected; run `fa disconnect` first")
-        token = getpass.getpass("SimpleFIN setup token (input hidden): ")
-        access = simplefin.claim(token, simplefin.transport)
-        keychain.set_text(SERVICE, access)
+        access = _adopt_spike_item()
+        if access is None:
+            token = getpass.getpass("SimpleFIN setup token (input hidden): ")
+            access = simplefin.claim(token, simplefin.transport)
+            keychain.set_text(SERVICE, access)
         print("Connected. The access URL is stored in the Keychain only.")
-        today = datetime.now(simplefin.LONDON).date()
         raw = simplefin.fetch(access, today, today, simplefin.transport)
         accounts = simplefin.parse(raw).accounts
         with engine.begin() as conn:
             ledger = Ledger(conn, user_id)
+            ledger.record_consent_renewed(today)
             existing = {a.masked_number: a.id for a in ledger.accounts()}
             for acc in accounts:
                 print(f"Synced Account: {acc.org} {acc.name} ({acc.currency})")
@@ -107,19 +149,61 @@ def _print(r: SyncReport) -> None:
         )
 
 
-def sync(user_id: int) -> int:
+def _alert(engine: Engine, user_id: int, notify: Notifier) -> None:
+    """Notify about a failure or a nearing consent expiry, once per state."""
+    today = datetime.now(simplefin.LONDON).date()
+    with engine.begin() as conn:
+        ledger = Ledger(conn, user_id)
+        st = ledger.sync_status(today)
+        key: str | None = None
+        body = ""
+        renew = "renew it, then run `fa connect --renewed`"
+        if st.failure_class:
+            key = f"fail:{st.failure_class}"
+            body = f"Sync failed ({st.failure_class}), {st.failures_in_a_row} in a row"
+        elif st.consent_warning and st.consent_days_left is not None:
+            key = f"consent:{st.consent_expires_on}"
+            body = (
+                f"Bank consent expired; {renew}"
+                if st.consent_days_left < 0
+                else f"Bank consent expires in {st.consent_days_left} days; {renew}"
+            )
+        if ledger.alert_is_new(key) and key is not None:
+            notify(TITLE, body)
+
+
+def sync(user_id: int, notify: Notifier | None = None) -> int:
+    """Fetch and apply. `notify` is set by the scheduled job only."""
     engine = _encrypted_db()
     try:
         access = keychain.get_text(SERVICE)
         if access is None:
             return _err("not connected; run `fa connect` first")
-        today = datetime.now(simplefin.LONDON).date()
+        try:
+            _fetch_and_apply(engine, user_id, access)
+        except Exception as e:  # recorded by class name only, then re-raised
+            with engine.begin() as conn:
+                Ledger(conn, user_id).record_sync_failure(
+                    type(e).__name__, datetime.now(UTC)
+                )
+            log.warning("sync_failed class=%s", type(e).__name__)
+            if notify:
+                _alert(engine, user_id, notify)
+            raise
         with engine.begin() as conn:
-            since = Ledger(conn, user_id).sync_since(today)
-        for start, end in simplefin.windows(since, today):
-            raw = simplefin.fetch(access, start, end, simplefin.transport)
-            with engine.begin() as conn:  # each response commits on its own
-                _print(Ledger(conn, user_id).apply_sync(raw))
+            Ledger(conn, user_id).record_sync_success(datetime.now(UTC))
+        if notify:
+            _alert(engine, user_id, notify)
         return 0
     finally:
         engine.dispose()
+
+
+def _fetch_and_apply(engine: Engine, user_id: int, access: str) -> None:
+    today = datetime.now(simplefin.LONDON).date()
+    with engine.begin() as conn:
+        since = Ledger(conn, user_id).sync_since(today)
+    for start, end in simplefin.windows(since, today):
+        raw = simplefin.fetch(access, start, end, simplefin.transport)
+        with engine.begin() as conn:  # each response commits on its own
+            _print(Ledger(conn, user_id).apply_sync(raw))

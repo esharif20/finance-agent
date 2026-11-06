@@ -1,6 +1,7 @@
 """The API is a thin adapter over the Ledger interface (FastAPI test client)."""
 
 from collections.abc import Callable, Iterator
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,20 @@ def seeded(engine: Engine, write_export: Callable[[str], Path]) -> str:
             [write_export(render_export(h, 0, 120, gap_at=60, gap_minor=1240).text)]
         )
         return ledger.transactions()[-1].posted_on.strftime("%Y-%m")
+
+
+def test_sync_status_endpoint_has_no_amounts_or_urls(
+    client: TestClient, engine: Engine
+) -> None:
+    empty = client.get("/api/sync-status").json()
+    assert empty["last_sync_at"] is None and empty["consent_warning"] is False
+    with engine.begin() as conn:
+        ledger = Ledger(conn, identity.current_user())
+        ledger.record_consent_renewed(date.today() - timedelta(days=80))
+        ledger.record_sync_failure("OSError", datetime.now(UTC))
+    body = client.get("/api/sync-status").json()
+    assert body["failure_class"] == "OSError" and body["failures_in_a_row"] == 1
+    assert body["consent_warning"] is True and body["consent_days_left"] in (9, 10, 11)
 
 
 def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None:

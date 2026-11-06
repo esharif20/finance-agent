@@ -11,6 +11,9 @@ HMAC_SERVICE = "finance-agent.account-hmac"
 # The SimpleFIN access URL: it carries the credentials (ADR 0013).
 SIMPLEFIN_ACCESS_SERVICE = "finance-agent.simplefin-access"
 ACCOUNT = "finance-agent"
+# The #26 spike stored the real access URL under this account name; `fa connect`
+# adopts it once, then it is deleted.
+LEGACY_ACCOUNT = "lunchflow"
 
 
 class MissingKey(LookupError):
@@ -43,3 +46,11 @@ def delete(service: str) -> bool:
         return False
     keyring.delete_password(service, ACCOUNT)
     return True
+
+
+def legacy_text(service: str) -> str | None:
+    return keyring.get_password(service, LEGACY_ACCOUNT)
+
+
+def delete_legacy(service: str) -> None:
+    keyring.delete_password(service, LEGACY_ACCOUNT)

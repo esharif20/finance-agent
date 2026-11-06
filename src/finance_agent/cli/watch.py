@@ -3,6 +3,7 @@
 Notifications carry counts and line numbers only (no amounts, names, accounts).
 """
 
+import os
 import plistlib
 import subprocess
 import sys
@@ -10,7 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from finance_agent.ledger import Ledger
-from finance_agent.storage import open_db
+from finance_agent.storage import DB_ENV, open_db
 
 LABEL = "com.finance-agent.watch"
 AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
@@ -27,7 +28,7 @@ _SCRIPT = (
 )
 
 
-def _osascript(title: str, body: str) -> None:
+def osascript(title: str, body: str) -> None:
     subprocess.run(  # noqa: S603
         ["/usr/bin/osascript", "-e", _SCRIPT, title, body], check=False
     )
@@ -37,7 +38,7 @@ def _launchctl(args: list[str]) -> None:
     subprocess.run(["/bin/launchctl", *args], check=False)  # noqa: S603
 
 
-def run(folder: Path, notify: Notifier = _osascript) -> int:
+def run(folder: Path, notify: Notifier = osascript) -> int:
     """Import every CSV in folder via the Ledger; stay silent if nothing changed."""
     files = sorted(p for p in folder.glob("*.csv") if p.is_file())
     if not files:
@@ -66,28 +67,53 @@ def run(folder: Path, notify: Notifier = _osascript) -> int:
     return 1 if r.rejected else 0
 
 
-def install(
-    folder: Path, agents_dir: Path | None = None, ctl: Launchctl | None = None
+def write_agent(
+    label: str,
+    args: list[str],
+    when: dict[str, object],
+    agents_dir: Path | None = None,
+    ctl: Launchctl | None = None,
 ) -> Path:
+    """Write and load a launchd agent that runs `fa <args>`. A custom database
+    path (FA_DB_PATH) is passed through so the job opens the same Ledger."""
     agents_dir = agents_dir or AGENTS_DIR
-    ctl = ctl or _launchctl
-    folder = folder.expanduser().resolve()
-    folder.mkdir(parents=True, exist_ok=True)
     agents_dir.mkdir(parents=True, exist_ok=True)
     boot = "import sys; from finance_agent.cli import main; sys.exit(main())"
-    plist = {
-        "Label": LABEL,
-        "ProgramArguments": [sys.executable, "-c", boot, "watch", "run", str(folder)],
-        "WatchPaths": [str(folder)],
+    plist: dict[str, object] = {
+        "Label": label,
+        "ProgramArguments": [sys.executable, "-c", boot, *args],
+        **when,
     }
-    path = agents_dir / f"{LABEL}.plist"
+    if db := os.environ.get(DB_ENV):
+        plist["EnvironmentVariables"] = {DB_ENV: db}
+    path = agents_dir / f"{label}.plist"
     path.write_bytes(plistlib.dumps(plist))
-    ctl(["load", str(path)])
+    (ctl or _launchctl)(["load", str(path)])
     return path
 
 
-def remove(agents_dir: Path | None = None, ctl: Launchctl | None = None) -> None:
-    path = (agents_dir or AGENTS_DIR) / f"{LABEL}.plist"
+def remove_agent(
+    label: str, agents_dir: Path | None = None, ctl: Launchctl | None = None
+) -> None:
+    path = (agents_dir or AGENTS_DIR) / f"{label}.plist"
     if path.exists():
         (ctl or _launchctl)(["unload", str(path)])
         path.unlink()
+
+
+def install(
+    folder: Path, agents_dir: Path | None = None, ctl: Launchctl | None = None
+) -> Path:
+    folder = folder.expanduser().resolve()
+    folder.mkdir(parents=True, exist_ok=True)
+    return write_agent(
+        LABEL,
+        ["watch", "run", str(folder)],
+        {"WatchPaths": [str(folder)]},
+        agents_dir,
+        ctl,
+    )
+
+
+def remove(agents_dir: Path | None = None, ctl: Launchctl | None = None) -> None:
+    remove_agent(LABEL, agents_dir, ctl)

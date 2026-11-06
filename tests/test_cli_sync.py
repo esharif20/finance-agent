@@ -6,6 +6,7 @@ import json
 import logging
 import secrets
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,8 @@ import pytest
 
 from finance_agent.cli import main
 from finance_agent.ingest import simplefin
-from finance_agent.storage import keychain
+from finance_agent.ledger import Ledger
+from finance_agent.storage import keychain, open_db
 from synthetic_lloyds import generate_histories, render_export
 from synthetic_simplefin import response
 
@@ -192,3 +194,48 @@ def test_a_failing_claim_leaks_nothing_to_output_logs_or_files(
     access = env["access"]
     for secret in (access, access.split("@")[0], env["claim"], env["token"]):
         assert secret.encode() not in seen
+
+
+def test_connect_adopts_the_spike_item_without_a_token(
+    env: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    keyring.set_password(SERVICE, keychain.LEGACY_ACCOUNT, env["access"])
+
+    def no_prompt(prompt: str = "") -> str:
+        raise AssertionError("must not ask for a token")
+
+    monkeypatch.setattr("getpass.getpass", no_prompt)
+    assert main(["connect"]) == 0
+    assert keyring.get_password(SERVICE, keychain.ACCOUNT) == env["access"]
+    assert keyring.get_password(SERVICE, keychain.LEGACY_ACCOUNT) is None
+    assert [m for m, _ in env["t"].calls] == ["GET"]  # no claim
+    captured = capsys.readouterr()
+    assert env["access"] not in captured.out + captured.err
+    engine = open_db()
+    with engine.begin() as conn:
+        st = Ledger(conn, 1).sync_status(datetime.now(simplefin.LONDON).date())
+    engine.dispose()
+    assert st.consent_renewed_on == datetime.now(simplefin.LONDON).date()
+
+
+def test_failed_adoption_deletes_legacy_and_prints_the_hint(
+    env: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    keyring.set_password(SERVICE, keychain.LEGACY_ACCOUNT, env["access"])
+
+    def boom(service: str, value: str) -> None:
+        raise OSError(f"keychain said no about {value}")
+
+    monkeypatch.setattr(keychain, "set_text", boom)
+    assert main(["connect"]) == 1
+    captured = capsys.readouterr()
+    assert env["access"] not in captured.out + captured.err
+    assert (
+        "security delete-generic-password -s finance-agent.simplefin-access "
+        "-a lunchflow" in captured.err + captured.out
+    )
+    assert keyring.get_password(SERVICE, keychain.LEGACY_ACCOUNT) is None
