@@ -42,7 +42,7 @@
     --border: #1f2225;
     --control: #3a3e43;
     --foreground: #f4f5f6;
-    --muted-foreground: #a9aeb4;
+    --muted-foreground: #b6bbc1;
     --accent: #7da2f7;
     --primary: #f4f5f6;
     --primary-foreground: #111214;
@@ -300,26 +300,62 @@ html[data-private] .money {
 .account-card {
   --h: 200;
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "title balance" "status status";
+  column-gap: 12px;
   width: 100%;
-  padding: 16px 18px;
+  padding: 14px 18px 16px;
   border-radius: var(--radius);
   color: #fff;
   cursor: pointer;
   background:
-    linear-gradient(160deg, rgb(255 255 255 / 0.22), transparent 45%),
-    linear-gradient(145deg, oklch(0.5 0.12 var(--h)), oklch(0.34 0.09 calc(var(--h) + 18)));
+    linear-gradient(160deg, rgb(255 255 255 / 0.14), transparent 45%),
+    linear-gradient(145deg, oklch(0.43 0.11 var(--h)), oklch(0.31 0.085 calc(var(--h) + 18)));
   border: 1px solid rgb(255 255 255 / 0.28);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 10px 24px rgb(0 0 0 / 0.18);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);
   backdrop-filter: blur(20px) saturate(1.6);
   transition: box-shadow 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.account-card [data-slot="title"] {
+  grid-area: title;
+}
+.account-card .account-balance {
+  grid-area: balance;
+  justify-self: end;
+}
+.account-card [data-slot="status"] {
+  grid-area: status;
+  align-self: end;
+}
+/* The front card is the one in view: its balance becomes the figure, beside the status,
+   so the card is full rather than a tall face with one line at the bottom. */
+.account-card[data-front="true"] {
+  grid-template-areas: "title title" "balance status";
+}
+.account-card[data-front="true"] .account-balance {
+  align-self: end;
+  justify-self: start;
+  font-size: var(--text-figure);
+  line-height: var(--text-figure--line-height);
+  letter-spacing: var(--text-figure--letter-spacing);
+  font-weight: var(--text-figure--font-weight);
+  font-variant-numeric: proportional-nums;
+}
+.account-card[data-front="true"] [data-slot="status"] {
+  justify-self: end;
+  padding-bottom: 4px;
+}
+.account-card .money-minor {
+  color: inherit;
+  opacity: 0.78;
+}
 .account-card[data-all="true"] {
   background:
-    linear-gradient(160deg, rgb(255 255 255 / 0.2), transparent 45%),
-    linear-gradient(145deg, oklch(0.42 0.02 205), oklch(0.28 0.02 205));
+    linear-gradient(160deg, rgb(255 255 255 / 0.13), transparent 45%),
+    linear-gradient(145deg, oklch(0.38 0.02 205), oklch(0.26 0.02 205));
 }
 .account-card:focus-visible {
   z-index: 15 !important;

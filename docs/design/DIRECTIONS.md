@@ -262,10 +262,15 @@ Why: the answer figure is 1.43 times the page title and 1.43 times its siblings,
 - CSS keyframes on `transform` only. The gradients are painted once and the compositor moves them, so there is no repaint per frame. Measured in WebKit, frame timing was the same with the fields running and paused. No WebGL and no new dependency.
 - Covers the whole document in light and dark at any scroll height (fixed layer, plus `html` takes the ground colour), so the dark seam is gone.
 - Paused while the tab is hidden (`data-paused` on `visibilitychange`). Fully static under `prefers-reduced-motion` (no animation is created; the fields stay in their first-frame positions).
-- Contrast: text that sits straight on the fields or on glass was measured at six points of the loop (0-45s) in both schemes, against the worst background pixel under each line. The lowest was 7.5:1 (dark header pill), and every line passed AA with a wide margin. The light muted ink moved from `#5c6064` to `#53575b` to keep that margin over the deepest field.
+- Contrast: text that sits straight on the fields or on glass was measured at six points of the loop (0-45s) in both schemes, against the worst background pixel under each line. The lowest was 4.85:1 (the 13px "Choose one to filter the Overview" over the brightest frame at 36s). Every line passed AA. To get there, the muted ink moved from `#5c6064` to `#53575b` in light and from `#a9aeb4` to `#b6bbc1` in dark, and the account card faces were darkened (see below).
 - Alternatives considered: a `@property` conic-gradient "aurora" (it repaints the whole layer every frame) and two Stripe-like diagonal ribbons (they read as a marketing hero behind working screens). Stills are in the scratchpad (`screens/55/alt-*.png`).
 
 ### Charts
 
 - Single-series charts take the data hue `--data` (`#0e6f8a` light, `#5cc3dc` dark, hue about 195, between the ambient blue and teal). Money in takes `--positive`. The chosen month is at full strength and the others are a pale step of the same hue (`color-mix`, not opacity, which muddies it on the dark card).
-- If the Ledger's newest Transaction falls before the last day of the newest month, that month's bar is hatched and the footnote says "Jul so far, to 19 Jul". A partial month no longer reads as a drop.
+- If the Ledger's newest Transaction (for the chosen Account, when one is chosen) falls before the last day of the newest month, that month's bar is hatched and the footnote says "Jul so far, to 19 Jul". A partial month no longer reads as a drop.
+
+### Account card stack (#44)
+
+- Cards are 116px with a 64px peek. Each card is a grid with three slots (`data-slot="title"`, `.account-balance`, `data-slot="status"`), placed by `grid-template-areas`. A back card shows its title and balance in the peek. The front card (`data-front`) moves its balance down beside "Matches ledger" and sets it as a `text-figure`, so the "All accounts" face is full rather than a tall card with one line at the bottom. #58 (3D cards) and #59 (per-account view) can restyle a slot or animate the card without changing the markup.
+- Faces are darker (`oklch(0.43 0.11 h)` to `oklch(0.31 0.085 h+18)`, highlight 14%) so the white text holds 5.6:1 or better. Pence on a card take the card's ink at 78%, not the page's muted grey.

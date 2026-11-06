@@ -49,7 +49,7 @@ try {
       console.error(`FAIL ${scheme} ${name}: page scrolls sideways by ${overflow}px`);
       failed = true;
     }
-    const text = async (label) => (await page.getByLabel(label).first().innerText()).replace(/\s+/g, "");
+    const text = async (label) => (await page.getByLabel(label, { exact: true }).first().innerText()).replace(/\s+/g, "");
     const want = [
       ["Money in", gbp(summary.money_in.minor)],
       ["Money out", gbp(summary.money_out.minor)],
