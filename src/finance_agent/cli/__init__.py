@@ -7,8 +7,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from finance_agent import categorise
-from finance_agent.api import current_user
 from finance_agent.cli import launcher
+from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.storage import open_db
 

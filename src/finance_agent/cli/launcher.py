@@ -11,7 +11,7 @@ import webbrowser
 from collections.abc import Callable
 from pathlib import Path
 
-from finance_agent.api import DEFAULT_PORT, HOST
+from finance_agent.identity import DEFAULT_PORT, HOST
 from finance_agent.storage import default_db_path
 
 

@@ -14,18 +14,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import Engine
 
+from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import AccountBalance, Gap, Ledger, MonthSummary
 from finance_agent.storage import open_db
 
-HOST = "127.0.0.1"  # never 0.0.0.0: nothing on the network may read the Ledger
-DEFAULT_PORT = 8765
 # shortcut: located relative to the source tree, so only a checkout serves the UI
 WEB_DIST = Path(__file__).resolve().parents[3] / "web" / "dist"
-
-
-def current_user() -> int:
-    """The single local user until the demo milestone (ADR 0003)."""
-    return 1
 
 
 class Money(BaseModel):

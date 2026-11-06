@@ -138,3 +138,21 @@ def test_fa_no_browser_env_keeps_the_browser_closed(
     monkeypatch.setattr(webbrowser, "open", fail)
 
     launcher.default().open_url("http://127.0.0.1:1/")
+
+
+def test_cli_never_imports_api() -> None:
+    import ast
+
+    src = Path(__file__).resolve().parents[1] / "src/finance_agent/cli"
+    for f in src.rglob("*.py"):
+        for node in ast.walk(ast.parse(f.read_text())):
+            names = (
+                [a.name for a in node.names]
+                if isinstance(node, ast.Import)
+                else [node.module or ""]
+                if isinstance(node, ast.ImportFrom)
+                else []
+            )
+            assert not any(n.startswith("finance_agent.api") for n in names), f
+            if isinstance(node, ast.ImportFrom) and node.module == "finance_agent":
+                assert "api" not in [a.name for a in node.names], f

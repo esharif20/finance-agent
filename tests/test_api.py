@@ -8,7 +8,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from finance_agent import api
+from finance_agent import api, identity
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import generate_histories, render_export
 
@@ -24,7 +24,7 @@ def seeded(engine: Engine, write_export: Callable[[str], Path]) -> str:
     """Imports a synthetic history with a 12.40 gap; returns its latest month."""
     h, _ = generate_histories(seed=8, days=60)
     with engine.begin() as conn:
-        ledger = Ledger(conn, api.current_user())
+        ledger = Ledger(conn, identity.current_user())
         ledger.import_files(
             [write_export(render_export(h, 0, 120, gap_at=60, gap_minor=1240).text)]
         )
@@ -42,11 +42,11 @@ def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None
     api.serve(port=9999)
 
     assert calls[0]["host"] == "127.0.0.1"
-    assert api.HOST == "127.0.0.1"
+    assert identity.HOST == "127.0.0.1"
 
 
 def test_current_user_is_the_single_local_user() -> None:
-    assert api.current_user() == 1
+    assert identity.current_user() == 1
 
 
 def test_health_identifies_the_app(client: TestClient) -> None:
