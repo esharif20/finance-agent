@@ -41,6 +41,8 @@ Any task that touches the frontend (components, screens, styling, charts, motion
 - `vercel-plugin:shadcn` (or `shadcn`): adding and composing shadcn/ui components.
 - `design-taste-frontend`: anti-slop house style; also its gallery research when choosing a direction.
 - `nateherk-design:scroll-craft`: scroll-driven motion. Use it for the public demo landing page; app screens keep motion restrained.
+- `impeccable`: design audit, critique and polish passes (`/impeccable audit`, `/impeccable polish`) before calling a screen done.
+- `emil-design-eng`: interaction and animation polish (easing, durations, springs, the small details). Its rules sit under the reduced-motion rule below.
 
 Motion: use `motion/react` (Motion, formerly Framer Motion), following `design-taste-frontend`'s `references/motion.md`. Every animation respects `prefers-reduced-motion`.
 

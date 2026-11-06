@@ -4,8 +4,30 @@ from pathlib import Path
 import pytest
 from sqlalchemy import Engine
 
+from finance_agent import storage
 from finance_agent.ledger import Ledger
 from finance_agent.storage import open_db
+
+REAL_DATA_DIR = storage.DEFAULT_DB.parent
+
+
+@pytest.fixture(autouse=True)
+def _never_touch_real_data(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every test (and any subprocess it spawns) defaults to a temp database,
+    and opening anything under the real data directory fails the test."""
+    monkeypatch.setenv(
+        storage.DB_ENV, str(tmp_path_factory.mktemp("data") / "ledger.db")
+    )
+    inside_repo = storage._inside_repo  # pyright: ignore[reportPrivateUsage]
+
+    def guarded(path: Path) -> bool:
+        if path.resolve().is_relative_to(REAL_DATA_DIR.resolve()):
+            pytest.fail(f"test reached the real data directory: {REAL_DATA_DIR}")
+        return inside_repo(path)
+
+    monkeypatch.setattr(storage, "_inside_repo", guarded)
 
 
 @pytest.fixture

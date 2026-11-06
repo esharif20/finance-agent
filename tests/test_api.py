@@ -40,6 +40,7 @@ def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None
         calls.append(kwargs)
 
     monkeypatch.setattr(uvicorn, "run", fake_run)
+    monkeypatch.setattr(api, "open_db", lambda: None)  # binding needs no database
 
     api.serve(port=9999)
 
