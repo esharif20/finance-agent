@@ -171,17 +171,17 @@ def test_fa_import_takes_several_files_in_one_command(
 def test_twins_with_the_same_balance_survive_any_import_order(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    # seed 21 rows 113-115: SPOTIFY -10.99, REFUND +10.99, SPOTIFY -10.99 on one
+    # seed 31 rows 69-71: SPOTIFY -10.99, REFUND +10.99, SPOTIFY -10.99 on one
     # day, so both purchases share date, description, amount and balance
-    h, _ = generate_histories(seed=21, days=60)
-    assert key(h.txns[113]) == key(h.txns[115])
-    only_second = write_export(render_export(h, 114, 130).text)
-    both = write_export(render_export(h, 100, 120).text)
+    h, _ = generate_histories(seed=31, days=60)
+    assert key(h.txns[69]) == key(h.txns[71])
+    only_second = write_export(render_export(h, 70, 86).text)
+    both = write_export(render_export(h, 56, 76).text)
     ledger = ledger_for(1)
 
     ledger.import_files([only_second, both])
 
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])
 
 
 # --- Verifier: multiset semantics over arbitrary (overlapping) imports ---------
@@ -340,14 +340,14 @@ def test_same_rows_under_another_name_and_bytes_do_not_duplicate(
 def test_twins_split_across_files_by_a_one_row_overlap(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 are twins, 114 refund
-    first = write_export(render_export(h, 100, 115).text)
-    second = write_export(render_export(h, 114, 130).text)
+    h, _ = generate_histories(seed=31, days=60)  # rows 69/71 are twins, 70 refund
+    first = write_export(render_export(h, 56, 71).text)
+    second = write_export(render_export(h, 70, 86).text)
     ledger = ledger_for(1)
 
     ledger.import_files([first, second])
 
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])
 
 
 # --- Sequence alignment (ADR 0006 amendment, #34) -----------------------------
@@ -404,14 +404,14 @@ def test_random_covering_windows_with_repeated_keys_reproduce_the_history(
 def test_a_row_that_could_be_either_twin_is_known_and_reported(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 are twins, 114 refund
+    h, _ = generate_histories(seed=31, days=60)  # rows 69/71 are twins, 70 refund
     ledger = ledger_for(1)
-    ledger.import_files([write_export(render_export(h, 110, 120).text)])
+    ledger.import_files([write_export(render_export(h, 66, 76).text)])
 
-    report = ledger.import_files([write_export(render_export(h, 115, 116).text)])
+    report = ledger.import_files([write_export(render_export(h, 71, 72).text)])
 
     assert (report.added, report.already_known, report.ambiguous) == (0, 1, 1)
-    assert stored(ledger) == Counter(key(t) for t in h.txns[110:120])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[66:76])
 
 
 _TEXT = st.text("ABC *0123456789", min_size=1, max_size=12)
@@ -504,38 +504,55 @@ def test_one_row_matching_twins_in_two_disjoint_runs_is_flagged(
     assert (report.added, report.already_known, report.ambiguous) == (0, 1, 1)
 
 
+def test_one_stored_twin_is_never_matched_by_two_rows_of_a_file(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    rows = _twin_rows("PRP")[1:4]  # P R P
+    ledger = ledger_for(1)
+    ledger.import_files([write_export(_export(rows, 0, 1))])  # [P]
+
+    # [P R P] fits [P] at either end; only one end may be the stored P
+    report = ledger.import_files([write_export(_export(rows, 0, 3))])
+
+    assert (report.added, report.already_known, report.ambiguous) == (2, 1, 1)
+    assert sorted(Counter(t.description for t in ledger.transactions()).values()) == [
+        1,
+        2,
+    ]
+
+
 def test_an_export_inside_stored_history_adds_nothing(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 twins, 114 refund
+    h, _ = generate_histories(seed=31, days=60)  # rows 69/71 twins, 70 refund
     ledger = ledger_for(1)
-    ledger.import_files([write_export(render_export(h, 100, 130).text)])
+    ledger.import_files([write_export(render_export(h, 56, 86).text)])
 
-    for s, e in [(112, 117), (113, 116), (114, 116), (113, 114), (101, 129)]:
+    for s, e in [(68, 73), (69, 72), (70, 72), (69, 70), (57, 85)]:
         report = ledger.import_files([write_export(render_export(h, s, e).text)])
         assert report.added == 0, (s, e)
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])
 
 
 def test_an_export_bridging_two_stored_runs_joins_them(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
-    h, _ = generate_histories(seed=21, days=60)
+    h, _ = generate_histories(seed=31, days=60)
     ledger = ledger_for(1)
     ledger.import_files(
         [
-            write_export(render_export(h, 100, 112).text),
-            write_export(render_export(h, 118, 130).text),
+            write_export(render_export(h, 56, 68).text),
+            write_export(render_export(h, 74, 86).text),
         ]
     )
 
-    bridge = ledger.import_files([write_export(render_export(h, 110, 120).text)])
+    bridge = ledger.import_files([write_export(render_export(h, 66, 76).text)])
     # the twins' refund and second twin, now inside one joined run
-    again = ledger.import_files([write_export(render_export(h, 114, 116).text)])
+    again = ledger.import_files([write_export(render_export(h, 70, 72).text)])
 
     assert bridge.added == 6
     assert (again.added, again.ambiguous) == (0, 0)
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])
 
 
 def test_split_twins_in_newest_first_exports_are_both_kept(
@@ -544,16 +561,16 @@ def test_split_twins_in_newest_first_exports_are_both_kept(
     from finance_agent.ingest import lloyds
 
     monkeypatch.setattr(lloyds, "OLDEST_FIRST", False)
-    h, _ = generate_histories(seed=21, days=60)
+    h, _ = generate_histories(seed=31, days=60)
     ledger = ledger_for(1)
 
     def newest_first(s: int, e: int) -> Path:
         lines = render_export(h, s, e).text.splitlines()
         return write_export("\n".join(lines[:2] + lines[:1:-1]) + "\n")
 
-    ledger.import_files([newest_first(100, 115), newest_first(114, 130)])
+    ledger.import_files([newest_first(56, 71), newest_first(70, 86)])
 
-    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+    assert stored(ledger) == Counter(key(t) for t in h.txns[56:86])
 
 
 def test_import_against_5000_stored_rows_stays_fast(
@@ -577,3 +594,65 @@ def test_import_against_5000_stored_rows_stays_fast(
 
     assert report.added == 0
     assert elapsed < 0.5, elapsed
+
+
+def _reversed(description: str) -> str:
+    return description[::-1]
+
+
+@settings(max_examples=15, deadline=None)
+@given(covering_windows(), st.data())
+def test_changing_rules_or_the_normaliser_never_changes_which_rows_match(
+    case: tuple[History, list[tuple[int, int]]], data: st.DataObject
+) -> None:
+    # ADR 0006 / Firefly III #12246: identity is raw Bank fields only, so
+    # categorising between imports, under any rules, Merchant table or
+    # normaliser, leaves which rows are the same Transaction unchanged
+    from unittest import mock
+
+    from finance_agent import categorise
+
+    h, windows = case
+    cut = data.draw(st.integers(0, len(windows)))
+    texts = [render_export(h, s, e).text for s, e in windows]
+
+    def run(recategorise: bool) -> list[tuple[int, Key]]:
+        with tempfile.TemporaryDirectory() as d:
+            engine = open_db(Path(d) / "ledger.db")
+            try:
+                with engine.begin() as conn:
+                    ledger = Ledger(conn, 1)
+                    for i, text in enumerate(texts):
+                        p = Path(d) / f"e{i}.csv"
+                        p.write_text(text)
+                        ledger.import_files([p])
+                        if recategorise and i == cut:
+                            categorise.run(conn, 1)
+                            with (
+                                mock.patch.object(
+                                    categorise, "MERCHANTS", dict[str, object]()
+                                ),
+                                mock.patch.object(categorise, "RULES", []),
+                                mock.patch.object(categorise, "normalise", _reversed),
+                            ):
+                                categorise.run(conn, 1)
+                    for text in texts:  # re-importing still adds nothing
+                        p = Path(d) / "again.csv"
+                        p.write_text(text)
+                        assert ledger.import_files([p]).added == 0
+                    return [
+                        (
+                            t.id,
+                            (
+                                t.posted_on.isoformat(),
+                                t.description,
+                                t.amount,
+                                t.running_balance,
+                            ),
+                        )
+                        for t in ledger.transactions()
+                    ]
+            finally:
+                engine.dispose()
+
+    assert run(recategorise=True) == run(recategorise=False)

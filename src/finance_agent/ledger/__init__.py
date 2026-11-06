@@ -11,11 +11,15 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import Connection, case, func
+from sqlalchemy import Connection, Select, case, func, union
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
+
+TRANSFER_TYPES = ("TFR",)  # Lloyds Type that favours a pair; not required
+TRANSFER_DAYS = 3  # the two legs post at most this many days apart
 
 
 @dataclass(frozen=True)
@@ -75,12 +79,43 @@ def _overlaps(new: list[Identity], run: list[Identity]) -> list[tuple[int, int]]
 
 
 @dataclass(frozen=True)
+class Categorisation:
+    kind: str  # Spending, Income, Transfer, Refund or Fee
+    merchant: str | None
+    category: tuple[str, str] | None  # (top level, subcategory)
+    source: str  # "merchant:<name>", "rule:<id>" or "default"
+    taxonomy_version: int
+    merchant_id: int | None = None
+
+
+@dataclass(frozen=True)
+class Merchant:
+    id: int  # stable across imports and rule changes
+    name: str
+    default_category: tuple[str, str] | None
+
+
+@dataclass(frozen=True)
 class Transaction:
     posted_on: date
     description: str
     amount: Decimal
     running_balance: Decimal
     statement_imports: frozenset[str]  # file hashes of every import it appeared in
+    id: int = 0
+    bank_type: str = ""  # the Bank's Transaction Type code; not the Kind
+    transfer_with: int | None = None  # the other leg of an own-account Transfer
+    categorisation: Categorisation | None = None  # None until `categorise.run`
+
+
+@dataclass(frozen=True)
+class Spend:
+    """Spending minus Refunds in one Category, Subcategory or Merchant;
+    negative when Refunds received exceed spending (ADR 0004)."""
+
+    name: str
+    amount: Decimal
+    children: tuple["Spend", ...] = ()
 
 
 @dataclass(frozen=True)
@@ -206,6 +241,8 @@ class Ledger:
                 file_added,
                 (time.perf_counter_ns() - started) // 1_000_000,
             )
+        if added:
+            self._link_transfers()
         self._recompute_gaps()
         return ImportReport(
             added,
@@ -230,8 +267,11 @@ class Ledger:
                 t.c.description,
                 t.c.amount_minor,
                 t.c.running_balance_minor,
+                t.c.bank_type,
             ).order_by(t.c.posted_on, t.c.id)
         ).all()
+        other_leg = self._transfer_legs()
+        cats = self._categorisations()
         hashes: dict[int, set[str]] = {}
         for link in self._db.execute(
             self._db.select(src, src.c.transaction_id, si.c.file_hash).join(
@@ -246,9 +286,108 @@ class Ledger:
                 _decimal(r.amount_minor),
                 _decimal(r.running_balance_minor),
                 frozenset(hashes.get(r.id, ())),
+                r.id,
+                r.bank_type,
+                other_leg.get(r.id),
+                cats.get(r.id),
             )
             for r in rows
         ]
+
+    def spending_by_category(self, month: str) -> list[Spend]:
+        """Spending minus Refunds received in `month` (ADR 0004), by Category,
+        then Subcategory, then Merchant ("Unknown" when none), largest first."""
+        start, end = _month_bounds(month)
+        t = schema.transaction
+        amounts: dict[int, int] = {
+            r.id: r.amount_minor
+            for r in self._db.execute(
+                self._db.select(t, t.c.id, t.c.amount_minor).where(
+                    t.c.posted_on >= start,
+                    t.c.posted_on < end,
+                    t.c.currency == "GBP",  # shortcut: as in summarise_month
+                )
+            )
+        }
+        tree: dict[str, dict[str, dict[str, int]]] = {}
+        for txn_id, c in self._categorisations().items():
+            if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
+                top, sub = c.category
+                merchants = tree.setdefault(top, {}).setdefault(sub, {})
+                key = c.merchant or "Unknown"
+                merchants[key] = merchants.get(key, 0) - amounts[txn_id]
+
+        def level(nodes: dict[str, Any]) -> tuple[Spend, ...]:
+            out: list[Spend] = []
+            for name, v in nodes.items():
+                if isinstance(v, int):  # a Merchant's minor-unit total
+                    out.append(Spend(name, _decimal(v)))
+                else:
+                    kids = level(v)
+                    total = sum((k.amount for k in kids), Decimal(0))
+                    out.append(Spend(name, total, kids))
+            return tuple(sorted(out, key=lambda s: (-s.amount, s.name)))
+
+        return list(level(tree))
+
+    def merchants(self) -> list[Merchant]:
+        """Every Merchant of this user with its default Category, by name."""
+        m, sub, top = (
+            schema.merchant,
+            schema.category.alias("sub"),
+            schema.category.alias("top"),
+        )
+        rows = self._db.execute(
+            self._db.select(
+                m,
+                m.c.id,
+                m.c.name,
+                top.c.name.label("top"),
+                sub.c.name.label("sub"),
+            )
+            .outerjoin(sub, sub.c.id == m.c.default_category_id)
+            .outerjoin(top, top.c.id == sub.c.parent_id)
+            .order_by(m.c.name)
+        )
+        return [
+            Merchant(r.id, r.name, (r.top, r.sub) if r.sub is not None else None)
+            for r in rows
+        ]
+
+    def _categorisations(self) -> dict[int, Categorisation]:
+        c, m, sub, top = (
+            schema.categorisation,
+            schema.merchant,
+            schema.category.alias("sub"),
+            schema.category.alias("top"),
+        )
+        rows = self._db.execute(
+            self._db.select(
+                c,
+                c.c.transaction_id,
+                c.c.kind,
+                c.c.merchant_id,
+                m.c.name.label("merchant"),
+                c.c.source,
+                c.c.taxonomy_version,
+                top.c.name.label("top"),
+                sub.c.name.label("sub"),
+            )
+            .outerjoin(m, m.c.id == c.c.merchant_id)
+            .outerjoin(sub, sub.c.id == c.c.category_id)
+            .outerjoin(top, top.c.id == sub.c.parent_id)
+        )
+        return {
+            r.transaction_id: Categorisation(
+                r.kind,
+                r.merchant,
+                (r.top, r.sub) if r.sub is not None else None,
+                r.source,
+                r.taxonomy_version,
+                r.merchant_id,
+            )
+            for r in rows
+        }
 
     def summarise_month(self, month: str) -> MonthSummary:
         start, end = _month_bounds(month)
@@ -263,6 +402,7 @@ class Ledger:
             t.c.posted_on < end,
             # shortcut: GBP only until FX conversion lands; then sum gbp_minor
             t.c.currency == "GBP",
+            t.c.id.not_in(self._transfer_ids()),  # neither spending nor income
         )
         row = self._db.execute(stmt).one()
         ins, outs = (int(v) for v in row)
@@ -285,20 +425,107 @@ class Ledger:
         new = [row_identity(r) for r in rows]
         runs, identity = self._bank_order_runs(account_id)
         found = [
-            (length, run, o, range(max(0, -o), max(0, -o) + length))
-            for run in runs
+            (length, n, o, range(max(0, -o), max(0, -o) + length))
+            for n, run in enumerate(runs)
             for length, o in _overlaps(new, [identity[t] for t in run])
         ]
-        # a row that another consistent placement also covers may be the other
-        # twin; with P R P R P even a unique longest overlap is unsure (ADR 0006)
+        # a row, or stored Transaction, that another consistent placement also
+        # covers may be the other twin; with P R P R P even a unique longest
+        # overlap is unsure (ADR 0006)
         cover = Counter(i for *_, span in found for i in span)
+        cover_t = Counter(runs[n][i + o] for _, n, o, span in found for i in span)
         placed: dict[int, int] = {}
-        for _, run, o, span in sorted(found, key=lambda f: -f[0]):  # stable
-            if any(i in placed for i in span):
+        used: set[int] = set()  # a file overlaps each run in one block at most
+        for _, n, o, span in sorted(found, key=lambda f: -f[0]):  # stable
+            if n in used or any(i in placed for i in span):
                 continue  # a longer or earlier block already placed these rows
-            placed |= {i: run[i + o] for i in span}
-        unsure = sum(cover[i] > 1 for i in placed)
+            used.add(n)
+            placed |= {i: runs[n][i + o] for i in span}
+        unsure = sum(cover[i] > 1 or cover_t[t] > 1 for i, t in placed.items())
         return {rows[i].line: t for i, t in placed.items()}, unsure
+
+    def _transfer_ids(self) -> Select[Any]:
+        """Ids of every Transaction that is one leg of a Transfer."""
+        tl = schema.transfer_link
+        return (
+            union(
+                self._db.select(tl, tl.c.from_transaction_id),
+                self._db.select(tl, tl.c.to_transaction_id),
+            )
+            .subquery()
+            .select()
+        )
+
+    def _transfer_legs(self) -> dict[int, int]:
+        tl = schema.transfer_link
+        legs: dict[int, int] = {}
+        for r in self._db.execute(
+            self._db.select(tl, tl.c.from_transaction_id, tl.c.to_transaction_id)
+        ):
+            a, b = int(r.from_transaction_id), int(r.to_transaction_id)
+            legs[a], legs[b] = b, a
+        return legs
+
+    def _link_transfers(self) -> None:
+        """Pair unlinked own-account Transfer legs: same amount and currency,
+        opposite sign, another of this user's Accounts, dates within
+        TRANSFER_DAYS. Among candidates, Type TFR on both legs, then identical
+        descriptions, then the closest date win; each leg pairs at most once.
+
+        Uses raw Bank fields only.
+        """
+        t = schema.transaction
+        linked = self._transfer_legs()
+        rows = [
+            r
+            for r in self._db.execute(
+                self._db.select(
+                    t,
+                    t.c.id,
+                    t.c.account_id,
+                    t.c.posted_on,
+                    t.c.bank_type,
+                    t.c.description,
+                    t.c.amount_minor,
+                    t.c.currency,
+                ).order_by(t.c.posted_on, t.c.id)
+            )
+            if r.id not in linked
+        ]
+        incoming: dict[tuple[str, int], list[Any]] = {}
+        for r in rows:
+            if r.amount_minor > 0:
+                incoming.setdefault((r.currency, r.amount_minor), []).append(r)
+        candidates = [
+            (
+                (
+                    not (
+                        o.bank_type in TRANSFER_TYPES and i.bank_type in TRANSFER_TYPES
+                    ),
+                    o.description != i.description,
+                    abs((i.posted_on - o.posted_on).days),
+                    o.id,
+                    i.id,
+                ),
+                o.id,
+                i.id,
+            )
+            for o in rows
+            if o.amount_minor < 0
+            for i in incoming.get((o.currency, -o.amount_minor), [])
+            if i.account_id != o.account_id
+            and abs((i.posted_on - o.posted_on).days) <= TRANSFER_DAYS
+        ]
+        used: set[int] = set()
+        for _, out_id, in_id in sorted(candidates):  # best pairs claim legs first
+            if out_id in used or in_id in used:
+                continue
+            used |= {out_id, in_id}
+            self._db.insert(
+                schema.transfer_link,
+                from_transaction_id=out_id,
+                to_transaction_id=in_id,
+            )
 
     def gaps(self) -> list[Gap]:
         """Open Reconciliation Gaps, by Account then date."""

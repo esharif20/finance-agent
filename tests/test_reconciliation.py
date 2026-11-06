@@ -286,13 +286,13 @@ def test_split_twins_from_issue_34_leave_no_gap(
 ) -> None:
     """#34: twins split across files that overlap only at the refund are both
     kept (sequence alignment), so the running balance has no break."""
-    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 twins, 114 refund
+    h, _ = generate_histories(seed=31, days=60)  # rows 69/71 twins, 70 refund
     ledger = ledger_for(1)
 
     ledger.import_files(
         [
-            write_export(render_export(h, 100, 115).text),
-            write_export(render_export(h, 114, 130).text),
+            write_export(render_export(h, 56, 71).text),
+            write_export(render_export(h, 70, 86).text),
         ]
     )
 
