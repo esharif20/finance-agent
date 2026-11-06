@@ -4,6 +4,7 @@ import tempfile
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,7 @@ from hypothesis import strategies as st
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.ledger import Ledger, Transaction
+from finance_agent.ledger import Ledger, Spend, Transaction
 from finance_agent.storage import open_db
 from synthetic_lloyds import generate_histories, render_export
 
@@ -274,3 +275,180 @@ def test_every_import_that_stores_a_file_bumps_ledger_version(
         assert ledger.ledger_version() == 2
         ledger.import_files([first])  # nothing new stored
         assert ledger.ledger_version() == 2
+
+
+# --- verifier: adversarial tests -------------------------------------------
+
+
+def total(spend: list[Spend]) -> Decimal:
+    return sum((s.amount for s in spend), Decimal(0))
+
+
+@settings(max_examples=15, deadline=None)
+@given(st.integers(0, 2**32 - 1), st.data())
+def test_corrections_move_spending_between_categories_but_never_change_totals(
+    seed: int, data: st.DataObject
+) -> None:
+    with seeded(seed, 40) as (conn, path):
+        ledger = imported(conn, path)
+        candidates = categorised(ledger)
+        if not candidates:
+            return
+        months = {t.posted_on.strftime("%Y-%m") for t in candidates}
+        before = {m: ledger.spending_by_category(m) for m in months}
+        summaries = {m: ledger.summarise_month(m) for m in months}
+        picks = data.draw(
+            st.lists(
+                st.tuples(st.sampled_from(candidates), st.sampled_from(LEAVES)),
+                max_size=6,
+            )
+        )
+        for t, cat in picks:
+            ledger.correct_transaction(t.id, cat)
+        for m in months:
+            assert total(ledger.spending_by_category(m)) == total(before[m])
+            assert ledger.summarise_month(m) == summaries[m]
+        # each corrected Transaction's amount sits under its corrected Category
+        final = {t.id: cat for t, cat in picks}
+        for t in candidates:
+            if t.id in final:
+                assert category_of(ledger, t.id) == final[t.id]
+
+
+def test_a_refund_correction_reduces_the_corrected_category(
+    engine: Engine, write_export: WriteExport
+) -> None:
+    current, _ = generate_histories(seed=7, days=120)
+    with engine.begin() as conn:
+        ledger = imported(conn, write_export(render_export(current, 0, 150).text))
+        refund = next(
+            (
+                t
+                for t in categorised(ledger)
+                if t.categorisation and t.categorisation.kind == "Refund"
+            ),
+            None,
+        )
+        if refund is None:
+            pytest.skip("no Refund in this synthetic history")
+        month = refund.posted_on.strftime("%Y-%m")
+        ledger.correct_transaction(refund.id, ("Travel", "Hotels"))
+        travel = {s.name: s for s in ledger.spending_by_category(month)}["Travel"]
+        hotels = {s.name: s for s in travel.children}["Hotels"]
+        assert hotels.amount <= -refund.amount  # the Refund reduces Hotels (ADR 0004)
+
+
+def test_a_correction_never_gives_a_categoryless_kind_a_category(
+    engine: Engine, write_export: WriteExport
+) -> None:
+    current, _ = generate_histories(seed=7, days=120)
+    with engine.begin() as conn:
+        ledger = imported(conn, write_export(render_export(current, 0, 150).text))
+        transfer = next(
+            (
+                t
+                for t in ledger.transactions()
+                if t.categorisation
+                and t.categorisation.kind in ("Transfer", "Income", "Fee")
+            ),
+            None,
+        )
+        if transfer is None:
+            pytest.skip("no Transfer, Income or Fee in this synthetic history")
+        month = transfer.posted_on.strftime("%Y-%m")
+        spend, summary = (
+            ledger.spending_by_category(month),
+            ledger.summarise_month(month),
+        )
+        ledger.correct_transaction(transfer.id, ("Travel", "Hotels"))
+        c = {t.id: t.categorisation for t in ledger.transactions()}[transfer.id]
+        assert c is not None and c.category is None and c.source != "correction"
+        assert ledger.spending_by_category(month) == spend
+        assert ledger.summarise_month(month) == summary
+
+
+@pytest.mark.parametrize("order", ["merchant_first", "transaction_first"])
+def test_reverting_merchant_and_transaction_corrections_in_any_order(
+    engine: Engine, write_export: WriteExport, order: str
+) -> None:
+    current, _ = generate_histories(seed=7, days=60)
+    with engine.begin() as conn:
+        ledger = imported(conn, write_export(render_export(current, 0, 100).text))
+        tesco = [
+            t
+            for t in categorised(ledger)
+            if t.categorisation and t.categorisation.merchant == "Tesco"
+        ]
+        one, other = tesco[0], tesco[1]
+        rule = {t.id: t.categorisation for t in ledger.transactions()}
+        by_m = ledger.correct_merchant(merchant_of(one), ("Shopping", "Household"))
+        by_t = ledger.correct_transaction(one.id, ("Entertainment", "Events"))
+        if order == "merchant_first":
+            ledger.revert_correction(by_m.id)
+            assert category_of(ledger, one.id) == ("Entertainment", "Events")
+            assert category_of(ledger, other.id) == rule[other.id].category  # type: ignore[union-attr]
+            ledger.revert_correction(by_t.id)
+        else:
+            ledger.revert_correction(by_t.id)
+            assert category_of(ledger, one.id) == ("Shopping", "Household")
+            assert category_of(ledger, other.id) == ("Shopping", "Household")
+            ledger.revert_correction(by_m.id)
+        now = {t.id: t.categorisation for t in ledger.transactions()}
+        assert now[one.id] == rule[one.id] and now[other.id] == rule[other.id]
+
+
+def test_many_corrections_on_one_transaction_last_wins_and_history_is_kept(
+    engine: Engine, write_export: WriteExport
+) -> None:
+    current, _ = generate_histories(seed=7, days=30)
+    with engine.begin() as conn:
+        ledger = imported(conn, write_export(render_export(current, 0, 50).text))
+        t = categorised(ledger)[0]
+        version = ledger.ledger_version()
+        made = [ledger.correct_transaction(t.id, cat) for cat in LEAVES[:10]]
+        assert category_of(ledger, t.id) == LEAVES[9]
+        ledger.revert_correction(made[4].id)  # reverting an older one changes nothing
+        assert category_of(ledger, t.id) == LEAVES[9]
+        ledger.revert_correction(made[9].id)  # the latest still-active one wins
+        assert category_of(ledger, t.id) == LEAVES[8]
+        assert [k.id for k in ledger.corrections()] == [k.id for k in made]
+        assert ledger.ledger_version() == version + 12
+
+
+@pytest.mark.parametrize("bad_id", [0, -1, 10**9])
+def test_unknown_ids_are_refused_without_bumping_ledger_version(
+    engine: Engine, write_export: WriteExport, bad_id: int
+) -> None:
+    current, _ = generate_histories(seed=7, days=30)
+    with engine.begin() as conn:
+        ledger = imported(conn, write_export(render_export(current, 0, 50).text))
+        version = ledger.ledger_version()
+        for call in (
+            lambda: ledger.correct_transaction(bad_id, ("Travel", "Hotels")),
+            lambda: ledger.correct_merchant(bad_id, ("Travel", "Hotels")),
+            lambda: ledger.revert_correction(bad_id),
+        ):
+            with pytest.raises(ValueError):
+                call()
+        assert ledger.corrections() == []
+        assert ledger.ledger_version() == version
+
+
+def test_a_correction_to_a_since_retired_category_still_applies_and_reverts(
+    engine: Engine, write_export: WriteExport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    current, _ = generate_histories(seed=7, days=30)
+    with engine.begin() as conn:
+        ledger = imported(conn, write_export(render_export(current, 0, 50).text))
+        t = categorised(ledger)[0]
+        k = ledger.correct_transaction(t.id, ("Travel", "Hotels"))
+        taxonomy = {a: b for a, b in categorise.TAXONOMY.items() if a != "Travel"}
+        monkeypatch.setattr(categorise, "TAXONOMY", taxonomy)
+        monkeypatch.setattr(categorise, "TAXONOMY_VERSION", 2)
+        categorise.run(conn, 1)
+        # the user's choice is kept, never silently dropped, and stays reversible
+        assert category_of(ledger, t.id) == ("Travel", "Hotels")
+        ledger.revert_correction(k.id)
+        c = {x.id: x.categorisation for x in ledger.transactions()}[t.id]
+        assert c is not None and c.source != "correction"
+        assert c.category is None or c.category[0] != "Travel"
