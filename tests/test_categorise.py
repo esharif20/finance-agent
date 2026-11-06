@@ -162,3 +162,24 @@ def test_lookalike_or_injected_descriptors_do_not_map_to_a_real_merchant(
     got = c(description, -500)
     assert got.merchant != "Tesco"
     assert (got.kind, got.category) == ("Spending", categorise.UNCATEGORISED)
+
+
+@pytest.mark.parametrize(
+    ("description", "merchant"),
+    [
+        ("TESCO STORES 3021 LONDON", "Tesco"),
+        ("TESCO EXPRESS 0042", "Tesco"),
+        ("TESCOMPANY LTD", "TESCOMPANY LTD"),
+        ("TEſCO STORES 3021", "TEſCO STORES"),  # long s upper-cases to S
+        ("spotıfy p1a2b3", "SPOTıFY"),  # dotless i upper-cases to I
+        ("ТЕSCO STORES 3021", "ТЕSCO STORES"),  # Cyrillic
+    ],
+)
+def test_normalisation_cannot_be_steered_into_a_seeded_merchant(
+    description: str, merchant: str
+) -> None:
+    assert categorise.normalise(description) == merchant
+    got = c(description, -500)
+    assert got.merchant == merchant
+    if merchant not in categorise.MERCHANTS:
+        assert got.category == categorise.UNCATEGORISED

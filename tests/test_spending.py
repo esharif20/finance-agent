@@ -236,3 +236,20 @@ def test_a_refund_in_a_later_month_reduces_that_month_and_can_go_negative(
             "Groceries",
             (Spend("Tesco", Decimal("-15.00")),),
         )
+
+
+def test_two_users_merchants_never_mix(
+    engine: Engine, write_export: WriteExport
+) -> None:
+    h = history(
+        [(1, "DEB", "TESCO STORES 3021", -100), (2, "DEB", "CORNER SHOP", -200)]
+    )
+    with engine.begin() as conn:
+        for user in (1, 2):
+            Ledger(conn, user).import_files([write_export(render_export(h, 0, 9).text)])
+            categorise.run(conn, user)
+        one, two = (merchant_ids(Ledger(conn, u)) for u in (1, 2))
+        ids = [{m.id for m in Ledger(conn, u).merchants()} for u in (1, 2)]
+    assert set(one) == set(two)
+    assert not set(one.values()) & set(two.values())
+    assert not ids[0] & ids[1]

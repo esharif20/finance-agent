@@ -46,9 +46,15 @@ MERCHANTS: dict[str, tuple[re.Pattern[str], tuple[str, str]]] = {
 }
 
 
+def _upper(description: str) -> str:
+    """ASCII-only upper case: str.upper() turns lookalikes such as the long s
+    and dotless i into S and I, which would let them pass for a real Merchant."""
+    return "".join(ch.upper() if ch.isascii() else ch for ch in description)
+
+
 def merchant_for(description: str) -> str | None:
     """The seeded Merchant a raw Bank descriptor is an alias of, if any."""
-    d = description.upper()
+    d = _upper(description)
     return next((m for m, (p, _) in MERCHANTS.items() if p.search(d)), None)
 
 
@@ -66,7 +72,7 @@ def normalise(description: str) -> str:
         return known
     words = [
         w
-        for w in re.split(r"[\s*]+", description.upper())
+        for w in re.split(r"[\s*]+", _upper(description))
         if w and w != "REFUND" and w not in LOCATIONS and not re.search(r"\d", w)
     ]
     return " ".join(words)[:64]
@@ -120,7 +126,7 @@ def classify(
     `transfer` comes from the Ledger's Transfer links; Kind is never the Bank's
     Transaction Type (a TFR row to someone else is Spending).
     """
-    d = description.upper()
+    d = _upper(description)
     if transfer:
         return Classification("Transfer", None, None, "rule:transfer")
     if bank_type.upper() in FEE_TYPES:
