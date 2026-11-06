@@ -12,11 +12,13 @@ from alembic.config import Config
 from sqlalchemy import (
     Connection,
     CursorResult,
+    Delete,
     Engine,
     Executable,
     Select,
     Table,
     create_engine,
+    delete,
     event,
     insert,
     select,
@@ -86,6 +88,9 @@ class Scoped:
         res = self.conn.execute(insert(table).values(user_id=self.user_id, **values))
         key: tuple[Any, ...] = tuple(res.inserted_primary_key or ())
         return int(key[0])
+
+    def delete(self, table: Table) -> Delete:
+        return delete(table).where(table.c.user_id == self.user_id)
 
     def execute(self, stmt: Executable) -> CursorResult[Any]:
         return self.conn.execute(stmt)
