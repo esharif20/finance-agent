@@ -149,6 +149,7 @@ describe("Overview account filter", () => {
           return Response.json(summary(url.includes("account_id=2") ? 5000 : 9000));
         if (url.startsWith("/api/spending")) return Response.json(spending);
         if (url.startsWith("/api/months")) return Response.json(["2026-02"]);
+        if (url.startsWith("/api/month-series")) return Response.json([]);
         return Response.json([account(), saver]);
       }),
     );

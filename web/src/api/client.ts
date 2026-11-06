@@ -58,3 +58,12 @@ export async function postCorrection(body: {
   if (!res.ok) throw new Error(`correction: ${res.status}`);
 }
 export const fetchMonths = () => get<string[]>("/api/months");
+export type MonthTotals = components["schemas"]["MonthTotalsOut"];
+export const fetchMonthSeries = (accountId?: number) =>
+  get<MonthTotals[]>(
+    `/api/month-series?limit=12${accountId === undefined ? "" : `&account_id=${accountId}`}`,
+  );
+
+export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
+export const fetchCategory = (name: string, month: string) =>
+  get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}?month=${month}`);
