@@ -57,3 +57,25 @@ _Avoid_: Payee, vendor, shop, counterparty
 **Review Queue**:
 The Transactions whose Category could not be assigned with enough confidence and are waiting for the user to decide.
 _Avoid_: Inbox, uncategorised
+
+## Intelligence
+
+**Insight**:
+A typed finding produced by the Intelligence Engine (a price increase, a spending spike, an upcoming renewal), carrying a £ impact, a confidence and links to its evidence.
+_Avoid_: Tip, alert, suggestion
+
+**Intelligence Engine**:
+The deterministic, non-LLM part of the system that detects patterns, forecasts and ranks Insights.
+_Avoid_: AI, brain, model
+
+**Assistant**:
+The conversational part of the system: it interprets questions, calls read-only tools and explains results. It never computes a financial figure itself.
+_Avoid_: Agent, bot, chatbot, AI
+
+**Memory**:
+A user-confirmed preference, goal or constraint the Assistant may rely on, with provenance and a review date. Never a financial fact.
+_Avoid_: Profile, belief, fact
+
+**Proposal**:
+A change the Assistant suggests (a Memory or a Correction) that has no effect until the user confirms it.
+_Avoid_: Draft, pending change
