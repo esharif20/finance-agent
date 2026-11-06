@@ -1,0 +1,30 @@
+/** The only place money is formatted. Input is integer minor units + currency. */
+
+export type Money = { minor: number; currency: string };
+export type MoneyParts = { main: string; fraction: string };
+
+const MINUS = "−";
+
+export function formatMoneyParts(
+  { minor, currency }: Money,
+  opts: { sign?: boolean } = {},
+): MoneyParts {
+  const fmt = new Intl.NumberFormat("en-GB", { style: "currency", currency });
+  const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
+  // integer arithmetic on a BigInt string: no float ever touches the amount
+  const abs = BigInt(Math.abs(minor)).toString().padStart(digits + 1, "0");
+  const decimal = digits ? `${abs.slice(0, -digits)}.${abs.slice(-digits)}` : abs;
+  const parts = fmt.formatToParts(decimal as unknown as number);
+  const fraction = parts.find((p) => p.type === "fraction")?.value;
+  const body = parts
+    .filter((p) => p.type !== "fraction" && p.type !== "decimal")
+    .map((p) => p.value)
+    .join("");
+  const sign = minor < 0 ? MINUS : opts.sign && minor > 0 ? "+" : "";
+  return { main: sign + body, fraction: fraction ? `.${fraction}` : "" };
+}
+
+export function formatMoney(m: Money, opts: { sign?: boolean } = {}): string {
+  const { main, fraction } = formatMoneyParts(m, opts);
+  return main + fraction;
+}

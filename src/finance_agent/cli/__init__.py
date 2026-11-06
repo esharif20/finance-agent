@@ -6,10 +6,13 @@ from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 
+from finance_agent import categorise
+from finance_agent.cli import launcher
+from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.storage import open_db
 
-LOCAL_USER = 1  # single local user until the demo milestone (ADR 0003)
+LOCAL_USER = current_user()
 
 
 def gbp(amount: Decimal) -> str:
@@ -18,7 +21,8 @@ def gbp(amount: Decimal) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="fa")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
+    sub.add_parser("stop", help="stop the local server")
     imp = sub.add_parser("import", help="import Bank CSV exports")
     imp.add_argument("files", nargs="+", type=Path)
     summ = sub.add_parser("summary", help="money in, out and net for a month")
@@ -32,6 +36,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     wr.add_argument("folder", type=Path)
     args = parser.parse_args(argv)
 
+    if args.command in (None, "stop"):
+        ln = launcher.default()
+        try:
+            if args.command is None:
+                ln.start()
+            elif not ln.stop():
+                print("fa: the server is not running")
+        except (OSError, launcher.ServerDidNotStart) as e:
+            print(f"fa: {e}", file=sys.stderr)
+            return 1
+        return 0
     if args.command == "watch":
         from finance_agent.cli import watch
 
@@ -54,6 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ledger = Ledger(conn, LOCAL_USER)
             if args.command == "import":
                 r = ledger.import_files(args.files)
+                categorise.run(conn, LOCAL_USER)
                 print(
                     f"{r.added} added, {r.already_known} already known, "
                     f"{len(r.rejected)} rejected"
@@ -75,6 +91,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"Money in   {gbp(s.money_in)}")
                 print(f"Money out  {gbp(s.money_out)}")
                 print(f"Net        {gbp(s.net)}")
+                for g in s.gaps:
+                    print(
+                        f"Warning: Reconciliation Gap on {g.account.masked_number} "
+                        f"between {g.from_date} and {g.to_date} of {gbp(g.amount)}; "
+                        "these figures may be incomplete"
+                    )
     except (OSError, ValueError) as e:
         print(f"fa: {e}", file=sys.stderr)
         return 1

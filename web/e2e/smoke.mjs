@@ -1,0 +1,76 @@
+// Smoke test: run `fa`, open the Overview in WebKit, assert the totals match the API.
+//   FA_DB_PATH=<synthetic db> pnpm --dir web run smoke [screens-dir]
+// Needs `pnpm build` first and a WebKit install of the global Playwright CLI.
+// Not part of CI (no browser there); never opens a real browser window of yours:
+// FA_NO_BROWSER is set and `fa stop` always runs.
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { mkdirSync } from "node:fs";
+
+const require = createRequire(import.meta.url);
+const globalRoot = execFileSync("npm", ["root", "-g"]).toString().trim();
+const { webkit } = require(process.env.PLAYWRIGHT_MODULE ?? `${globalRoot}/playwright`);
+
+const port = process.env.FA_PORT ?? "8791";
+const env = { ...process.env, FA_PORT: port, FA_NO_BROWSER: "1" };
+const fa = (...args) => execFileSync("uv", ["run", "fa", ...args], { env, cwd: "..", stdio: "inherit" });
+const base = `http://127.0.0.1:${port}`;
+const shots = process.argv[2];
+if (shots) mkdirSync(shots, { recursive: true });
+
+const gbp = (minor, sign) => {
+  const abs = Math.abs(minor);
+  const s = `£${Math.floor(abs / 100).toLocaleString("en-GB")}.${String(abs % 100).padStart(2, "0")}`;
+  return minor < 0 ? `−${s}` : sign && minor > 0 ? `+${s}` : s;
+};
+
+let failed = false;
+fa();
+try {
+  const summary = await (await fetch(`${base}/api/summary`)).json();
+  const accounts = await (await fetch(`${base}/api/accounts`)).json();
+  const browser = await webkit.launch();
+  for (const [scheme, name, viewport] of [
+    ["light", "desktop", { width: 1280, height: 860 }],
+    ["dark", "desktop", { width: 1280, height: 860 }],
+    ["light", "phone", { width: 390, height: 844 }],
+    ["dark", "phone", { width: 390, height: 844 }],
+  ]) {
+    const page = await browser.newPage({ colorScheme: scheme, viewport });
+    await page.goto(base);
+    await page.getByLabel("Net").waitFor();
+    const text = async (label) => (await page.getByLabel(label).first().innerText()).replace(/\s+/g, "");
+    const want = [
+      ["Money in", gbp(summary.money_in.minor)],
+      ["Money out", gbp(summary.money_out.minor)],
+      ["Net", gbp(summary.net.minor, true)],
+    ];
+    for (const [label, expected] of want) {
+      const got = await text(label);
+      if (!got.includes(expected)) {
+        console.error(`FAIL ${scheme} ${name}: ${label} shows ${got}, API says ${expected}`);
+        failed = true;
+      }
+    }
+    const body = await page.locator("main").innerText();
+    for (const a of accounts) {
+      if (!body.includes(gbp(a.bank_balance.minor).replace(/\.\d\d$/, ""))) {
+        console.error(`FAIL ${scheme} ${name}: balance of ${a.masked_number} missing`);
+        failed = true;
+      }
+      const row = await page.getByRole("listitem", { name: a.name }).first().innerText();
+      if (!row.includes(a.gaps.length ? "Find it" : "Matches ledger")) {
+        console.error(`FAIL ${scheme} ${name}: status of ${a.masked_number} wrong`);
+        failed = true;
+      }
+    }
+    await page.waitForTimeout(500); // let the strip finish drawing in
+    if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}.png`, fullPage: true });
+    await page.close();
+  }
+  await browser.close();
+} finally {
+  fa("stop");
+}
+if (failed) process.exit(1);
+console.log("smoke: Overview totals match the API");
