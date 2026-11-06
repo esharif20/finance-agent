@@ -52,7 +52,7 @@ def test_reimporting_an_identical_file_changes_nothing(
     assert ledger.summarise_month("2026-01") == before
 
 
-def test_malformed_row_is_rejected_with_its_line_number(
+def test_malformed_row_rejects_the_file_with_its_line_number(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
     h, _ = generate_histories(seed=9, days=30)
@@ -61,7 +61,7 @@ def test_malformed_row_is_rejected_with_its_line_number(
 
     report = ledger_for(1).import_files([path])
 
-    assert report.added == 20
+    assert report.added == 0  # the whole file is refused (#7)
     assert [(r.file, r.line) for r in report.rejected] == [
         (path.name, export.malformed_line)
     ]
