@@ -14,6 +14,8 @@ uv run ruff check .
 uv run pyright
 uv run lint-imports
 uv run pytest
+uv run python scripts/fixture_guard.py
+gitleaks git . --no-banner --redact   # if gitleaks is installed
 ```
 
 CI (`.github/workflows/ci.yml`, job `checks`) runs the same commands on every PR.
