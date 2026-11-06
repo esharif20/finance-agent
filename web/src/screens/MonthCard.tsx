@@ -30,6 +30,7 @@ export function MonthCard({ summary, slices }: { summary: Summary; slices?: Slic
         <Money
           value={net}
           sign
+          countUp
           className={`block text-[32px] leading-10 font-semibold tracking-[-0.02em] ${overspent ? "" : "text-positive"}`}
         />
       </div>
@@ -38,13 +39,13 @@ export function MonthCard({ summary, slices }: { summary: Summary; slices?: Slic
         <div role="group" aria-label="Money in" className="rounded-[10px] bg-raised p-4">
           <dt className="text-sm text-muted-foreground">Money in</dt>
           <dd>
-            <Money value={money_in} className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+            <Money value={money_in} countUp className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
           </dd>
         </div>
         <div role="group" aria-label="Money out" className="rounded-[10px] bg-raised p-4">
           <dt className="text-sm text-muted-foreground">Money out</dt>
           <dd>
-            <Money value={money_out} className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+            <Money value={money_out} countUp className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
           </dd>
         </div>
       </dl>

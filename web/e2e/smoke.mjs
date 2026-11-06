@@ -37,10 +37,18 @@ try {
     ["dark", "desktop", { width: 1280, height: 860 }],
     ["light", "phone", { width: 390, height: 844 }],
     ["dark", "phone", { width: 390, height: 844 }],
+    ["light", "narrow", { width: 375, height: 812 }],
+    ["dark", "narrow", { width: 375, height: 812 }],
   ]) {
     const page = await browser.newPage({ colorScheme: scheme, viewport });
     await page.goto(base);
     await page.getByLabel("Net").waitFor();
+    await page.waitForTimeout(900); // count-up and strip finish; read the settled figures
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (overflow > 0) {
+      console.error(`FAIL ${scheme} ${name}: page scrolls sideways by ${overflow}px`);
+      failed = true;
+    }
     const text = async (label) => (await page.getByLabel(label).first().innerText()).replace(/\s+/g, "");
     const want = [
       ["Money in", gbp(summary.money_in.minor)],
@@ -77,7 +85,6 @@ try {
         failed = true;
       }
     }
-    await page.waitForTimeout(500); // let the strip finish drawing in
     if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}.png`, fullPage: true });
     if (months.length > 1) {
       // step back a month: every Overview figure must follow the API for that month
@@ -92,6 +99,14 @@ try {
       }
       if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}-prev.png`, fullPage: true });
     }
+    // privacy mode: H blurs every amount and the page keeps its width
+    await page.keyboard.press("h");
+    const unblurred = await page.$$eval(".money", (els) => els.filter((e) => getComputedStyle(e).filter === "none").length);
+    if (unblurred) {
+      console.error(`FAIL ${scheme} ${name}: ${unblurred} amounts not blurred in privacy mode`);
+      failed = true;
+    }
+    if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}-private.png`, fullPage: true });
     await page.close();
   }
   await browser.close();

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { components } from "@/api/schema";
 import { AccountsCard } from "./AccountsCard";
+import { PrivacyProvider } from "@/lib/privacy";
 import { MonthCard } from "./MonthCard";
 import { SpendingDonut } from "./SpendingDonut";
 import { Overview } from "./Overview";
@@ -151,6 +152,26 @@ describe("SpendingDonut", () => {
     const ring = screen.getByRole("img", { name: /Spending by Category/ });
     expect(ring.querySelectorAll("circle")).toHaveLength(2); // Housing + grey rest; no refund arc
     expect(screen.getByRole("row", { name: /Uncategorised/ })).toHaveTextContent("£28.07");
+  });
+
+  it("blurs every amount and reads 'hidden' in privacy mode", async () => {
+    localStorage.setItem("fa-private", "1");
+    try {
+      const { container } = render(
+        <PrivacyProvider>
+          <SpendingDonut spending={{ ...spending, unmatched_refunds: m(-1099) }} />
+        </PrivacyProvider>,
+      );
+
+      const amounts = container.querySelectorAll(".money");
+      expect(amounts.length).toBeGreaterThan(8); // centre, legend rows, refunds line, reconcile line
+      expect(document.documentElement).toHaveAttribute("data-private");
+      for (const a of amounts) expect(a.querySelector(".sr-only")).toHaveTextContent("Amount hidden");
+      expect(container.querySelector("svg")?.getAttribute("aria-label")).not.toMatch(/£/);
+    } finally {
+      localStorage.removeItem("fa-private");
+      document.documentElement.removeAttribute("data-private");
+    }
   });
 
   it("says so when nothing was spent", () => {
