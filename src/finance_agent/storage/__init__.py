@@ -137,13 +137,13 @@ class Scoped:
         key: tuple[Any, ...] = tuple(res.inserted_primary_key or ())
         return int(key[0])
 
+    def update(self, table: Table) -> Update:
+        """A user-scoped UPDATE; add `.where(...)` and `.values(...)`."""
+        return update(table).where(table.c.user_id == self.user_id)
+
     def delete(self, table: Table) -> Delete:
         """A DELETE of this user's rows only; narrow it further with .where()."""
         return delete(table).where(table.c.user_id == self.user_id)
-
-    def update(self, table: Table) -> Update:
-        """An UPDATE of this user's rows only; narrow it further with .where()."""
-        return update(table).where(table.c.user_id == self.user_id)
 
     def ledger_version(self) -> int:
         u = schema.user

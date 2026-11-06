@@ -1,4 +1,5 @@
-"""The `fa` command. `fa import` and `fa summary` call the Ledger in process."""
+"""The `fa` command. `fa import`, `fa summary` and `fa sync` call the Ledger
+in process."""
 
 import argparse
 import sys
@@ -34,7 +35,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     wsub.add_parser("remove", help="remove the launchd agent")
     wr = wsub.add_parser("run", help="import the folder now (launchd calls this)")
     wr.add_argument("folder", type=Path)
+    sub.add_parser("connect", help="connect a SimpleFIN aggregator (setup token)")
+    sub.add_parser("disconnect", help="remove the SimpleFIN access URL")
+    sub.add_parser("sync", help="fetch new Transactions from SimpleFIN")
     args = parser.parse_args(argv)
+
+    if args.command in ("connect", "disconnect", "sync"):
+        from finance_agent.cli import bank
+        from finance_agent.ingest.simplefin import SimpleFINError
+
+        try:
+            if args.command == "disconnect":
+                return bank.disconnect()
+            return (bank.connect if args.command == "connect" else bank.sync)(
+                LOCAL_USER
+            )
+        except (OSError, ValueError, SimpleFINError) as e:
+            print(f"fa: {e}", file=sys.stderr)  # messages never carry the URL
+            return 1
 
     if args.command in (None, "stop"):
         ln = launcher.default()
