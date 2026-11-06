@@ -102,5 +102,21 @@ transaction_source = Table(
         ForeignKey("statement_import.id"),
         primary_key=True,
     ),
-    Column("row_number", Integer, primary_key=True),
+    Column("row_number", Integer, primary_key=True),  # physical line, for provenance
+    # index in the file's Bank order (oldest first); differs from row_number
+    # when the Bank lists newest first
+    Column("bank_position", Integer, nullable=False, server_default="0"),
+)
+
+# derived: recomputed from the Ledger after every import, never edited by hand
+reconciliation_gap = Table(
+    "reconciliation_gap",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("account_id", Integer, ForeignKey("account.id"), nullable=False),
+    Column("from_date", Date, nullable=False),
+    Column("to_date", Date, nullable=False),
+    # Bank's balance minus the Ledger's: the net of the missing Transactions
+    Column("amount_minor", BigInteger, nullable=False),
 )

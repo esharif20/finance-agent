@@ -106,8 +106,8 @@ def generate_histories(seed: int, days: int = 60) -> tuple[History, History]:
 
 
 def _money(minor: int) -> str:
-    q, r = divmod(minor, 100)
-    return f"{q}.{r:02d}"
+    q, r = divmod(abs(minor), 100)  # floor divmod would print -1p as -1.99
+    return f"{'-' if minor < 0 else ''}{q}.{r:02d}"
 
 
 def _row(h: History, t: Txn, balance: int) -> str:

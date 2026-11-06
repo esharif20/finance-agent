@@ -84,12 +84,34 @@ class Transaction:
 
 
 @dataclass(frozen=True)
+class Gap:
+    """A Reconciliation Gap: the Bank's balance disagrees with the Ledger's
+    between two Transactions. The Bank is truth, so `amount` is the net of
+    whatever is missing (positive: money in is missing)."""
+
+    account: AffectedAccount
+    from_date: date  # last Transaction that agrees
+    to_date: date  # first Transaction after the break
+    amount: Decimal
+
+
+@dataclass(frozen=True)
 class MonthSummary:
     month: str  # YYYY-MM
     currency: str
     money_in: Decimal
     money_out: Decimal  # positive
     net: Decimal
+    gaps: list[Gap]  # Gaps touching the month: the figures may be incomplete
+
+
+@dataclass(frozen=True)
+class BankOrderRow:
+    id: int
+    posted_on: date
+    description: str
+    amount_minor: int
+    running_balance_minor: int
 
 
 def _decimal(minor: int) -> Decimal:
@@ -150,7 +172,7 @@ class Ledger:
                 aligned, unsure = self._align(account_id, rows)
                 known_ids |= aligned
                 ambiguous += unsure
-            for row in parsed.rows:
+            for position, row in enumerate(parsed.rows):
                 account_id = self._account_id(bank_id, row)
                 txn_id = known_ids.get(row.line)
                 if txn_id is None:
@@ -174,6 +196,7 @@ class Ledger:
                     transaction_id=txn_id,
                     statement_import_id=import_id,
                     row_number=row.line,
+                    bank_position=position,
                 )
             added += file_added
             log.info(
@@ -183,6 +206,7 @@ class Ledger:
                 file_added,
                 (time.perf_counter_ns() - started) // 1_000_000,
             )
+        self._recompute_gaps()
         return ImportReport(
             added,
             known,
@@ -248,6 +272,7 @@ class Ledger:
             _decimal(ins),
             _decimal(outs),
             _decimal(ins - outs),
+            [g for g in self.gaps() if g.from_date < end and g.to_date >= start],
         )
 
     def _align(
@@ -276,6 +301,126 @@ class Ledger:
                 unsure += length
         return {rows[i].line: t for i, t in placed.items()}, unsure
 
+    def gaps(self) -> list[Gap]:
+        """Open Reconciliation Gaps, by Account then date."""
+        g, a = schema.reconciliation_gap, schema.account
+        rows = self._db.execute(
+            self._db.select(
+                g,
+                g.c.from_date,
+                g.c.to_date,
+                g.c.amount_minor,
+                a.c.id,
+                a.c.masked_number,
+            )
+            .join(a, a.c.id == g.c.account_id)
+            .order_by(a.c.id, g.c.from_date, g.c.id)
+        ).all()
+        return [
+            Gap(
+                AffectedAccount(r.id, r.masked_number),
+                r.from_date,
+                r.to_date,
+                _decimal(r.amount_minor),
+            )
+            for r in rows
+        ]
+
+    def _recompute_gaps(self) -> None:
+        """Walk each Account in Bank order; every break in the running balance
+        is a Gap. Rebuilt from scratch, so a Gap closes once its rows arrive."""
+        g, a = schema.reconciliation_gap, schema.account
+        self._db.execute(self._db.delete(g))
+        for account_id in self._db.execute(self._db.select(a, a.c.id)).scalars():
+            prev: BankOrderRow | None = None
+            for t in self._transactions_in_bank_order(account_id):
+                bank_prior = t.running_balance_minor - t.amount_minor
+                if prev is not None and bank_prior != prev.running_balance_minor:
+                    self._db.insert(
+                        g,
+                        account_id=account_id,
+                        from_date=prev.posted_on,
+                        to_date=t.posted_on,
+                        amount_minor=bank_prior - prev.running_balance_minor,
+                    )
+                prev = t
+        log.info("reconcile gaps=%d", len(self.gaps()))
+
+    def _transactions_in_bank_order(self, account_id: int) -> list[BankOrderRow]:
+        """One Account's Transactions in the order the Bank listed them.
+
+        Each Statement Import is a contiguous run of Bank order, so its rows give
+        "comes before" edges; the union is topologically sorted, earliest date
+        first. Ties (rows split across files that don't overlap) go to the row
+        whose prior balance continues the current one, then to the row the same
+        file lists next, then to storage order.
+        """
+        t, src = schema.transaction, schema.transaction_source
+        rows = {
+            r.id: BankOrderRow(
+                r.id,
+                r.posted_on,
+                r.description,
+                r.amount_minor,
+                r.running_balance_minor,
+            )
+            for r in self._db.execute(
+                self._db.select(
+                    t,
+                    t.c.id,
+                    t.c.posted_on,
+                    t.c.description,
+                    t.c.amount_minor,
+                    t.c.running_balance_minor,
+                ).where(t.c.account_id == account_id)
+            )
+        }
+        after: dict[int, set[int]] = {i: set() for i in rows}
+        preds = dict.fromkeys(rows, 0)
+        last: dict[int, int] = {}  # statement_import_id -> previous row's txn
+        for link in self._db.execute(
+            self._db.select(src, src.c.transaction_id, src.c.statement_import_id)
+            .where(src.c.transaction_id.in_(rows))
+            .order_by(src.c.statement_import_id, src.c.bank_position, src.c.row_number)
+        ):
+            before = last.get(link.statement_import_id)
+            if before is not None and link.transaction_id not in after[before]:
+                after[before].add(link.transaction_id)
+                preds[link.transaction_id] += 1
+            last[link.statement_import_id] = link.transaction_id
+        ready = {i for i, n in preds.items() if n == 0}
+        out: list[BankOrderRow] = []
+        placed: set[int] = set()
+        balance: int | None = None
+        follows: set[int] = set()  # rows listed right after the last pick
+        while len(out) < len(rows):
+            if not ready:  # shortcut: inconsistent files form a cycle; break it
+                ready = {
+                    min(
+                        set(rows) - placed,
+                        key=lambda i: (rows[i].posted_on, i),
+                    )
+                }
+            day = min(rows[i].posted_on for i in ready)
+            pick = min(
+                (i for i in ready if rows[i].posted_on == day),
+                key=lambda i: (
+                    rows[i].running_balance_minor - rows[i].amount_minor != balance,
+                    i not in follows,  # balances can repeat (purchase, refund)
+                    i,
+                ),
+            )
+            ready.discard(pick)
+            placed.add(pick)
+            out.append(rows[pick])
+            balance = rows[pick].running_balance_minor
+            follows = after[pick]
+            for nxt in after[pick]:
+                preds[nxt] -= 1
+                if preds[nxt] == 0 and nxt not in placed:  # a cycle break placed it
+                    ready.add(nxt)
+        return out
+
     def _bank_order_runs(
         self, account_id: int
     ) -> tuple[list[list[int]], dict[int, Identity]]:
@@ -295,7 +440,7 @@ class Ledger:
             )
             .join(t, t.c.id == src.c.transaction_id)
             .where(t.c.account_id == account_id)
-            .order_by(src.c.statement_import_id, src.c.row_number)
+            .order_by(src.c.statement_import_id, src.c.bank_position)
         ).all()
         identity: dict[int, Identity] = {}
         per_import: dict[int, list[int]] = {}

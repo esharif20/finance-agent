@@ -61,6 +61,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"Money in   {gbp(s.money_in)}")
                 print(f"Money out  {gbp(s.money_out)}")
                 print(f"Net        {gbp(s.net)}")
+                for g in s.gaps:
+                    print(
+                        f"Warning: Reconciliation Gap on {g.account.masked_number} "
+                        f"between {g.from_date} and {g.to_date} of {gbp(g.amount)}; "
+                        "these figures may be incomplete"
+                    )
     except (OSError, ValueError) as e:
         print(f"fa: {e}", file=sys.stderr)
         return 1
