@@ -10,6 +10,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     MetaData,
@@ -77,6 +78,17 @@ transaction = Table(
     Column("currency", String(3), nullable=False),
     Column("running_balance_minor", BigInteger, nullable=False),
     Column("status", String(16), nullable=False),
+    # ADR 0006 identity; not unique: a purchase, refund, same purchase again
+    # on one day repeats the key, and both are real Transactions
+    Index(
+        "ix_transaction_identity",
+        "user_id",
+        "account_id",
+        "posted_on",
+        "description",
+        "amount_minor",
+        "running_balance_minor",
+    ),
 )
 
 transaction_source = Table(

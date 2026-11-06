@@ -39,8 +39,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                     f"{r.added} added, {r.already_known} already known, "
                     f"{len(r.rejected)} rejected"
                 )
+                if r.accounts:
+                    masked = ", ".join(a.masked_number for a in r.accounts)
+                    print(f"Accounts affected: {masked}")
                 for rej in r.rejected:
                     print(f"  rejected {rej.file} line {rej.line}: {rej.reason}")
+                if r.rejected:
+                    return 1
             else:
                 try:
                     s = ledger.summarise_month(args.month)

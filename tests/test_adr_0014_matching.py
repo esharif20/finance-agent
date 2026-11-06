@@ -60,10 +60,15 @@ def match(rows: list[Row]) -> tuple[list[tuple[str, str]], list[frozenset[str]]]
     for group in components.values():
         if len(group) == 1:
             continue
-        cs = sorted((r for r in group if r.source == "csv"), key=lambda r: (r.day, r.key))
-        ss = sorted((r for r in group if r.source == "synced"), key=lambda r: (r.day, r.key))
-        zipped = list(zip(cs, ss))
-        if len(cs) == len(ss) and all(abs((c.day - s.day).days) <= WINDOW for c, s in zipped):
+        cs = sorted(
+            (r for r in group if r.source == "csv"), key=lambda r: (r.day, r.key)
+        )
+        ss = sorted(
+            (r for r in group if r.source == "synced"), key=lambda r: (r.day, r.key)
+        )
+        zipped = list(zip(cs, ss, strict=False))
+        within = all(abs((c.day - s.day).days) <= WINDOW for c, s in zipped)
+        if len(cs) == len(ss) and within:
             pairs += [(c.key, s.key) for c, s in zipped]
         else:
             ambiguous.append(frozenset(r.key for r in group))
@@ -117,10 +122,15 @@ def test_pairs_are_one_to_one_valid_candidates(rs: list[Row]) -> None:
 @given(rows())
 def test_case_and_punctuation_do_not_change_matches(rs: list[Row]) -> None:
     def noisy(d: str) -> str:
-        return " -" + "".join(c.swapcase() + ("." if c.isalnum() else "") for c in d) + "*"
+        return (
+            " -" + "".join(c.swapcase() + ("." if c.isalnum() else "") for c in d) + "*"
+        )
 
     pairs, ambiguous = match(rs)
-    assert match([replace(r, description=noisy(r.description)) for r in rs]) == (pairs, ambiguous)
+    assert match([replace(r, description=noisy(r.description)) for r in rs]) == (
+        pairs,
+        ambiguous,
+    )
 
 
 @given(
@@ -128,15 +138,20 @@ def test_case_and_punctuation_do_not_change_matches(rs: list[Row]) -> None:
     st.integers(0, WINDOW),
 )
 def test_equal_count_groups_pair_in_date_order(days: list[int], lag: int) -> None:
-    csv = [Row("csv", f"c{i:03d}", -450, "GBP", "CAFE NERO", BASE + timedelta(d)) for i, d in enumerate(days)]
+    csv = [
+        Row("csv", f"c{i:03d}", -450, "GBP", "CAFE NERO", BASE + timedelta(d))
+        for i, d in enumerate(days)
+    ]
     synced = [
-        Row("synced", f"s{i:03d}", -450, "GBP", "Cafe Nero", BASE + timedelta(d + lag)) for i, d in enumerate(days)
+        Row("synced", f"s{i:03d}", -450, "GBP", "Cafe Nero", BASE + timedelta(d + lag))
+        for i, d in enumerate(days)
     ]
     pairs, ambiguous = match(csv + synced)
     expected = list(
         zip(
             [r.key for r in sorted(csv, key=lambda r: (r.day, r.key))],
             [r.key for r in sorted(synced, key=lambda r: (r.day, r.key))],
+            strict=True,
         )
     )
     assert ambiguous == []
@@ -145,7 +160,9 @@ def test_equal_count_groups_pair_in_date_order(days: list[int], lag: int) -> Non
 
 def test_provider_sending_one_purchase_three_times_keeps_all_rows() -> None:
     csv = Row("csv", "c000", -1299, "GBP", "AMAZON", BASE)
-    synced = [Row("synced", pid, -1299, "GBP", "Amazon", BASE) for pid in ("007", "7", "0007")]
+    synced = [
+        Row("synced", pid, -1299, "GBP", "Amazon", BASE) for pid in ("007", "7", "0007")
+    ]
     pairs, ambiguous = match([csv, *synced])
     assert pairs == []
     assert ambiguous == [frozenset({"c000", "007", "7", "0007"})]
@@ -162,7 +179,10 @@ def test_chain_beyond_the_window_is_ambiguous_not_merged() -> None:
 
 
 def test_empty_normalised_description_never_matches() -> None:
-    rs = [Row("csv", "c000", -450, "GBP", "***", BASE), Row("synced", "s1", -450, "GBP", "--", BASE)]
+    rs = [
+        Row("csv", "c000", -450, "GBP", "***", BASE),
+        Row("synced", "s1", -450, "GBP", "--", BASE),
+    ]
     assert match(rs) == ([], [])
 
 
