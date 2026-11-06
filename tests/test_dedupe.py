@@ -1,10 +1,12 @@
 """Duplicate-free importing (ADR 0006), through the Ledger interface."""
 
 import hashlib
+import random
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -24,6 +26,7 @@ from synthetic_lloyds import (
     overlapping_windows,
     render_export,
 )
+from synthetic_lloyds.generator import SORT_CODE, START
 
 LedgerFor = Callable[[int], Ledger]
 WriteExport = Callable[[str], Path]
@@ -175,5 +178,125 @@ def test_twins_with_the_same_balance_survive_any_import_order(
     ledger = ledger_for(1)
 
     ledger.import_files([only_second, both])
+
+    assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
+
+
+# --- Verifier: multiset semantics over arbitrary (overlapping) imports ---------
+# A tiny alphabet so identical keys collide often, inside and across files.
+_ROW = st.builds(
+    Txn,
+    date=st.sampled_from([START, START + timedelta(days=1)]),
+    type=st.just("DEB"),
+    description=st.sampled_from(["SYNTH CAFE 01", "SYNTH SHOP 02"]),
+    amount_minor=st.sampled_from([-450, 450]),
+    balance_minor=st.sampled_from([10000, 9550]),
+)
+_FILES = st.lists(st.lists(_ROW, min_size=1, max_size=8), min_size=1, max_size=4)
+
+
+def _csv(rows: list[Txn]) -> str:
+    return render_export(History(SORT_CODE, "00000001", rows), 0, len(rows)).text
+
+
+def _expected(files: list[list[Txn]]) -> Counter[Key]:
+    want: Counter[Key] = Counter()
+    for f in files:
+        want |= Counter(key(t) for t in f)  # | is per-key max
+    return want
+
+
+@settings(max_examples=150, deadline=None)
+@given(_FILES, st.data())
+def test_stored_count_is_max_multiplicity_within_any_single_import(
+    files: list[list[Txn]], data: st.DataObject
+) -> None:
+    order = data.draw(st.permutations(range(len(files))))
+    order += data.draw(st.lists(st.sampled_from(range(len(files)))))  # some again
+    with temp_ledger() as (ledger, d):
+        paths: list[Path] = []
+        for i, f in enumerate(files):
+            p = d / f"f{i}.csv"
+            p.write_text(_csv(f))
+            paths.append(p)
+
+        report = ledger.import_files([paths[i] for i in order])
+
+        assert stored(ledger) == _expected(files)
+        assert report.added == sum(_expected(files).values())
+
+
+@settings(max_examples=60, deadline=None)
+@given(_FILES, st.randoms(use_true_random=False))
+def test_import_order_does_not_change_the_ledger(
+    files: list[list[Txn]], rnd: random.Random
+) -> None:
+    shuffled = files[:]
+    rnd.shuffle(shuffled)
+    results: list[Counter[Key]] = []
+    for fs in (files, shuffled):
+        with temp_ledger() as (ledger, d):
+            paths: list[Path] = []
+            for i, f in enumerate(fs):
+                p = d / f"f{i}.csv"
+                p.write_text(_csv(f))
+                paths.append(p)
+            ledger.import_files(paths)
+            results.append(stored(ledger))
+    assert results[0] == results[1]
+
+
+@settings(max_examples=60, deadline=None)
+@given(_FILES)
+def test_reimporting_any_file_is_a_no_op(files: list[list[Txn]]) -> None:
+    with temp_ledger() as (ledger, d):
+        paths: list[Path] = []
+        for i, f in enumerate(files):
+            p = d / f"f{i}.csv"
+            p.write_text(_csv(f))
+            paths.append(p)
+        ledger.import_files(paths)
+        before = ledger.transactions()
+
+        for p in paths:
+            assert ledger.import_files([p]).added == 0
+        assert ledger.transactions() == before
+
+
+@settings(max_examples=60, deadline=None)
+@given(st.lists(_ROW, min_size=1, max_size=8), st.sampled_from(["\n", "\n\n", "crlf"]))
+def test_same_rows_under_another_name_and_bytes_do_not_duplicate(
+    rows: list[Txn], variant: str
+) -> None:
+    text = _csv(rows)
+    other = text.replace("\n", "\r\n") if variant == "crlf" else text + variant
+    with temp_ledger() as (ledger, d):
+        a, b = d / "statement.csv", d / "statement (1).csv"
+        a.write_text(text)
+        b.write_bytes(other.encode())
+        assert a.read_bytes() != b.read_bytes()
+
+        ledger.import_files([a])
+        before = stored(ledger)
+        again = ledger.import_files([b])
+
+        assert stored(ledger) == before == Counter(key(t) for t in rows)
+        assert again.added == 0
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="ADR 0006 limit: twins split across files that overlap only between "
+    "them are indistinguishable by key, so one is taken as already known",
+)
+def test_twins_split_across_files_by_a_one_row_overlap(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    h, _ = generate_histories(seed=21, days=60)  # rows 113/115 are twins, 114 refund
+    first = write_export(render_export(h, 100, 115).text)
+    second = write_export(render_export(h, 114, 130).text)
+    ledger = ledger_for(1)
+
+    ledger.import_files([first, second])
 
     assert stored(ledger) == Counter(key(t) for t in h.txns[100:130])
