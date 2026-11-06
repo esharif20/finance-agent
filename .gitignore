@@ -30,3 +30,7 @@ dist/
 # OS / tooling
 .DS_Store
 .scratch/**/*.local.md
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
