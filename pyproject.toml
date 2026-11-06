@@ -2,7 +2,13 @@
 name = "finance-agent"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "alembic>=1.20.1",
+    "sqlalchemy>=2.1.8",
+]
+
+[project.scripts]
+fa = "finance_agent.cli:main"
 
 [dependency-groups]
 dev = ["pytest", "hypothesis", "ruff", "pyright", "import-linter"]
@@ -35,8 +41,28 @@ extraPaths = ["tests"]
 [tool.importlinter]
 root_package = "finance_agent"
 
+# ledger calls ingest's parsers; ingest (untrusted input) touches neither the
+# database nor the Ledger, so full account numbers cannot leak past it.
 [[tool.importlinter.contracts]]
-name = "placeholder: storage never imports api"
+name = "cli -> ledger -> ingest | storage"
+type = "layers"
+layers = [
+    "finance_agent.cli",
+    "finance_agent.ledger",
+    "finance_agent.ingest | finance_agent.storage",
+]
+
+[[tool.importlinter.contracts]]
+name = "nothing imports cli or api"
 type = "forbidden"
-source_modules = ["finance_agent.storage"]
-forbidden_modules = ["finance_agent.api"]
+source_modules = [
+    "finance_agent.storage",
+    "finance_agent.ingest",
+    "finance_agent.ledger",
+    "finance_agent.categorise",
+    "finance_agent.engine",
+    "finance_agent.memory",
+    "finance_agent.assistant",
+    "finance_agent.gateway",
+]
+forbidden_modules = ["finance_agent.cli", "finance_agent.api"]
