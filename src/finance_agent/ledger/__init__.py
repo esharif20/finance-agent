@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import Connection, case, func
+from sqlalchemy import Connection, case, func, select
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
@@ -28,6 +28,15 @@ class ImportReport:
     already_known: int
     rejected: list[Rejection]
     accounts: list[int]  # internal Account IDs touched
+
+
+@dataclass(frozen=True)
+class Transaction:
+    posted_on: date
+    description: str
+    amount: Decimal
+    running_balance: Decimal
+    statement_imports: frozenset[str]  # file hashes of every import it appeared in
 
 
 @dataclass(frozen=True)
@@ -78,28 +87,67 @@ class Ledger:
             for row in parsed.rows:
                 account_id = self._account_id(bank_id, row)
                 accounts.add(account_id)
-                txn_id = self._db.insert(
-                    schema.transaction,
-                    account_id=account_id,
-                    posted_on=row.posted_on,
-                    bank_type=row.bank_type,
-                    description=row.description,
-                    amount_minor=row.amount_minor,
-                    currency=row.currency,
-                    running_balance_minor=row.balance_minor,
-                    status="completed",
-                )
+                txn_id = self._known_transaction_id(account_id, row, import_id)
+                if txn_id is None:
+                    txn_id = self._db.insert(
+                        schema.transaction,
+                        account_id=account_id,
+                        posted_on=row.posted_on,
+                        bank_type=row.bank_type,
+                        description=row.description,
+                        amount_minor=row.amount_minor,
+                        currency=row.currency,
+                        running_balance_minor=row.balance_minor,
+                        status="completed",
+                    )
+                    added += 1
+                else:
+                    known += 1
                 self._db.insert(
                     schema.transaction_source,
                     transaction_id=txn_id,
                     statement_import_id=import_id,
                     row_number=row.line,
                 )
-                added += 1
             rejected += [
                 Rejection(path.name, r.line, r.reason) for r in parsed.rejected
             ]
         return ImportReport(added, known, rejected, sorted(accounts))
+
+    def transactions(self) -> list[Transaction]:
+        """Every stored Transaction, oldest first."""
+        t, src, si = (
+            schema.transaction,
+            schema.transaction_source,
+            schema.statement_import,
+        )
+        rows = self._db.execute(
+            self._db.select(
+                t,
+                t.c.id,
+                t.c.posted_on,
+                t.c.description,
+                t.c.amount_minor,
+                t.c.running_balance_minor,
+            ).order_by(t.c.posted_on, t.c.id)
+        ).all()
+        hashes: dict[int, set[str]] = {}
+        for link in self._db.execute(
+            self._db.select(src, src.c.transaction_id, si.c.file_hash).join(
+                si, si.c.id == src.c.statement_import_id
+            )
+        ):
+            hashes.setdefault(link.transaction_id, set()).add(link.file_hash)
+        return [
+            Transaction(
+                r.posted_on,
+                r.description,
+                _decimal(r.amount_minor),
+                _decimal(r.running_balance_minor),
+                frozenset(hashes.get(r.id, ())),
+            )
+            for r in rows
+        ]
 
     def summarise_month(self, month: str) -> MonthSummary:
         start, end = _month_bounds(month)
@@ -124,6 +172,35 @@ class Ledger:
             _decimal(outs),
             _decimal(ins - outs),
         )
+
+    def _known_transaction_id(
+        self, account_id: int, row: ingest.ParsedRow, import_id: int
+    ) -> int | None:
+        """ADR 0006 identity: (Account, date, description, amount, balance).
+
+        Rows within one file are distinct Transactions, so a match must not
+        already be linked to this import (keeps identical-key twins apart).
+        """
+        t, src = schema.transaction, schema.transaction_source
+        in_this_import = (
+            select(src.c.transaction_id)
+            .where(src.c.statement_import_id == import_id)
+            .where(src.c.transaction_id == t.c.id)
+        )
+        found = self._db.execute(
+            self._db.select(t, t.c.id)
+            .where(
+                t.c.account_id == account_id,
+                t.c.posted_on == row.posted_on,
+                t.c.description == row.description,
+                t.c.amount_minor == row.amount_minor,
+                t.c.running_balance_minor == row.balance_minor,
+                ~in_this_import.exists(),
+            )
+            .order_by(t.c.id)
+            .limit(1)
+        ).scalar()
+        return None if found is None else int(found)
 
     def _bank_id(self, name: str) -> int:
         b = schema.bank
