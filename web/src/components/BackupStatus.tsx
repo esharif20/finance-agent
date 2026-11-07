@@ -5,7 +5,7 @@ import { fetchSyncStatus } from "@/api/client";
 const DAY = 86_400_000;
 const rtf = new Intl.RelativeTimeFormat("en-GB", { numeric: "auto" });
 
-function ago(at: Date, now: Date): string {
+export function ago(at: Date, now: Date): string {
   const ms = now.getTime() - at.getTime();
   if (ms >= DAY) return rtf.format(-Math.floor(ms / DAY), "day");
   if (ms >= 3_600_000) return rtf.format(-Math.floor(ms / 3_600_000), "hour");
