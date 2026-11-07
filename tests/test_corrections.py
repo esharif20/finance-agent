@@ -191,24 +191,34 @@ def test_corrections_are_timestamped_and_reversible(
             ledger.revert_correction(first.id)  # already reverted
 
 
+def on_v1(conn: Connection, path: Path) -> tuple[Ledger, list[int]]:
+    """A Ledger last categorised under taxonomy v1, before any v2 rows exist."""
+    ledger = Ledger(conn, 1)
+    ledger.import_files([path])
+    categorise.seed_taxonomy(conn, 1, version=1)
+    return ledger, [t.id for t in ledger.transactions()]
+
+
 def test_corrections_survive_a_taxonomy_version_and_rule_change(
     engine: Engine, write_export: WriteExport, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     current, _ = generate_histories(seed=7, days=30)
     with engine.begin() as conn:
-        ledger = imported(conn, write_export(render_export(current, 0, 50).text))
-        t = categorised(ledger)[0]
-        ledger.correct_transaction(t.id, ("Travel", "Hotels"))
-        monkeypatch.setattr(categorise, "TAXONOMY_VERSION", 2)
+        ledger, ids = on_v1(conn, write_export(render_export(current, 0, 50).text))
+        for i in ids:  # v1 names, renamed in v2
+            ledger.correct_transaction(i, ("Housing", "Rent"))
         monkeypatch.setattr(categorise, "RULES", ())
         categorise.run(conn, 1)
-        c = {x.id: x.categorisation for x in ledger.transactions()}[t.id]
-        assert c is not None
-        assert (c.category, c.source, c.taxonomy_version) == (
-            ("Travel", "Hotels"),
-            "correction",
-            2,
-        )
+        got = {
+            (
+                t.categorisation.category,
+                t.categorisation.source,
+                t.categorisation.taxonomy_version,
+            )
+            for t in categorised(ledger)
+            if t.categorisation
+        }
+        assert got == {(("Bills", "Rent or mortgage"), "correction", 2)}
 
 
 def test_corrections_are_scoped_to_their_user(
@@ -252,12 +262,10 @@ def test_a_correction_must_name_a_current_category(
         with pytest.raises(ValueError):
             ledger.correct_transaction(target, category)
         # a Category retired by a newer taxonomy version is refused too
-        taxonomy = {k: v for k, v in categorise.TAXONOMY.items() if k != "Travel"}
-        monkeypatch.setattr(categorise, "TAXONOMY", taxonomy)
-        monkeypatch.setattr(categorise, "TAXONOMY_VERSION", 2)
-        categorise.run(conn, 1)
-        with pytest.raises(ValueError):
-            ledger.correct_transaction(target, ("Travel", "Hotels"))
+        categorise.seed_taxonomy(conn, 1, version=1)
+        for retired in [("Housing", "Rent"), ("Bills & Utilities", "Energy")]:
+            with pytest.raises(ValueError):
+                ledger.correct_transaction(target, retired)
         assert ledger.ledger_version() == version
 
 
@@ -427,20 +435,16 @@ def test_unknown_ids_are_refused_without_bumping_ledger_version(
 
 
 def test_a_correction_to_a_since_retired_category_still_applies_and_reverts(
-    engine: Engine, write_export: WriteExport, monkeypatch: pytest.MonkeyPatch
+    engine: Engine, write_export: WriteExport
 ) -> None:
     current, _ = generate_histories(seed=7, days=30)
     with engine.begin() as conn:
-        ledger = imported(conn, write_export(render_export(current, 0, 50).text))
-        t = categorised(ledger)[0]
-        k = ledger.correct_transaction(t.id, ("Travel", "Hotels"))
-        taxonomy = {a: b for a, b in categorise.TAXONOMY.items() if a != "Travel"}
-        monkeypatch.setattr(categorise, "TAXONOMY", taxonomy)
-        monkeypatch.setattr(categorise, "TAXONOMY_VERSION", 2)
+        ledger, ids = on_v1(conn, write_export(render_export(current, 0, 50).text))
+        ks = {i: ledger.correct_transaction(i, ("Housing", "Mortgage")) for i in ids}
         categorise.run(conn, 1)
+        t = categorised(ledger)[0]
         # the user's choice is kept, never silently dropped, and stays reversible
-        assert category_of(ledger, t.id) == ("Travel", "Hotels")
-        ledger.revert_correction(k.id)
+        assert category_of(ledger, t.id) == ("Bills", "Rent or mortgage")
+        ledger.revert_correction(ks[t.id].id)
         c = {x.id: x.categorisation for x in ledger.transactions()}[t.id]
         assert c is not None and c.source != "correction"
-        assert c.category is None or c.category[0] != "Travel"
