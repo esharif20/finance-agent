@@ -27,7 +27,7 @@ from typing import Any, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-from finance_agent.ingest.types import NOT_HUNDREDTHS, NOT_HUNDREDTHS_REASON
+from finance_agent.ingest.types import NOT_HUNDREDTHS
 
 HOST = "www.lunchflow.app"  # the one allowlisted aggregator host (ADR 0013)
 # Spike: one 730-day request returned 684-727 days per Account. Other SimpleFIN
@@ -88,6 +88,7 @@ class SyncedAccount:
 class SyncResponse:
     accounts: list[SyncedAccount]
     errors: int  # count of provider messages; their text is never kept
+    skipped: int = 0  # Accounts in a currency without hundredths (#186)
 
 
 def _obj(v: Any, what: str) -> dict[str, Any]:
@@ -156,13 +157,14 @@ def _text(t: dict[str, Any]) -> str:
     return " ".join(dict.fromkeys(p for p in (payee, desc) if p))
 
 
-def _account(a: dict[str, Any]) -> SyncedAccount:
+def _account(a: dict[str, Any]) -> SyncedAccount | None:
+    """None for an Account in a currency without hundredths: skipped, not fatal."""
     pid = _str(a, "id")
     currency = _str(a, "currency")
     if not pid or len(pid) > 256 or not _CURRENCY.fullmatch(currency):
         raise UnreadableResponse("account id or currency is malformed")
     if currency in NOT_HUNDREDTHS:  # amounts are stored in hundredths (#156)
-        raise UnreadableResponse(f"account {NOT_HUNDREDTHS_REASON}")
+        return None
     org = _obj(a.get("org", {}), "org")
     # spike: org.domain is always null; name, then id, identifies the Bank
     org_name = _str(org, "name", required=False) or _str(org, "id", required=False)
@@ -205,11 +207,16 @@ def parse(data: bytes) -> SyncResponse:
     if doc is _BAD:
         raise UnreadableResponse("response is not JSON")
     top = _obj(doc, "response")
-    accounts = [
+    parsed = [
         _account(_obj(a, "account")) for a in _list(top.get("accounts"), "accounts")
     ]
+    accounts = [a for a in parsed if a is not None]
     errors = top.get("errors")
-    return SyncResponse(accounts, len(_list(errors, "errors")) if errors else 0)
+    return SyncResponse(
+        accounts,
+        len(_list(errors, "errors")) if errors else 0,
+        len(parsed) - len(accounts),
+    )
 
 
 # --- client -----------------------------------------------------------------

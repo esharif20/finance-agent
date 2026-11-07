@@ -113,6 +113,35 @@ def test_sync_adds_rows_and_a_second_sync_adds_nothing(
     assert all(m == "POST" or "start-date" in u for m, u in env["t"].calls)
 
 
+def test_sync_skips_a_jpy_account_and_syncs_the_gbp_one(
+    env: dict[str, Any],
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    doc = json.loads(env["t"].body)
+    doc["accounts"].append(
+        {
+            "org": {"name": "Synthetic Bank"},
+            "id": "ACC-JPY",
+            "name": "Synthetic Yen",
+            "currency": "JPY",
+            "balance": "123456",
+            "balance-date": doc["accounts"][0]["balance-date"],
+            "transactions": [],
+        }
+    )
+    env["t"].body = json.dumps(doc).encode()
+    assert main(["connect"]) == 0
+    capsys.readouterr()
+    with caplog.at_level(logging.DEBUG):
+        assert main(["sync"]) == 0
+    out = capsys.readouterr().out
+    assert "10 added" in out
+    assert "1 account skipped: unsupported currency" in out
+    for secret in ("ACC-JPY", "Synthetic Yen", "123456"):
+        assert secret not in out + caplog.text
+
+
 def test_sync_without_connect_says_so(
     env: dict[str, Any], capsys: pytest.CaptureFixture[str]
 ) -> None:
