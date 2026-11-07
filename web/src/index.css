@@ -163,7 +163,12 @@
   height: 78vmax;
   border-radius: 50%;
   will-change: transform;
-  animation: 47s ease-in-out infinite alternate both;
+  /* Longhands: the build minifier turns a nameless `animation` shorthand into `animation:none`. */
+  animation-duration: 47s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-fill-mode: both;
 }
 .ambient i:nth-child(1) {
   left: -26vmax;
