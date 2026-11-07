@@ -118,7 +118,49 @@ sys.exit(1 if attempts else 0)
 """
 
 
-@pytest.mark.parametrize("probe", [PROBE, LATE_PROBE], ids=["first", "late"])
+# #139: the real Assistant graph (router, a sub-graph, checkpoints in the
+# database) on FakeChatModel and a throwaway SQLite file, never the Keychain.
+GRAPH_PROBE = """
+import socket, ssl, sys, time, tempfile, datetime
+attempts = []
+def record(name):
+    def guard(*a, **k):
+        attempts.append((name, repr(a[:3])))
+        raise OSError("egress blocked by probe")
+    return guard
+for n in ("getaddrinfo", "gethostbyname", "gethostbyname_ex", "create_connection"):
+    setattr(socket, n, record(n))
+for n in ("connect", "connect_ex", "sendto", "sendmsg"):
+    setattr(socket.socket, n, record(n))
+ssl.SSLContext.wrap_socket = record("ssl.wrap_socket")
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine
+from finance_agent import storage
+from finance_agent.assistant import FakeChatModel, Reply
+from finance_agent.assistant.graph import Assistant, ask
+
+eng = create_engine(f"sqlite:///{tempfile.mkdtemp()}/probe.db")
+cfg = Config()
+cfg.set_main_option("script_location", str(storage._MIGRATIONS))
+with eng.begin() as c:
+    cfg.attributes["connection"] = c
+    command.upgrade(cfg, "head")
+for script in (["plan"], ["ask", "No figures here."]):
+    with eng.begin() as c:
+        m = FakeChatModel([Reply(content=s) for s in script])
+        a = ask(Assistant(m, c, datetime.date(2026, 1, 1)), "hello")
+        assert a.path in ("deterministic", "local_model"), a
+time.sleep(3)
+print(attempts)
+sys.exit(1 if attempts else 0)
+"""
+
+
+@pytest.mark.parametrize(
+    "probe", [PROBE, LATE_PROBE, GRAPH_PROBE], ids=["first", "late", "graph"]
+)
 def test_assistant_import_and_a_graph_run_open_no_socket(probe: str) -> None:
     env = {
         **os.environ,

@@ -2522,6 +2522,114 @@
         "summary": "Category"
       }
     },
+    "/api/chat": {
+      "post": {
+        "description": "One turn. Omit `thread_id` to start a conversation; the reply's `meta`\nevent carries the new one.",
+        "operationId": "chat_api_chat_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Chat",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/{thread_id}": {
+      "delete": {
+        "description": "End the conversation: its checkpoints are deleted.",
+        "operationId": "end_api_chat__thread_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response End Api Chat  Thread Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/chat/{thread_id}/resume": {
+      "post": {
+        "description": "Answer the confirm card the thread is paused on.",
+        "operationId": "decide_api_chat__thread_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/corrections": {
       "post": {
         "operationId": "correct_api_corrections_post",
