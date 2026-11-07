@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, Settings as SettingsIcon } from "lucide-react";
+import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, Repeat, Settings as SettingsIcon } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
 import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
@@ -11,6 +11,7 @@ import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Overview } from "@/screens/Overview";
 import { ReviewQueue, useReviewCount } from "@/screens/ReviewQueue";
 import { Settings } from "@/screens/Settings";
+import { Subscriptions } from "@/screens/Subscriptions";
 import { Transactions } from "@/screens/Transactions";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ function HideAmounts() {
 const tabs = (review: number) => [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="size-4" aria-hidden="true" /> },
   { id: "transactions", label: "Transactions", icon: <ListOrdered className="size-4" aria-hidden="true" /> },
+  { id: "subscriptions", label: "Subscriptions", icon: <Repeat className="size-4" aria-hidden="true" /> },
   { id: "review", label: "Review", icon: <Inbox className="size-4" aria-hidden="true" />, badge: review },
 ];
 
@@ -53,7 +55,7 @@ function Shell() {
   const route = useRoute();
   const review = useReviewCount();
   const TABS = tabs(review);
-  const tab = route.name === "transactions" || route.name === "review" ? route.name : route.name === "settings" ? "" : "overview";
+  const tab = route.name === "transactions" || route.name === "review" || route.name === "subscriptions" ? route.name : route.name === "settings" ? "" : "overview";
   return (
     <>
       <Ambient />
@@ -99,6 +101,8 @@ function Shell() {
               </div>
               {route.name === "transactions" ? (
                 <Transactions />
+              ) : route.name === "subscriptions" ? (
+                <Subscriptions />
               ) : route.name === "review" ? (
                 <ReviewQueue />
               ) : route.name === "settings" ? (
@@ -112,8 +116,8 @@ function Shell() {
         <NavTabs
           tabs={TABS}
           tab={tab}
-          className="glass fixed inset-x-4 bottom-3 z-20 flex justify-center gap-1 rounded-full p-1.5 sm:hidden"
-          item="inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold"
+          className="glass fixed inset-x-4 bottom-3 z-20 flex justify-center gap-0.5 rounded-full p-1.5 sm:hidden"
+          item="inline-flex min-h-11 items-center gap-2 rounded-full px-2.5 text-xs font-semibold [&_svg]:hidden"
         />
       </div>
     </>
