@@ -32,7 +32,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import operators
 from sqlalchemy.sql.elements import BinaryExpression, ClauseElement, ColumnClause
-from sqlalchemy.sql.selectable import SelectBase
+from sqlalchemy.sql.selectable import CompoundSelect, SelectBase, Subquery
 
 from finance_agent.storage import schema
 
@@ -144,26 +144,68 @@ class Scoped:
             raise UnscopedQuery("statement is not scoped to the user")
         return self.conn.execute(stmt)
 
-    def _scoped(self, stmt: Executable) -> bool:
+    def _scoped(self, stmt: Executable | SelectBase) -> bool:
+        """Scoped at this level, and every nested SELECT (FROM, columns,
+        WHERE, UPDATE values) scoped too."""
+        return self._scoped_here(stmt) and all(
+            self._scoped(s) for s in self._nested(stmt)
+        )
+
+    def _nested(self, stmt: Executable | SelectBase) -> list[SelectBase]:
+        found: list[SelectBase] = []
+        todo: list[ClauseElement] = list(stmt.get_children())  # type: ignore[attr-defined]
+        while todo:
+            x = todo.pop()
+            if isinstance(x, SelectBase):
+                found.append(x)
+            else:
+                todo += x.get_children()
+        return found
+
+    def _scoped_here(self, stmt: Executable | SelectBase) -> bool:
+        if isinstance(stmt, CompoundSelect):
+            return True  # its member SELECTs are checked as nested statements
         if isinstance(stmt, Select):
             roots: list[FromClause] = list(stmt.get_final_froms())
         elif isinstance(stmt, Update | Delete):
-            roots = [stmt.table]
+            # UPDATE/DELETE ... FROM: tables named only in WHERE are read too
+            roots = list({id(x): x for x in [stmt.table, *self._tables(stmt)]}.values())
         else:
             return False
         tables: list[FromClause] = []
+        subqueries = 0
         conds: list[ClauseElement | None] = [stmt.whereclause]
         while roots:
             f = roots.pop()
             if isinstance(f, Join):
                 roots += [f.left, f.right]
                 conds.append(f.onclause)
+            elif isinstance(f, Subquery):
+                subqueries += 1  # its SELECT is checked as a nested statement
             else:
                 tables.append(f)
         filtered = {
             id(c.table) for e in conds if e is not None for c in self._filters(e)
         }
-        return bool(tables) and all(id(f) in filtered for f in tables)
+        return bool(tables or subqueries) and all(id(f) in filtered for f in tables)
+
+    def _tables(self, stmt: Update | Delete) -> list[FromClause]:
+        """Tables whose columns the WHERE names outside subqueries."""
+        found: list[Any] = []
+        todo: list[ClauseElement] = (
+            [] if stmt.whereclause is None else [stmt.whereclause]
+        )
+        while todo:
+            x = todo.pop()
+            if isinstance(x, SelectBase):
+                continue
+            if isinstance(x, ColumnClause):
+                owner: Any = x.table  # untyped in SQLAlchemy's stubs
+                if isinstance(owner, Table):
+                    found.append(owner)
+                continue
+            todo += x.get_children()
+        return found
 
     def _filters(self, e: ClauseElement) -> list[ColumnClause[Any]]:
         """Columns compared `user_id == this user` in `e`, not inside subqueries

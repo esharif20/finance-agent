@@ -204,6 +204,8 @@ LLOYDS = (
         ("tab.txt", b"Date\tDescription\tAmount\tBalance\n"),
         ("semi.txt", b"Date;Payee;Amount\n"),
         ("crlf.txt", LLOYDS.replace(b"\n", b"\r\n")),
+        ("utf16.txt", LLOYDS.decode().encode("utf-16")),  # Excel "Unicode text"
+        ("utf16be.txt", b"\xfe\xff" + LLOYDS.decode().encode("utf-16-be")),
         ("evals/datasets_evil/a.csv", b"# synthetic\n"),
         ("src/evals/datasets/a.csv", b"# synthetic\n"),
     ],

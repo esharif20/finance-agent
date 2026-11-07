@@ -28,7 +28,8 @@ _MONEY = re.compile(r"amount|debit|credit|balance|paid (in|out)|money (in|out)",
 def _looks_like_export(head: bytes) -> bool:
     """The first line that is not blank or a `#` comment is a delimited header
     of at least three column names, one naming a date and one an amount."""
-    text = head.decode("utf-8-sig", errors="replace")
+    utf16 = head.startswith((b"\xff\xfe", b"\xfe\xff"))
+    text = head.decode("utf-16" if utf16 else "utf-8-sig", errors="replace")
     line = next(
         (x for x in text.splitlines() if x.strip() and not x.startswith("#")), ""
     )
