@@ -44,3 +44,35 @@ jobs:
           git diff --exit-code -- web/openapi.json web/src/api/schema.d.ts
       - run: pnpm --dir web run build
       - run: pnpm --dir web run test
+
+  smoke:
+    name: smoke (webkit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm --dir web install --frozen-lockfile
+      - run: pnpm --dir web run build
+      # smoke.mjs loads Playwright from the global npm root; it is not a repo dependency
+      - run: npm install -g playwright@1.58.2
+      - id: pw
+        run: echo "v=$(playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-webkit-${{ steps.pw.outputs.v }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: playwright install --with-deps webkit
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: playwright install-deps webkit
+      - run: pnpm --dir web run smoke
