@@ -112,6 +112,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fx/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Balances */
+        get: operations["balances_api_fx_balances_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fx/month": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Month */
+        get: operations["month_api_fx_month_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fx/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rates
+         * @description Rates from the user's own exchanges, then those entered.
+         */
+        get: operations["rates_api_fx_rates_get"];
+        /** Set Rate */
+        put: operations["set_rate_api_fx_rates_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -512,6 +567,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountGbpOut */
+        AccountGbpOut: {
+            /** Account Id */
+            account_id: number;
+            balance: components["schemas"]["Money"];
+            /** Currency */
+            currency: string;
+            gbp: components["schemas"]["Money"] | null;
+            rate: components["schemas"]["RateOut"] | null;
+        };
         /** AccountMonthOut */
         AccountMonthOut: {
             /** Account Id */
@@ -593,6 +658,12 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** BalancesOut */
+        BalancesOut: {
+            /** Accounts */
+            accounts: components["schemas"]["AccountGbpOut"][];
+            total: components["schemas"]["Money"] | null;
+        };
         /** CategoryDetailOut */
         CategoryDetailOut: {
             /** Currency */
@@ -671,6 +742,15 @@ export interface components {
             interval: string | null;
             /** On */
             on: string;
+        };
+        /** FxMonthOut */
+        FxMonthOut: {
+            /** Month */
+            month: string;
+            /** Rate Needed */
+            rate_needed: components["schemas"]["RateNeededOut"][];
+            /** Rates */
+            rates: components["schemas"]["RateUsedOut"][];
         };
         /** GapOut */
         GapOut: {
@@ -827,6 +907,55 @@ export interface components {
             ledger_version: number;
             /** Remaining */
             remaining: number;
+        };
+        /** RateIn */
+        RateIn: {
+            /** Currency */
+            currency: string;
+            /**
+             * On
+             * Format: date
+             */
+            on: string;
+            /** Rate */
+            rate: string;
+        };
+        /** RateNeededOut */
+        RateNeededOut: {
+            /** Count */
+            count: number;
+            /** Currency */
+            currency: string;
+        };
+        /** RateOut */
+        RateOut: {
+            /** Currency */
+            currency: string;
+            /** On */
+            on: string;
+            /** Rate */
+            rate: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "bank" | "exchange" | "user";
+        };
+        /** RateUsedOut */
+        RateUsedOut: {
+            /** Count */
+            count: number;
+            /** Currency */
+            currency: string;
+            /** On */
+            on: string;
+            /** Rate */
+            rate: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "bank" | "exchange" | "user";
         };
         /** RevertOut */
         RevertOut: {
@@ -1195,6 +1324,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CorrectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    balances_api_fx_balances_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalancesOut"];
+                };
+            };
+        };
+    };
+    month_api_fx_month_get: {
+        parameters: {
+            query: {
+                month: string;
+                account_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxMonthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rates_api_fx_rates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateOut"][];
+                };
+            };
+        };
+    };
+    set_rate_api_fx_rates_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateOut"];
                 };
             };
             /** @description Validation Error */
