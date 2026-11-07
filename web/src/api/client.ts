@@ -96,3 +96,30 @@ export const fetchMonthSeries = (accountId?: number) =>
 export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
 export const fetchCategory = (name: string, month: string, accountId?: number) =>
   get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}${query(month, accountId)}`);
+
+export type ReviewItem = components["schemas"]["ItemOut"];
+export type ReviewQueueOut = components["schemas"]["QueueOut"];
+export type ReviewAnswer = { category?: [string, string]; transaction_id?: number; choice?: string };
+
+export const fetchReviewQueue = () => get<ReviewQueueOut>("/api/review-queue");
+
+/** A refusal throws the API's own reason (a stale item says so); every write returns the queue as it now stands. */
+async function review(url: string, body?: object): Promise<ReviewQueueOut> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: body && JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const j: unknown = await res.json().catch(() => null);
+    const detail = (j as { detail?: unknown } | null)?.detail;
+    throw new Error(typeof detail === "string" ? detail : "Couldn't save that. Try again.");
+  }
+  return (await res.json()) as ReviewQueueOut;
+}
+const itemUrl = (id: string, verb: string) => `/api/review-queue/${encodeURIComponent(id)}/${verb}`;
+
+export const answerReview = (item: ReviewItem, answer: ReviewAnswer) =>
+  review(itemUrl(item.id, "answer"), { version: item.version, ...answer });
+export const skipReview = (item: ReviewItem) => review(itemUrl(item.id, "skip"), { version: item.version });
+export const undoReview = () => review("/api/review-queue/undo");
