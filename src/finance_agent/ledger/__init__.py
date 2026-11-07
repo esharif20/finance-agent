@@ -332,6 +332,7 @@ class SyncReport:
     provider_errors: int
     gaps: list[SyncGap]
     accounts: list[AffectedAccount]
+    skipped_accounts: int = 0  # unsupported currency (#186); no fields kept
 
 
 @dataclass(frozen=True)
@@ -905,6 +906,7 @@ class Ledger:
                 provider_errors=parsed.errors,
                 gaps=[],
                 accounts=[],
+                skipped_accounts=parsed.skipped,
             )
         import_id = self._db.insert(
             si,
@@ -1006,6 +1008,7 @@ class Ledger:
             provider_errors=parsed.errors,
             gaps=gaps,
             accounts=[AffectedAccount(i, m) for i, m in sorted(touched.items())],
+            skipped_accounts=parsed.skipped,
         )
 
     def link_synced_account(self, provider_account_id: str, account_id: int) -> None:

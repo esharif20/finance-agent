@@ -19,7 +19,6 @@ from sqlalchemy import Engine
 
 from finance_agent import api, ingest
 from finance_agent.ingest import simplefin
-from finance_agent.ingest.simplefin import UnreadableResponse
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.fx import InvalidRate
 from synthetic_banks import revolut_export, revolut_pockets
@@ -55,7 +54,7 @@ def test_revolut_refuses_a_currency_not_in_hundredths(cur: str) -> None:
 
 
 @pytest.mark.parametrize("cur", NOT_HUNDREDTHS)
-def test_simplefin_refuses_an_account_not_in_hundredths(cur: str) -> None:
+def test_simplefin_skips_an_account_not_in_hundredths(cur: str) -> None:
     acc: dict[str, Any] = {
         "org": {"name": "Example Bank"},
         "id": "A1",
@@ -65,8 +64,8 @@ def test_simplefin_refuses_an_account_not_in_hundredths(cur: str) -> None:
         "balance-date": 1772366400,
         "transactions": [],
     }
-    with pytest.raises(UnreadableResponse, match="two-digit minor unit"):
-        simplefin.parse(json.dumps({"errors": [], "accounts": [acc]}).encode())
+    r = simplefin.parse(json.dumps({"errors": [], "accounts": [acc]}).encode())
+    assert (r.accounts, r.skipped) == ([], 1)
 
 
 @pytest.mark.parametrize("cur", NOT_HUNDREDTHS)
