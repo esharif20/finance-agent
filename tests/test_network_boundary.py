@@ -14,6 +14,20 @@ ALLOWED = {
 }
 
 
+DYNAMIC = {"__import__", "import_module"}
+
+
+def _callee(call: ast.Call) -> str | None:
+    f = call.func
+    return (
+        f.id
+        if isinstance(f, ast.Name)
+        else f.attr
+        if isinstance(f, ast.Attribute)
+        else None
+    )
+
+
 def network_imports(source: str) -> set[str]:
     found: set[str] = set()
     for node in ast.walk(ast.parse(source)):
@@ -21,6 +35,12 @@ def network_imports(source: str) -> set[str]:
             names = [a.name for a in node.names]
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             names = [node.module]
+        elif isinstance(node, ast.Call) and _callee(node) in DYNAMIC:
+            arg = node.args[0] if node.args else None
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                names = [arg.value]
+            else:
+                names = ["socket"]  # a computed name cannot be checked: refuse it
         else:
             continue
         found |= {n.split(".")[0] for n in names} & NETWORK
@@ -50,6 +70,10 @@ def test_the_scan_catches_every_import_form() -> None:
         "from http.client import HTTPSConnection",
         "from ssl import create_default_context",
         "def f():\n    import requests",
+        'importlib.import_module("socket")',
+        'import_module("http.client")',
+        '__import__("ssl")',
+        "__import__(name)",  # a computed name cannot be checked: refused
     ):
         assert network_imports(src), src
     assert network_imports("from . import socket") == set()  # a sibling module
