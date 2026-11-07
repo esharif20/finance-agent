@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { CategoryGroup } from "@/api/client";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,9 @@ export function chipStyle(hue: string): { background: string; color: string } {
 }
 
 const label = (c: Category) => (c[0] === c[1] ? c[0] : c[1]);
+
+const POPOVER_WIDTH = 288; // w-72
+const EDGE_GAP = 8; // keep this much clear of the card's (or the window's) edge
 
 /**
  * The Category of a Transaction, and its editor: click for a popover of every
@@ -42,6 +45,16 @@ export function CategoryChip({
   const root = useRef<HTMLSpanElement>(null);
   const reduce = useReducedMotion();
   const id = useId();
+  const [align, setAlign] = useState<"start" | "end">("start");
+
+  // open towards the left when the popover would hang past the card's right edge
+  useLayoutEffect(() => {
+    if (!open || !root.current) return;
+    const chip = root.current.getBoundingClientRect();
+    const card = root.current.closest("[data-slot=card]")?.getBoundingClientRect();
+    const edge = Math.min(card?.right ?? Infinity, window.innerWidth) - EDGE_GAP;
+    setAlign(chip.left + POPOVER_WIDTH > edge ? "end" : "start");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,8 +95,13 @@ export function CategoryChip({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
             transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
-            style={{ transformOrigin: "top left" }}
-            className="absolute top-full left-0 z-30 mt-2 flex max-h-80 w-72 flex-col overflow-hidden rounded-[16px] border bg-card shadow-lg"
+            data-align={align}
+            style={{ transformOrigin: align === "end" ? "top right" : "top left" }}
+            className={cn(
+              "absolute top-full z-30",
+              align === "end" ? "right-0" : "left-0",
+              "mt-2 flex max-h-80 w-72 flex-col overflow-hidden rounded-[16px] border bg-card shadow-lg",
+            )}
           >
             <div className="overflow-y-auto p-3">
               {groups.map((g) => (

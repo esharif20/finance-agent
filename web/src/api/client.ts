@@ -45,18 +45,32 @@ export const fetchTransactions = (f: TxnFilters, limit: number) => {
 };
 export const fetchCategories = () => get<CategoryGroup[]>("/api/categories");
 
-export async function postCorrection(body: {
+export type CorrectionOut = components["schemas"]["CorrectionOut"];
+
+/** Send a Correction change; a refusal throws the API's own reason when it gives one. */
+async function send(url: string, init: RequestInit): Promise<CorrectionOut> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => null);
+    const detail = (body as { detail?: unknown } | null)?.detail;
+    throw new Error(typeof detail === "string" ? detail : "Couldn't save that change. Try again.");
+  }
+  return (await res.json()) as CorrectionOut;
+}
+
+export const postCorrection = (body: {
   transaction_id?: number;
   merchant_id?: number;
   category: [string, string];
-}): Promise<void> {
-  const res = await fetch("/api/corrections", {
+}) =>
+  send("/api/corrections", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`correction: ${res.status}`);
-}
+
+/** Undo a Correction; the Ledger keeps it in the history, marked reverted. */
+export const revertCorrection = (id: number) => send(`/api/corrections/${id}`, { method: "DELETE" });
 export const fetchMonths = () => get<string[]>("/api/months");
 export type MonthTotals = components["schemas"]["MonthTotalsOut"];
 export const fetchMonthSeries = (accountId?: number) =>
