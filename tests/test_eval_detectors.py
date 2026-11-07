@@ -1,0 +1,81 @@
+"""Detector evaluation (#146): precision and recall per planted event type,
+the trivial-rule baseline and the stub the detector tickets (#147) replace."""
+
+import json
+from datetime import date
+
+import detectors
+import gate
+import synthetic_history as sh
+from detectors import Detection, Row
+
+E = sh.Event
+D = date(2024, 3, 10)
+
+
+def _event(t: str, d: date = D, key: str = "STREAMLY") -> sh.Event:
+    return E(t, d, 0, key, sh.NONE, 100, ())
+
+
+def test_a_detection_matches_one_event_of_its_type_and_key_inside_the_window() -> None:
+    events = [_event("price_rise")]
+    hit = Detection("price_rise", date(2024, 3, 20), "STREAMLY")
+    assert detectors.match(events, [hit]) == {"price_rise": (1, 0, 0)}
+    # a second detection of the same event is a false positive
+    assert detectors.match(events, [hit, hit]) == {"price_rise": (1, 1, 0)}
+    # wrong key, wrong type, too early: misses and false positives
+    wrong = [
+        Detection("price_rise", D, "PIXELFORGE SOFTWARE"),
+        Detection("category_spike", D, "STREAMLY"),
+        Detection("price_rise", date(2024, 3, 9), "STREAMLY"),
+    ]
+    assert detectors.match(events, wrong) == {
+        "price_rise": (0, 2, 1),
+        "category_spike": (0, 1, 0),
+    }
+
+
+def test_shortfall_warnings_must_come_before_the_balance_goes_negative() -> None:
+    events = [_event("payday_shortfall", key="")]
+    early = Detection("payday_shortfall", date(2024, 3, 4), "")
+    same_day = Detection("payday_shortfall", D, "")
+    assert detectors.match(events, [early]) == {"payday_shortfall": (1, 0, 0)}
+    assert detectors.match(events, [same_day]) == {"payday_shortfall": (0, 1, 1)}
+
+
+def _row(i: int, d: date, merchant: str, amount: int, balance: int = 10_000) -> Row:
+    return Row(i, d, merchant, ("Subscriptions", "Streaming"), amount, balance)
+
+
+def test_baseline_rules_on_hand_cases() -> None:
+    rows = [
+        _row(1, date(2024, 1, 5), "STREAMLY", -1099),
+        _row(2, date(2024, 2, 5), "STREAMLY", -1099),
+        _row(3, date(2024, 3, 5), "STREAMLY", -1199),  # a rise
+        _row(4, date(2024, 1, 9), "CLOUDNOTE ANNUAL", -4999),  # seen once
+    ]
+    found = set(detectors.baseline(rows))
+    assert Detection("price_rise", date(2024, 3, 5), "STREAMLY") in found
+    # a once-a-year Merchant is predicted to renew 358 days on
+    assert Detection("forgotten_renewal", date(2025, 1, 1), "CLOUDNOTE ANNUAL") in found
+    assert detectors.stub(rows) == []
+
+
+def test_committed_results_are_reproducible_from_the_seed() -> None:
+    assert (
+        gate.run(
+            "detectors",
+            detectors.evaluate,
+            detectors.RESULTS,
+            detectors.lower_is_better,
+            [],
+        )
+        == 0
+    )
+    committed = json.loads(detectors.RESULTS.read_text())
+    assert committed["seed"] == sh.SEED
+    assert committed["models"]["baseline"]["model_version"] is not None
+    for t in sh.EVENT_TYPES:  # reported per type, not only overall
+        assert f"{t}.recall" in committed["models"]["baseline"]["metrics"]
+    # every planted price rise is a monthly charge going up: the rule finds all
+    assert committed["models"]["baseline"]["metrics"]["price_rise.recall"] == 1.0

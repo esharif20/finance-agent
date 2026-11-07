@@ -1,0 +1,53 @@
+{
+  "harness": "ranking",
+  "dataset": "synthetic_history",
+  "dataset_version": 1,
+  "dataset_sha256": "fa43ab8514fb9003269bc1434d58ae228a1d434a00be2fb4fe1a29dfc5d894ef",
+  "seed": 146,
+  "histories": 6,
+  "rounds": 14,
+  "slate": 10,
+  "shown": 3,
+  "models": {
+    "baseline": {
+      "model": "impact",
+      "model_version": "1",
+      "metrics": {
+        "overall.ndcg@3": 0.814112,
+        "overall.ndcg@5": 0.861019,
+        "history_0.ndcg@3": 0.785517,
+        "history_0.ndcg@5": 0.842643,
+        "history_1.ndcg@3": 0.778646,
+        "history_1.ndcg@5": 0.839149,
+        "history_2.ndcg@3": 0.783828,
+        "history_2.ndcg@5": 0.873524,
+        "history_3.ndcg@3": 0.818648,
+        "history_3.ndcg@5": 0.85704,
+        "history_4.ndcg@3": 0.905285,
+        "history_4.ndcg@5": 0.917345,
+        "history_5.ndcg@3": 0.812749,
+        "history_5.ndcg@5": 0.836411
+      }
+    },
+    "candidate": {
+      "model": "stub",
+      "model_version": "0",
+      "metrics": {
+        "overall.ndcg@3": 0.334683,
+        "overall.ndcg@5": 0.419617,
+        "history_0.ndcg@3": 0.4163,
+        "history_0.ndcg@5": 0.526119,
+        "history_1.ndcg@3": 0.392487,
+        "history_1.ndcg@5": 0.449316,
+        "history_2.ndcg@3": 0.423621,
+        "history_2.ndcg@5": 0.468553,
+        "history_3.ndcg@3": 0.222154,
+        "history_3.ndcg@5": 0.321654,
+        "history_4.ndcg@3": 0.325483,
+        "history_4.ndcg@5": 0.406992,
+        "history_5.ndcg@3": 0.228053,
+        "history_5.ndcg@5": 0.345069
+      }
+    }
+  }
+}
