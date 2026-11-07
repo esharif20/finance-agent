@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)  # counts only
 SUB, BILL = "subscription", "bill"
 
 # Generic UK and global services: name -> (kind, taxonomy v2 group). The single
-# backend source; Manage links (#97) stay in the web app until they read this.
+# backend source; Manage links (#97) are in manage_links.py.
 KNOWN_SERVICES: dict[str, tuple[str, str]] = {
     "Netflix": (SUB, "Streaming"),
     "Spotify": (SUB, "Streaming"),
