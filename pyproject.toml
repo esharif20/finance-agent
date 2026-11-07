@@ -1,0 +1,81 @@
+[project]
+name = "finance-agent"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi>=0.162.0",
+    "sqlalchemy>=2.1.8",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+fa = "finance_agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "hypothesis",
+    "ruff",
+    "pyright",
+    "import-linter",
+    "httpx2>=2.16.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/finance_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+
+[tool.ruff]
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+extraPaths = ["scripts", "tests"]
+typeCheckingMode = "strict"
+
+# Later tickets extend the contracts; docs/ARCHITECTURE.md "Modules" is the source.
+[tool.importlinter]
+root_package = "finance_agent"
+
+# ledger calls ingest's parsers; ingest (untrusted input) touches neither the
+# database nor the Ledger, so full account numbers cannot leak past it.
+# categorise reads through the Ledger and writes only its derived tables.
+[[tool.importlinter.contracts]]
+name = "cli | api -> categorise -> ledger -> ingest | storage"
+type = "layers"
+layers = [
+    "finance_agent.cli | finance_agent.api",
+    "finance_agent.categorise",
+    "finance_agent.ledger",
+    "finance_agent.ingest | finance_agent.storage | finance_agent.identity",
+]
+
+[[tool.importlinter.contracts]]
+name = "nothing imports cli or api"
+type = "forbidden"
+source_modules = [
+    "finance_agent.storage",
+    "finance_agent.identity",
+    "finance_agent.ingest",
+    "finance_agent.ledger",
+    "finance_agent.categorise",
+    "finance_agent.engine",
+    "finance_agent.memory",
+    "finance_agent.assistant",
+    "finance_agent.gateway",
+]
+forbidden_modules = ["finance_agent.cli", "finance_agent.api"]

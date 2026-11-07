@@ -32,4 +32,4 @@ TypeScript types are generated from FastAPI's OpenAPI schema with `openapi-types
 
 ## Tests
 
-Vitest and Testing Library for components. One Playwright smoke test: run `fa`, open the Overview, assert the totals match the API. Visual checks with the Playwright CLI (WebKit) in light and dark after UI changes.
+Vitest and Testing Library for components. One Playwright smoke test (`pnpm --dir web run smoke`): seed a temp ledger with synthetic data, run `fa` on it, open the Overview, assert the totals match the API. It refuses any ledger outside the temp directory, and serving (`fa`, `python -m finance_agent.api`) never creates a ledger; only `fa import` does. Visual checks with the Playwright CLI (WebKit) in light and dark after UI changes.

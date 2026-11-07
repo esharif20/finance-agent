@@ -21,6 +21,7 @@ flowchart TB
   subgraph Core["Local process: trusted core"]
     ING[ingest: parsers + Importer interface]
     LED[(ledger: Statement Imports, Transactions, Corrections)]
+    LI[Ledger application interface]
     CAT[categorise: Corrections, rules, ML]
     ENG[engine: detectors, forecasts, preferences, planning]
     MEM[(memory: Memories, Proposals, feedback)]
@@ -54,10 +55,13 @@ flowchart TB
   G --> GC
   G <--> C
   G -.placeholders only.-> GW --> LLM
+  LI --> LED
+  API --> LI
   API --> ENG
   API --> G
   WEB[React app] --> API
-  CLI[fa CLI] --> API
+  CLI[fa CLI] -->|fa import, fa summary, in process| LI
+  CLI -->|fa opens dashboard| API
 ```
 
 ## Modules
@@ -67,17 +71,30 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | Module | Owns | Depends on |
 | --- | --- | --- |
 | `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id` | nothing |
-| `ingest` | One parser per Bank, the `Importer` interface, duplicate detection (ADR 0006), account-number masking | `storage` |
-| `ledger` | Transactions, Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage` |
-| `categorise` | Taxonomy (versioned), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger` |
+| `ingest` | One parser per Bank, the `Importer` interface, account-number masking. Untrusted input: it touches neither the database nor the Ledger | nothing |
+| `ledger` | Transactions, duplicate detection (ADR 0006), Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage`, `ingest` |
+| `categorise` | Taxonomy (versioned), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger`, `storage` (its own derived tables) |
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry | `ledger`, `categorise`, `memory` |
 | `memory` | Memories, Proposals, feedback, retention | `storage` |
 | `assistant` | The LangGraph graph, tool allowlist, grounding check, answer cache (ADR 0010), `ChatModel` interface and adapters | `engine`, `ledger` (read-only views), `memory` |
 | `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0012). No database access. | nothing except the payload it is handed |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
-| `cli` | The `fa` command | `api` (in-process) |
+| `cli` | The `fa` command. `fa import` and `fa summary` call the Ledger interface in process; `fa` (open dashboard) talks to the running server | `ledger`, `categorise` (in-process); `api` only over HTTP |
 
 Dependency direction is enforced by an import-linter check in CI: nothing imports `assistant` except `api`, and `gateway` imports nothing from the core.
+
+## Ledger application interface
+
+The main seam of the core (spec #1). It is the in-process interface that the CLI, the API and the tests all call. The API is a thin adapter over it, so no figure is computed in a route handler. It takes a `user_id` and a connection from the `storage` factory, and it never returns floats.
+
+Operations:
+
+- **Import** Statement Import file(s) and return an import report: rows added, rows already known, rejected rows with line numbers, and the Accounts affected.
+- **List Accounts** with the Bank-reported balance, the Ledger-implied balance and any open Reconciliation Gaps.
+- **Summarise a month**: money in, money out, net, and the Reconciliation Gaps touching that month.
+- **Spending by Category** for a month, with drill-down to subcategories and Merchants.
+- **List and search Transactions** with filters.
+- **Record a Correction** for one Transaction, or for every Transaction with a Merchant.
 
 ## How data moves
 
@@ -85,7 +102,7 @@ Dependency direction is enforced by an import-linter check in CI: nothing import
 2. **Reconcile.** The Bank's running balance is checked against the Ledger; a difference becomes a Reconciliation Gap. Only completed Transactions count.
 3. **Classify.** Each Transaction gets a Kind, then (for Spending and Refund) a Merchant and Category from Corrections, rules or ML, with a confidence and its source. Low confidence goes to the Review Queue.
 4. **Analyse.** The Engine recomputes baselines, detectors and forecasts after each import, producing Insights with £ impact, confidence and evidence links.
-5. **Present.** The API serves aggregates to the React app and the CLI.
+5. **Present.** The API serves aggregates to the React app. The CLI reads the same aggregates in process through the Ledger interface, so the figures match.
 6. **Converse.** The Assistant routes a question to a sub-graph, calls tools that return aggregates and Insights (at most 20 rows, evidence IDs attached), runs the grounding check, and replies. Any change it suggests is a Proposal that waits for a confirm click.
 
 ## Database: core entities
@@ -106,7 +123,7 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 | `correction` | id, user_id, transaction_id, field, new_value, origin (ui, chat), created_at, superseded_by |
 | `categorisation` | transaction_id, category_id, kind, source (correction, rule, model), confidence, model_version |
 | `transfer_link` | from_transaction_id, to_transaction_id, confidence, confirmed |
-| `reconciliation_gap` | account_id, as_of, bank_balance_minor, ledger_balance_minor |
+| `reconciliation_gap` | account_id, from_date, to_date, amount_minor (Bank minus Ledger; rebuilt after every import) |
 | `insight` | id, user_id, type, impact_minor, confidence, relevance, evidence (JSON of ids), created_at, status |
 | `feedback` | insight_id or transaction_id, signal (accept, dismiss, worth_it, regret, pairwise), created_at |
 | `memory` | id, user_id, type (preference, goal, constraint), text, tags, provenance (turn id, quote, date), review_on, status |

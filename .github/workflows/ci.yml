@@ -1,0 +1,46 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gitleaks scans the full history
+      - uses: astral-sh/setup-uv@v5
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+      - name: gitleaks
+        run: gitleaks git . --no-banner --redact
+      - run: uv sync --locked
+      - name: fixture guard
+        run: uv run python scripts/fixture_guard.py
+      - run: uv run ruff check .
+      - run: uv run pyright
+      - run: uv run lint-imports
+      - run: uv run pytest
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm --dir web install --frozen-lockfile
+      - name: OpenAPI types are current
+        run: |
+          pnpm --dir web run gen
+          git diff --exit-code -- web/openapi.json web/src/api/schema.d.ts
+      - run: pnpm --dir web run build
+      - run: pnpm --dir web run test

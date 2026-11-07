@@ -1,0 +1,32 @@
+/* One hue per Category on every screen (docs/design/DIRECTIONS.md, Pocket). Only the
+   top 5 of a month are drawn in colour; `--cat-other` greys the rest. Marks are at
+   least 3:1 on the card in both schemes; the legend names carry the meaning. */
+:root {
+  --cat-housing: #0b66c3;
+  --cat-food-drink: #0e7a82;
+  --cat-shopping: #b45309;
+  --cat-transport: #c03a5e;
+  --cat-travel: #2f7a45;
+  --cat-bills-utilities: #8a6a00;
+  --cat-subscriptions: #a03c96;
+  --cat-health: #0a6fa8;
+  --cat-entertainment: #7a5636;
+  --cat-personal-care: #5f6b0f;
+  --cat-other: #8a8f94;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --cat-housing: #7da2f7;
+    --cat-food-drink: #3fc1c4;
+    --cat-shopping: #f0a04b;
+    --cat-transport: #f27b9b;
+    --cat-travel: #5ccf86;
+    --cat-bills-utilities: #dcb83c;
+    --cat-subscriptions: #d886d0;
+    --cat-health: #4fb4ec;
+    --cat-entertainment: #cfa57c;
+    --cat-personal-care: #b5c94a;
+    --cat-other: #7d838a;
+  }
+}
