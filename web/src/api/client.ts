@@ -180,3 +180,23 @@ export const purgeNote = (txn: number, part?: number | null) =>
 export const fetchMerchants = () => get<{ items: MerchantRow[] }>("/api/merchants").then((r) => r.items);
 export const setAlwaysAsk = (merchant: number, on: boolean, source: "user" | "suggestion" = "user") =>
   call<AlwaysAskResult>(`/api/merchants/${merchant}/always-ask`, json("PUT", { on, source }));
+
+// Subscriptions (#101). Costs may carry flags and trials (#106); lib/subscriptions types them.
+export type SubscriptionEntry = components["schemas"]["SubscriptionOut"];
+export type SubscriptionCosts = import("@/lib/subscriptions").Costs;
+export type Placement = { kind: "subscription" | "bill"; group: string };
+export const fetchSubscriptions = () => get<SubscriptionEntry[]>("/api/subscriptions");
+export const fetchSubscriptionCosts = () => get<SubscriptionCosts>("/api/subscriptions/costs");
+
+const sub = (merchant: number, verb = "") => `/api/subscriptions/${merchant}${verb}`;
+export const addSubscription = (merchant: number, p: Placement) =>
+  call<SubscriptionEntry>("/api/subscriptions", json("POST", { merchant_id: merchant, ...p }));
+export const regroupSubscription = (merchant: number, p: Placement) =>
+  call<SubscriptionEntry>(sub(merchant), json("PATCH", p));
+export const confirmSubscription = (merchant: number, p?: Placement) =>
+  call<SubscriptionEntry>(sub(merchant, "/confirm"), json("POST", p ?? {}));
+export const dismissSubscription = (merchant: number) =>
+  call<SubscriptionEntry>(sub(merchant, "/dismiss"), { method: "POST" });
+export const removeSubscription = (merchant: number) => call<SubscriptionEntry>(sub(merchant), { method: "DELETE" });
+export const cancelSubscription = (merchant: number) =>
+  call<SubscriptionEntry>(sub(merchant, "/cancel"), { method: "POST" });
