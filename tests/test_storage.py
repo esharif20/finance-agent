@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0009"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0010"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -125,7 +125,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
             conn.execute(text(stmt))
         before = conn.execute(text(rows)).all()
 
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, "0009")
         assert conn.execute(text(rows)).all() == before
         reverted = conn.execute(text("SELECT reverted_at FROM subscription_entry"))
         assert reverted.all() == [(None,)]
@@ -137,4 +137,51 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
         assert "review_decision" not in insp.get_table_names()
         cols = {c["name"] for c in insp.get_columns("subscription_entry")}
         assert "reverted_at" not in cols
+    eng.dispose()
+
+
+def test_migration_0010_keeps_category_corrections_and_drops_only_splits(
+    tmp_path: Path,
+) -> None:
+    """0009 -> 0010 keeps synthetic Corrections as kind "category"; 0010 -> 0009
+    drops the split rows and table only (#123)."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+    rows = "SELECT id, merchant_id, category_id, reverted_at FROM correction"
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0009")
+        for stmt in (
+            "INSERT INTO user (id, created_at) VALUES (1, '2026-01-01')",
+            "INSERT INTO category (id, user_id, name, taxonomy_version)"
+            " VALUES (1, 1, 'Groceries', 2)",
+            "INSERT INTO merchant (id, user_id, name) VALUES (1, 1, 'SYNTH SHOP')",
+            "INSERT INTO correction (user_id, merchant_id, category_id, created_at)"
+            " VALUES (1, 1, 1, '2026-01-01')",
+        ):
+            conn.execute(text(stmt))
+        before = conn.execute(text(rows)).all()
+
+        command.upgrade(cfg, "0010")
+        assert conn.execute(text(rows)).all() == before
+        kinds = conn.execute(text("SELECT kind FROM correction")).all()
+        assert kinds == [("category",)]
+        with pytest.raises(Exception, match="CHECK"):  # a category row needs one
+            conn.execute(
+                text(
+                    "INSERT INTO correction (user_id, merchant_id, created_at)"
+                    " VALUES (1, 1, '2026-01-02')"
+                )
+            )
+
+        command.downgrade(cfg, "0009")
+        assert conn.execute(text(rows)).all() == before
+        insp = inspect(conn)
+        assert "split_part" not in insp.get_table_names()
+        assert "kind" not in {c["name"] for c in insp.get_columns("correction")}
     eng.dispose()
