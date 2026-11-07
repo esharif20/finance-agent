@@ -602,6 +602,13 @@
             "title": "Counted",
             "type": "boolean"
           },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/FlagOut"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
           "group": {
             "title": "Group",
             "type": "string"
@@ -653,6 +660,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "trial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrialOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -665,13 +682,19 @@
           "last_charge_on",
           "monthly",
           "cost_note",
-          "counted"
+          "counted",
+          "flags",
+          "trial"
         ],
         "title": "CostOut",
         "type": "object"
       },
       "CostsOut": {
         "properties": {
+          "flag_count": {
+            "title": "Flag Count",
+            "type": "integer"
+          },
           "groups": {
             "items": {
               "$ref": "#/components/schemas/GroupTotal"
@@ -696,13 +719,20 @@
             },
             "title": "Totals",
             "type": "array"
+          },
+          "trial_detection": {
+            "const": "partial",
+            "default": "partial",
+            "title": "Trial Detection",
+            "type": "string"
           }
         },
         "required": [
           "items",
           "totals",
           "groups",
-          "rate_needed"
+          "rate_needed",
+          "flag_count"
         ],
         "title": "CostsOut",
         "type": "object"
@@ -742,6 +772,60 @@
           "interval"
         ],
         "title": "EvidenceOut",
+        "type": "object"
+      },
+      "FlagOut": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "enum": [
+              "overlap",
+              "duplicate",
+              "charged_after_cancel",
+              "trial_converted",
+              "price_rise"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          }
+        },
+        "required": [
+          "code",
+          "on",
+          "before",
+          "after"
+        ],
+        "title": "FlagOut",
         "type": "object"
       },
       "FxMonthOut": {
@@ -1934,6 +2018,29 @@
           "amount"
         ],
         "title": "TrendPointOut",
+        "type": "object"
+      },
+      "TrialOut": {
+        "properties": {
+          "converted": {
+            "title": "Converted",
+            "type": "boolean"
+          },
+          "converts_on": {
+            "title": "Converts On",
+            "type": "string"
+          },
+          "started_on": {
+            "title": "Started On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "started_on",
+          "converts_on",
+          "converted"
+        ],
+        "title": "TrialOut",
         "type": "object"
       },
       "ValidationError": {
