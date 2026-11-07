@@ -152,9 +152,10 @@ def run(on_mount: bool = False, notify: watch.Notifier | None = None) -> int:
                 "the backup folder is a link; refusing to follow it"
             )
         folder.mkdir(exist_ok=True)
-        name = store.take(default_db_path(), folder, now)
-        lost = store.missing(folder)
-        gone = store.prune(folder)
+        with store.lock(data):
+            name = store.take(default_db_path(), folder, now)
+            lost = store.missing(folder)
+            gone = store.prune(folder)
     except (OSError, ValueError, LookupError) as e:
         store.record(data, now, "failed")
         why = f": {e}" if isinstance(e, store.BackupError) else ""  # ours: no data
@@ -189,6 +190,13 @@ def _read_recovery_key() -> tuple[bytes, bytes]:
 
 
 def restore(copy: str | None, recovery: bool) -> int:
+    if copy is not None and store.holds_recovery_key(copy):
+        print(  # it is already in shell history; say so, never echo it
+            "fa: never pass the recovery key as an argument; use --recovery-key "
+            "and paste it when asked. Clear it from your shell history.",
+            file=sys.stderr,
+        )
+        return 1
     rec = _read_recovery_key() if recovery else None
     if copy is not None and Path(copy).is_file():
         path = Path(copy)

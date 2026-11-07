@@ -551,3 +551,71 @@ def test_diskutil_resolver_reads_uuid_and_flags_without_touching_disks(
     ]
     assert len(calls) == 2  # the symlink was skipped
     assert all(c[:3] == ["/usr/sbin/diskutil", "info", "-plist"] for c in calls)
+
+
+# --- verifier: adversarial inputs --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "entry", ["../../victim.zip", "/Users/victim.zip", "fa-20260101T000000Z.zip/../x"]
+)
+def test_a_manifest_naming_a_path_outside_the_folder_deletes_nothing(
+    tmp_path: Path, entry: str
+) -> None:
+    folder = tmp_path / "Volumes" / "D" / FOLDER
+    folder.mkdir(parents=True)
+    victim = tmp_path / "victim.zip"
+    victim.write_bytes(b"not ours")
+    (folder / store.MANIFEST).write_text(json.dumps({"copies": [entry]}))
+    with pytest.raises(store.BackupError):
+        store.prune(folder)
+    assert victim.read_bytes() == b"not ours"
+
+
+def test_a_recovery_key_on_argv_is_refused_before_anything_runs(
+    ledger_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    key = store.recovery_key()
+    stdin = io.StringIO("untouched\n")
+    monkeypatch.setattr("sys.stdin", stdin)
+    before = ledger_db.read_bytes()
+    assert main(["restore", "--recovery-key", key]) == 1
+    out = capsys.readouterr()
+    assert "never pass the recovery key" in out.err
+    assert key not in out.out + out.err
+    assert stdin.read() == "untouched\n"  # not prompted: refused first
+    assert ledger_db.read_bytes() == before
+
+
+def test_a_second_backup_never_deletes_a_running_ones_temp_file(
+    drives: list[backup.Volume], ledger_db: Path, tmp_path: Path
+) -> None:
+    """A sync-triggered run and an on-mount run can start together."""
+    mount = tmp_path / "Volumes" / "D"
+    drives.append(_vol(mount))
+    _register(mount)
+    folder = mount / FOLDER
+    folder.mkdir()
+    running = folder / ".fa-20260101T000000Z.zip.partial"
+    running.write_bytes(b"half written")
+    (folder / store.MANIFEST).write_text(
+        json.dumps({"copies": [], "pending": running.name})
+    )
+    with store.lock(ledger_db.parent):  # the first run holds it
+        assert main(["backup"]) == 1
+    assert running.read_bytes() == b"half written"
+    assert main(["backup"]) == 0  # once it is free, the next run goes ahead
+
+
+def test_a_ledger_that_cannot_be_read_is_recorded_as_a_failed_run(
+    drives: list[backup.Volume], ledger_db: Path, tmp_path: Path
+) -> None:
+    mount = tmp_path / "Volumes" / "D"
+    drives.append(_vol(mount))
+    _register(mount)
+    ledger_db.write_bytes(os.urandom(8192))  # not a database under this key
+    assert main(["backup"]) == 1
+    assert store.status(ledger_db.parent, datetime.now(UTC)).last_result == "failed"
+    assert store.copies(mount / FOLDER) == []

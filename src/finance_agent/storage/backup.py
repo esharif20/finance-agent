@@ -13,6 +13,8 @@ import re
 import shutil
 import tempfile
 import zipfile
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -29,6 +31,7 @@ DEFAULT_FOLDER = "FinanceAgent Backups"
 MANIFEST = "manifest.json"
 CONFIG = "backup.json"  # in the data dir: the volume UUID and folder name only
 STATUS = "backup-status.json"  # in the data dir: when the last backup ran
+LOCK = ".backup.lock"  # in the data dir: one run at a time
 DB_MEMBER = "ledger.db"
 ART = "card-art"
 DAILY, WEEKLY = 7, 4
@@ -184,6 +187,10 @@ def recovery_key() -> str:
     db = keychain.secret(keychain.DB_SERVICE).hex()
     hmac = keychain.secret(keychain.HMAC_SERVICE).hex()
     return f"FA1-{db}-{hmac}"
+
+
+def holds_recovery_key(text: str) -> bool:
+    return _RECOVERY.search(text) is not None
 
 
 def parse_recovery_key(text: str) -> tuple[bytes, bytes]:
@@ -360,6 +367,23 @@ def _clear_pending(folder: Path, m: _Manifest) -> None:
         _save(folder, m)
 
 
+@contextmanager
+def lock(data_dir: Path) -> Generator[None]:
+    """One backup at a time: a sync-triggered run and an on-mount run can start
+    together, and each would delete the other's temp file as a crash leftover.
+    The OS drops the lock when a run dies, so a crash never blocks the next."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    fd = os.open(data_dir / LOCK, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise BackupError("another backup is running; this one skipped") from None
+        yield
+    finally:
+        os.close(fd)
+
+
 def take(db_path: Path, folder: Path, now: datetime) -> str:
     """Write one verified copy into `folder`; return its name. On any failure
     no partial copy is left behind (a crash leaves only the temp file, which
@@ -377,12 +401,15 @@ def take(db_path: Path, folder: Path, now: datetime) -> str:
     work = Path(tempfile.mkdtemp(dir=data, prefix=".backup-"))
     try:
         snap = work / DB_MEMBER
-        src, dst = _connect(db_path, key), _connect(snap, key)
         try:
-            src.backup(dst)  # a consistent copy, encrypted under the same key
-        finally:
-            dst.close()
-            src.close()
+            src, dst = _connect(db_path, key), _connect(snap, key)
+            try:
+                src.backup(dst)  # a consistent copy, encrypted under the same key
+            finally:
+                dst.close()
+                src.close()
+        except sqlcipher.DatabaseError:
+            raise BackupError("the ledger could not be read with its key") from None
         with partial.open("xb") as fh, zipfile.ZipFile(fh, "w") as zf:
             zf.write(snap, DB_MEMBER)
             for p in _art_files(data):
