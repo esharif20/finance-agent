@@ -1,8 +1,9 @@
 """Personal baselines per Category (#147, docs/AI_DESIGN.md, ADR 0015).
 
 Pure functions over one Category's Transactions, given as (date, signed
-pence) pairs as the Ledger holds them, spending negative. Only money out
-counts: refunds and income are not spending. Results are integer pence.
+pence) pairs as the Ledger holds them, spending negative. A month counts its
+spending after Refunds, as the Ledger reports a Category, and never below
+zero. Results are integer pence.
 
 - `seasonal_baseline`: what a calendar month is expected to cost. The median
   month of the last six; once a year exists, the median of the same calendar
@@ -77,7 +78,8 @@ def seasonal_baseline(rows: Rows, month: date) -> SeasonalBaseline | Insufficien
     for d, amount in rows:
         m = _month(d)
         if m < target:
-            spend[m] = spend.get(m, 0) + max(0, -amount)
+            spend[m] = spend.get(m, 0) - amount
+    spend = {m: max(0, v) for m, v in spend.items()}  # a month of net Refunds is 0
     have = target - min(spend) if spend else 0
     if have < MIN_MONTHS:
         return Insufficient(have, MIN_MONTHS)
@@ -94,9 +96,18 @@ def payday_baseline(
 ) -> PaydayBaseline | Insufficient:
     """Spend by day into a pay cycle, over the cycles complete by `as_of`.
 
-    A cycle runs from one payday up to the day before the next."""
+    A cycle runs from one payday up to the day before the next. Only cycles
+    that end after the Category's first Transaction count: before it there is
+    no history, not a history of spending nothing. Within a cycle only money
+    out counts, so spend so far never falls."""
+    rows = list(rows)
     days = sorted({p for p in paydays if p <= as_of})
-    cycles = list(zip(days, days[1:], strict=False))
+    first = min((d for d, _ in rows), default=None)
+    cycles = [
+        (a, b)
+        for a, b in zip(days, days[1:], strict=False)
+        if first is not None and b > first
+    ]
     if len(cycles) < MIN_CYCLES:
         return Insufficient(len(cycles), MIN_CYCLES)
     length = min((b - a).days for a, b in cycles)

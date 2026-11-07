@@ -76,7 +76,7 @@ A learned component runs live only when the user's own data clears its gate. Bel
 | Categoriser: embedding nearest neighbours (first M3 candidate) | ≥ 200 Corrections and ≥ 5 per Category it may assign | Corrections + rules |
 | Categoriser: calibrated classifier on embeddings + amount/day features | Beats the embedding nearest-neighbour model on macro F1 and calibration | Embedding nearest neighbours |
 | Recurring detection | ≥ 3 occurrences of the series | Not flagged |
-| Personal baselines and anomaly scores | ≥ 6 months for the Category, counted from its first Transaction (seasonal); ≥ 6 complete pay cycles (payday). Confirmed by #147: the seasonal baseline beats the trailing mean from month six | No anomaly Insight; the baseline returns `Insufficient` |
+| Personal baselines and anomaly scores | ≥ 6 months for the Category, counted from its first Transaction (seasonal); ≥ 6 complete pay cycles ending after that first Transaction (payday). Both count spending after Refunds. Confirmed by #147: the seasonal baseline beats the trailing mean from month six | No anomaly Insight; the baseline returns `Insufficient` |
 | Forecasting (ETS) | ≥ 13 months of history | Seasonal naive at ≥ 12 months; none before |
 | Change-point detection | ≥ 9 months for the series | None |
 | Preference prediction / contextual bandit | Starts from priors on day one, and needs no gate | Rank by £ impact |

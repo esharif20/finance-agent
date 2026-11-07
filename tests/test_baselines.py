@@ -146,11 +146,57 @@ def test_payday_is_deterministic_and_invariant_to_row_order(
     rnd.shuffle(days)
     b = payday_baseline(rows, paydays, as_of)
     assert b == payday_baseline(shuffled, days, as_of)
-    complete = len({p for p in paydays if p <= as_of}) - 1
+    days = sorted({p for p in paydays if p <= as_of})
+    first = min((d for d, _ in rows), default=None)
+    # complete cycles that end after the Category's first Transaction
+    complete = sum(1 for b in days[1:] if first is not None and b > first)
     if complete < MIN_CYCLES:
-        assert b == Insufficient(max(0, complete), MIN_CYCLES)
+        assert b == Insufficient(complete, MIN_CYCLES)
     else:
         assert not isinstance(b, Insufficient)
         # spend so far never falls as the cycle goes on
         assert list(b.by_day) == sorted(b.by_day)
         assert all(0 <= x <= b.cycle for x in b.by_day)
+
+
+# --- verifier (#175) ------------------------------------------------------------
+
+
+def test_a_refunded_purchase_does_not_inflate_next_years_month() -> None:
+    # the Ledger reports a Category's spending after Refunds; so does its baseline
+    rows = _monthly(date(2024, 1, 1), [1_000] * 12)
+    rows += [(date(2024, 7, 3), -40_000), (date(2024, 7, 9), 40_000)]
+    b = seasonal_baseline(rows, date(2025, 7, 1))
+    assert not isinstance(b, Insufficient) and b.expected == 1_000
+
+
+def test_a_month_of_net_refunds_counts_as_nothing_spent() -> None:
+    rows = _monthly(date(2024, 1, 1), [1_000] * 6) + [(date(2024, 6, 20), 9_000)]
+    b = seasonal_baseline(rows, date(2024, 7, 1))
+    # June nets to -8,000; it is a zero month, never a negative one
+    assert not isinstance(b, Insufficient) and b.expected == 1_000
+
+
+def test_a_new_category_has_no_payday_baseline_from_cycles_before_it() -> None:
+    # six complete cycles of paydays, but the Category's first charge is in the last:
+    # five cycles of zeros would otherwise be a fake baseline of 0
+    paydays = _paydays(date(2024, 1, 25), 7)
+    rows = [(paydays[5] + timedelta(days=3), -2_000)]
+    assert payday_baseline(rows, paydays, paydays[-1]) == Insufficient(1, MIN_CYCLES)
+
+
+@given(ROWS, ROWS, PAYDAYS, PAYDAYS, MONTH)
+def test_a_baseline_at_t_never_sees_rows_or_paydays_after_t(
+    rows: list[tuple[date, int]],
+    later: list[tuple[date, int]],
+    paydays: list[date],
+    later_paydays: list[date],
+    t: date,
+) -> None:
+    # adversarial: anything dated on or after t, however large, changes nothing
+    future = [(max(d, t), a) for d, a in later]
+    assert seasonal_baseline(rows, t) == seasonal_baseline(rows + future, t)
+    days_after = [max(p, t + timedelta(days=1)) for p in later_paydays]
+    assert payday_baseline(rows, paydays, t) == payday_baseline(
+        rows + future, paydays + days_after, t
+    )

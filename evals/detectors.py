@@ -202,7 +202,7 @@ def _baseline_spikes(rows: Sequence[Row]) -> list[Detection]:
                 continue
             spent = 0
             for r in sorted(month, key=lambda r: (r.date, r.id)):
-                spent += max(0, -r.amount)
+                spent -= r.amount  # net of Refunds, like the baseline
                 if SPIKE[1] * spent > SPIKE[0] * b.expected:
                     out.append(Detection("category_spike", r.date, sh.label(cat)))
                     break
