@@ -33,10 +33,10 @@ packages = ["src/finance_agent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["scripts"]
+pythonpath = ["scripts", "evals"]
 
 [tool.ruff]
-src = ["src", "tests", "scripts"]
+src = ["src", "tests", "scripts", "evals"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S"]
@@ -45,8 +45,8 @@ select = ["E", "F", "I", "UP", "B", "S"]
 "tests/**" = ["S101"]
 
 [tool.pyright]
-include = ["src", "tests", "scripts"]
-extraPaths = ["scripts", "tests"]
+include = ["src", "tests", "scripts", "evals"]
+extraPaths = ["scripts", "tests", "evals"]
 typeCheckingMode = "strict"
 
 # Later tickets extend the contracts; docs/ARCHITECTURE.md "Modules" is the source.
