@@ -105,7 +105,7 @@ export function createCardParts(width: number, height = width / ASPECT) {
   const s2 = sg.getContext("2d");
   if (s2) {
     const grad = s2.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, "rgb(6 8 10 / 0.9)");
+    grad.addColorStop(0, "rgb(6 8 10 / 1)"); // `setScrim`'s strength sets the darkness
     grad.addColorStop(1, "rgb(0 0 0 / 0)");
     s2.fillStyle = grad;
     s2.fillRect(0, 0, 4, 256);

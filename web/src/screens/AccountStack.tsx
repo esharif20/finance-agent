@@ -11,8 +11,9 @@ import {
 } from "react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
+import { usePrivacy } from "@/lib/privacy";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ASPECT, FACE_HUE, loadArt, RADIUS } from "@/lib/cardArt";
+import { ASPECT, BACK_SCRIM, FACE_HUE, FRONT_SCRIM, loadArt, RADIUS } from "@/lib/cardArt";
 import { type Hover, type Pose, stackLayout, stackPoses } from "@/lib/cardPoses";
 import type { CardScene, SceneFace } from "@/three/cardScene";
 
@@ -56,6 +57,8 @@ type Face = {
   hue: number | null;
   art: string | null;
 };
+
+const NO_ART: Record<string, HTMLCanvasElement> = {};
 
 function faces(accounts: Account[]): Face[] {
   const currency = accounts[0]?.currency ?? "GBP";
@@ -108,7 +111,10 @@ export function AccountStack({
   const [hover, setHover] = useState<Hover | null>(null);
   const [rising, setRising] = useState<number | null>(null);
   const [width, setWidth] = useState(0);
-  const [art, setArt] = useState<Record<string, HTMLCanvasElement>>({});
+  const [loaded, setArt] = useState<Record<string, HTMLCanvasElement>>({});
+  // A card image can carry a name or number: privacy mode shows generic faces only.
+  const { hidden } = usePrivacy();
+  const art = hidden ? NO_ART : loaded;
   const [gl, setGl] = useState(false);
   const stack = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -397,7 +403,7 @@ export function AccountStack({
                         backgroundImage:
                           b === null || b === undefined
                             ? image
-                            : `linear-gradient(to bottom, transparent ${b}px, rgb(6 8 10 / ${isFront(i) ? 0.88 : 0.72}) ${b + (isFront(i) ? 44 : 28)}px), ${image}`,
+                            : `linear-gradient(to bottom, transparent ${b}px, rgb(6 8 10 / ${isFront(i) ? FRONT_SCRIM : BACK_SCRIM}) ${b + (isFront(i) ? 44 : 28)}px), ${image}`,
                       }
                     : {}),
                 } as CSSProperties

@@ -4,6 +4,7 @@
 // its 3D card.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { BACK_SCRIM, FRONT_SCRIM } from "@/lib/cardArt";
 import type { Pose } from "@/lib/cardPoses";
 import { type CardParts, createCardParts, createPaymentCardModel } from "./cardModel";
 
@@ -125,7 +126,7 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
         const p = poses[i];
         if (!p) return;
         const sc = scrims[i];
-        c.setScrim(sc ? sc.top : null, sc?.front ? 44 : 28, sc?.front ? 1 : 0.8);
+        c.setScrim(sc ? sc.top : null, sc?.front ? 44 : 28, sc?.front ? FRONT_SCRIM : BACK_SCRIM);
         c.group.position.set(w / 2 + p.x - w / 2, -(c.h / 2 + p.y - h / 2), p.z);
         c.group.rotation.set((-p.rx * Math.PI) / 180, (p.ry * Math.PI) / 180, (-p.rz * Math.PI) / 180);
         c.group.scale.setScalar(p.s);
