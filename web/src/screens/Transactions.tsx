@@ -12,7 +12,9 @@ import {
 } from "@/api/client";
 import { CategoryChip, type Category } from "@/components/CategoryChip";
 import { CountTick } from "@/components/CountTick";
+import { ManageLink } from "@/components/ManageLink";
 import { Money } from "@/components/Money";
+import { isSubscription } from "@/lib/manageLinks";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -224,6 +226,11 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
                     />
                   ) : (
                     <span className="text-label text-muted-foreground">{t.kind}</span>
+                  )}
+                  {isSubscription(t.category) && (
+                    <div className="mt-1.5">
+                      <ManageLink merchant={t.merchant} />
+                    </div>
                   )}
                 </div>
               </li>
