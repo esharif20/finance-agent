@@ -78,7 +78,7 @@ def _out(e: SubscriptionEntry) -> SubscriptionOut:
 
 
 def _apply(
-    led: Ledger, merchant_id: int, change: Callable[[], None]
+    led: Ledger, merchant_id: int, change: Callable[[], object]
 ) -> SubscriptionOut:
     try:
         change()

@@ -17,6 +17,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -297,5 +298,26 @@ subscription_entry = Table(
     Column("charge_count", Integer),
     Column("interval", String(16)),  # "weekly", "monthly" or "annual"
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # set when the Review Queue undoes the user decision this row records (#110)
+    Column("reverted_at", DateTime(timezone=True)),
     Index("ix_subscription_entry_merchant", "user_id", "merchant_id"),
+)
+
+# Review Queue decisions (#110), append-only: an answer or a skip of one item,
+# identified by its type and key, holding while the item's inputs still hash
+# to `item_version`. `effect_id` is what the answer wrote, read by the item's
+# type (a Correction id, a registry row id, or NULL). Undo sets `undone_at`.
+review_decision = Table(
+    "review_decision",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("item_type", String(32), nullable=False),
+    Column("item_key", Text, nullable=False),
+    Column("item_version", String(64), nullable=False),
+    Column("action", String(16), nullable=False),  # "answer" or "skip"
+    Column("effect_id", Integer),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("undone_at", DateTime(timezone=True)),
+    Index("ix_review_decision_user", "user_id"),
 )
