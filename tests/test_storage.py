@@ -249,3 +249,45 @@ def test_migration_0012_adds_and_drops_the_always_ask_flag(tmp_path: Path) -> No
         names = conn.execute(text("SELECT name FROM merchant")).scalars().all()
         assert names == ["SYNTH"]
     eng.dispose()
+
+
+def test_migration_0012_keeps_rows_that_reference_a_merchant(tmp_path: Path) -> None:
+    """Verifier #170: the app migrates with foreign keys on (`open_db`), so
+    recreating `merchant` must not fail or cascade on rows pointing at it."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, event, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+
+    def fk_on(dbapi_conn: Any, _record: Any) -> None:
+        dbapi_conn.execute("PRAGMA foreign_keys = ON")
+
+    event.listen(eng, "connect", fk_on)
+    sub = "SELECT merchant_id FROM subscription_entry"
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0011")
+        conn.execute(text("INSERT INTO user (id, created_at) VALUES (1, '2026-01-01')"))
+        conn.execute(
+            text("INSERT INTO merchant (id, user_id, name) VALUES (7, 1, 'SYNTH')")
+        )
+        conn.execute(
+            text(
+                "INSERT INTO subscription_entry (user_id, merchant_id, source, status,"
+                " evidence_on, created_at) VALUES (1, 7, 'user', 'not_subscription',"
+                " '2026-01-01', '2026-01-01')"
+            )
+        )
+    for target in ("0012", "0011", "0012"):
+        with eng.begin() as conn:
+            cfg.attributes["connection"] = conn
+            if target == "0011":
+                command.downgrade(cfg, target)
+            else:
+                command.upgrade(cfg, target)
+            assert conn.execute(text(sub)).scalars().all() == [7]
+            assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+    eng.dispose()

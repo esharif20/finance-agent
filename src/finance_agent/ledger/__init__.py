@@ -1802,10 +1802,16 @@ class Ledger:
                 self._db.select(c, c.c.transaction_id, c.c.merchant_id)
             )
         }
+        # oldest first: a later Correction of the same target replaces it
+        live: dict[tuple[int | None, int | None], Correction] = {
+            (k.transaction_id, k.merchant_id): k
+            for k in self.corrections()
+            if k.reverted_at is None
+        }
         seen: dict[int, set[tuple[str, str]]] = {}
-        for k in self.corrections():
+        for k in live.values():
             mid = k.merchant_id or merchant_of.get(k.transaction_id or 0)
-            if k.reverted_at is None and mid is not None:
+            if mid is not None:
                 seen.setdefault(mid, set()).add(k.category)
         flagged = {m.id for m in self.merchants() if m.always_ask}
         return {m for m, cats in seen.items() if len(cats) >= SUGGEST_AFTER} - flagged

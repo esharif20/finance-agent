@@ -112,6 +112,20 @@ def test_a_reverted_correction_does_not_count_towards_the_suggestion() -> None:
         assert led.always_ask_suggested() == set()
 
 
+def test_re_correcting_the_same_target_counts_once() -> None:
+    """Verifier #170: a later Correction of the same payment (or Merchant-wide)
+    replaces the earlier one, so changing your mind is not a second Category."""
+    with ledger_with([("SYNTH CAFE", -350)] * 2) as (_, led):
+        a, _b = (t.id for t in led.transactions())
+        led.correct_transaction(a, COFFEE)
+        led.correct_transaction(a, ONLINE)
+        assert led.always_ask_suggested() == set()
+        cafe = merchant_id(led, "SYNTH CAFE")
+        led.correct_merchant(cafe, ONLINE)
+        led.correct_merchant(cafe, GROCERIES)  # b is now Groceries, a Online
+        assert led.always_ask_suggested() == {cafe}
+
+
 POOL = [
     ("SYNTH CAFE", -350),
     ("SYNTH CAFE REFUND", 350),
