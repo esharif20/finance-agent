@@ -1479,8 +1479,16 @@ class Ledger:
                 fees -= t.amount
             elif c.kind == "Refund":
                 refunds += t.amount
-                if c.category and c.category[0] == UNCATEGORISED:
-                    unmatched -= t.amount
+                # only the Uncategorised share: a split Refund's other parts
+                # are matched in their own Categories
+                unmatched -= sum(
+                    (
+                        _decimal(minor)
+                        for (top, _), minor in _shares(c, int(t.amount.scaleb(2)))
+                        if top == UNCATEGORISED
+                    ),
+                    Decimal(0),
+                )
         cats: list[Spend] = []
         for sp in spends:
             if sp.name == UNCATEGORISED:
@@ -1603,7 +1611,12 @@ class Ledger:
             )
         }
         for refund_id, c in out.items():
-            if c.kind != "Refund" or c.merchant_id is None or refund_id in corrected:
+            if (
+                c.kind != "Refund"
+                or c.merchant_id is None
+                or refund_id in corrected
+                or c.source == "split"  # the user split the Refund itself
+            ):
                 continue
             purchase = self._refunded_split(rows[refund_id], c.merchant_id, out, rows)
             if purchase is not None:
