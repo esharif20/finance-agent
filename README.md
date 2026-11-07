@@ -20,6 +20,22 @@ gitleaks git . --no-banner --redact   # if gitleaks is installed
 
 CI (`.github/workflows/ci.yml`, job `checks`) runs the same commands on every PR.
 
+## Local model (optional, one-time setup)
+
+Category suggestions use a local embedding model through
+[Ollama](https://ollama.com), on `localhost:11434` only. The app never
+installs or downloads it; run this once yourself:
+
+```
+brew install ollama
+ollama pull nomic-embed-text
+```
+
+Without it the app keeps to Corrections and rules, and `/api/local-model`
+reports `off`. Ollama loads the model when it is asked and unloads it about a
+minute later. `uv run fa forget-embeddings` deletes every stored Merchant
+vector; they are rebuilt from your Transactions when needed.
+
 ## Importing
 
 ```

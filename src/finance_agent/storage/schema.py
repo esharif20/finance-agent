@@ -193,6 +193,7 @@ categorisation = Table(
     Column("category_id", Integer, ForeignKey("category.id")),
     Column("source", String(64), nullable=False),
     Column("taxonomy_version", Integer, nullable=False),
+    Index("ix_categorisation_merchant", "merchant_id"),  # the 0014 trigger probes it
 )
 
 # ADR 0014 identity: (Account, provider transaction ID), raw synced fields as
@@ -391,4 +392,23 @@ review_decision = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("undone_at", DateTime(timezone=True)),
     Index("ix_review_decision_user", "user_id"),
+)
+
+# Derived (#113): one local-model vector per Merchant (its normalised
+# descriptor), int16 components. Deleted with its Merchant (cascade), with the
+# last Transaction naming it (trigger `merchant_embedding_source_gone`,
+# migration 0014) and by `fa forget-embeddings`. No weights, only these rows.
+merchant_embedding = Table(
+    "merchant_embedding",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "merchant_id",
+        Integer,
+        ForeignKey("merchant.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("model", String(64), nullable=False),
+    Column("dims", Integer, nullable=False),
+    Column("vector", LargeBinary, nullable=False),
 )
