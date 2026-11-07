@@ -6,8 +6,8 @@ import hashlib
 import logging
 import time
 from collections import Counter
-from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -147,6 +147,19 @@ class Spend:
     name: str
     amount: Decimal
     children: tuple["Spend", ...] = ()
+    # set on Merchant rows (None for "Unknown"); a key, not a figure, so equality
+    # stays about names and amounts
+    merchant_id: int | None = field(default=None, compare=False)
+
+
+def _top_merchants(subs: Iterable[Spend], n: int) -> tuple[Spend, ...]:
+    """The `n` largest Merchants across Subcategories, keyed by Merchant id."""
+    total: dict[tuple[int | None, str], Decimal] = {}
+    for m in (m for sub in subs for m in sub.children):
+        key = (m.merchant_id, m.name)
+        total[key] = total.get(key, Decimal(0)) + m.amount
+    ranked = sorted(total.items(), key=lambda kv: (-kv[1], kv[0][1]))[:n]
+    return tuple(Spend(name, a, merchant_id=i) for (i, name), a in ranked)
 
 
 @dataclass(frozen=True)
@@ -454,19 +467,20 @@ class Ledger:
                 )
             )
         }
-        tree: dict[str, dict[str, dict[str, int]]] = {}
+        tree: dict[str, dict[str, dict[tuple[int | None, str], int]]] = {}
         for txn_id, c in self._categorisations().items():
             if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
                 top, sub = c.category
                 merchants = tree.setdefault(top, {}).setdefault(sub, {})
-                key = c.merchant or "Unknown"
+                key = (c.merchant_id, c.merchant or "Unknown")
                 merchants[key] = merchants.get(key, 0) - amounts[txn_id]
 
-        def level(nodes: dict[str, Any]) -> tuple[Spend, ...]:
+        def level(nodes: dict[Any, Any]) -> tuple[Spend, ...]:
             out: list[Spend] = []
             for name, v in nodes.items():
                 if isinstance(v, int):  # a Merchant's minor-unit total
-                    out.append(Spend(name, _decimal(v)))
+                    merchant_id, label = name
+                    out.append(Spend(label, _decimal(v), merchant_id=merchant_id))
                 else:
                     kids = level(v)
                     total = sum((k.amount for k in kids), Decimal(0))
@@ -495,11 +509,6 @@ class Ledger:
         here = total_in(month)
         if here is None:
             return None
-        merchants: dict[str, Decimal] = {}
-        for sub in here.children:
-            for m in sub.children:
-                merchants[m.name] = merchants.get(m.name, Decimal(0)) + m.amount
-        ranked = sorted(merchants.items(), key=lambda kv: (-kv[1], kv[0]))
         months = [
             f"{(end.year * 12 + end.month - 2 - i) // 12}-"
             f"{(end.month - 2 - i) % 12 + 1:02d}"
@@ -522,7 +531,7 @@ class Ledger:
             name,
             here.amount,
             here.children,
-            tuple(Spend(n, a) for n, a in ranked[:top_merchants]),
+            _top_merchants(here.children, top_merchants),
             series,
             txns,
         )
@@ -561,17 +570,13 @@ class Ledger:
                     continue
             cats.append(sp)
         total = sum((sp.amount for sp in spends), Decimal(0))
-        shops: dict[str, Decimal] = {}
-        for m in (m for sp in spends for sub in sp.children for m in sub.children):
-            shops[m.name] = shops.get(m.name, Decimal(0)) + m.amount
-        top = sorted(shops.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
         return Breakdown(
             tuple(cats),
             unmatched,
             total,
             refunds,
             fees,
-            tuple(Spend(n, a) for n, a in top),
+            _top_merchants((sub for sp in spends for sub in sp.children), 5),
         )
 
     def merchants(self) -> list[Merchant]:

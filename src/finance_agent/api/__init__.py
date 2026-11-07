@@ -122,6 +122,12 @@ class CategorySpendOut(BaseModel):
     amount: Money
 
 
+class MerchantSpendOut(BaseModel):
+    merchant_id: int | None  # None for "Unknown": no Merchant
+    name: str
+    amount: Money
+
+
 class SpendingOut(BaseModel):
     month: str
     currency: str
@@ -151,6 +157,7 @@ class CategoryTxnOut(BaseModel):
     posted_on: str
     description: str
     amount: Money  # signed as the Bank has it: spending negative
+    merchant_id: int | None
     merchant: str | None
     subcategory: str | None
 
@@ -161,7 +168,7 @@ class CategoryDetailOut(BaseModel):
     currency: str
     total: Money  # spending after refunds, as on the donut
     subcategories: list[CategorySpendOut]
-    merchants: list[CategorySpendOut]  # top 5 across Subcategories
+    merchants: list[MerchantSpendOut]  # top 5 across Subcategories
     trend: list[TrendPointOut]  # trailing 6 months, oldest first
     transactions: list[CategoryTxnOut]  # newest first
 
@@ -269,6 +276,7 @@ def _txn(t: Transaction) -> CategoryTxnOut:
         posted_on=t.posted_on.isoformat(),
         description=t.description,
         amount=_money(t.amount, CURRENCY),
+        merchant_id=c.merchant_id if c else None,
         merchant=c.merchant if c else None,
         subcategory=c.category[1] if c and c.category else None,
     )
@@ -286,7 +294,12 @@ def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
         currency=c,
         total=_money(d.total, c),
         subcategories=spends(d.subcategories),
-        merchants=spends(d.merchants),
+        merchants=[
+            MerchantSpendOut(
+                merchant_id=x.merchant_id, name=x.name, amount=_money(x.amount, c)
+            )
+            for x in d.merchants
+        ],
         trend=[TrendPointOut(month=m, amount=_money(a, c)) for m, a in d.trend],
         transactions=[_txn(t) for t in d.transactions],
     )

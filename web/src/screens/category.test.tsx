@@ -18,7 +18,7 @@ const detail: Detail = {
     { name: "Groceries", amount: m(30000) },
     { name: "Eating out", amount: m(10000) },
   ],
-  merchants: [{ name: "TESCO", amount: m(25000) }],
+  merchants: [{ merchant_id: 7, name: "TESCO", amount: m(25000) }],
   trend: ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02"].map((month, i) => ({
     month,
     amount: m(i === 5 ? 40000 : 1000),
@@ -29,6 +29,7 @@ const detail: Detail = {
       posted_on: "2026-02-03",
       description: "TESCO STORES 1234",
       amount: m(-2550),
+      merchant_id: 7,
       merchant: "TESCO",
       subcategory: "Groceries",
     },
@@ -64,6 +65,23 @@ describe("CategoryScreen", () => {
     const txns = screen.getByRole("region", { name: "Transactions" });
     expect(within(txns).getByText("−£25.50")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "#overview");
+  });
+
+  it("keys Top Merchants by id, so two with one name both show", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const twins: Detail = {
+      ...detail,
+      merchants: [
+        { merchant_id: 1, name: "CORNER SHOP", amount: m(2000) },
+        { merchant_id: 2, name: "CORNER SHOP", amount: m(1000) },
+        { merchant_id: null, name: "Unknown", amount: m(500) },
+      ],
+    };
+    mount("Food & Drink", (url) => (url.startsWith("/api/months") ? json(["2026-02"]) : json(twins)));
+    const merchants = await screen.findByRole("region", { name: "Top Merchants" });
+    expect(within(merchants).getAllByText("CORNER SHOP")).toHaveLength(2);
+    expect(errors.mock.calls.flat().join(" ")).not.toMatch(/same key/);
+    errors.mockRestore();
   });
 
   it("explains an empty month", async () => {

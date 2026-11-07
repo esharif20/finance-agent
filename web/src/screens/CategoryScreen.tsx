@@ -20,7 +20,7 @@ function Bars({
   currency,
   colour,
 }: {
-  rows: { name: string; minor: number }[];
+  rows: { key: string; name: string; minor: number }[];
   currency: string;
   colour: string;
 }) {
@@ -28,7 +28,7 @@ function Bars({
   return (
     <ul className="flex flex-col gap-3">
       {rows.map((r) => (
-        <li key={r.name}>
+        <li key={r.key}>
           <div className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 truncate text-row font-medium">{r.name}</span>
             <Money value={{ minor: r.minor, currency }} className="text-row font-semibold" />
@@ -177,7 +177,7 @@ export function CategoryScreen({
               <CardTitle id="subs-title">Subcategories</CardTitle>
             </CardHeader>
             <Bars
-              rows={d.subcategories.map((s) => ({ name: s.name, minor: s.amount.minor }))}
+              rows={d.subcategories.map((s) => ({ key: s.name, name: s.name, minor: s.amount.minor }))}
               currency={d.currency}
               colour={colour}
             />
@@ -190,7 +190,11 @@ export function CategoryScreen({
               <p className="text-muted-foreground">No Merchants this month.</p>
             ) : (
               <Bars
-                rows={d.merchants.map((s) => ({ name: s.name, minor: s.amount.minor }))}
+                rows={d.merchants.map((s) => ({
+                  key: `merchant-${s.merchant_id ?? "none"}`,
+                  name: s.name,
+                  minor: s.amount.minor,
+                }))}
                 currency={d.currency}
                 colour={colour}
               />
