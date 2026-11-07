@@ -794,6 +794,8 @@ export interface components {
             cost_note: string | null;
             /** Counted */
             counted: boolean;
+            /** Flags */
+            flags: components["schemas"]["FlagOut"][];
             /** Group */
             group: string;
             /** Interval */
@@ -809,9 +811,12 @@ export interface components {
             monthly: components["schemas"]["Pence"] | null;
             /** Status */
             status: string;
+            trial: components["schemas"]["TrialOut"] | null;
         };
         /** CostsOut */
         CostsOut: {
+            /** Flag Count */
+            flag_count: number;
             /** Groups */
             groups: components["schemas"]["GroupTotal"][];
             /** Items */
@@ -820,6 +825,12 @@ export interface components {
             rate_needed: number;
             /** Totals */
             totals: components["schemas"]["KindTotal"][];
+            /**
+             * Trial Detection
+             * @default partial
+             * @constant
+             */
+            trial_detection: "partial";
         };
         /** EvidenceOut */
         EvidenceOut: {
@@ -829,6 +840,18 @@ export interface components {
             interval: string | null;
             /** On */
             on: string;
+        };
+        /** FlagOut */
+        FlagOut: {
+            after: components["schemas"]["Pence"] | null;
+            before: components["schemas"]["Pence"] | null;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "overlap" | "duplicate" | "charged_after_cancel" | "trial_converted" | "price_rise";
+            /** On */
+            on: string | null;
         };
         /** FxMonthOut */
         FxMonthOut: {
@@ -1226,6 +1249,15 @@ export interface components {
             amount: components["schemas"]["Money"];
             /** Month */
             month: string;
+        };
+        /** TrialOut */
+        TrialOut: {
+            /** Converted */
+            converted: boolean;
+            /** Converts On */
+            converts_on: string;
+            /** Started On */
+            started_on: string;
         };
         /** ValidationError */
         ValidationError: {

@@ -163,6 +163,17 @@ def test_a_foreign_currency_charge_needs_a_rate_and_is_never_guessed() -> None:
     assert s.rate_needed == 1
 
 
+def test_a_charge_needing_a_rate_is_not_mixed_into_the_cadence() -> None:
+    """Verifier #185: a USD amount beside GBP ones is not comparable."""
+    (c,) = subscription_costs(
+        [entry(1, interval=None)],
+        [Charge(1, date(2026, 4, 1), 999), Charge(1, date(2026, 5, 1), 999),
+         Charge(1, date(2026, 5, 15), 999, "USD")],
+        TODAY,
+    ).items  # fmt: skip
+    assert c.interval == "monthly"  # from the GBP charges, 30 days apart
+
+
 def test_no_charge_or_no_interval_gives_no_cost() -> None:
     s = subscription_costs(
         [entry(1, interval=None), entry(2), entry(3, interval=None)],

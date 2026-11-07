@@ -245,6 +245,8 @@ class SubscriptionEntry:
     interval: str | None
     created_at: datetime  # when the Merchant first entered the registry
     changed_at: datetime
+    # when `status` began: a regroup moves changed_at but not this (#190)
+    status_since: datetime | None = None
 
 
 class InvalidEntry(ValueError):
@@ -2199,6 +2201,7 @@ class Ledger:
             .order_by(e.c.id)
         )
         first: dict[int, datetime] = {}
+        since: dict[int, datetime] = {}
         latest: dict[int, Any] = {}
         for r in rows:
             first.setdefault(r.merchant_id, r.created_at)
@@ -2206,6 +2209,8 @@ class Ledger:
             # a detection that lost a race with a user write never wins
             if r.source == "detection" and prior is not None and prior.source == "user":
                 continue
+            if prior is None or prior.status != r.status:
+                since[r.merchant_id] = r.created_at
             latest[r.merchant_id] = r
         return sorted(
             (
@@ -2222,6 +2227,7 @@ class Ledger:
                     r.interval,
                     first[r.merchant_id],
                     r.created_at,
+                    since[r.merchant_id],
                 )
                 for r in latest.values()
             ),

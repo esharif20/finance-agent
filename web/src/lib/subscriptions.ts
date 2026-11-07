@@ -6,12 +6,12 @@ export type Entry = S["SubscriptionOut"];
 export type Kind = "subscription" | "bill";
 
 export type FlagCode = "overlap" | "duplicate" | "charged_after_cancel" | "trial_converted" | "price_rise";
-/** From PR #190 (#106). Not in the generated schema until it merges, so every use treats it as optional. */
+/** From #106 (PR #190). Kept optional over the generated schema so an older server still renders. */
 export type Flag = { code: FlagCode; on: string | null; before: Money | null; after: Money | null };
 export type Trial = { started_on: string; converts_on: string; converted: boolean };
 
-export type CostItem = S["CostOut"] & { flags?: Flag[]; trial?: Trial | null };
-export type Costs = Omit<S["CostsOut"], "items"> & {
+export type CostItem = Omit<S["CostOut"], "flags" | "trial"> & { flags?: Flag[]; trial?: Trial | null };
+export type Costs = Omit<S["CostsOut"], "items" | "flag_count" | "trial_detection"> & {
   items: CostItem[];
   flag_count?: number;
   trial_detection?: "partial";

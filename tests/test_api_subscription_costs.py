@@ -82,11 +82,99 @@ def test_another_users_subscriptions_are_unreachable(
     """current_user() is 1; user 2's entries and Merchant ids are unknown."""
     theirs = seed(engine, write_export, user_id=2)
     body = client.get("/api/subscriptions/costs").json()
-    assert body == {"items": [], "totals": [], "groups": [], "rate_needed": 0}
+    assert body == {
+        "items": [],
+        "totals": [],
+        "groups": [],
+        "rate_needed": 0,
+        "flag_count": 0,
+        "trial_detection": "partial",
+    }
     assert client.post(f"/api/subscriptions/{theirs}/cancel").status_code == 404
     with engine.begin() as conn:
         (e,) = Ledger(conn, 2).subscriptions()
     assert (e.status, e.source) == ("active", "detection")
+
+
+def charges(name: str, amounts: list[str], last_days_ago: int = 7) -> str:
+    """Monthly charges, oldest first, the last one `last_days_ago` days ago."""
+    last = date.today() - timedelta(days=last_days_ago)
+    n = len(amounts)
+    return "".join(
+        f"{last - timedelta(days=30 * (n - 1 - i)):%d/%m/%Y},{name},-{a}\n"
+        for i, a in enumerate(amounts)
+    )
+
+
+def seed_rows(engine: Engine, export: Export, rows: str, user_id: int = 1) -> None:
+    with engine.begin() as conn:
+        Ledger(conn, user_id).import_files([export(rows)])
+        categorise.run(conn, user_id)
+
+
+def test_costs_carry_waste_flags_and_a_flag_count(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    rows = charges("NETFLIX.COM", ["10.99", "10.99", "10.99", "12.99"])
+    rows += charges("DISNEY PLUS", ["7.99", "7.99", "7.99"], last_days_ago=3)
+    seed_rows(engine, write_export, rows)
+    body = client.get("/api/subscriptions/costs").json()
+    by = {i["merchant"]: i["flags"] for i in body["items"]}
+    rise = {
+        "code": "price_rise",
+        "on": (date.today() - timedelta(days=7)).isoformat(),
+        "before": {"minor": 1099, "currency": "GBP"},
+        "after": {"minor": 1299, "currency": "GBP"},
+    }
+    overlap = {"code": "overlap", "on": None, "before": None, "after": None}
+    assert by == {"NETFLIX.COM": [rise, overlap], "DISNEY PLUS": [overlap]}
+    assert body["flag_count"] == 3 and body["trial_detection"] == "partial"
+
+
+LLOYDS = (
+    "Transaction Date,Transaction Type,Sort Code,Account Number,"
+    "Transaction Description,Debit Amount,Credit Amount,Balance\n"
+)
+
+
+def test_one_service_charged_on_two_accounts_is_a_duplicate(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    seed(engine, write_export)  # HSBC: Netflix monthly, last a week ago
+    on = [date.today() - timedelta(days=d) for d in (63, 33, 3)]
+    lloyds = LLOYDS + "".join(
+        f"{d:%d/%m/%Y},DEB,00-00-00,00000001,NETFLIX.COM,10.99,,{balance}\n"
+        for d, balance in zip(on, ("89.01", "78.02", "67.03"), strict=True)
+    )
+    seed_rows(engine, write_export, lloyds)
+    (item,) = client.get("/api/subscriptions/costs").json()["items"]
+    assert [f["code"] for f in item["flags"]] == ["duplicate"]
+
+
+def test_a_small_first_charge_from_a_known_service_is_a_trial(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    seed_rows(engine, write_export, charges("SPOTIFY", ["0.99"], last_days_ago=10))
+    (item,) = client.get("/api/subscriptions/costs").json()["items"]
+    started = date.today() - timedelta(days=10)
+    assert item["trial"] == {
+        "started_on": started.isoformat(),
+        "converts_on": (started + timedelta(days=30)).isoformat(),
+        "converted": False,
+    }
+
+
+def test_another_users_subscriptions_never_raise_my_flags(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    """User 2's Streaming entry and price rise neither overlap nor show for user 1."""
+    seed(engine, write_export)  # user 1: Netflix
+    theirs = charges("DISNEY PLUS", ["7.99", "7.99", "9.99"])
+    theirs += charges("NETFLIX.COM", ["10.99", "10.99"], last_days_ago=5)
+    seed_rows(engine, write_export, theirs, user_id=2)
+    body = client.get("/api/subscriptions/costs").json()
+    assert [i["merchant"] for i in body["items"]] == ["NETFLIX.COM"]
+    assert body["items"][0]["flags"] == [] and body["flag_count"] == 0
 
 
 @pytest.mark.parametrize("bad", [0, -1, 2**63, 2**80])
