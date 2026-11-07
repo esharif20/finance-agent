@@ -12,8 +12,11 @@ class ParsedRow:
     bank_type: str
     description: str
     amount_minor: int  # signed; negative is money out
-    balance_minor: int  # the Bank's running balance after this row
+    # the Bank's running balance after this row; None when the export has none
+    # (HSBC): stored NULL like a synced row, so it is never reconciled
+    balance_minor: int | None
     currency: str
+    account_name: str = ""  # the new Account's name; "" means "Account <masked>"
 
 
 @dataclass(frozen=True)
@@ -27,6 +30,16 @@ class ParsedFile:
     bank: str
     rows: list[ParsedRow]  # Bank order, oldest first
     rejected: list[RejectedRow]
+    skipped: int = 0  # rows left out by design (Revolut PENDING/REVERTED); a count
+
+
+def body(text: str) -> tuple[int, list[str]]:
+    """Skip leading `#` comment lines; return (lines skipped, remaining lines)."""
+    lines = text.splitlines()
+    skip = 0
+    while skip < len(lines) and lines[skip].startswith("#"):
+        skip += 1
+    return skip, lines[skip:]
 
 
 class Importer(Protocol):

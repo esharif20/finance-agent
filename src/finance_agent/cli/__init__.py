@@ -208,6 +208,8 @@ def _main(argv: Sequence[str] | None) -> int:
                     f"{r.added} added, {r.already_known} already known, "
                     f"{len(r.rejected)} rejected"
                 )
+                if r.skipped:
+                    print(f"{r.skipped} pending or reverted rows skipped")
                 if r.ambiguous:
                     print(
                         f"{r.ambiguous} matched where twins made the "

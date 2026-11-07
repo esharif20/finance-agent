@@ -61,11 +61,12 @@ class ImportReport:
     # earliest, is used
     ambiguous: int = 0
     files_imported: int = 0  # files stored or already known; not rejected
+    skipped: int = 0  # Revolut PENDING or REVERTED rows left out; a count only
 
 
 log = logging.getLogger(__name__)  # counts, IDs and timings only
 
-Identity = tuple[date, str, int, int]
+Identity = tuple[date, str, int, int | None]  # None: the Bank gives no balance
 
 
 def row_identity(row: ingest.ParsedRow) -> Identity:
@@ -267,7 +268,7 @@ class Transaction:
     posted_on: date
     description: str
     amount: Decimal
-    running_balance: Decimal | None  # None for synced rows (no running balance)
+    running_balance: Decimal | None  # None for synced and HSBC rows (none given)
     statement_imports: frozenset[str]  # file hashes of every import it appeared in
     id: int = 0
     bank_type: str = ""  # the Bank's Transaction Type code; not the Kind
@@ -372,8 +373,10 @@ class AccountBalance:
     name: str
     kind: str
     currency: str
-    bank_balance: Decimal  # the Bank's last running balance (the truth)
-    ledger_balance: Decimal  # opening balance plus every Transaction we hold
+    # the Bank's last running balance (the truth); None when the Bank's export
+    # has no balance (HSBC): nothing to reconcile, so no figure and no Gaps
+    bank_balance: Decimal | None
+    ledger_balance: Decimal | None  # opening balance plus every Transaction we hold
     gaps: list[Gap]  # bank_balance - ledger_balance == sum of these amounts
     bank: str = ""  # the Bank's name, e.g. "Lloyds"
     last_import: datetime | None = None  # newest statement holding its rows
@@ -594,7 +597,7 @@ class Ledger:
         self._db = Scoped(conn, user_id)
 
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
-        added = known = ambiguous = files = 0
+        added = known = ambiguous = files = skipped = 0
         stored = False
         rejected: list[Rejection] = []
         accounts: dict[int, str] = {}
@@ -620,6 +623,7 @@ class Ledger:
                 ]
                 log.info("import file=%d rejected=%d", n, len(parsed.rejected))
                 continue
+            skipped += parsed.skipped
             digest = hashlib.sha256(data).hexdigest()
             si = schema.statement_import
             if self._db.execute(
@@ -696,6 +700,7 @@ class Ledger:
             [AffectedAccount(i, m) for i, m in sorted(accounts.items())],
             ambiguous,
             files,
+            skipped,
         )
 
     def transactions(self) -> list[Transaction]:
@@ -2330,9 +2335,20 @@ class Ledger:
         return sorted({f"{d:%Y-%m}" for d in days}, reverse=True)
 
     def accounts(self) -> list[AccountBalance]:
-        """Accounts with Bank and Ledger balances; an empty Account is skipped."""
+        """Accounts with Bank and Ledger balances; an empty Account is skipped.
+        A CSV Account whose Bank gives no balance (HSBC) has None for both."""
         a = schema.account
         gaps = self.gaps()
+        t = schema.transaction
+        # shortcut: synced-only Accounts stay hidden (they reconcile through
+        # sync_gaps(), ADR 0014) until the Accounts screen shows synced balances
+        no_balance = set(
+            self._db.execute(
+                self._db.select(t, t.c.account_id)
+                .where(t.c.origin == "csv", t.c.running_balance_minor.is_(None))
+                .distinct()
+            ).scalars()
+        )
         si, ts, tx = (
             schema.statement_import,
             schema.transaction_source,
@@ -2364,9 +2380,16 @@ class Ledger:
             .order_by(a.c.id)
         ).all():
             rows = self._transactions_in_bank_order(r.id)
-            if not rows:
+            if rows:
+                opening = rows[0].running_balance_minor - rows[0].amount_minor
+                bank: Decimal | None = _decimal(rows[-1].running_balance_minor)
+                held: Decimal | None = _decimal(
+                    opening + sum(x.amount_minor for x in rows)
+                )
+            elif r.id in no_balance:
+                bank = held = None
+            else:
                 continue
-            opening = rows[0].running_balance_minor - rows[0].amount_minor
             out.append(
                 AccountBalance(
                     r.id,
@@ -2374,8 +2397,8 @@ class Ledger:
                     r.name,
                     r.kind,
                     r.currency,
-                    _decimal(rows[-1].running_balance_minor),
-                    _decimal(opening + sum(x.amount_minor for x in rows)),
+                    bank,
+                    held,
                     [g for g in gaps if g.account.id == r.id],
                     r.bank,
                     *latest.get(r.id, (None, "")),
@@ -2660,7 +2683,7 @@ class Ledger:
             a,
             bank_id=bank_id,
             external_ref=ref,
-            name=f"Account {row.masked_number}",
+            name=row.account_name or f"Account {row.masked_number}",
             kind="current",
             masked_number=row.masked_number,
             currency=row.currency,
