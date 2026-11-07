@@ -210,6 +210,13 @@ def test_migration_0011_adds_and_drops_only_the_note_table(tmp_path: Path) -> No
                 ),
                 {"t": "x" * 141},
             )
+        with pytest.raises(Exception, match="CHECK"):  # a part note needs its Split
+            conn.execute(
+                text(
+                    "INSERT INTO note (user_id, transaction_id, part, text, created_at)"
+                    " VALUES (1, 1, 0, 'synthetic', '2026-01-01')"
+                )
+            )
         command.downgrade(cfg, "0010")
         assert set(inspect(conn).get_table_names()) == tables
     eng.dispose()

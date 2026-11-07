@@ -306,8 +306,10 @@ split_part = Table(
 
 # Purpose notes (#124), versioned: editing supersedes the live row and adds a
 # new one; deleting purges every row of that target. The target is one
-# Transaction (`part` NULL) or part `part` of its Split, by position. Notes are
-# never logged and never leave the Mac by default (AI_DESIGN, DATA_POLICY).
+# Transaction (`part` and `split_id` NULL) or part `part` of the Split
+# Correction `split_id`: a part note stays with that Split version, so a re-split
+# never moves it onto a different purpose. Notes are never logged and never leave
+# the Mac by default (AI_DESIGN, DATA_POLICY).
 note = Table(
     "note",
     metadata,
@@ -315,11 +317,13 @@ note = Table(
     Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
     Column("transaction_id", Integer, ForeignKey("transaction.id"), nullable=False),
     Column("part", Integer),
+    Column("split_id", Integer, ForeignKey("correction.id")),
     Column("text", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("superseded_at", DateTime(timezone=True)),
     CheckConstraint(text("length(text) BETWEEN 1 AND 140"), name="ck_note_length"),
     CheckConstraint(text("part BETWEEN 0 AND 9"), name="ck_note_part"),
+    CheckConstraint(text("(part IS NULL) = (split_id IS NULL)"), name="ck_note_split"),
     Index("ix_note_target", "user_id", "transaction_id"),
 )
 

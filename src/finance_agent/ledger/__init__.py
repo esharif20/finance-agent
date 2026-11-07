@@ -734,8 +734,13 @@ class Ledger:
                 .join(m, self._db.on(m, m.c.id == c.c.merchant_id))
                 .where(func.lower(m.c.name).contains(needle, autoescape=True))
             )
+            k = schema.correction
+            live_splits = self._db.select(k, k.c.id).where(
+                k.c.kind == "split", k.c.reverted_at.is_(None)
+            )
             noted = self._db.select(n, n.c.transaction_id).where(
                 n.c.superseded_at.is_(None),
+                or_(n.c.split_id.is_(None), n.c.split_id.in_(live_splits)),
                 func.lower(n.c.text).contains(needle, autoescape=True),
             )
             terms.append(
@@ -1361,6 +1366,7 @@ class Ledger:
                 .values(transaction_id=csv_id)
             )
         self._db.execute(self._db.delete(t).where(t.c.id == synced_id))
+        self._one_live_note(csv_id)
 
     def _reconcile(
         self,
@@ -1769,7 +1775,7 @@ class Ledger:
         made = self.preview_split(transaction_id, parts)
         if (live := self.split(transaction_id)) is not None:
             self._revert(live.id, "split")
-        return self._write_split(transaction_id, made)
+        return self._write_split(transaction_id, made, [live] if live else [])
 
     def revert_split(self, transaction_id: int) -> int:
         """Undo the live Split as a whole; returns its Correction id."""
@@ -1787,7 +1793,8 @@ class Ledger:
             raise UnknownTarget("no such reverted Split")
         if (live := self.split(old.transaction_id)) is not None:
             self._revert(live.id, "split")
-        return self._write_split(old.transaction_id, old.parts)
+        carry = [live, old] if live else [old]
+        return self._write_split(old.transaction_id, old.parts, carry)
 
     def split(self, transaction_id: int) -> Split | None:
         """The Transaction's live Split, if any."""
@@ -1847,7 +1854,15 @@ class Ledger:
             )
         return out
 
-    def _write_split(self, transaction_id: int, parts: Sequence[SplitPart]) -> Split:
+    def _write_split(
+        self,
+        transaction_id: int,
+        parts: Sequence[SplitPart],
+        carry: Sequence[Split] = (),
+    ) -> Split:
+        """Write a live Split. Part notes of each Split in `carry` move to it only
+        where the part at that position is unchanged, so a note never lands on a
+        different purpose; the rest stay with their own (reverted) Split."""
         cid = self._db.insert(
             schema.correction,
             kind="split",
@@ -1862,6 +1877,16 @@ class Ledger:
                 amount_minor=part.amount_minor,
                 category_id=self._category_id(part.category),
             )
+        n = schema.note
+        for old in carry:
+            for i, part in enumerate(old.parts):
+                if i < len(parts) and parts[i] == part:
+                    self._db.execute(
+                        self._db.update(n)
+                        .where(n.c.split_id == old.id, n.c.part == i)
+                        .values(split_id=cid)
+                    )
+        self._one_live_note(transaction_id)
         self._db.bump_ledger_version()
         return next(s for s in self.splits() if s.id == cid)
 
@@ -1873,10 +1898,12 @@ class Ledger:
         _check_note(text)
         t, n = schema.transaction, schema.note
         self._exists(self._db.select(t, t.c.id).where(t.c.id == transaction_id))
+        split_id = None
         if part is not None:
             live = self.split(transaction_id)
             if live is None or not 0 <= part < len(live.parts):
                 raise UnknownTarget("no such Split part")
+            split_id = live.id
         now = datetime.now(UTC)
         self._db.execute(
             self._db.update(n)
@@ -1886,7 +1913,12 @@ class Ledger:
             .values(superseded_at=now)
         )
         self._db.insert(
-            n, transaction_id=transaction_id, part=part, text=text, created_at=now
+            n,
+            transaction_id=transaction_id,
+            part=part,
+            split_id=split_id,
+            text=text,
+            created_at=now,
         )
         self._db.bump_ledger_version()
         return self.note_history(transaction_id, part)[-1]
@@ -1910,7 +1942,6 @@ class Ledger:
                 n.c.superseded_at,
             )
             .where(*self._note_target(transaction_id, part))
-            # after a merge two rows can be live; the newest is the one shown
             .order_by(n.c.id)
         ).all()
         return [Note(*r) for r in rows]
@@ -1928,11 +1959,37 @@ class Ledger:
     def _note_target(
         self, transaction_id: int, part: int | None
     ) -> list[ColumnElement[bool]]:
+        """The rows of one note: the Transaction's own, or part `part` of its
+        live Split (none when it has no live Split)."""
         n = schema.note
+        if part is None:
+            return [n.c.transaction_id == transaction_id, n.c.part.is_(None)]
+        live = self.split(transaction_id)
+        if live is None:
+            return [n.c.id.is_(None)]  # matches nothing; false() drops the user scope
         return [
             n.c.transaction_id == transaction_id,
-            n.c.part.is_(None) if part is None else n.c.part == part,
+            n.c.part == part,
+            n.c.split_id == live.id,
         ]
+
+    def _one_live_note(self, transaction_id: int) -> None:
+        """After a merge or a carried-over Split, a target can hold two live
+        versions; the newest stays live and the others become its history."""
+        n = schema.note
+        rows = self._db.execute(
+            self._db.select(n, n.c.id, n.c.part, n.c.split_id)
+            .where(n.c.transaction_id == transaction_id, n.c.superseded_at.is_(None))
+            .order_by(n.c.id)
+        ).all()
+        newest = {(r.part, r.split_id): r.id for r in rows}
+        stale = [r.id for r in rows if newest[(r.part, r.split_id)] != r.id]
+        if stale:
+            self._db.execute(
+                self._db.update(n)
+                .where(n.c.id.in_(stale))
+                .values(superseded_at=datetime.now(UTC))
+            )
 
     def corrections(self) -> list[Correction]:
         """Every Category Correction, reverted ones included, oldest first."""

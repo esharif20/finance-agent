@@ -25,11 +25,13 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("part", sa.Integer),
+        sa.Column("split_id", sa.Integer, sa.ForeignKey("correction.id")),
         sa.Column("text", sa.Text, nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("superseded_at", sa.DateTime(timezone=True)),
         sa.CheckConstraint("length(text) BETWEEN 1 AND 140", name="ck_note_length"),
         sa.CheckConstraint("part BETWEEN 0 AND 9", name="ck_note_part"),
+        sa.CheckConstraint("(part IS NULL) = (split_id IS NULL)", name="ck_note_split"),
     )
     op.create_index("ix_note_target", "note", ["user_id", "transaction_id"])
 

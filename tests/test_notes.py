@@ -172,7 +172,7 @@ def test_the_latest_version_is_shown_and_history_is_ordered(
 def test_open_db_zeroes_deleted_content() -> None:
     """SQLCipher pages are encrypted on disk, but a freed page still holds the
     old text once decrypted (and the backup API copies free pages). SQLCipher
-    builds with secure_delete on; this guards that a purge zeroes the page."""
+    builds with secure_delete on, and open_db also sets it explicitly."""
     with ledger_with([]) as (conn, _):
         assert conn.exec_driver_sql("PRAGMA secure_delete").scalar() == 1
 
@@ -204,3 +204,101 @@ def test_a_purged_note_leaves_no_bytes_in_the_file(tmp_path: Path) -> None:
             Ledger(dst, 1).delete_note(tid)
         plain.dispose()
         assert b"SYNTHPURGE" not in path.read_bytes()
+
+
+# --- verifier (#165): part notes follow their Split version --------------------
+
+
+def test_a_re_split_keeps_a_part_note_only_where_the_part_is_unchanged() -> None:
+    """A part note is tied to the Split it was written on: a re-split carries it
+    only to a part with the same position, amount and Category, so a note never
+    lands on a different purpose. Restoring the old Split brings its notes back."""
+    with ledger_with([(KNOWN, -1200)]) as (_, led):
+        tid = led.transactions()[0].id
+        first = led.split_transaction(tid, [(-700, GROCERIES), (None, GIFTS)])
+        led.set_note(tid, "weekly shop", part=0)
+        led.set_note(tid, "birthday present", part=1)
+        led.split_transaction(tid, [(-700, GROCERIES), (-300, GIFTS), (None, GIFTS)])
+        kept = led.note(tid, part=0)
+        assert kept is not None and kept.text == "weekly shop"
+        assert led.note(tid, part=1) is None and led.note_history(tid, part=1) == []
+        assert led.search_transactions(query="birthday").total == 0
+        with pytest.raises(UnknownTarget):
+            led.delete_note(tid, part=1)
+        led.set_note(tid, "card", part=1)
+        led.restore_split(first.id)
+        back = led.note(tid, part=1)
+        assert back is not None and back.text == "birthday present"
+        again = led.note(tid, part=0)
+        assert again is not None and again.text == "weekly shop"
+        assert led.search_transactions(query="card").total == 0
+
+
+def test_an_undone_split_hides_its_part_notes_until_restored() -> None:
+    with ledger_with([(KNOWN, -1200)]) as (_, led):
+        tid = led.transactions()[0].id
+        made = led.split_transaction(tid, [(-700, GROCERIES), (None, GIFTS)])
+        led.set_note(tid, "birthday present", part=1)
+        led.revert_split(tid)
+        assert led.note(tid, part=1) is None
+        assert led.search_transactions(query="birthday").total == 0
+        led.restore_split(made.id)
+        n = led.note(tid, part=1)
+        assert n is not None and n.text == "birthday present"
+
+
+def test_a_merge_of_two_noted_rows_keeps_one_live_note_and_both_versions() -> None:
+    with ledger_with([(KNOWN, -1200), (KNOWN, -1201)]) as (_, led):
+        csv, synced = (t.id for t in led.transactions())
+        led.set_note(csv, "older csv note")
+        led.set_note(synced, "newer synced note")
+        led._merge(csv, synced)  # pyright: ignore[reportPrivateUsage]
+        history = led.note_history(csv)
+        assert [n.text for n in history] == ["older csv note", "newer synced note"]
+        assert [n.superseded_at is None for n in history] == [False, True]
+        assert led.search_transactions(query="older").total == 0
+
+
+def test_a_purge_then_a_backup_and_restore_does_not_bring_the_note_back(
+    tmp_path: Path,
+) -> None:
+    """A copy taken after the purge never holds the note. A copy taken before
+    it does, and restoring that copy brings it back (DATA_POLICY says so)."""
+    from finance_agent import categorise
+    from finance_agent.storage import backup, default_db_path, open_db
+    from test_review_queue import export
+
+    db, folder = default_db_path(), tmp_path / "drive"
+    folder.mkdir()
+    csv = tmp_path / "export.csv"
+    csv.write_text(export([(KNOWN, -1200)]))
+
+    def notes() -> list[str]:
+        engine = open_db(db, create=False)
+        with engine.begin() as conn:
+            texts = [r.text for r in conn.execute(schema.note.select())]
+        engine.dispose()
+        return texts
+
+    engine = open_db(db)
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        led.import_files([csv])
+        categorise.run(conn, 1)
+        tid = led.transactions()[0].id
+        led.set_note(tid, "SYNTHPURGE one")
+        led.set_note(tid, "SYNTHPURGE two")
+    engine.dispose()
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
+    before = backup.take(db, folder, t0)
+    engine = open_db(db, create=False)
+    with engine.begin() as conn:
+        assert Ledger(conn, 1).delete_note(tid) == 2
+    engine.dispose()
+    after = backup.take(db, folder, t0.replace(day=2))
+
+    backup.restore(folder / after, db)
+    assert notes() == []
+    db.with_name(db.name + ".pre-restore").unlink()
+    backup.restore(folder / before, db)
+    assert notes() == ["SYNTHPURGE one", "SYNTHPURGE two"]
