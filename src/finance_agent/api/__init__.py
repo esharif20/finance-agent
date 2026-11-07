@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine
 
 from finance_agent import categorise
+from finance_agent.api import card_art
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     AccountBalance,
@@ -63,6 +64,7 @@ class AccountOut(BaseModel):
     bank_balance: Money
     ledger_balance: Money
     gaps: list[GapOut]
+    art: str | None  # key for /api/card-art/{art}; None means the generic face
 
 
 class TransactionOut(BaseModel):
@@ -187,6 +189,7 @@ def _account(a: AccountBalance) -> AccountOut:
         bank_balance=_money(a.bank_balance, a.currency),
         ledger_balance=_money(a.ledger_balance, a.currency),
         gaps=[_gap(g, a.currency) for g in a.gaps],
+        art=card_art.art_key(a.bank),
     )
 
 
@@ -381,6 +384,23 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:
         return [_account(a) for a in led.accounts()]
+
+    @app.get(
+        "/api/card-art/{key}",
+        response_class=Response,
+        responses={200: {"content": {"image/png": {}}}, 404: {}, 413: {}, 415: {}},
+    )
+    def card_image(key: str) -> Response:
+        """The user's local card image, or 404 so the app draws the generic face."""
+        try:
+            data, media = card_art.read(key)
+        except card_art.Refused as e:
+            raise HTTPException(e.status, "No card art.") from None
+        return Response(
+            data,
+            media_type=media,
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
 
     @app.get("/api/categories")
     def categories() -> list[CategoryOut]:

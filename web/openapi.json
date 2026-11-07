@@ -3,6 +3,17 @@
     "schemas": {
       "AccountOut": {
         "properties": {
+          "art": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Art"
+          },
           "bank": {
             "title": "Bank",
             "type": "string"
@@ -50,7 +61,8 @@
           "currency",
           "bank_balance",
           "ledger_balance",
-          "gaps"
+          "gaps",
+          "art"
         ],
         "title": "AccountOut",
         "type": "object"
@@ -638,6 +650,51 @@
           }
         },
         "summary": "Accounts"
+      }
+    },
+    "/api/card-art/{key}": {
+      "get": {
+        "description": "The user's local card image, or 404 so the app draws the generic face.",
+        "operationId": "card_image_api_card_art__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {}
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "413": {
+            "description": "Content Too Large"
+          },
+          "415": {
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Card Image"
       }
     },
     "/api/categories": {
