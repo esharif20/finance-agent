@@ -23,6 +23,7 @@ from finance_agent.ledger import (
     Breakdown,
     CategoryDetail,
     Gap,
+    KindHasNoCategory,
     Ledger,
     MonthSummary,
     Spend,
@@ -461,7 +462,18 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             raise HTTPException(
                 404, "no such Transaction, Merchant or Category"
             ) from None
+        except KindHasNoCategory as e:
+            raise HTTPException(422, f"{e}: only Spending and Refunds do") from None
         return CorrectionOut(id=k.id, ledger_version=led.ledger_version())
+
+    @app.delete("/api/corrections/{correction_id}")
+    def revert(led: Led, correction_id: int) -> CorrectionOut:
+        """Undo a Correction (it stays in the history, marked reverted)."""
+        try:
+            led.revert_correction(correction_id)
+        except UnknownTarget:
+            raise HTTPException(404, "no such active Correction") from None
+        return CorrectionOut(id=correction_id, ledger_version=led.ledger_version())
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():

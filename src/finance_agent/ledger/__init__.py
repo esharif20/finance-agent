@@ -105,6 +105,13 @@ class UnknownTarget(ValueError):
     """No such Transaction, Merchant, Category or Correction for this user."""
 
 
+CATEGORISED_KINDS = ("Spending", "Refund")  # the only Kinds that take a Category
+
+
+class KindHasNoCategory(ValueError):
+    """Transfers, Income and Fees take no Category, so a Correction is refused."""
+
+
 @dataclass(frozen=True)
 class Merchant:
     id: int  # stable across imports and rule changes
@@ -628,7 +635,7 @@ class Ledger:
             # Corrections beat every rule (ADR 0005); Kinds without a Category
             # (Income, Transfer, Fee) ignore them
             fix = by_txn.get(r.transaction_id) or by_merchant.get(r.merchant_id)
-            if fix and r.kind in ("Spending", "Refund"):
+            if fix and r.kind in CATEGORISED_KINDS:
                 category, source = fix, "correction"
             out[r.transaction_id] = Categorisation(
                 r.kind, r.merchant, category, source, r.taxonomy_version, r.merchant_id
@@ -643,9 +650,15 @@ class Ledger:
         self, transaction_id: int, category: tuple[str, str]
     ) -> Correction:
         """Give one Transaction this Category, over any rule or Merchant."""
-        t = schema.transaction
+        t, c = schema.transaction, schema.categorisation
         self._exists(self._db.select(t, t.c.id).where(t.c.id == transaction_id))
-        return self._correct(category, transaction_id=transaction_id)
+        kind = self._db.execute(
+            self._db.select(c, c.c.kind).where(c.c.transaction_id == transaction_id)
+        ).scalar()
+        category_id = self._category_id(category)  # an unknown one is a 404 first
+        if kind is not None and kind not in CATEGORISED_KINDS:
+            raise KindHasNoCategory(f"{kind} takes no Category")
+        return self._correct(category_id, transaction_id=transaction_id)
 
     def correct_merchant(
         self, merchant_id: int, category: tuple[str, str]
@@ -654,7 +667,7 @@ class Ledger:
         a Correction for one Transaction still beats it."""
         m = schema.merchant
         self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
-        return self._correct(category, merchant_id=merchant_id)
+        return self._correct(self._category_id(category), merchant_id=merchant_id)
 
     def revert_correction(self, correction_id: int) -> None:
         """Undo a Correction; it stays in the history, marked reverted."""
@@ -702,12 +715,12 @@ class Ledger:
             for r in rows
         ]
 
-    def _correct(self, category: tuple[str, str], **target: int) -> Correction:
+    def _category_id(self, category: tuple[str, str]) -> int:
         sub, top = schema.category, schema.category.alias("top")
         latest = self._db.execute(
             self._db.select(sub, func.max(sub.c.taxonomy_version))
         ).scalar()
-        category_id = self._exists(  # a leaf of the current taxonomy version only
+        return self._exists(  # a leaf of the current taxonomy version only
             self._db.select(sub, sub.c.id)
             .join(top, top.c.id == sub.c.parent_id)
             .where(
@@ -716,6 +729,8 @@ class Ledger:
                 sub.c.taxonomy_version == latest,
             )
         )
+
+    def _correct(self, category_id: int, **target: int) -> Correction:
         cid = self._db.insert(
             schema.correction,
             category_id=category_id,

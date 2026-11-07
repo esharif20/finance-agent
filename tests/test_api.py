@@ -231,6 +231,63 @@ def test_bad_corrections_are_refused(
     assert client.post("/api/corrections", json=body).status_code == status
 
 
+def test_a_correction_on_a_categoryless_kind_is_a_422(
+    client: TestClient, categorised: str
+) -> None:
+    income = next(t for t in _all(client) if t["kind"] == "Income")
+    res = client.post(
+        "/api/corrections",
+        json={"transaction_id": income["id"], "category": ["Housing", "Rent"]},
+    )
+    assert res.status_code == 422
+    assert "Income" in res.json()["detail"]
+
+
+def test_deleting_a_correction_reverts_it(client: TestClient, categorised: str) -> None:
+    spend = next(t for t in _all(client) if t["kind"] == "Spending")
+    new = (
+        ["Housing", "Rent"]
+        if spend["category"] != ["Housing", "Rent"]
+        else ["Travel", "Hotels"]
+    )
+    made = client.post(
+        "/api/corrections", json={"transaction_id": spend["id"], "category": new}
+    ).json()
+
+    res = client.delete(f"/api/corrections/{made['id']}")
+
+    assert res.status_code == 200
+    assert res.json()["ledger_version"] == made["ledger_version"] + 1
+    row = next(t for t in _all(client) if t["id"] == spend["id"])
+    assert row["category"] == spend["category"] and row["source"] == spend["source"]
+    assert client.delete(f"/api/corrections/{made['id']}").status_code == 404
+
+
+def test_deleting_an_unknown_or_another_users_correction_is_a_404(
+    client: TestClient,
+    engine: Engine,
+    categorised: str,
+    write_export: Callable[[str], Path],
+) -> None:
+    h, _ = generate_histories(seed=3, days=30)
+    with engine.begin() as conn:
+        theirs = Ledger(conn, 2)
+        theirs.import_files([write_export(render_export(h, 0, 60).text)])
+        categorise.run(conn, 2)
+        spend = next(
+            t
+            for t in theirs.transactions()
+            if t.categorisation and t.categorisation.kind == "Spending"
+        )
+        k = theirs.correct_transaction(spend.id, ("Housing", "Rent"))
+
+    assert client.delete("/api/corrections/999999").status_code == 404
+    assert client.delete("/api/corrections/abc").status_code == 422
+    assert client.delete(f"/api/corrections/{k.id}").status_code == 404
+    with engine.begin() as conn:
+        assert Ledger(conn, 2).corrections()[0].reverted_at is None
+
+
 def test_categories_list_the_taxonomy(client: TestClient) -> None:
     body = client.get("/api/categories").json()
     assert {c["name"]: tuple(c["subs"]) for c in body} == categorise.TAXONOMY

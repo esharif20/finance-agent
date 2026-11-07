@@ -13,7 +13,7 @@ from hypothesis import strategies as st
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.ledger import Ledger, Spend, Transaction
+from finance_agent.ledger import KindHasNoCategory, Ledger, Spend, Transaction
 from finance_agent.storage import open_db
 from synthetic_lloyds import generate_histories, render_export
 
@@ -338,33 +338,25 @@ def test_a_refund_correction_reduces_the_corrected_category(
         assert hotels.amount <= -refund.amount  # the Refund reduces Hotels (ADR 0004)
 
 
-def test_a_correction_never_gives_a_categoryless_kind_a_category(
+def test_a_categoryless_kind_refuses_a_correction(
     engine: Engine, write_export: WriteExport
 ) -> None:
     current, _ = generate_histories(seed=7, days=120)
     with engine.begin() as conn:
         ledger = imported(conn, write_export(render_export(current, 0, 150).text))
-        transfer = next(
-            (
-                t
-                for t in ledger.transactions()
-                if t.categorisation
-                and t.categorisation.kind in ("Transfer", "Income", "Fee")
-            ),
-            None,
-        )
-        if transfer is None:
-            pytest.skip("no Transfer, Income or Fee in this synthetic history")
-        month = transfer.posted_on.strftime("%Y-%m")
-        spend, summary = (
-            ledger.spending_by_category(month),
-            ledger.summarise_month(month),
-        )
-        ledger.correct_transaction(transfer.id, ("Travel", "Hotels"))
-        c = {t.id: t.categorisation for t in ledger.transactions()}[transfer.id]
-        assert c is not None and c.category is None and c.source != "correction"
-        assert ledger.spending_by_category(month) == spend
-        assert ledger.summarise_month(month) == summary
+        kinds = {
+            t.categorisation.kind: t
+            for t in ledger.transactions()
+            if t.categorisation
+            and t.categorisation.kind in ("Transfer", "Income", "Fee")
+        }
+        assert kinds, "the synthetic history should hold Income at least"
+        version = ledger.ledger_version()
+        for t in kinds.values():
+            with pytest.raises(KindHasNoCategory):
+                ledger.correct_transaction(t.id, ("Travel", "Hotels"))
+        assert ledger.corrections() == []
+        assert ledger.ledger_version() == version
 
 
 @pytest.mark.parametrize("order", ["merchant_first", "transaction_first"])
