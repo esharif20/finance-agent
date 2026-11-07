@@ -4,15 +4,16 @@ planted event type on the synthetic histories, against a trivial-rule baseline.
     uv run python evals/detectors.py            # CI: results reproduce
     uv run python evals/detectors.py --write    # refresh (see gate.py)
 
-The detector tickets implement `Detector` as `candidate`: #147 flags Category
-spikes against the personal seasonal baseline; #148 adds the other types.
-A detector sees only what the Ledger holds (`Row`), never the ground truth,
-and returns dated `Detection`s for the whole history. A detection matches an
-unmatched planted event of its type and key when its date falls in that
-type's window (`WINDOWS`), in days from the event's date: price rises and
-spikes may be flagged up to a month after they show, a renewal must be flagged
-in the five weeks before it, and a shortfall warning must come before the
-balance goes negative.
+The candidate is `engine.detectors` (#147 spikes, #148 price increases and
+upcoming renewals); shortfall risk is #151's. A true positive is also scored
+on what it says (`evidence_valid`, `impact_consistent`). A detector sees
+only what the Ledger holds (`Row`), never the ground truth, and returns
+dated `Detection`s for the whole history. A detection matches an unmatched
+planted event of its type and key when its date falls in that type's window
+(`WINDOWS`), in days from the event's date: price rises and spikes may be
+flagged up to a month after they show, a renewal must be flagged in the five
+weeks before it, and a shortfall warning must come before the balance goes
+negative.
 """
 
 import sys
@@ -24,7 +25,7 @@ from typing import Any, NamedTuple, Protocol
 
 import gate
 import synthetic_history as sh
-from finance_agent.engine.baselines import Insufficient, seasonal_baseline
+from finance_agent.engine import detectors
 
 RESULTS = Path(__file__).parent / "results" / "detectors_baseline.json"
 WINDOWS = {
@@ -50,6 +51,8 @@ class Detection(NamedTuple):
     type: str  # one of synthetic_history.EVENT_TYPES
     date: date
     key: str  # Merchant, Category label, or "" for a shortfall
+    impact: int | None = None  # pence; the trivial rules give none
+    evidence: tuple[int, ...] = ()  # Transaction ids
 
 
 class Detector(Protocol):
@@ -69,8 +72,16 @@ def match(
     events: Sequence[sh.Event], found: Sequence[Detection]
 ) -> dict[str, tuple[int, int, int]]:
     """(true positives, false positives, false negatives) per type."""
+    return pair(events, found)[0]
+
+
+def pair(
+    events: Sequence[sh.Event], found: Sequence[Detection]
+) -> tuple[dict[str, tuple[int, int, int]], list[tuple[sh.Event, Detection]]]:
+    """`match`'s counts, and each true positive's event and detection."""
     tp: defaultdict[str, int] = defaultdict(int)
     fn: defaultdict[str, int] = defaultdict(int)
+    hits: list[tuple[sh.Event, Detection]] = []
     left = list(found)
     for e in sorted(events, key=lambda e: e.date):
         lo, hi = WINDOWS[e.type]
@@ -88,11 +99,13 @@ def match(
             fn[e.type] += 1
         else:
             tp[e.type] += 1
+            hits.append((e, hit))
             left.remove(hit)
     fp: defaultdict[str, int] = defaultdict(int)
     for d in left:
         fp[d.type] += 1
-    return {t: (tp[t], fp[t], fn[t]) for t in sorted(tp.keys() | fp.keys() | fn.keys())}
+    types = sorted(tp.keys() | fp.keys() | fn.keys())
+    return {t: (tp[t], fp[t], fn[t]) for t in types}, hits
 
 
 # --- the trivial-rule baseline and the stub -----------------------------------
@@ -178,45 +191,52 @@ def baseline(rows: Sequence[Row]) -> list[Detection]:
     return _price_rises(rows) + _spikes(rows) + _renewals(rows) + _shortfalls(rows)
 
 
-# --- the candidate ------------------------------------------------------------
+# --- the candidate: the Engine's detectors (#147, #148) ----------------------
 
-SPIKE = (3, 2)  # a month's spend over 1.5 x its personal seasonal baseline
-
-
-def _baseline_spikes(rows: Sequence[Row]) -> list[Detection]:
-    """A Category-month spending over SPIKE x its seasonal baseline (#147),
-    flagged on the day it crosses; nothing below the ADR 0015 gate."""
-    by_cat: defaultdict[sh.Category, list[Row]] = defaultdict(list)
-    for r in rows:
-        if r.category != sh.NONE:
-            by_cat[r.category].append(r)
-    out: list[Detection] = []
-    for cat, rs in by_cat.items():
-        pairs = [(r.date, r.amount) for r in rs]
-        by_month: defaultdict[int, list[Row]] = defaultdict(list)
-        for r in rs:
-            by_month[sh.month_index(r.date)].append(r)
-        for m, month in sorted(by_month.items()):
-            b = seasonal_baseline(pairs, sh.month_start(m))
-            if isinstance(b, Insufficient) or b.expected == 0:
-                continue
-            spent = 0
-            for r in sorted(month, key=lambda r: (r.date, r.id)):
-                spent -= r.amount  # net of Refunds, like the baseline
-                if SPIKE[1] * spent > SPIKE[0] * b.expected:
-                    out.append(Detection("category_spike", r.date, sh.label(cat)))
-                    break
-    return out
+TYPES = {"price_increase": "price_rise", "upcoming_renewal": "forgotten_renewal"}
 
 
 def candidate(rows: Sequence[Row]) -> list[Detection]:
-    return _baseline_spikes(rows)
+    """`engine.detectors` on the Ledger's Spending: salary and transfers (no
+    Category) are not Spending. Shortfall risk is #151's."""
+    found = detectors.detect(
+        [
+            detectors.Row(r.id, r.date, r.merchant, r.category, r.amount)
+            for r in rows
+            if r.category != sh.NONE
+        ]
+    )
+    return [
+        Detection(TYPES.get(i.type, i.type), i.on, i.key, i.impact, i.evidence)
+        for i in found
+        if TYPES.get(i.type, i.type) in WINDOWS  # recurring has its own eval
+    ]
 
 
 MODELS: dict[str, tuple[str, str, Detector]] = {
     "baseline": ("trivial-rules", "1", baseline),
-    "candidate": ("engine-detectors", "1", candidate),
+    "candidate": ("engine-detectors", "2", candidate),
 }
+
+
+# --- what a hit says ------------------------------------------------------------
+
+
+def evidence_valid(e: sh.Event, d: Detection) -> bool:
+    """The Insight cites Transactions, and only the planted event's own."""
+    return bool(d.evidence) and set(d.evidence) <= set(e.evidence)
+
+
+def impact_consistent(e: sh.Event, d: Detection) -> bool:
+    """A price rise (annualised) and a renewal (the fee) are known exactly, to
+    within 5%. A spike is flagged on the day it crosses, so its impact is the
+    excess so far: positive, and at most half again the planted excess (the
+    baseline's normal is an estimate of the planted one)."""
+    if d.impact is None:
+        return False
+    if e.type == "category_spike":
+        return 0 < d.impact and 2 * d.impact <= 3 * e.impact
+    return abs(d.impact - e.impact) * 20 <= e.impact
 
 
 # --- the harness --------------------------------------------------------------
@@ -231,16 +251,29 @@ def evaluate() -> dict[str, Any]:
     models: dict[str, Any] = {}
     for key, (name, version, detect) in MODELS.items():
         totals = {t: [0, 0, 0] for t in sh.EVENT_TYPES}
+        hits: list[tuple[sh.Event, Detection]] = []
         for h in histories:
             end = h.txns[-1].date
             found = [d for d in detect(view(h)) if d.date <= end]
-            for t, counts in match(h.events, found).items():
+            counted, paired = pair(h.events, found)
+            hits += paired
+            for t, counts in counted.items():
                 totals[t] = [a + b for a, b in zip(totals[t], counts, strict=True)]
         totals["overall"] = [sum(c[i] for c in totals.values()) for i in range(3)]
         metrics: dict[str, float] = {}
         for t, (tp, fp, fn) in sorted(totals.items()):
             metrics[f"{t}.precision"] = _ratio(tp, tp + fp)
             metrics[f"{t}.recall"] = _ratio(tp, tp + fn)
+        # of the true positives, the share whose evidence and impact hold up
+        for t in sh.EVENT_TYPES:
+            mine = [(e, d) for e, d in hits if e.type == t]
+            n = len(mine)
+            metrics[f"{t}.evidence_valid"] = _ratio(
+                sum(evidence_valid(e, d) for e, d in mine), n
+            )
+            metrics[f"{t}.impact_consistent"] = _ratio(
+                sum(impact_consistent(e, d) for e, d in mine), n
+            )
         models[key] = {
             "model": name,
             "model_version": version,
