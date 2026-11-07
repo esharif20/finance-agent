@@ -113,6 +113,35 @@
         "title": "AccountOut",
         "type": "object"
       },
+      "AddIn": {
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "subscription",
+              "bill"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "merchant_id": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Merchant Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "group",
+          "merchant_id"
+        ],
+        "title": "AddIn",
+        "type": "object"
+      },
       "CategoryDetailOut": {
         "properties": {
           "currency": {
@@ -273,6 +302,38 @@
         "title": "CategoryTxnOut",
         "type": "object"
       },
+      "ConfirmIn": {
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "subscription",
+                  "bill"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          }
+        },
+        "title": "ConfirmIn",
+        "type": "object"
+      },
       "CorrectionIn": {
         "properties": {
           "category": {
@@ -331,6 +392,43 @@
         "title": "CorrectionOut",
         "type": "object"
       },
+      "EvidenceOut": {
+        "properties": {
+          "charge_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charge Count"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "on": {
+            "title": "On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "on",
+          "charge_count",
+          "interval"
+        ],
+        "title": "EvidenceOut",
+        "type": "object"
+      },
       "GapOut": {
         "properties": {
           "amount": {
@@ -351,6 +449,28 @@
           "amount"
         ],
         "title": "GapOut",
+        "type": "object"
+      },
+      "GroupIn": {
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "subscription",
+              "bill"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "group"
+        ],
+        "title": "GroupIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -504,6 +624,84 @@
           "merchants"
         ],
         "title": "SpendingOut",
+        "type": "object"
+      },
+      "SubscriptionOut": {
+        "properties": {
+          "changed_at": {
+            "title": "Changed At",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceOut"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "merchant": {
+            "title": "Merchant",
+            "type": "string"
+          },
+          "merchant_id": {
+            "title": "Merchant Id",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "merchant_id",
+          "merchant",
+          "kind",
+          "group",
+          "status",
+          "reason",
+          "source",
+          "evidence",
+          "created_at",
+          "changed_at"
+        ],
+        "title": "SubscriptionOut",
         "type": "object"
       },
       "SummaryOut": {
@@ -1263,6 +1461,249 @@
           }
         },
         "summary": "Spending"
+      }
+    },
+    "/api/subscriptions": {
+      "get": {
+        "description": "Every entry, negative (\"not a subscription\") ones included.",
+        "operationId": "subscriptions_api_subscriptions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubscriptionOut"
+                  },
+                  "title": "Response Subscriptions Api Subscriptions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Subscriptions"
+      },
+      "post": {
+        "operationId": "add_api_subscriptions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add"
+      }
+    },
+    "/api/subscriptions/{merchant_id}": {
+      "delete": {
+        "description": "Take an entry off the list: remembered as \"not a subscription\".",
+        "operationId": "remove_api_subscriptions__merchant_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchant_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Merchant Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove"
+      },
+      "patch": {
+        "operationId": "regroup_api_subscriptions__merchant_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchant_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Merchant Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Regroup"
+      }
+    },
+    "/api/subscriptions/{merchant_id}/confirm": {
+      "post": {
+        "operationId": "confirm_api_subscriptions__merchant_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchant_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Merchant Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm"
+      }
+    },
+    "/api/subscriptions/{merchant_id}/dismiss": {
+      "post": {
+        "description": "No to a suggestion: remembered as \"not a subscription\".",
+        "operationId": "dismiss_api_subscriptions__merchant_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchant_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Merchant Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss"
       }
     },
     "/api/summary": {

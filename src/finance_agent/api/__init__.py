@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.api import card_art
+from finance_agent.api import card_art, subscriptions
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -558,6 +558,8 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         except UnknownTarget:
             raise HTTPException(404, "no such active Correction") from None
         return CorrectionOut(id=correction_id, ledger_version=led.ledger_version())
+
+    app.include_router(subscriptions.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
