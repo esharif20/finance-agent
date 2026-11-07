@@ -4,6 +4,8 @@ ADR 0005)."""
 
 import tempfile
 from collections.abc import Callable
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -193,3 +195,80 @@ def test_api_serves_v2_and_accepts_a_new_category_before_the_next_import(
     with engine.begin() as conn:
         got = Ledger(conn, 1).corrections()
         assert [k.category for k in got] == [("Subscriptions", "AI tools")]
+
+
+def _totals(ledger: Ledger, months: list[str]) -> dict[str, Decimal]:
+    out: dict[str, Decimal] = {}
+    for m in months:
+        tops = ledger.spending_by_category(m)
+        names = [s.name for s in tops]
+        assert len(names) == len(set(names)), names  # one row per Category
+        for s in tops:
+            subs = [c.name for c in s.children]
+            assert len(subs) == len(set(subs)), (s.name, subs)
+            assert s.amount == sum((c.amount for c in s.children), Decimal(0))
+        out[m] = sum((s.amount for s in tops), Decimal(0))
+    return out
+
+
+@settings(max_examples=15, deadline=None)
+@given(
+    st.lists(
+        st.tuples(st.integers(0, 80), st.sampled_from(V1_LEAVES), st.booleans()),
+        max_size=15,
+    )
+)
+def test_v1_and_v2_corrections_on_one_name_add_up_once(
+    fixes: list[tuple[int, tuple[str, str], bool]],
+) -> None:
+    """Adversarial (verifier): Corrections on a v1 row and on the v2 row of the
+    same name, or of a v1 name renamed onto it, land in one Category, and the
+    money-out total of every month never moves."""
+    with tempfile.TemporaryDirectory() as tmp:
+        engine = open_db(Path(tmp) / "ledger.db")
+        export = Path(tmp) / "export.csv"
+        h, _ = generate_histories(seed=5, days=60)
+        export.write_text(render_export(h, 0, 90).text)
+        with engine.begin() as conn:
+            ledger = Ledger(conn, 1)
+            ledger.import_files([export])
+            v1 = categorise.seed_taxonomy(conn, 1, version=1)
+            categorise.run(conn, 1)
+            txns = ledger.transactions()
+            months = sorted({t.posted_on.strftime("%Y-%m") for t in txns})
+            before = _totals(ledger, months)
+            v2 = categorise.seed_taxonomy(conn, 1)
+            db = Scoped(conn, 1)
+            for i, leaf, old in fixes:
+                db.insert(  # straight to the row: the API offers only v2
+                    schema.correction,
+                    category_id=v1[leaf] if old else v2[taxonomy.current(1, leaf)],
+                    transaction_id=txns[i % len(txns)].id,
+                    created_at=datetime(2026, 1, 1, tzinfo=UTC),
+                )
+            categorise.run(conn, 1)
+            assert _totals(ledger, months) == before
+            got = {
+                c.category
+                for t in ledger.transactions()
+                if (c := t.categorisation) and c.category
+            }
+            assert got <= _leaves(categorise.TAXONOMY)
+        engine.dispose()
+
+
+def test_seeding_is_idempotent_and_per_user() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        engine = open_db(Path(tmp) / "ledger.db")
+        with engine.begin() as conn:
+            conn.execute(
+                schema.user.insert().values(id=2, created_at=datetime.now(UTC))
+            )
+            a = categorise.seed_taxonomy(conn, 1)
+            assert categorise.seed_taxonomy(conn, 1) == a
+            b = categorise.seed_taxonomy(conn, 2)
+            assert not set(a.values()) & set(b.values())
+            assert categorise.seed_taxonomy(conn, 1) == a
+            rows = conn.execute(select(schema.category.c.id)).all()
+            assert len(rows) == 2 * (len(a) + len(categorise.TAXONOMY))
+        engine.dispose()
