@@ -28,6 +28,12 @@
   --glass-bg: rgb(255 255 255 / 0.58);
   --glass-edge: rgb(255 255 255 / 0.75);
   --glass-shadow: 0 8px 24px rgb(27 29 31 / 0.08);
+  /* Frosted content cards. 0.78 keeps every card text colour >= 4.5:1 (worst: --positive at
+     4.53) over all four fields stacked at full strength, after saturate(1.4). Re-measure
+     before lowering it. --card stays opaque: fallbacks and colour-mix() tints use it. */
+  --card-glass: rgb(255 255 255 / 0.78);
+  --card-edge: rgb(27 29 31 / 0.07);
+  --card-highlight: rgb(255 255 255 / 0.9);
   --grain: 0.035;
   --radius: 20px;
   color-scheme: light;
@@ -59,6 +65,9 @@
     --glass-bg: rgb(40 44 48 / 0.5);
     --glass-edge: rgb(255 255 255 / 0.16);
     --glass-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+    --card-glass: rgb(17 17 17 / 0.6); /* worst: --accent at 4.85:1 */
+    --card-edge: rgb(255 255 255 / 0.08);
+    --card-highlight: rgb(255 255 255 / 0.1);
     --grain: 0.05;
     color-scheme: dark;
   }
@@ -236,7 +245,36 @@
   color: var(--muted-foreground);
 }
 
-/* Glass: chrome only (header, pills, tab bar). Figures, charts and lists stay on solid cards. */
+/* Frosted content cards (Card). Layered so a utility on one Card can still override it. The
+   hairline and top highlight are inset shadows, so the box keeps today's size. */
+@layer components {
+  .card-glass {
+    background: var(--card-glass);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight);
+  }
+  /* backdrop-filter makes each card a stacking context; lift the one in use so its open
+     category menu paints over the cards after it. */
+  .card-glass:focus-within {
+    position: relative;
+    z-index: 1;
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .card-glass {
+      background: var(--card);
+    }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .card-glass {
+      background: var(--card);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+}
+
+/* Glass chrome (header, pills, tab bar). */
 .glass {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);

@@ -7,15 +7,16 @@ import os
 import plistlib
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from finance_agent.cli import LOCAL_USER
 from finance_agent.ledger import Ledger
 from finance_agent.storage import DB_ENV, open_db
 
 LABEL = "com.finance-agent.watch"
 AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
-LOCAL_USER = 1
 TITLE = "Finance Agent"
 
 Notifier = Callable[[str, str], None]
@@ -39,19 +40,26 @@ def _launchctl(args: list[str]) -> None:
 
 
 def run(folder: Path, notify: Notifier = osascript) -> int:
-    """Import every CSV in folder via the Ledger; stay silent if nothing changed."""
-    files = sorted(p for p in folder.glob("*.csv") if p.is_file())
+    """Import every CSV in folder via the Ledger; stay silent if nothing changed.
+    Symlinks and anything resolving outside the folder are skipped."""
+    root = folder.resolve()
+    files = sorted(
+        p
+        for p in folder.glob("*.csv")
+        if not p.is_symlink() and p.is_file() and p.resolve().is_relative_to(root)
+    )
     if not files:
         return 0
     try:
-        engine = open_db()  # raises on a plaintext or wrong-key database
-    except (OSError, ValueError):
+        # never creates a ledger or keys; raises on plaintext, wrong or lost key
+        engine = open_db(create=False)
+    except (OSError, ValueError, LookupError):
         notify(TITLE, "Import refused: database unavailable or not encrypted")
         return 1
     try:
         with engine.begin() as conn:
             r = Ledger(conn, LOCAL_USER).import_files(files)
-    except (OSError, ValueError):
+    except (OSError, ValueError, LookupError):
         notify(TITLE, "Import failed")
         return 1
     finally:
@@ -87,7 +95,17 @@ def write_agent(
     if db := os.environ.get(DB_ENV):
         plist["EnvironmentVariables"] = {DB_ENV: db}
     path = agents_dir / f"{label}.plist"
-    path.write_bytes(plistlib.dumps(plist))
+    if path.is_symlink():
+        raise ValueError(f"refusing to replace a symlink at {path}")
+    fd, tmp = tempfile.mkstemp(dir=agents_dir, prefix=f".{label}.")
+    try:  # written whole, then renamed: launchd never reads half a plist
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(plistlib.dumps(plist))
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
     (ctl or _launchctl)(["load", str(path)])
     return path
 

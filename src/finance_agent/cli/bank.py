@@ -6,26 +6,30 @@ ingest client, and never printed, logged or put in an error message."""
 import getpass
 import logging
 import sys
-from collections.abc import Callable
 from datetime import UTC, datetime
 
 from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
 from finance_agent.cli import gbp
+from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
 from finance_agent.ledger import Ledger, SyncReport
 from finance_agent.storage import default_db_path, is_encrypted, keychain, open_db
 
 log = logging.getLogger(__name__)
-Notifier = Callable[[str, str], None]
-TITLE = "Finance Agent"
 LEGACY_HINT = (
     "fa: remove the old Keychain item yourself: "
     f"security delete-generic-password -s {keychain.SIMPLEFIN_ACCESS_SERVICE} "
     f"-a {keychain.LEGACY_ACCOUNT}"
 )
 SERVICE = keychain.SIMPLEFIN_ACCESS_SERVICE
+KEYCHAIN_LOST = (
+    "could not save the access URL in the Keychain, so it is lost. The setup "
+    "token is now spent: remove this connection in your Lunch Flow dashboard, "
+    "get a new setup token there and run `fa connect` again"
+)
+RELINK = "nothing was saved; run `fa connect --link` to try again"
 REVOKE = (
     "To revoke access at the provider too, remove this connection in your "
     "Lunch Flow dashboard (and the bank consent in your banking app)."
@@ -67,7 +71,39 @@ def _adopt_spike_item() -> str | None:
     return legacy
 
 
-def connect(user_id: int, renewed: bool = False) -> int:
+def _store(access: str) -> None:
+    """Save the freshly claimed access URL, retrying once: it is the only copy."""
+    try:
+        keychain.set_text(SERVICE, access)
+    except (OSError, KeyringError):
+        try:
+            keychain.set_text(SERVICE, access)
+        except (OSError, KeyringError):
+            raise ValueError(KEYCHAIN_LOST) from None
+
+
+def _link(ledger: Ledger, accounts: list[simplefin.SyncedAccount]) -> None:
+    """Ask which CSV Account each synced Account is. A bad answer raises
+    ValueError, so the caller's transaction rolls back whole."""
+    csv = ledger.unlinked_csv_accounts()
+    for acc in accounts:
+        print(f"Synced Account: {acc.org} {acc.name} ({acc.currency})")
+        if not csv or ledger.synced_account_linked(acc.provider_id):
+            continue
+        choice = input(
+            "  Link it to a CSV Account? Enter its masked number "
+            f"({', '.join(csv)}) or leave blank: "
+        ).strip()
+        if choice:
+            if choice not in csv:
+                raise ValueError(f"no Account with that masked number; {RELINK}")
+            ledger.link_synced_account(acc.provider_id, csv.pop(choice))
+            print(f"  Linked to {choice}")
+
+
+def connect(user_id: int, renewed: bool = False, link: bool = False) -> int:
+    """Connect once; `link` instead links synced Accounts to CSV Accounts
+    imported since (ADR 0014)."""
     engine = _encrypted_db()
     try:
         today = datetime.now(simplefin.LONDON).date()
@@ -76,33 +112,27 @@ def connect(user_id: int, renewed: bool = False) -> int:
                 Ledger(conn, user_id).record_consent_renewed(today)
             print("Bank consent renewal recorded.")
             return 0
-        if keychain.get_text(SERVICE) is not None:
-            return _err("already connected; run `fa disconnect` first")
-        access = _adopt_spike_item()
-        if access is None:
-            token = getpass.getpass("SimpleFIN setup token (input hidden): ")
-            access = simplefin.claim(token, simplefin.transport)
-            keychain.set_text(SERVICE, access)
-        print("Connected. The access URL is stored in the Keychain only.")
+        access = keychain.get_text(SERVICE)
+        if link:
+            if access is None:
+                return _err("not connected; run `fa connect` first")
+        else:
+            if access is not None:
+                return _err("already connected; run `fa disconnect` first")
+            access = _adopt_spike_item()
+            if access is None:
+                token = getpass.getpass("SimpleFIN setup token (input hidden): ")
+                access = simplefin.claim(token, simplefin.transport)
+                _store(access)
+            print("Connected. The access URL is stored in the Keychain only.")
         raw = simplefin.fetch(access, today, today, simplefin.transport)
         accounts = simplefin.parse(raw).accounts
-        with engine.begin() as conn:
+        with engine.begin() as conn:  # one transaction: an error commits nothing
             ledger = Ledger(conn, user_id)
-            ledger.record_consent_renewed(today)
-            existing = {a.masked_number: a.id for a in ledger.accounts()}
-            for acc in accounts:
-                print(f"Synced Account: {acc.org} {acc.name} ({acc.currency})")
-                if not existing:
-                    continue
-                choice = input(
-                    "  Link it to a CSV Account? Enter its masked number "
-                    f"({', '.join(existing)}) or leave blank: "
-                ).strip()
-                if choice:
-                    if choice not in existing:
-                        return _err("no Account with that masked number")
-                    ledger.link_synced_account(acc.provider_id, existing.pop(choice))
-                    print(f"  Linked to {choice}")
+            # a connect whose linking failed left no consent date: set it now
+            if not link or ledger.sync_status(today).consent_renewed_on is None:
+                ledger.record_consent_renewed(today)
+            _link(ledger, accounts)
         return 0
     finally:
         engine.dispose()
@@ -136,8 +166,6 @@ def _print(r: SyncReport) -> None:
         print(
             f"  {r.provider_duplicates} rows are Possible Duplicates; kept, not merged"
         )
-    if r.pending_explained:
-        print(f"  {r.pending_explained} Gaps equal the pending rows' total")
     if r.provider_errors:
         print(f"  the provider reported {r.provider_errors} messages")
     for g in r.gaps:
@@ -166,7 +194,10 @@ def _alert(engine: Engine, user_id: int, notify: Notifier) -> None:
                 if st.consent_days_left < 0
                 else f"Bank consent expires in {st.consent_days_left} days; {renew}"
             )
-        if ledger.alert_is_new(key) and key is not None:
+        # always called: key None (all well) clears the memory, so a later
+        # recurrence of the same problem is announced again
+        new = ledger.alert_is_new(key)
+        if key is not None and new:
             notify(TITLE, body)
 
 

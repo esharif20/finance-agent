@@ -2,15 +2,18 @@
 
 import json
 from collections.abc import Callable
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import History, generate_histories, render_export
+from synthetic_lloyds.generator import SORT_CODE, _with_balances  # pyright: ignore[reportPrivateUsage]
 from synthetic_simplefin import response
 from test_dedupe import temp_ledger
 
@@ -111,18 +114,72 @@ def test_first_sync_anchors_and_a_missing_row_opens_a_gap(
     assert led.sync_gaps() == r.gaps
 
 
-def test_a_gap_equal_to_the_pending_sum_is_reported_as_pending(
-    ledger_for: LedgerFor,
+@settings(max_examples=25, deadline=None)
+@given(st.integers(0, 3), st.integers(0, 3), st.integers(-500, 500), st.booleans())
+def test_pending_rows_never_open_a_gap_but_a_real_gap_still_does(
+    first_pending: int, later_pending: int, offset: int, lose_row: bool
 ) -> None:
-    # Spike #26: the feed cannot say whether balance includes pending rows.
-    led = ledger_for(1)
-    led.apply_sync(response(H, 0, 10))
-    r = led.apply_sync(response(H, 10, 20, pending=2, balance_offset=-200))
-    # ADR 0014: every non-zero value opens a Gap; the report only says it
-    # equals the pending sum (a missing row of that amount must not hide).
-    assert ([g.amount for g in r.gaps], r.pending_explained) == ([Decimal("-2.00")], 1)
-    r = led.apply_sync(response(H, 10, 20, pending=2, balance_offset=-201))
-    assert [g.amount for g in r.gaps] == [Decimal("-2.01")]
+    # Spike #26: balance == available-balance with a pending row present, so
+    # balance includes pending rows and ADR 0014 reduces B by their total.
+    lost = H.txns[14].amount_minor if lose_row else 0
+    with temp_ledger() as (led, _):
+        led.apply_sync(response(H, 0, 10, pending=first_pending))
+        r = led.apply_sync(
+            response(
+                H,
+                10,
+                20,
+                pending=later_pending,
+                balance_offset=offset,
+                drop={14} if lose_row else (),
+            )
+        )
+        expected = offset + lost
+        assert [g.amount for g in r.gaps] == (
+            [Decimal(expected).scaleb(-2)] if expected else []
+        )
+
+
+def test_a_repeated_pending_id_cannot_cancel_a_real_gap() -> None:
+    # Adversarial: the feed lists one pending row twice under one ID and drops
+    # a posted row of the same amount. Subtracting the pending row twice would
+    # net the missing row's Gap to zero; one ID is one row (ADR 0014).
+    with temp_ledger() as (led, _):
+        led.apply_sync(response(H, 0, 10))
+        doc = json.loads(response(H, 10, 20, pending=1))
+        rows = doc["accounts"][0]["transactions"]
+        lost = next(i for i in range(10, 19) if H.txns[i].amount_minor < 0)
+        amount = Decimal(H.txns[lost].amount_minor).scaleb(-2)
+        rows[:] = [r for r in rows if r["id"] != f"{lost:05d}"]
+        pend = next(r for r in rows if r.get("pending"))
+        pend["amount"] = str(amount)
+        rows.append(dict(pend))
+        acc = doc["accounts"][0]
+        acc["balance"] = str(Decimal(acc["balance"]) + Decimal(1) + amount)
+        r = led.apply_sync(json.dumps(doc).encode())
+        assert [g.amount for g in r.gaps] == [amount]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="ADR 0014 sorted pairing chains across the coverage boundary; needs an "
+    "ADR decision (coverage-aware matching)",
+)
+def test_identical_purchases_across_the_coverage_boundary_are_never_merged() -> None:
+    # Three real coffees on 1, 3 and 5 Jan. The CSV holds the first two, the sync
+    # the last two. Sorted pairing gives (1, 3) and (3, 5), both within 3 days, so
+    # three purchases become two, with no Possible Duplicate and no Gap.
+    ev = [(date(2026, 1, d), "DEB", "CAFE NERO 0042", -350) for d in (1, 3, 5)]
+    h = History(SORT_CODE, "00000001", _with_balances(ev, 100000))
+    with temp_ledger() as (led, d):
+        csv = d / "export.csv"
+        csv.write_text(render_export(h, 0, 2).text)
+        led.import_files([csv])
+        led.apply_sync(response(h, 1, 3))
+        (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
+        led.link_synced_account("ACC-1", acc.id)
+        lost_one = len(led.transactions()) < 3
+        assert not lost_one or led.possible_duplicates()
 
 
 def test_csv_history_before_the_anchor_never_opens_a_gap(
@@ -182,27 +239,8 @@ def test_syncing_twice_changes_nothing(case: tuple[History, int, int, int]) -> N
         assert len(before[0]) == n and before[1] == []
 
 
-@settings(max_examples=25, deadline=None)
-@given(histories_and_split(), st.booleans())
-def test_csv_and_sync_never_double_count_unambiguous_rows(
-    case: tuple[History, int, int, int], csv_first: bool
-) -> None:
-    h, a, b, n = case  # CSV holds rows [0, a), the sync [b, n): overlap [b, a)
-    with temp_ledger() as (led, d):
-        csv = d / "export.csv"
-        csv.write_text(render_export(h, 0, a).text)
-        if csv_first:
-            led.import_files([csv])
-        led.apply_sync(response(h, b, n))
-        if not csv_first:
-            led.import_files([csv])
-        (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
-        led.link_synced_account("ACC-1", acc.id)  # merges the synced Account in
-        assert len(led.accounts()) == 1
-        assume(led.ambiguous_matches() == [])
-        assert len(led.transactions()) == n
-        total = sum(t.amount for t in led.transactions())
-        assert total == Decimal(sum(t.amount_minor for t in h.txns)).scaleb(-2)
+# CSV plus sync never double-counting is tested through the CLI:
+# test_cli_sync.py::test_csv_and_sync_through_the_cli_never_double_count
 
 
 @settings(max_examples=25, deadline=None)
@@ -259,9 +297,7 @@ def test_a_pending_row_posting_under_a_new_id_counts_once(
     rows = doc["accounts"][0]["transactions"]
     posted = rows.pop()
     rows.append(posted | {"id": "pending-id", "posted": 0, "pending": True})
-    doc["accounts"][0]["balance"] = str(
-        Decimal(doc["accounts"][0]["balance"]) - Decimal(posted["amount"])
-    )
+    # the balance already includes the pending row (spike #26)
     doc["accounts"][0]["balance-date"] -= 60  # read before the row posted
     led.apply_sync(json.dumps(doc).encode())
     assert len(led.transactions()) == 9

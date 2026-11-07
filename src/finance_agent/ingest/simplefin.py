@@ -36,9 +36,8 @@ OVERLAP_DAYS = 7  # re-fetch so late-posting rows are caught
 CONSENT_DAYS = 90  # GoCardless bank consent; the bank re-asks after this
 CONSENT_WARN_DAYS = 14  # warn this far ahead of expiry
 MAX_REQUESTS = 5  # per run; firefly-iii#12538 hit the bridge's daily quota
-# Spike: balance == available-balance even with a pending row, and balance-date is
-# the fetch time, so the feed cannot say whether balance includes pending rows.
-# The Ledger reports a Gap equal to the pending sum as "pending" instead.
+# Spike: balance == available-balance even with a pending row, so balance
+# includes pending rows; the Ledger subtracts them before reconciling (ADR 0014).
 TIMEOUT_S = 30
 MAX_RESPONSE_BYTES = 32 * 1024 * 1024  # spike: ~24 months of 2 Accounts is far less
 MAX_TEXT = 1024  # characters in any text field; longer refuses the response
@@ -165,16 +164,17 @@ def _account(a: dict[str, Any]) -> SyncedAccount:
     org_name = _str(org, "name", required=False) or _str(org, "id", required=False)
     txns = _list(a.get("transactions", []), "transactions")
     posted: dict[str, SyncedRow] = {}
+    # one ID is one row for pending rows too, so a repeat cannot cancel a Gap
+    pending: dict[str, SyncedRow] = {}
     conflict = False
-    pending_minor = 0
     for t in txns:
         is_pending, row = _row(_obj(t, "transaction"))
-        if is_pending:
-            pending_minor += row.amount_minor
-        elif row.provider_id not in posted:
-            posted[row.provider_id] = row
-        elif posted[row.provider_id] != row:
+        seen = pending if is_pending else posted
+        if row.provider_id not in seen:
+            seen[row.provider_id] = row
+        elif seen[row.provider_id] != row:
             conflict = True
+    pending_minor = sum(r.amount_minor for r in pending.values())
     return SyncedAccount(
         provider_id=pid,
         org=org_name,

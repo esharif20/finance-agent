@@ -182,7 +182,6 @@ class SyncReport:
     changed_known: int  # known IDs arriving with other fields; stored rows unchanged
     rejected_accounts: int  # one ID with differing rows: that Account's rows refused
     provider_duplicates: int  # rows in new Possible Duplicates (ADR 0014 (a), (b))
-    pending_explained: int  # Gaps equal to the pending sum (still opened)
     provider_errors: int
     gaps: list[SyncGap]
     accounts: list[AffectedAccount]
@@ -355,7 +354,6 @@ def _month_bounds(month: str) -> tuple[date, date]:
 class Ledger:
     def __init__(self, conn: Connection, user_id: int) -> None:
         self._db = Scoped(conn, user_id)
-        self._merged = 0  # pairs merged by _match, for reports
 
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
         added = known = ambiguous = files = 0
@@ -572,7 +570,17 @@ class Ledger:
             self._db.select(si, si.c.id).where(si.c.file_hash == digest)
         ).first():
             n = sum(len(a.rows) for a in parsed.accounts)
-            return SyncReport(0, 0, n, 0, 0, 0, 0, parsed.errors, [], [])
+            return SyncReport(
+                added=0,
+                matched=0,
+                already_known=n,
+                changed_known=0,
+                rejected_accounts=0,
+                provider_duplicates=0,
+                provider_errors=parsed.errors,
+                gaps=[],
+                accounts=[],
+            )
         import_id = self._db.insert(
             si,
             source="simplefin",
@@ -581,8 +589,7 @@ class Ledger:
             imported_at=datetime.now(UTC),
         )
         self._db.bump_ledger_version()  # a stored Statement Import, as in import_files
-        added = known = changed = rejected = dupes = pending_explained = 0
-        self._merged = 0
+        added = known = changed = rejected = dupes = merged = 0
         gaps: list[SyncGap] = []
         touched: dict[int, str] = {}
         position = 0
@@ -639,11 +646,9 @@ class Ledger:
                     statement_import_id=import_id,
                     row_number=position,
                 )
-            self._match(account_id)
+            merged += self._match(account_id)[0]
             dupes += self._record_duplicates(account_id, import_id, acc, new_ids)
             gap = self._reconcile(account_id, masked, acc)
-            if gap is not None and gap.amount == _decimal(acc.pending_minor):
-                pending_explained += 1  # a hint only: ADR 0014 opens every Gap
             if gap is not None:
                 self._db.insert(
                     schema.sync_gap,
@@ -667,16 +672,15 @@ class Ledger:
             (time.perf_counter_ns() - started) // 1_000_000,
         )
         return SyncReport(
-            added - self._merged,
-            self._merged,
-            known,
-            changed,
-            rejected,
-            dupes,
-            pending_explained,
-            parsed.errors,
-            gaps,
-            [AffectedAccount(i, m) for i, m in sorted(touched.items())],
+            added=added - merged,
+            matched=merged,
+            already_known=known,
+            changed_known=changed,
+            rejected_accounts=rejected,
+            provider_duplicates=dupes,
+            provider_errors=parsed.errors,
+            gaps=gaps,
+            accounts=[AffectedAccount(i, m) for i, m in sorted(touched.items())],
         )
 
     def link_synced_account(self, provider_account_id: str, account_id: int) -> None:
@@ -716,6 +720,41 @@ class Ledger:
         self._match(account_id)
         self._link_transfers()
 
+    def unlinked_csv_accounts(self) -> dict[str, int]:
+        """Accounts no synced Account is linked to, by masked number."""
+        a = schema.account
+        return {
+            str(r.masked_number): int(r.id)
+            for r in self._db.execute(
+                self._db.select(a, a.c.id, a.c.masked_number).where(
+                    a.c.provider_ref.is_(None)
+                )
+            )
+        }
+
+    def synced_account_linked(self, provider_account_id: str) -> bool:
+        """True once that SimpleFIN Account is linked to a CSV Account."""
+        a = schema.account
+        ref = keyed_ref("simplefin:" + provider_account_id)
+        return (
+            self._db.execute(
+                self._db.select(a, a.c.id).where(
+                    a.c.provider_ref == ref, a.c.external_ref != ref
+                )
+            ).first()
+            is not None
+        )
+
+    def unlinked_synced_accounts(self) -> int:
+        """Synced Accounts still standing alone (ADR 0014: two Accounts until
+        the user links them)."""
+        a = schema.account
+        return len(
+            self._db.execute(
+                self._db.select(a, a.c.id).where(a.c.provider_ref == a.c.external_ref)
+            ).all()
+        )
+
     def ambiguous_matches(self) -> list[frozenset[int]]:
         """ADR 0014 ambiguous CSV-to-sync components, re-evaluated each import."""
         a = schema.account
@@ -723,7 +762,7 @@ class Ledger:
         for (account_id,) in self._db.execute(
             self._db.select(a, a.c.id).where(a.c.provider_ref.is_not(None))
         ):
-            out += self._match(account_id, merge=False)
+            out += self._match(account_id, merge=False)[1]
         return out
 
     def possible_duplicates(self) -> list[frozenset[int]]:
@@ -809,7 +848,9 @@ class Ledger:
 
     def alert_is_new(self, key: str | None) -> bool:
         """Remember the alert last shown; True only when `key` differs from it,
-        so an unchanged problem is not announced again on every run."""
+        so an unchanged problem is not announced again on every run. Pass None
+        when all is well: it clears the memory (and returns True, which the
+        caller ignores), so the same problem recurring later is announced."""
         row = self._status_row()
         if (row.notified if row else None) == key:
             return False
@@ -941,15 +982,18 @@ class Ledger:
             rows += len(g)
         return rows
 
-    def _match(self, account_id: int, *, merge: bool = True) -> list[frozenset[int]]:
+    def _match(
+        self, account_id: int, *, merge: bool = True
+    ) -> tuple[int, list[frozenset[int]]]:
         """ADR 0014 CSV-to-sync matching over the Account's unmatched rows.
-        Pairs merge into the CSV Transaction; returns ambiguous components."""
+        Pairs merge into the CSV Transaction; returns (pairs merged, ambiguous
+        components)."""
         a, t, k = schema.account, schema.transaction, schema.synced_key
         linked = self._db.execute(
             self._db.select(a, a.c.provider_ref).where(a.c.id == account_id)
         ).scalar()
         if linked is None:
-            return []
+            return 0, []
         rows = self._db.execute(
             self._db.select(
                 t,
@@ -975,6 +1019,7 @@ class Ledger:
                     _MatchRow(r.id, synced, r.posted_on, r.provider_id or r.id)
                 )
         ambiguous: list[frozenset[int]] = []
+        merged = 0
         for group in groups.values():
             for component in _components(group):
                 csv = sorted(
@@ -993,9 +1038,10 @@ class Ledger:
                     if merge:
                         for c, s in pairs:
                             self._merge(c.id, s.id)
+                        merged += len(pairs)
                 else:
                     ambiguous.append(frozenset(m.id for m in component))
-        return ambiguous
+        return merged, ambiguous
 
     def _merge(self, csv_id: int, synced_id: int) -> None:
         """A matched pair becomes one Transaction: the CSV one stays and takes the
@@ -1020,7 +1066,6 @@ class Ledger:
                 .values(transaction_id=csv_id)
             )
         self._db.execute(self._db.delete(t).where(t.c.id == synced_id))
-        self._merged += 1
 
     def _reconcile(
         self,
@@ -1028,7 +1073,10 @@ class Ledger:
         masked: str,
         acc: simplefin.SyncedAccount,
     ) -> SyncGap | None:
-        """ADR 0014: B_k - B_1 - sum of Transactions with instant in (t_1, t_k]."""
+        """ADR 0014: B_k - B_1 - sum of Transactions with instant in (t_1, t_k].
+        B is the reported balance less pending rows: spike #26 found it includes
+        them (balance == available-balance with a pending row present)."""
+        balance = acc.balance_minor - acc.pending_minor
         anchor = schema.sync_anchor
         first = self._db.execute(
             self._db.select(anchor, anchor.c.balance_minor, anchor.c.balance_ts).where(
@@ -1039,7 +1087,7 @@ class Ledger:
             self._db.insert(
                 anchor,
                 account_id=account_id,
-                balance_minor=acc.balance_minor,
+                balance_minor=balance,
                 balance_ts=acc.balance_ts,
             )
             return None
@@ -1055,7 +1103,7 @@ class Ledger:
             )
             if first.balance_ts < instant <= acc.balance_ts:
                 moved += r.amount_minor
-        gap = acc.balance_minor - first.balance_minor - moved
+        gap = balance - first.balance_minor - moved
         if not gap:
             return None
         return SyncGap(
