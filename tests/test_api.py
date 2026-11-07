@@ -13,6 +13,7 @@ from sqlalchemy import Engine
 
 from finance_agent import api, categorise, identity, storage
 from finance_agent.ledger import Ledger
+from finance_agent.storage import backup
 from synthetic_lloyds import generate_histories, render_export
 
 
@@ -46,6 +47,21 @@ def test_sync_status_endpoint_has_no_amounts_or_urls(
     body = client.get("/api/sync-status").json()
     assert body["failure_class"] == "OSError" and body["failures_in_a_row"] == 1
     assert body["consent_warning"] is True and body["consent_days_left"] in (9, 10, 11)
+    assert body["last_backup_at"] is None and body["backup_warning"] is False
+
+
+def test_sync_status_reports_the_last_backup_and_warns_after_7_days(
+    client: TestClient,
+) -> None:
+    data = storage.default_db_path().parent
+    uuid = "0A1B2C3D-0000-4000-8000-000000000001"
+    backup.save_config(data, backup.Config(uuid, backup.DEFAULT_FOLDER))
+    ran = datetime.now(UTC) - timedelta(days=8)
+    backup.record(data, ran, "ok")
+    body = client.get("/api/sync-status").json()
+    assert body["last_backup_at"] == ran.isoformat() and body["backup_warning"]
+    backup.record(data, datetime.now(UTC), "ok")
+    assert client.get("/api/sync-status").json()["backup_warning"] is False
 
 
 def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None:

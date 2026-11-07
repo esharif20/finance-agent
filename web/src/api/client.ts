@@ -7,6 +7,7 @@ export type TxnPage = components["schemas"]["TransactionsOut"];
 export type CategoryGroup = components["schemas"]["CategoryOut"];
 
 export type Spending = components["schemas"]["SpendingOut"];
+export type SyncStatus = components["schemas"]["SyncStatusOut"];
 
 export class NoData extends Error {}
 
@@ -72,6 +73,7 @@ export const postCorrection = (body: {
 /** Undo a Correction; the Ledger keeps it in the history, marked reverted. */
 export const revertCorrection = (id: number) => send(`/api/corrections/${id}`, { method: "DELETE" });
 export const fetchMonths = () => get<string[]>("/api/months");
+export const fetchSyncStatus = () => get<SyncStatus>("/api/sync-status");
 export type MonthTotals = components["schemas"]["MonthTotalsOut"];
 export const fetchMonthSeries = (accountId?: number) =>
   get<MonthTotals[]>(

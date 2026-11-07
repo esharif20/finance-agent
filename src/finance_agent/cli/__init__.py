@@ -94,7 +94,41 @@ def _main(argv: Sequence[str] | None) -> int:
     mode.add_argument("--install", action="store_true", help="run daily (launchd)")
     mode.add_argument("--uninstall", action="store_true", help="stop the daily run")
     mode.add_argument("--notify", action="store_true", help="alert on trouble")
+    bk = sub.add_parser(
+        "backup",
+        help="back up to the registered external drive",
+        description="Back up the ledger, card art and config to the external "
+        "drive registered with `fa backup setup`. Keeps 7 daily and 4 weekly copies.",
+    )
+    bk.add_argument("action", nargs="?", choices=["setup", "remove"])
+    bk.add_argument(
+        "--on-mount",
+        action="store_true",
+        help="back up only if the last one is over 24h old (launchd calls this)",
+    )
+    rs = sub.add_parser("restore", help="restore the ledger from a backup copy")
+    rs.add_argument("copy", nargs="?", help="a copy's name or path (default: newest)")
+    rs.add_argument(
+        "--recovery-key",
+        action="store_true",
+        help="on a new Mac: read the recovery key from stdin (never pass it here)",
+    )
     args = parser.parse_args(argv)
+
+    if args.command in ("backup", "restore"):
+        from finance_agent.cli import backup
+
+        try:
+            if args.command == "restore":
+                return backup.restore(args.copy, args.recovery_key)
+            if args.action == "setup":
+                return backup.setup()
+            if args.action == "remove":
+                return backup.remove()
+            return backup.run(on_mount=args.on_mount)
+        except (OSError, ValueError, LookupError) as e:
+            print(f"fa: {e}", file=sys.stderr)  # messages never carry a key
+            return 1
 
     if args.command in ("connect", "disconnect", "sync"):
         from finance_agent.cli import bank
@@ -116,7 +150,12 @@ def _main(argv: Sequence[str] | None) -> int:
                 return 0
             from finance_agent.cli import watch
 
-            return bank.sync(LOCAL_USER, watch.osascript if args.notify else None)
+            rc = bank.sync(LOCAL_USER, watch.osascript if args.notify else None)
+            if rc == 0 and args.notify:  # the scheduled job: back up after a sync
+                from finance_agent.cli import backup
+
+                backup.run(notify=watch.osascript)
+            return rc
         except (OSError, ValueError, SimpleFINError) as e:
             print(f"fa: {e}", file=sys.stderr)  # messages never carry the URL
             return 1
