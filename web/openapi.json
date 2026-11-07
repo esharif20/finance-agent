@@ -563,6 +563,10 @@
       "SyncStatusOut": {
         "description": "Freshness and consent only: a failure is an error class and a count.",
         "properties": {
+          "backup_warning": {
+            "title": "Backup Warning",
+            "type": "boolean"
+          },
           "consent_days_left": {
             "anyOf": [
               {
@@ -604,6 +608,17 @@
             "title": "Failures In A Row",
             "type": "integer"
           },
+          "last_backup_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Backup At"
+          },
           "last_failure_at": {
             "anyOf": [
               {
@@ -634,7 +649,9 @@
           "failures_in_a_row",
           "consent_expires_on",
           "consent_days_left",
-          "consent_warning"
+          "consent_warning",
+          "last_backup_at",
+          "backup_warning"
         ],
         "title": "SyncStatusOut",
         "type": "object"

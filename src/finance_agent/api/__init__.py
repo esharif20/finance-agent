@@ -4,7 +4,7 @@ Money crosses the wire as integer minor units plus a currency; the frontend
 formats it in one place."""
 
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
@@ -31,7 +31,7 @@ from finance_agent.ledger import (
     Transaction,
     UnknownTarget,
 )
-from finance_agent.storage import open_db
+from finance_agent.storage import backup, default_db_path, open_db
 
 # shortcut: located relative to the source tree, so only a checkout serves the UI
 WEB_DIST = Path(__file__).resolve().parents[3] / "web" / "dist"
@@ -184,6 +184,8 @@ class SyncStatusOut(BaseModel):
     consent_expires_on: str | None
     consent_days_left: int | None
     consent_warning: bool
+    last_backup_at: str | None  # the last good copy on the backup drive (#95)
+    backup_warning: bool  # a drive is registered but no copy in 7 days
 
 
 class HealthOut(BaseModel):
@@ -440,6 +442,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.get("/api/sync-status")
     def sync_status(led: Led) -> SyncStatusOut:
         st = led.sync_status()
+        bk = backup.status(default_db_path().parent, datetime.now(UTC))
 
         def iso(v: object) -> str | None:
             return v.isoformat() if isinstance(v, (date, datetime)) else None
@@ -452,6 +455,8 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             consent_expires_on=iso(st.consent_expires_on),
             consent_days_left=st.consent_days_left,
             consent_warning=st.consent_warning,
+            last_backup_at=iso(bk.last_backup_at),
+            backup_warning=bk.warning,
         )
 
     @app.get(

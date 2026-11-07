@@ -70,7 +70,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 
 | Module | Owns | Depends on |
 | --- | --- | --- |
-| `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id` | nothing |
+| `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id`, and `storage.backup`: encrypted copies to a registered drive, their manifest and retention, and restore (#95) | nothing |
 | `ingest` | One parser per Bank, the `Importer` interface, account-number masking, and `ingest.simplefin`: the read-only SimpleFIN client, the only module that may import a network client, besides `cli.launcher`'s probe of our own server on 127.0.0.1 (ADR 0013, `tests/test_network_boundary.py`). Untrusted input: it touches neither the database nor the Ledger | nothing |
 | `ledger` | Transactions, duplicate detection (ADR 0006), Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage`, `ingest` |
 | `categorise` | Taxonomy (versioned; the data is in `ledger.taxonomy` so the Ledger can show old Corrections in current names), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger`, `storage` (its own derived tables) |
@@ -79,7 +79,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `assistant` | The LangGraph graph, tool allowlist, grounding check, answer cache (ADR 0010), `ChatModel` interface and adapters | `engine`, `ledger` (read-only views), `memory` |
 | `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0013). No database access. | nothing except the payload it is handed |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
-| `cli` | The `fa` command. `fa import`, `fa summary`, `fa connect` / `disconnect` / `sync` (SimpleFIN, ADR 0013/0014) and `fa watch` (watched-folder import) call the Ledger interface in process; `fa sync --install` and `fa watch install` write `launchd` agents; `fa` (open dashboard) talks to the running server | `ledger`, `categorise`, `storage` (opening the database, the Keychain), `ingest.simplefin` (fetching), `identity` (in-process); `api` only over HTTP |
+| `cli` | The `fa` command. `fa import`, `fa summary`, `fa connect` / `disconnect` / `sync` (SimpleFIN, ADR 0013/0014) and `fa watch` (watched-folder import) call the Ledger interface in process; `fa backup` / `fa restore` call `storage.backup` (the scheduled sync backs up after it succeeds); `fa sync --install`, `fa watch install` and `fa backup setup` write `launchd` agents; `fa` (open dashboard) talks to the running server | `ledger`, `categorise`, `storage` (opening the database, the Keychain), `ingest.simplefin` (fetching), `identity` (in-process); `api` only over HTTP |
 
 Dependency direction is enforced by an import-linter check in CI: nothing imports `assistant` except `api`, and `gateway` imports nothing from the core.
 
