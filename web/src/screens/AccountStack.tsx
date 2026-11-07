@@ -416,7 +416,7 @@ export function AccountStack({
                 {f.masked ? <span className="block text-label opacity-80">{f.masked}</span> : null}
               </span>
               {f.balance ? (
-                <Money value={f.balance} className="account-balance text-row font-semibold" />
+                <Money value={f.balance} odometer={f.key} className="account-balance text-row font-semibold" />
               ) : null}
               <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
                 {f.matches ? (
@@ -438,7 +438,7 @@ export function AccountStack({
         Showing {current.masked ? `${current.title} ${current.masked}` : current.title}
       </p>
       {gaps.length === 0 ? null : (
-        <ul className="flex flex-col gap-2 text-label text-muted-foreground">
+        <ul className="spotlight flex flex-col gap-2 text-label text-muted-foreground">
           {gaps.map(({ a, g }) => (
             <li key={`${a.id}-${g.from_date}-${g.to_date}`}>
               {a.bank} {a.masked_number}: between {day(g.from_date)} and {day(g.to_date)} your
