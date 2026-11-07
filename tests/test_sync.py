@@ -2,15 +2,18 @@
 
 import json
 from collections.abc import Callable
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import History, generate_histories, render_export
+from synthetic_lloyds.generator import SORT_CODE, _with_balances  # pyright: ignore[reportPrivateUsage]
 from synthetic_simplefin import response
 from test_dedupe import temp_ledger
 
@@ -155,6 +158,28 @@ def test_a_repeated_pending_id_cannot_cancel_a_real_gap() -> None:
         acc["balance"] = str(Decimal(acc["balance"]) + Decimal(1) + amount)
         r = led.apply_sync(json.dumps(doc).encode())
         assert [g.amount for g in r.gaps] == [amount]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="ADR 0014 sorted pairing chains across the coverage boundary; needs an "
+    "ADR decision (coverage-aware matching)",
+)
+def test_identical_purchases_across_the_coverage_boundary_are_never_merged() -> None:
+    # Three real coffees on 1, 3 and 5 Jan. The CSV holds the first two, the sync
+    # the last two. Sorted pairing gives (1, 3) and (3, 5), both within 3 days, so
+    # three purchases become two, with no Possible Duplicate and no Gap.
+    ev = [(date(2026, 1, d), "DEB", "CAFE NERO 0042", -350) for d in (1, 3, 5)]
+    h = History(SORT_CODE, "00000001", _with_balances(ev, 100000))
+    with temp_ledger() as (led, d):
+        csv = d / "export.csv"
+        csv.write_text(render_export(h, 0, 2).text)
+        led.import_files([csv])
+        led.apply_sync(response(h, 1, 3))
+        (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
+        led.link_synced_account("ACC-1", acc.id)
+        lost_one = len(led.transactions()) < 3
+        assert not lost_one or led.possible_duplicates()
 
 
 def test_csv_history_before_the_anchor_never_opens_a_gap(

@@ -404,9 +404,11 @@ def test_csv_and_sync_through_the_cli_never_double_count(
     n = len(h.txns)
     a = data.draw(st.integers(1, n))  # CSV holds rows [0, a), the sync [b, n)
     b = data.draw(st.integers(0, a - 1))
-    # ADR 0014's precondition: a CSV-only row and a sync-only row are more than
-    # MATCH_DAYS apart, else the rule pairs them as one purchase
-    assume(b == 0 or a == n or (h.txns[a].date - h.txns[b - 1].date).days > 3)
+    # Known limit, pinned by test_sync.py::test_identical_purchases_across_the_
+    # coverage_boundary_are_never_merged (xfail): ADR 0014 can pair a CSV-only
+    # row with a sync-only identical purchase and lose one. Exclude only that.
+    csv_only = {(t.amount_minor, t.description) for t in h.txns[:b]}
+    assume(not csv_only & {(t.amount_minor, t.description) for t in h.txns[a:]})
     d = tmp_path_factory.mktemp("cli")
     csv = d / "export.csv"
     csv.write_text(render_export(h, 0, a).text)
@@ -429,11 +431,17 @@ def test_csv_and_sync_through_the_cli_never_double_count(
         try:
             with engine.begin() as conn:
                 led = Ledger(conn, 1)
-                assume(led.ambiguous_matches() == [])
+                ambiguous = led.ambiguous_matches()
+                surfaced = {i for c in led.possible_duplicates() for i in c}
                 txns = led.transactions()
                 assert len(led.accounts()) == 1
-                assert len(txns) == n
+                # ambiguity is surfaced, never merged: no purchase is lost, and
+                # each extra row sits in a surfaced Possible Duplicate
+                assert {i for c in ambiguous for i in c} <= surfaced
+                assert n <= len(txns) <= n + sum(len(c) for c in ambiguous) // 2
         finally:
             engine.dispose()
-    total = sum(t.amount for t in txns)
-    assert total == Decimal(sum(t.amount_minor for t in h.txns)).scaleb(-2)
+    if not ambiguous:
+        assert len(txns) == n
+        total = sum(t.amount for t in txns)
+        assert total == Decimal(sum(t.amount_minor for t in h.txns)).scaleb(-2)
