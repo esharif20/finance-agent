@@ -4,7 +4,8 @@ planted event type on the synthetic histories, against a trivial-rule baseline.
     uv run python evals/detectors.py            # CI: results reproduce
     uv run python evals/detectors.py --write    # refresh (see gate.py)
 
-The detector tickets (#147, #148) implement `Detector` and replace `stub`.
+The detector tickets implement `Detector` as `candidate`: #147 flags Category
+spikes against the personal seasonal baseline; #148 adds the other types.
 A detector sees only what the Ledger holds (`Row`), never the ground truth,
 and returns dated `Detection`s for the whole history. A detection matches an
 unmatched planted event of its type and key when its date falls in that
@@ -23,6 +24,7 @@ from typing import Any, NamedTuple, Protocol
 
 import gate
 import synthetic_history as sh
+from finance_agent.engine.baselines import Insufficient, seasonal_baseline
 
 RESULTS = Path(__file__).parent / "results" / "detectors_baseline.json"
 WINDOWS = {
@@ -176,14 +178,44 @@ def baseline(rows: Sequence[Row]) -> list[Detection]:
     return _price_rises(rows) + _spikes(rows) + _renewals(rows) + _shortfalls(rows)
 
 
-def stub(rows: Sequence[Row]) -> list[Detection]:
-    """Placeholder until #148: detects nothing."""
-    return []
+# --- the candidate ------------------------------------------------------------
+
+SPIKE = (3, 2)  # a month's spend over 1.5 x its personal seasonal baseline
+
+
+def _baseline_spikes(rows: Sequence[Row]) -> list[Detection]:
+    """A Category-month spending over SPIKE x its seasonal baseline (#147),
+    flagged on the day it crosses; nothing below the ADR 0015 gate."""
+    by_cat: defaultdict[sh.Category, list[Row]] = defaultdict(list)
+    for r in rows:
+        if r.category != sh.NONE:
+            by_cat[r.category].append(r)
+    out: list[Detection] = []
+    for cat, rs in by_cat.items():
+        pairs = [(r.date, r.amount) for r in rs]
+        by_month: defaultdict[int, list[Row]] = defaultdict(list)
+        for r in rs:
+            by_month[sh.month_index(r.date)].append(r)
+        for m, month in sorted(by_month.items()):
+            b = seasonal_baseline(pairs, sh.month_start(m))
+            if isinstance(b, Insufficient) or b.expected == 0:
+                continue
+            spent = 0
+            for r in sorted(month, key=lambda r: (r.date, r.id)):
+                spent += max(0, -r.amount)
+                if SPIKE[1] * spent > SPIKE[0] * b.expected:
+                    out.append(Detection("category_spike", r.date, sh.label(cat)))
+                    break
+    return out
+
+
+def candidate(rows: Sequence[Row]) -> list[Detection]:
+    return _baseline_spikes(rows)
 
 
 MODELS: dict[str, tuple[str, str, Detector]] = {
     "baseline": ("trivial-rules", "1", baseline),
-    "candidate": ("stub", "0", stub),
+    "candidate": ("engine-detectors", "1", candidate),
 }
 
 
