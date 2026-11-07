@@ -224,3 +224,72 @@ def test_empty_history_never_crashes() -> None:
     assert det.upcoming_renewals([]) == []
     for f in (det.price_increases, det.category_spikes, det.recurring_payments):
         assert isinstance(f([]), Insufficient)
+
+
+# --- verifier #188: adversarial ---------------------------------------------------
+
+
+@settings(max_examples=60, deadline=None)
+@given(ledgers())
+def test_a_stopped_merchant_never_gets_a_renewal_or_a_price_rise(
+    rows: list[det.Row],
+) -> None:
+    """Cancelled (`Ledger.cancel_subscription`) or marked not a subscription:
+    the user's word beats the rows, in every detector that predicts a charge."""
+    stopped = frozenset(MERCHANTS[::2])
+    rises = det.price_increases(rows, stopped)
+    for i in [*det.upcoming_renewals(rows, stopped), *_or_none(rises)]:
+        assert i.key not in stopped
+    for i in det.detect(rows, stopped):
+        if i.type in ("upcoming_renewal", "price_increase"):
+            assert i.key not in stopped
+    # the rows still count everywhere else
+    assert [i for i in det.detect(rows) if i.type == "category_spike"] == [
+        i for i in det.detect(rows, stopped) if i.type == "category_spike"
+    ]
+
+
+def _or_none(result: list[det.Insight] | Insufficient) -> list[det.Insight]:
+    return [] if isinstance(result, Insufficient) else result
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    st.integers(500, 5_000),
+    st.integers(3, 8),
+    st.lists(st.tuples(st.integers(0, 300), st.integers(1, 20_000)), max_size=6),
+)
+def test_a_refund_never_looks_like_a_price_rise(
+    price: int, n: int, refunds: list[tuple[int, int]]
+) -> None:
+    rows = _monthly("STREAMLY", [price] * n)
+    rows += [
+        det.Row(100 + k, date(2024, 1, 5) + timedelta(days=d), "STREAMLY", STREAM, a)
+        for k, (d, a) in enumerate(refunds)
+    ]
+    assert det.price_increases(rows) == []
+
+
+def test_a_weekly_rise_is_annualised_over_52_weeks() -> None:
+    rows = [
+        det.Row(i + 1, date(2024, 1, 1) + timedelta(weeks=i), "GYMLY", SHOP, -500)
+        for i in range(4)
+    ]
+    rows.append(det.Row(5, date(2024, 1, 29), "GYMLY", SHOP, -600))
+    [rise] = _found(det.price_increases(rows))
+    assert rise.impact == 100 * 52
+
+
+def test_a_one_off_buy_on_a_charge_day_is_not_a_price_rise() -> None:
+    rows = _monthly("STREAMLY", [1_099] * 4)
+    rows.append(det.Row(9, date(2024, 4, 5), "STREAMLY", STREAM, -4_000))
+    assert det.price_increases(rows) == []
+
+
+def test_a_lapsed_annual_series_renews_once_and_never_after_it_is_due() -> None:
+    rows = [
+        det.Row(i + 1, date(2021 + i, 6, 1), "VAULTBOX", SHOP, -6_000) for i in range(3)
+    ]
+    renewals = det.upcoming_renewals(rows)  # nothing after 2023: it lapsed
+    # one renewal, from the series' last charge; no later one once it is due
+    assert [(i.on, i.evidence) for i in renewals] == [(date(2024, 5, 4), (3,))]

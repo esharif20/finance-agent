@@ -1,7 +1,9 @@
 """Detectors (#148, docs/AI_DESIGN.md, ADR 0015): typed Insight candidates.
 
-Pure functions over a Ledger's Spending rows (`Row`: signed pence, money out
-negative, Refunds positive); the caller leaves out income and transfers. Each
+Pure functions over a Ledger's Spending rows (`Row`: signed GBP pence, money
+out negative, Refunds positive); the caller leaves out income, transfers and
+foreign rows still needing an FX rate (never guessed), and passes as `stopped`
+the Merchants the user cancelled or marked not a subscription. Each
 returns `Insight`s with an impact in integer pence computed here, a confidence
 in percent and the ids of the Transactions that evidence it, each dated the
 day the rows first support it, so a run over a whole history replays what
@@ -21,7 +23,7 @@ Confidences are fixed priors per rule until the ranker (#150) calibrates them.
 """
 
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Literal, NamedTuple
@@ -117,14 +119,19 @@ def recurring_payments(rows: Iterable[Row]) -> list[Insight] | Insufficient:
     return out
 
 
-def price_increases(rows: Iterable[Row]) -> list[Insight] | Insufficient:
+def price_increases(
+    rows: Iterable[Row], stopped: Collection[str] = ()
+) -> list[Insight] | Insufficient:
     """A charge over 5% above the series it follows, one cadence after the
-    series' last charge; impact is the rise over a year."""
+    series' last charge; impact is the rise over a year. `stopped` Merchants
+    (cancelled, or marked not a subscription) are never flagged."""
     by_merchant = _charges(rows)
     if (short := _gate(by_merchant)) is not None:
         return short
     out: list[Insight] = []
     for merchant, charges in sorted(by_merchant.items()):
+        if merchant in stopped:
+            continue
         for i in range(MIN_CHARGES, len(charges)):
             new, prev = -charges[i].amount, charges[i - 1]
             if new * 100 <= -prev.amount * (100 + TOLERANCE_PCT):
@@ -202,14 +209,19 @@ def _year_on(d: date) -> date:
         return date(d.year + 1, 2, 28)
 
 
-def upcoming_renewals(rows: Iterable[Row]) -> list[Insight]:
+def upcoming_renewals(
+    rows: Iterable[Row], stopped: Collection[str] = ()
+) -> list[Insight]:
     """A charge renewing a year on, raised LEAD_DAYS before it is due unless the
     Merchant charges again first: an annual series (any Category), or, below
     the recurring gate (a rule, not a learned component), a Subscriptions
     charge with nothing from the Merchant in the ANNUAL_GAP days before it.
-    Impact is the fee last paid."""
+    Impact is the fee last paid. `stopped` Merchants (cancelled, or marked
+    not a subscription) never renew."""
     out: list[Insight] = []
     for merchant, charges in sorted(_charges(rows).items()):
+        if merchant in stopped:
+            continue
         for j, c in enumerate(charges):
             prev = charges[j - 1] if j else None
             if prev and (c.posted_on - prev.posted_on).days < ANNUAL_GAP:
@@ -232,15 +244,17 @@ def upcoming_renewals(rows: Iterable[Row]) -> list[Insight]:
     return out
 
 
-def detect(rows: Iterable[Row]) -> list[Insight]:
-    """Every detector's Insights; one below its gate contributes none."""
+def detect(rows: Iterable[Row], stopped: Collection[str] = ()) -> list[Insight]:
+    """Every detector's Insights; one below its gate contributes none.
+    `stopped` Merchants get no price increase or renewal; their rows still
+    count towards spikes."""
     rows = list(rows)
     out: list[Insight] = []
     for found in (
         recurring_payments(rows),
-        price_increases(rows),
+        price_increases(rows, stopped),
         category_spikes(rows),
-        upcoming_renewals(rows),
+        upcoming_renewals(rows, stopped),
     ):
         if not isinstance(found, Insufficient):
             out += found
