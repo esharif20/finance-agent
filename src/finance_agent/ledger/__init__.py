@@ -345,6 +345,108 @@ def _components(rows: list[_MatchRow]) -> list[list[_MatchRow]]:
     return [c for c in out.values() if len(c) > 1]
 
 
+def _within(complete: list[tuple[date, date]], d: date) -> bool:
+    """[d - MATCH_DAYS, d + MATCH_DAYS] lies inside one run of complete days, so
+    the other source must hold this row's counterpart (ADR 0014 amendment)."""
+    lo, hi = d - timedelta(MATCH_DAYS), d + timedelta(MATCH_DAYS)
+    start = end = date.min
+    for a, b in sorted(complete):
+        if end != date.min and a <= end + timedelta(1):
+            end = max(end, b)
+        else:
+            start, end = a, b
+        if start <= lo and hi <= end:
+            return True
+    return False
+
+
+def _pair(rows: list[_MatchRow], must: set[int]) -> list[tuple[int, int]] | None:
+    """ADR 0014 amendment: pairs for one component, or None when it is
+    ambiguous. A `must` row lies where the other source is complete, so it has
+    a counterpart; any other row may or may not. The component resolves only if
+    some matching pairs every `must` row and every such matching has the same
+    size and pairs the same rows (a smaller one would mean a purchase silently
+    lost; a different leftover row could strand a later import's row)."""
+    csv = sorted(
+        (m for m in rows if not m.synced), key=lambda m: (m.posted_on, m.order)
+    )
+    syn = sorted((m for m in rows if m.synced), key=lambda m: (m.posted_on, m.order))
+    adj = {
+        c.id: [s.id for s in syn if abs((c.posted_on - s.posted_on).days) <= MATCH_DAYS]
+        for c in csv
+    }
+    back: dict[int, list[int]] = defaultdict(list)
+    for c, ss in adj.items():
+        for s in ss:
+            back[s].append(c)
+    of_c: dict[int, int] = {}
+    of_s: dict[int, int] = {}
+
+    def augment(c: int, seen: set[int]) -> bool:
+        for s in adj[c]:
+            if s not in seen:
+                seen.add(s)
+                if s not in of_s or augment(of_s[s], seen):
+                    of_s[s], of_c[c] = c, s
+                    return True
+        return False
+
+    # a maximum matching; `must` CSV rows first, so it pairs all it can of them
+    for c in sorted(csv, key=lambda m: m.id not in must):
+        augment(c.id, set())
+    # then swap each unpaired `must` synced row in along an alternating path
+    # that frees a synced row nobody requires (CSV rows stay paired)
+    for s0 in [s.id for s in syn if s.id in must and s.id not in of_s]:
+        prev: dict[int, tuple[int, int]] = {}
+        queue, end = [s0], None
+        for s in queue:
+            if s != s0 and s not in must:
+                end = s
+                break
+            for c in back[s]:
+                nxt = of_c[c]  # every neighbour is paired, or the matching grows
+                if nxt != s0 and nxt not in prev:
+                    prev[nxt] = (c, s)
+                    queue.append(nxt)
+        if end is None:
+            return None
+        del of_s[end]
+        while end != s0:
+            c, end = prev[end]
+            of_s[end], of_c[c] = c, end
+    if any(c.id in must and c.id not in of_c for c in csv):
+        return None
+    # a smaller valid matching exists iff an alternating path runs, by paired
+    # edges at both ends, from an optional CSV row to an optional synced row
+    queue = [of_c[c.id] for c in csv if c.id in of_c and c.id not in must]
+    seen = set(queue)
+    for s in queue:
+        if s not in must:
+            return None
+        for c in back[s]:
+            nxt = of_c.get(c)
+            if nxt is not None and nxt not in seen:
+                seen.add(nxt)
+                queue.append(nxt)
+    # an equal-size matching that leaves a different row unpaired is a guess
+    # too: that row may be the one a later import's row needed. It exists iff
+    # an alternating path runs from an unpaired row to a paired optional row.
+    for side, mate, other in ((adj, of_c, of_s), (back, of_s, of_c)):
+        queue = [x for x in side if x not in mate]
+        seen = set(queue)
+        for x in queue:
+            for y in side[x]:
+                nxt = other[y]  # y is paired, or the matching was not maximum
+                if nxt not in must:
+                    return None
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append(nxt)
+    if len(of_c) == len(csv) == len(syn):  # perfect: date order, as before
+        return [(c.id, s.id) for c, s in zip(csv, syn, strict=True)]
+    return list(of_c.items())
+
+
 def _month_bounds(month: str) -> tuple[date, date]:
     start = datetime.strptime(month, "%Y-%m").date()
     end = date(start.year + start.month // 12, start.month % 12 + 1, 1)
@@ -1020,28 +1122,74 @@ class Ledger:
                 )
         ambiguous: list[frozenset[int]] = []
         merged = 0
+        complete = self._coverage(account_id) if groups else {}
         for group in groups.values():
             for component in _components(group):
-                csv = sorted(
-                    (m for m in component if not m.synced),
-                    key=lambda m: (m.posted_on, m.order),
-                )
-                syn = sorted(
-                    (m for m in component if m.synced),
-                    key=lambda m: (m.posted_on, m.order),
-                )
-                pairs = list(zip(csv, syn, strict=False))
-                if len(csv) == len(syn) and all(
-                    abs((c.posted_on - s.posted_on).days) <= MATCH_DAYS
-                    for c, s in pairs
-                ):
-                    if merge:
-                        for c, s in pairs:
-                            self._merge(c.id, s.id)
-                        merged += len(pairs)
-                else:
+                must = {
+                    m.id
+                    for m in component
+                    if _within(
+                        complete["csv" if m.synced else "simplefin"], m.posted_on
+                    )
+                }
+                pairs = _pair(component, must)
+                if pairs is None:
                     ambiguous.append(frozenset(m.id for m in component))
+                elif merge:
+                    for c, s in pairs:
+                        self._merge(c, s)
+                    merged += len(pairs)
         return merged, ambiguous
+
+    def _coverage(self, account_id: int) -> dict[str, list[tuple[date, date]]]:
+        """ADR 0014 amendment: per source, the days each Statement Import holds
+        completely for the Account: from its first row's date (a sync asks from
+        London midnight; a CSV export may start mid-day, so not its first day)
+        to the day before its last row's (that day may still gain rows). A CSV
+        export whose dates are out of Bank order shows Bank order is not date
+        order, so no CSV export of the Account gives coverage."""
+        t, ts, si, k = (
+            schema.transaction,
+            schema.transaction_source,
+            schema.statement_import,
+            schema.synced_key,
+        )
+        days: dict[tuple[str, int], list[tuple[int, date]]] = defaultdict(list)
+        for r in self._db.execute(
+            self._db.select(
+                ts,
+                si.c.source,
+                ts.c.statement_import_id,
+                ts.c.bank_position,
+                t.c.posted_on,
+                k.c.posted_ts,
+            )
+            .join(si, self._db.on(si, si.c.id == ts.c.statement_import_id))
+            .join(t, self._db.on(t, t.c.id == ts.c.transaction_id))
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
+            .where(t.c.account_id == account_id)
+        ):
+            on = r.posted_on
+            if r.source == "simplefin" and r.posted_ts is not None:
+                on = datetime.fromtimestamp(int(r.posted_ts), simplefin.LONDON).date()
+            days[(str(r.source), int(r.statement_import_id))].append(
+                (int(r.bank_position), on)
+            )
+        unordered = any(
+            [d for _, d in sorted(rows)] != sorted(d for _, d in rows)
+            for (source, _), rows in days.items()
+            if source == "csv"
+        )
+        out: dict[str, list[tuple[date, date]]] = defaultdict(list)
+        for (source, _), rows in days.items():
+            if source == "csv" and unordered:
+                continue
+            ds = [d for _, d in rows]
+            lo = min(ds) + timedelta(0 if source == "simplefin" else 1)
+            hi = max(ds) - timedelta(1)
+            if lo <= hi:
+                out[source].append((lo, hi))
+        return out
 
     def _merge(self, csv_id: int, synced_id: int) -> None:
         """A matched pair becomes one Transaction: the CSV one stays and takes the

@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Eye, EyeOff, LayoutDashboard, ListOrdered } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
+import { IconSwap } from "@/components/IconSwap";
+import { NavTabs } from "@/components/NavTabs";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
 import { useRoute } from "@/lib/route";
 import { CategoryScreen } from "@/screens/CategoryScreen";
@@ -23,15 +25,14 @@ function Mark() {
 
 function HideAmounts() {
   const { hidden, toggle } = usePrivacy();
-  const Icon = hidden ? EyeOff : Eye;
   return (
     <button
       type="button"
       aria-pressed={hidden}
       onClick={toggle}
-      className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-full glass px-4 text-sm font-semibold transition-colors hover:bg-active"
+      className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-full glass px-4 text-sm font-semibold transition-colors [@media(hover:hover)]:hover:bg-active"
     >
-      <Icon className="size-4" aria-hidden="true" />
+      <IconSwap on={hidden} a={<Eye className="size-4" />} b={<EyeOff className="size-4" />} />
       Hide amounts
       <kbd className="hidden rounded-md bg-raised px-1.5 text-xs text-muted-foreground sm:inline">H</kbd>
     </button>
@@ -39,27 +40,9 @@ function HideAmounts() {
 }
 
 const TABS = [
-  { id: "overview", label: "Overview", Icon: LayoutDashboard },
-  { id: "transactions", label: "Transactions", Icon: ListOrdered },
-] as const;
-
-function Tabs({ tab, className, item }: { tab: string; className: string; item: string }) {
-  return (
-    <nav aria-label="Main" className={className}>
-      {TABS.map(({ id, label, Icon }) => (
-        <a
-          key={id}
-          href={`#${id}`}
-          aria-current={tab === id ? "page" : undefined}
-          className={`${item} ${tab === id ? "bg-foreground/10" : "hover:bg-active"}`}
-        >
-          <Icon className="size-4" aria-hidden="true" />
-          {label}
-        </a>
-      ))}
-    </nav>
-  );
-}
+  { id: "overview", label: "Overview", icon: <LayoutDashboard className="size-4" aria-hidden="true" /> },
+  { id: "transactions", label: "Transactions", icon: <ListOrdered className="size-4" aria-hidden="true" /> },
+];
 
 export function App() {
   const route = useRoute();
@@ -72,7 +55,8 @@ export function App() {
         <header className="glass sticky top-3 z-20 mb-6 flex items-center gap-3 rounded-full py-2 pr-2 pl-3">
           <Mark />
           <span className="text-base font-semibold">Finance Agent</span>
-          <Tabs
+          <NavTabs
+          tabs={TABS}
             tab={tab}
             className="ml-4 hidden gap-1 sm:flex"
             item="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold"
@@ -96,7 +80,8 @@ export function App() {
             </>
           )}
         </main>
-        <Tabs
+        <NavTabs
+          tabs={TABS}
           tab={tab}
           className="glass fixed inset-x-4 bottom-3 z-20 flex justify-center gap-1 rounded-full p-1.5 sm:hidden"
           item="inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold"

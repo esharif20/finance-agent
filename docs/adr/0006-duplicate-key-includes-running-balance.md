@@ -23,4 +23,4 @@ What is still ambiguous, and how it is handled:
 - Two windows with a gap between them can line up by mistake on a twin at their edges if the rows between them came only in a third, unconnected import. The runs make this unlikely, because any import that covers the gap joins the runs.
 - The balance chain (each row's balance minus its amount is the previous row's balance) is not used. It cannot tell twins apart, because twins have the same balance and the same amount.
 
-For Accounts synced through SimpleFIN, [ADR 0014](0014-synced-transaction-identity.md) amends this decision.
+For Accounts synced through SimpleFIN, [ADR 0014](0014-synced-transaction-identity.md) amends this decision. Its CSV-to-sync matching (amended in #74) relies on this decision's window model. Each CSV Statement Import holds every row on the days strictly between its first and last dates, while its edge days may be cut. CSV-to-CSV identity here is unchanged.
