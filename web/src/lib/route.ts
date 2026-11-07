@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 export type Route =
   | { name: "overview"; account?: number }
   | { name: "transactions" }
+  | { name: "review" }
   | { name: "category"; category: string; month?: string; account?: number };
 
 const id = (s: string | undefined) => (s && /^\d+$/.test(s) ? Number(s) : undefined);
@@ -12,6 +13,7 @@ const id = (s: string | undefined) => (s && /^\d+$/.test(s) ? Number(s) : undefi
 export function parseHash(hash: string): Route {
   const [kind, name, month, account] = hash.replace(/^#/, "").split("/");
   if (kind === "transactions") return { name: "transactions" };
+  if (kind === "review") return { name: "review" };
   if (kind === "account" && id(name) !== undefined) return { name: "overview", account: id(name) };
   if (kind === "category" && name) {
     try {
