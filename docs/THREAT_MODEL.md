@@ -17,6 +17,7 @@ Status: draft for review. Grows with each milestone.
 | B2 | `ingest` → rest of core | Transactions | Full account numbers never cross. Only the masked form leaves `ingest`. |
 | B3 | Core → `assistant` | Tool results | Read-only, allowlisted tools; aggregates, at most 20 rows, evidence IDs; descriptions marked as data and truncated. |
 | B4 | `assistant` → model | Prompt | Local Ollama on localhost only, unless the user opts in per conversation. |
+| B4a | `categorise.embedding` → Ollama | Merchant names (normalised descriptors) | `http://localhost:11434` only, the same guard as B4: any other host, port, scheme, credentials or path is refused, redirects are not followed, no proxy env vars. Replies are validated (shape, finite numbers, at most 4096 dimensions); errors and logs carry counts only (#113). |
 | B5 | `gateway` → cloud | Placeholder payload | Allowlist only: intent, generic Category names, placeholders, size buckets, months. Never merchants, amounts, exact dates, account details or Memory text (ADR 0011). |
 | B6 | Mac → registered external drive | Backup copies (zip of the SQLCipher database, card art, backup config) | Still SQLCipher-encrypted. Drive matched by Volume UUID only; the internal disk is refused; nothing is written elsewhere. `fa backup` deletes only files in its own manifest (#95). |
 | B7 | Repo → GitHub (public) | Code, fixtures, issues | Synthetic data only. Enforced by gitleaks and the fixture guard in CI. |

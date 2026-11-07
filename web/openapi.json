@@ -948,6 +948,23 @@
         "title": "KindTotal",
         "type": "object"
       },
+      "LocalModelOut": {
+        "properties": {
+          "status": {
+            "enum": [
+              "on",
+              "off"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "LocalModelOut",
+        "type": "object"
+      },
       "MerchantOut": {
         "properties": {
           "always_ask": {
@@ -2417,6 +2434,27 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/local-model": {
+      "get": {
+        "operationId": "local_model_api_local_model_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Local Model",
+        "tags": [
+          "local-model"
+        ]
       }
     },
     "/api/merchants": {

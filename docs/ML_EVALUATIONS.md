@@ -37,6 +37,23 @@ Status: draft for review.
 | Recommendation ranking | offline replay: acceptance of top 3 | rank by £ impact |
 | Change-point detection | detection delay and false alarms on synthetic shifts | none |
 
+### Categorisation (#112, #113)
+
+`evals/categoriser.py` scores two models on a seeded synthetic dataset of Merchant descriptors (seed 112, dataset v2: 320 Correction rows over 160 corrected Merchants, at least 5 per Category, and 259 test rows of clean, noisy, unseen, lookalike and refund descriptors). It runs through `evals/gate.py`, so CI fails unless the committed results reproduce, and `--write` refuses to lower any metric.
+
+- **Corrections + rules** (the baseline, ADR 0005). Its version is a fingerprint of the rule data (`rules-<sha>`), so a rule change shows as a new version.
+- **Corrections + rules + nearest neighbour**: what they leave Uncategorised takes the Category of the most similar Correction-labelled Merchant, with cosine similarity as the confidence. In CI it embeds with `TrigramEmbedder` (hashed character trigrams); `--ollama` runs nomic-embed-text on the local Ollama into `categoriser_ollama.json`, which CI cannot reproduce and never checks.
+
+Gated metrics, per model: macro F1, accuracy, coverage, ECE, ECE on assigned rows, and every Category's precision and recall, so one Category cannot collapse behind a steady macro F1. Plain ECE scores an abstention as confidence 0 and wrong, so a model that abstains a lot looks well calibrated; read `ece_assigned` beside `coverage`.
+
+| Model | Macro F1 | Accuracy | Coverage | ECE | ECE (assigned) |
+| --- | --- | --- | --- | --- | --- |
+| Corrections + rules | 0.775 | 0.656 | 0.676 | 0.019 | 0.029 |
+| + nearest neighbour, trigrams (CI) | 0.815 | 0.807 | 0.992 | 0.079 | 0.080 |
+| + nearest neighbour, nomic-embed-text (local) | 0.838 | 0.830 | 0.992 | 0.081 | 0.082 |
+
+Nearest neighbours fill noisy descriptors almost perfectly (noise accuracy 0.76 → 0.99) and help on unseen Merchants (0.25 → 0.50 with nomic), but raw similarity is a poor confidence: ECE quadruples. It does not beat the baseline on calibration, so it stays a suggester until #115 calibrates a threshold. Lookalikes stay at 0: a rule or a seeded alias decides them before any neighbour is asked.
+
 ### Recurring detection (#104)
 
 `evals/recurring.py` scores `categorise.recurring.detect_recurring` on 440 seeded synthetic schedules (seed 104, dataset v2). Gold recurring: weekly, monthly, annual, monthly with ±3 days and ±3% jitter, skipped months and price rises. Gold not recurring: irregular dates, one-offs, monthly visits with varying amounts, drifting amounts and fixed-price café visits. The metric is binary precision and recall. The baseline is "same amount ± 5% of the first charge, same interval ± 1 day as the first gap". Results are committed to `evals/results/recurring_baseline.json`; `tests/test_eval_recurring.py` fails when the detector falls below its committed scores or below the baseline.
