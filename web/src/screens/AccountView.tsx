@@ -165,7 +165,7 @@ export function TopMerchants({ spending }: { spending: Spending }) {
       {top.length === 0 ? (
         <p className="text-sm text-muted-foreground">No spending with a merchant this month.</p>
       ) : (
-        <ol aria-label="Top merchants" className="flex flex-col gap-3">
+        <ol aria-label="Top merchants" className="spotlight flex flex-col gap-3">
           {top.map((m) => (
             <li key={m.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1">
               <span className="truncate text-row font-semibold">{m.name}</span>
