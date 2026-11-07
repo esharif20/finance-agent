@@ -537,7 +537,7 @@ def test_migration_0017_adds_the_answer_cache_and_keeps_rows_that_reference_them
         "INSERT OR IGNORE INTO memory (id, user_id, proposal_id, type, text, tags,"
         " turn_id, quote, said_on, created_at) VALUES (1, 1, 1, 'goal', 's', '[]',"
         " 't', 'q', '2026-01-03', '2026-01-03')",
-        "INSERT INTO answer_cache (user_id, key, ledger_version, reply, created_at)"
-        " VALUES (1, 'k', 0, 'synthetic', '2026-01-03')",
+        "INSERT INTO answer_cache (user_id, key, ledger_version, reply, evidence,"
+        " created_at) VALUES (1, 'k', 0, 'synthetic', '[]', '2026-01-03')",
     )
     round_trip(tmp_path, "0016", "0017", {"answer_cache"}, rows).dispose()

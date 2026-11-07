@@ -27,6 +27,7 @@ from synthetic_assistant import EATING_OUT, ME, OTHER, seed
 TODAY = date(2026, 1, 20)
 MONTH = "2026-01"
 CALLS = [{"name": "spending_summary", "arguments": {"month": MONTH}}]
+EVIDENCE = ("month:2026-01",)
 
 # --- the key ---------------------------------------------------------------
 
@@ -90,13 +91,15 @@ def test_the_cache_never_serves_across_a_ledger_version_change(
 ) -> None:
     with shared().connect() as conn, conn.begin() as outer:
         cache = AnswerCache(conn, ME)
-        cache.put("ask", calls, TODAY, reply)
-        assert cache.get("ask", calls, TODAY) == reply
+        cache.put("ask", calls, TODAY, reply, EVIDENCE)
+        assert cache.get("ask", calls, TODAY) == (reply, EVIDENCE)
         for _ in range(bumps):
             Scoped(conn, ME).bump_ledger_version()  # an import or a Correction
         got = cache.get("ask", calls, TODAY)
-        assert got == (reply if bumps == 0 else None)
-        cache.put("ask", calls, TODAY, "fresh")  # storing drops the stale rows
+        assert got == ((reply, EVIDENCE) if bumps == 0 else None)
+        cache.put(
+            "ask", calls, TODAY, "fresh", EVIDENCE
+        )  # storing drops the stale rows
         n = conn.execute(text("SELECT count(*) FROM answer_cache")).scalar()
         assert n == 1
         outer.rollback()
@@ -104,27 +107,30 @@ def test_the_cache_never_serves_across_a_ledger_version_change(
 
 def test_another_users_cache_is_invisible(engine: Engine) -> None:
     with engine.begin() as conn:
-        AnswerCache(conn, OTHER).put("ask", CALLS, TODAY, "theirs")
+        AnswerCache(conn, OTHER).put("ask", CALLS, TODAY, "theirs", EVIDENCE)
         mine = AnswerCache(conn, ME)
         assert mine.get("ask", CALLS, TODAY) is None
         assert mine.clear() == 0
-        assert AnswerCache(conn, OTHER).get("ask", CALLS, TODAY) == "theirs"
+        assert AnswerCache(conn, OTHER).get("ask", CALLS, TODAY) == ("theirs", EVIDENCE)
 
 
 def test_a_memory_change_clears_the_cache(engine: Engine) -> None:
     with engine.begin() as conn:
         cache, props = AnswerCache(conn, ME), Proposals(conn, ME)
-        cache.put("ask", CALLS, TODAY, "cached")
+        cache.put("ask", CALLS, TODAY, "cached", EVIDENCE)
         draft = MemoryDraft(
             type="goal",
             text="synthetic",
             provenance=Provenance(turn_id="t", quote="q", said_on=TODAY),
         )
         p = props.propose_memory(draft)
-        assert cache.get("ask", CALLS, TODAY) == "cached"  # proposing is no change
+        assert cache.get("ask", CALLS, TODAY) == (
+            "cached",
+            EVIDENCE,
+        )  # proposing is no change
         props.confirm(p.id)
         assert cache.get("ask", CALLS, TODAY) is None
-        cache.put("ask", CALLS, TODAY, "cached")
+        cache.put("ask", CALLS, TODAY, "cached", EVIDENCE)
         props.delete_memory(props.memories()[0].id)
         assert cache.get("ask", CALLS, TODAY) is None
 
@@ -173,6 +179,18 @@ def test_a_repeated_question_is_answered_from_the_cache_until_the_ledger_changes
     assert c.path == "local_model" and len(m.calls) == 3
 
 
+def test_a_cached_answer_carries_the_evidence_of_the_answer_it_repeats(
+    engine: Engine, total: int
+) -> None:
+    """ADR 0007: every figure on screen links to its tool result, cached or
+    not."""
+    answer = f"You spent {pounds(total)}."
+    a, _ = turn(engine, "ask", first_round(), answer)
+    b, _ = turn(engine, "ask", first_round())
+    assert b.path == "cache" and a.evidence
+    assert b.evidence == a.evidence
+
+
 def test_a_deterministic_fallback_is_never_cached(engine: Engine, total: int) -> None:
     wrong = f"You spent {pounds(total + 1)}."
     a, _ = turn(engine, "ask", first_round(), wrong, wrong)
@@ -204,5 +222,7 @@ def test_cached_answers_are_encrypted_on_disk(
     engine: Engine, tmp_path: Path, total: int
 ) -> None:
     with engine.begin() as conn:
-        AnswerCache(conn, ME).put("ask", CALLS, TODAY, "zebra-cached synthetic answer")
+        AnswerCache(conn, ME).put(
+            "ask", CALLS, TODAY, "zebra-cached synthetic answer", EVIDENCE
+        )
     assert b"zebra-cached" not in (tmp_path / "db" / "ledger.db").read_bytes()
