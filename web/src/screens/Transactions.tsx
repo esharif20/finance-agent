@@ -11,6 +11,7 @@ import {
   revertCorrection,
 } from "@/api/client";
 import { CategoryChip, type Category } from "@/components/CategoryChip";
+import { CountTick } from "@/components/CountTick";
 import { Money } from "@/components/Money";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -172,7 +173,7 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
       ) : (
         <Card className="p-2 sm:p-3" aria-busy={page.isFetching}>
           <p role="status" className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm text-muted-foreground">
-            <span>{page.data.total === 0 ? "No transactions match." : `${page.data.total} transactions`}</span>
+            <span>{page.data.total === 0 ? "No transactions match." : <><CountTick value={page.data.total} /> transactions</>}</span>
             {correct.isError && <span className="text-foreground">{correct.error.message}</span>}
             {revert.isError && <span className="text-foreground">{revert.error.message}</span>}
             {undo && (
