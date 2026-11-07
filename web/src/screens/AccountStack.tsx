@@ -464,11 +464,12 @@ export function AccountStack({
               }}
               type="button"
               aria-pressed={on}
-              onClick={() => {
-                if (dragged.current) {
-                  dragged.current = false;
-                  return;
-                }
+              onClick={(e) => {
+                const wasDrag = dragged.current;
+                dragged.current = false;
+                // detail 0: Enter, Space or a screen reader, never the end of a drag; the drag's
+                // own click can go to the stack (pointer capture), leaving the flag set.
+                if (wasDrag && e.detail !== 0) return;
                 if (!on) setRising(i);
                 onSelect(f.id);
               }}

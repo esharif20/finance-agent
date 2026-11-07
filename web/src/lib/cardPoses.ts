@@ -7,8 +7,8 @@ const LAYER_Z = 8; // depth between layers; a hover adds less, so order never fl
 const TILT = 10; // max degrees towards the pointer
 const FAN_DEG = 1.6; // small, so a fanned card's corner never reaches the label of the one behind
 const FAN_X = 6;
-const REVEAL = 22;
-const FLIP_LIFT = 48; // a turning card comes forward so its edge never cuts the card behind // the cards in front of a hovered one move down this far to show more of it
+const REVEAL = 22; // the cards in front of a hovered one move down this far to show more of it
+const FLIP_LIFT = 48; // a turning card comes forward so its edge never cuts the card behind
 
 /** Sizes for `count` cards (All accounts first) of height `cardH`: All accounts is a compact
     half card; fanned, each account shows half its face; chosen, the cards behind share what

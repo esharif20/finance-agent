@@ -30,7 +30,7 @@ describe("card stack snap", () => {
     const { onSelect, card } = mount(1);
     const front = card(/Bank 1/);
     drag(front, 0.2 * WIDTH, fireEvent);
-    fireEvent.click(front);
+    fireEvent.click(front, { detail: 1 }); // a pointer's click; Enter or Space give detail 0
     await wait(250);
     expect(onSelect).not.toHaveBeenCalled();
   });
