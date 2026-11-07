@@ -182,7 +182,6 @@ class SyncReport:
     changed_known: int  # known IDs arriving with other fields; stored rows unchanged
     rejected_accounts: int  # one ID with differing rows: that Account's rows refused
     provider_duplicates: int  # rows in new Possible Duplicates (ADR 0014 (a), (b))
-    pending_explained: int  # Gaps equal to the pending sum (still opened)
     provider_errors: int
     gaps: list[SyncGap]
     accounts: list[AffectedAccount]
@@ -572,7 +571,7 @@ class Ledger:
             self._db.select(si, si.c.id).where(si.c.file_hash == digest)
         ).first():
             n = sum(len(a.rows) for a in parsed.accounts)
-            return SyncReport(0, 0, n, 0, 0, 0, 0, parsed.errors, [], [])
+            return SyncReport(0, 0, n, 0, 0, 0, parsed.errors, [], [])
         import_id = self._db.insert(
             si,
             source="simplefin",
@@ -581,7 +580,7 @@ class Ledger:
             imported_at=datetime.now(UTC),
         )
         self._db.bump_ledger_version()  # a stored Statement Import, as in import_files
-        added = known = changed = rejected = dupes = pending_explained = 0
+        added = known = changed = rejected = dupes = 0
         self._merged = 0
         gaps: list[SyncGap] = []
         touched: dict[int, str] = {}
@@ -642,8 +641,6 @@ class Ledger:
             self._match(account_id)
             dupes += self._record_duplicates(account_id, import_id, acc, new_ids)
             gap = self._reconcile(account_id, masked, acc)
-            if gap is not None and gap.amount == _decimal(acc.pending_minor):
-                pending_explained += 1  # a hint only: ADR 0014 opens every Gap
             if gap is not None:
                 self._db.insert(
                     schema.sync_gap,
@@ -673,7 +670,6 @@ class Ledger:
             changed,
             rejected,
             dupes,
-            pending_explained,
             parsed.errors,
             gaps,
             [AffectedAccount(i, m) for i, m in sorted(touched.items())],
@@ -1028,7 +1024,10 @@ class Ledger:
         masked: str,
         acc: simplefin.SyncedAccount,
     ) -> SyncGap | None:
-        """ADR 0014: B_k - B_1 - sum of Transactions with instant in (t_1, t_k]."""
+        """ADR 0014: B_k - B_1 - sum of Transactions with instant in (t_1, t_k].
+        B is the reported balance less pending rows: spike #26 found it includes
+        them (balance == available-balance with a pending row present)."""
+        balance = acc.balance_minor - acc.pending_minor
         anchor = schema.sync_anchor
         first = self._db.execute(
             self._db.select(anchor, anchor.c.balance_minor, anchor.c.balance_ts).where(
@@ -1039,7 +1038,7 @@ class Ledger:
             self._db.insert(
                 anchor,
                 account_id=account_id,
-                balance_minor=acc.balance_minor,
+                balance_minor=balance,
                 balance_ts=acc.balance_ts,
             )
             return None
@@ -1055,7 +1054,7 @@ class Ledger:
             )
             if first.balance_ts < instant <= acc.balance_ts:
                 moved += r.amount_minor
-        gap = acc.balance_minor - first.balance_minor - moved
+        gap = balance - first.balance_minor - moved
         if not gap:
             return None
         return SyncGap(

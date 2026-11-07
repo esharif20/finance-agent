@@ -111,18 +111,32 @@ def test_first_sync_anchors_and_a_missing_row_opens_a_gap(
     assert led.sync_gaps() == r.gaps
 
 
-def test_a_gap_equal_to_the_pending_sum_is_reported_as_pending(
-    ledger_for: LedgerFor,
+@settings(max_examples=25, deadline=None)
+@given(
+    st.integers(0, 3), st.integers(0, 3), st.integers(-500, 500), st.booleans()
+)
+def test_pending_rows_never_open_a_gap_but_a_real_gap_still_does(
+    first_pending: int, later_pending: int, offset: int, lose_row: bool
 ) -> None:
-    # Spike #26: the feed cannot say whether balance includes pending rows.
-    led = ledger_for(1)
-    led.apply_sync(response(H, 0, 10))
-    r = led.apply_sync(response(H, 10, 20, pending=2, balance_offset=-200))
-    # ADR 0014: every non-zero value opens a Gap; the report only says it
-    # equals the pending sum (a missing row of that amount must not hide).
-    assert ([g.amount for g in r.gaps], r.pending_explained) == ([Decimal("-2.00")], 1)
-    r = led.apply_sync(response(H, 10, 20, pending=2, balance_offset=-201))
-    assert [g.amount for g in r.gaps] == [Decimal("-2.01")]
+    # Spike #26: balance == available-balance with a pending row present, so
+    # balance includes pending rows and ADR 0014 reduces B by their total.
+    lost = H.txns[14].amount_minor if lose_row else 0
+    with temp_ledger() as (led, _):
+        led.apply_sync(response(H, 0, 10, pending=first_pending))
+        r = led.apply_sync(
+            response(
+                H,
+                10,
+                20,
+                pending=later_pending,
+                balance_offset=offset,
+                drop={14} if lose_row else (),
+            )
+        )
+        expected = offset + lost
+        assert [g.amount for g in r.gaps] == (
+            [Decimal(expected).scaleb(-2)] if expected else []
+        )
 
 
 def test_csv_history_before_the_anchor_never_opens_a_gap(
@@ -259,9 +273,7 @@ def test_a_pending_row_posting_under_a_new_id_counts_once(
     rows = doc["accounts"][0]["transactions"]
     posted = rows.pop()
     rows.append(posted | {"id": "pending-id", "posted": 0, "pending": True})
-    doc["accounts"][0]["balance"] = str(
-        Decimal(doc["accounts"][0]["balance"]) - Decimal(posted["amount"])
-    )
+    # the balance already includes the pending row (spike #26)
     doc["accounts"][0]["balance-date"] -= 60  # read before the row posted
     led.apply_sync(json.dumps(doc).encode())
     assert len(led.transactions()) == 9

@@ -47,7 +47,8 @@ def response(
     pending: int = 0,
     balance_offset: int = 0,
 ) -> bytes:
-    """Rows h.txns[start:end] (minus `drop`), balance as of the last row."""
+    """Rows h.txns[start:end] (minus `drop`), balance as of the last row. As in
+    spike #26, the balance includes the pending rows (-1.00 each)."""
     rows = [
         sync_row(h.txns[i], provider_id(i), posted_ts(h, i))
         for i in range(start, end)
@@ -73,7 +74,9 @@ def response(
                     "id": account_id,
                     "name": "Synthetic Current",
                     "currency": "GBP",
-                    "balance": _money(h.txns[last].balance_minor + balance_offset),
+                    "balance": _money(
+                        h.txns[last].balance_minor - 100 * pending + balance_offset
+                    ),
                     "balance-date": posted_ts(h, last),
                     "transactions": rows,
                 }
