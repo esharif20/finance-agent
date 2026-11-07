@@ -298,16 +298,17 @@ def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> Subscript
     trial, converted_on = _trial(e, gbp)
     flags: list[Flag] = []
     if status == "cancelled" and e.kind == SUB:
-        # shortcut: changed_at is the latest user change, so a regroup after the
-        # cancel moves the date; read the cancel's own row if that matters
-        after = [c.posted_on for c in charges if c.posted_on > e.changed_at.date()]
+        cancelled_on = (e.status_since or e.changed_at).date()  # a regroup keeps it
+        after = [c.posted_on for c in charges if c.posted_on > cancelled_on]
         if after:
             flags.append(Flag("charged_after_cancel", on=min(after)))
     if status in COUNTED:  # waste flags never fire on lapsed or cancelled items
         recent = today - timedelta(RECENT_DAYS)
         if e.kind == SUB and converted_on and converted_on > recent:
             flags.append(Flag("trial_converted", on=converted_on))
-        rise = _price_rise(gbp[1:] if trial else gbp)  # leaving a trial is no rise
+        # leaving a trial is no rise: compare prices from the conversion on
+        paid = converted_on or date.max
+        rise = _price_rise([g for g in gbp if not trial or g[0] >= paid])
         if rise and rise.on and rise.on > recent:
             flags.append(rise)
     return SubscriptionCost(
@@ -350,7 +351,10 @@ def _price_rise(gbp: list[tuple[date, int]]) -> Flag | None:
             runs.append((on, [minor]))
     if len(runs) < 2:
         return None
-    before, now = _mid(runs[-2][1]), _mid(runs[-1][1])
+    # the previous settled price (2+ charges), so a one-off between two runs
+    # at one price is no rise; the first charge when no earlier price settled
+    prev = next((r for _, r in reversed(runs[:-1]) if len(r) > 1), runs[0][1])
+    before, now = _mid(prev), _mid(runs[-1][1])
     return Flag("price_rise", runs[-1][0], before, now) if now > before else None
 
 
@@ -399,7 +403,10 @@ def _shared_flags(
     two or more Accounts within its shortest cadence gap, so a card switched a
     period ago is not one. Neither fires on lapsed or cancelled items."""
     subs = [x for x in items if x.status in COUNTED and x.entry.kind == SUB]
-    in_group = Counter(x.entry.group for x in subs)
+    # the catch-all group holds unrelated services: no overlap there
+    in_group = Counter(
+        x.entry.group for x in subs if x.entry.group != "Other subscriptions"
+    )
     service: dict[int, str | int] = {}
     pooled: dict[str | int, list[Charge]] = {}
     window: dict[str | int, int] = {}

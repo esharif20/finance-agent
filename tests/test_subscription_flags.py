@@ -1,7 +1,7 @@
 """Subscription waste flags and free-trial detection (#106). Synthetic data only."""
 
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from random import Random
 
 from hypothesis import given
@@ -179,3 +179,58 @@ def test_flags_do_not_depend_on_row_order(rows: Rows, rnd: Random) -> None:
     assert [(c.flags, c.trial) for c in after.items] == [
         (c.flags, c.trial) for c in before.items
     ]
+
+
+# --- verifier #190 ------------------------------------------------------------
+
+
+def test_the_catch_all_group_is_no_overlap() -> None:
+    # Xbox Game Pass and Patreon share "Other subscriptions" but replace nothing
+    by = flagged(
+        [entry(1, group="Other subscriptions"), entry(2, group="Other subscriptions")],
+        monthly(1, 999) + monthly(2, 500),
+    )
+    assert by[1].flags == () and by[2].flags == ()
+
+
+def test_a_cheap_one_off_between_two_same_prices_is_no_rise() -> None:
+    by = flagged(
+        [entry(1)],
+        monthly(1, 1099, n=5, last=date(2026, 4, 1))
+        + [Charge(1, date(2026, 4, 20), 199), Charge(1, date(2026, 5, 1), 1099),
+           Charge(1, date(2026, 6, 1), 1099)],
+    )  # fmt: skip
+    assert by[1].flags == ()
+
+
+def test_two_trial_charges_then_the_full_price_is_no_rise() -> None:
+    by = flagged(
+        [named(1, "SPOTIFY")],
+        [Charge(1, date(2026, 4, 1), 99), Charge(1, date(2026, 5, 1), 99),
+         Charge(1, date(2026, 6, 1), 1199)],
+    )  # fmt: skip
+    assert by[1].flags == (Flag("trial_converted", on=date(2026, 6, 1)),)
+
+
+def test_a_regroup_after_cancel_keeps_the_cancel_date() -> None:
+    # cancelled on 2026-01-01 (T0), regrouped on 2026-03-01: the February
+    # charge still came after the cancel
+    e = replace(
+        entry(1, status="user_cancelled", source="user"),
+        changed_at=datetime(2026, 3, 1, tzinfo=UTC),
+        status_since=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    by = flagged([e], [Charge(1, date(2026, 2, 1), 1099)])
+    assert by[1].flags == (Flag("charged_after_cancel", on=date(2026, 2, 1)),)
+
+
+@given(registry_and_charges(), st.integers(1, 10**4), st.integers(0, 36))
+def test_a_flat_price_with_any_one_off_never_rises(
+    rows: Rows, price: int, at: int
+) -> None:
+    # adversarial: a steady price with one stray charge anywhere after its
+    # first charge, ending on that price, never reads as a rise
+    cs = monthly(99, price, n=6)
+    stray = Charge(99, date(2026, 6, 1) - timedelta(days=at * 4 + 1), price // 3 + 1)
+    by = flagged([entry(99)], [*cs, stray])
+    assert "price_rise" not in codes(by[99])

@@ -94,7 +94,7 @@ _Avoid_: Expired, inactive
 A Subscription's or Bill's last charge in GBP as a monthly equivalent, in exact pence (weekly × 52 ÷ 12, annual ÷ 12), rounded half-even to the penny only when shown. Totals per group and per kind are the exact sums, rounded once. A foreign-currency charge is in GBP through the Ledger's one FX rate; without a rate it has no Monthly cost ("rate needed") and stays out of the totals, never guessed.
 
 **Waste flag**:
-A mark on a Subscription or Bill that may be wasting money (#106): **overlap**, two or more active Subscriptions in one group; **duplicate**, one service charged from two or more Accounts within a cadence gap; **charged after cancel**, a charge after the user cancelled it; **trial converted**, a Free trial followed by a full charge; **price rise**, the latest price above the previous one by more than ±5% (Bills too). Price rises and conversions older than a year are no longer flagged. Only "charged after cancel" fires on a cancelled item; no flag fires on a lapsed one.
+A mark on a Subscription or Bill that may be wasting money (#106): **overlap**, two or more active Subscriptions in one group (not the catch-all Other subscriptions); **duplicate**, one service charged from two or more Accounts within a cadence gap; **charged after cancel**, a charge after the day the user cancelled it (a later regroup keeps that day); **trial converted**, a Free trial followed by a full charge; **price rise**, the latest price above the previous settled one (two or more charges, so a one-off is ignored) by more than ±5% (Bills too). Price rises and conversions older than a year are no longer flagged. Only "charged after cancel" fires on a cancelled item; no flag fires on a lapsed one.
 _Avoid_: Warning, alert
 
 **Free trial**:

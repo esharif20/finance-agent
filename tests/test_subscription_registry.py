@@ -310,3 +310,17 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
                 assert e is not None and e.source == "user"
                 assert e == replace(live[-1][1], created_at=e.created_at)
         engine.dispose()
+
+
+def test_a_regroup_keeps_when_the_status_began(ledger_for: LedgerFor) -> None:
+    # verifier #190: charged-after-cancel reads the cancel's time, not the regroup's
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH STREAM")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.cancel_subscription(m)
+    cancelled = led.subscription(m)
+    assert cancelled is not None and cancelled.status_since == cancelled.changed_at
+    led.regroup_subscription(m, "subscription", "Software")
+    after = led.subscription(m)
+    assert after is not None and after.status == "user_cancelled"
+    assert after.status_since == cancelled.changed_at < after.changed_at
