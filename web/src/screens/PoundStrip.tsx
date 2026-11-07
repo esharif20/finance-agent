@@ -76,7 +76,7 @@ export function PoundStrip({
           </motion.div>
         )}
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">
+      <p className="mt-3 text-label text-muted-foreground">
         {strip.overspent ? (
           <span className="money">{label}</span>
         ) : (

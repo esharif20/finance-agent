@@ -22,7 +22,7 @@ export function MonthSwitcher({
       <button type="button" className={step} aria-label="Previous month" disabled={!older} onClick={() => older && onChange(older)}>
         <ChevronLeft className="size-5" aria-hidden="true" />
       </button>
-      <span className="min-w-36 text-center text-base font-semibold" aria-live="polite">
+      <span className="min-w-36 text-center text-row font-semibold tracking-[-0.01em]" aria-live="polite">
         {monthLabel(month)}
       </span>
       <button type="button" className={step} aria-label="Next month" disabled={!newer} onClick={() => newer && onChange(newer)}>

@@ -67,7 +67,7 @@ export function CategoryChip({
         onClick={() => setOpen((o) => !o)}
         animate={chipStyle(hue)}
         transition={{ duration: reduce ? 0.1 : 0.2 }}
-        className="inline-flex min-h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
+        className="inline-flex min-h-8 items-center gap-1 rounded-full px-3 text-label font-semibold"
       >
         {value ? label(value) : "Uncategorised"}
         <ChevronDown className="size-3.5" aria-hidden="true" />
@@ -88,7 +88,7 @@ export function CategoryChip({
             <div className="overflow-y-auto p-3">
               {groups.map((g) => (
                 <div key={g.name} role="group" aria-label={g.name} className="mb-3 last:mb-0">
-                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{g.name}</p>
+                  <p className="mb-1.5 text-meta text-muted-foreground">{g.name}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {g.subs.map((sub) => {
                       const current = value?.[0] === g.name && value[1] === sub;
@@ -103,7 +103,7 @@ export function CategoryChip({
                           }}
                           style={chipStyle(hueFor(g.name, groups))}
                           className={cn(
-                            "min-h-8 rounded-full px-3 text-[13px] font-semibold",
+                            "min-h-8 rounded-full px-3 text-label font-semibold",
                             current && "ring-2 ring-current",
                           )}
                         >

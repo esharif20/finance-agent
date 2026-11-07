@@ -26,26 +26,26 @@ export function MonthCard({ summary, slices }: { summary: Summary; slices?: Slic
       </CardHeader>
 
       <div role="group" aria-label="Net">
-        <p className="text-sm text-muted-foreground">Net</p>
+        <p className="text-label text-muted-foreground">Net</p>
         <Money
           value={net}
           sign
           countUp
-          className={`block text-[32px] leading-10 font-semibold tracking-[-0.02em] ${overspent ? "" : "text-positive"}`}
+          className={`figure mt-1 block text-hero ${overspent ? "" : "text-positive"}`}
         />
       </div>
 
       <dl className="grid grid-cols-2 gap-4">
         <div role="group" aria-label="Money in" className="rounded-[10px] bg-raised p-4">
-          <dt className="text-sm text-muted-foreground">Money in</dt>
-          <dd>
-            <Money value={money_in} countUp className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+          <dt className="text-label text-muted-foreground">Money in</dt>
+          <dd className="mt-0.5">
+            <Money value={money_in} countUp className="figure text-figure" />
           </dd>
         </div>
         <div role="group" aria-label="Money out" className="rounded-[10px] bg-raised p-4">
-          <dt className="text-sm text-muted-foreground">Money out</dt>
-          <dd>
-            <Money value={money_out} countUp className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+          <dt className="text-label text-muted-foreground">Money out</dt>
+          <dd className="mt-0.5">
+            <Money value={money_out} countUp className="figure text-figure" />
           </dd>
         </div>
       </dl>

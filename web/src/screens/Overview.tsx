@@ -32,7 +32,7 @@ export function Overview() {
   if (summary.error instanceof NoData) {
     return (
       <Card>
-        <h2 className="text-[18px] font-semibold">No transactions yet</h2>
+        <h2 className="text-heading">No transactions yet</h2>
         <p className="mt-2 text-muted-foreground">
           Import a statement export with <code>fa import</code>, then reload this page.
         </p>
@@ -42,7 +42,7 @@ export function Overview() {
   if (summary.error || accounts.error || spending.error || months.error) {
     return (
       <Card role="alert">
-        <h2 className="text-[18px] font-semibold">Can't reach the local server</h2>
+        <h2 className="text-heading">Can't reach the local server</h2>
         <p className="mt-2 text-muted-foreground">
           Run <code>fa</code> in a terminal to start it, then try again.
         </p>

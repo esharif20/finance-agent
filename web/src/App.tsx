@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Eye, EyeOff, LayoutDashboard, ListOrdered } from "lucide-react";
+import { Ambient } from "@/components/Ambient";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
 import { useRoute } from "@/lib/route";
 import { CategoryScreen } from "@/screens/CategoryScreen";
@@ -66,6 +67,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <PrivacyProvider>
+      <Ambient />
       <div className="mx-auto w-full max-w-[1120px] px-4 pt-3 pb-28 sm:px-9 sm:pb-16">
         <header className="glass sticky top-3 z-20 mb-6 flex items-center gap-3 rounded-full py-2 pr-2 pl-3">
           <Mark />
@@ -82,7 +84,7 @@ export function App() {
             <CategoryScreen key={route.category} category={route.category} month={route.month} />
           ) : (
             <>
-              <h1 className="mb-6 text-[28px] leading-9 font-semibold tracking-[-0.01em]">
+              <h1 className="mb-6 text-title">
                 {TABS.find((t) => t.id === tab)?.label}
               </h1>
               {route.name === "transactions" ? <Transactions /> : <Overview />}

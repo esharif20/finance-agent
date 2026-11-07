@@ -8,8 +8,8 @@ type Account = components["schemas"]["AccountOut"];
 
 // Gradient hues, all outside the violet band 235-290.
 const HUES = [172, 38, 345, 140, 15, 95];
-const PEEK = 72; // px of each card still visible when another sits in front
-const HEIGHT = 156;
+const PEEK = 64; // px of each card still visible when another sits in front
+const HEIGHT = 116;
 
 const day = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
@@ -69,8 +69,8 @@ export function AccountStack({
   if (accounts.length === 0) {
     return (
       <Card>
-        <h2 className="text-[18px] font-semibold">Accounts</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h2 className="text-heading">Accounts</h2>
+        <p className="mt-2 text-label text-muted-foreground">
           No accounts yet. Run <code>fa import</code> with a statement export.
         </p>
       </Card>
@@ -116,16 +116,16 @@ export function AccountStack({
                 ...(f.hue === null ? {} : { ["--h" as string]: f.hue }),
               }}
             >
-              <span className="flex items-start justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block truncate text-base font-semibold">{f.title}</span>
-                  {f.masked ? <span className="block text-sm opacity-80">{f.masked}</span> : null}
-                </span>
-                {f.balance ? (
-                  <Money value={f.balance} className="text-lg font-semibold" />
-                ) : null}
+              {/* Slots are placed by grid areas in index.css (.account-card): a back card shows
+                  title and balance in its peek; the front card sets its balance as a figure. */}
+              <span data-slot="title" className="min-w-0">
+                <span className="block truncate text-row font-semibold">{f.title}</span>
+                {f.masked ? <span className="block text-label opacity-80">{f.masked}</span> : null}
               </span>
-              <span className="mt-auto flex items-center gap-1.5 text-[13px] font-semibold">
+              {f.balance ? (
+                <Money value={f.balance} className="account-balance text-row font-semibold" />
+              ) : null}
+              <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
                 {f.matches ? (
                   <>
                     <Check className="size-3.5" aria-hidden="true" />
@@ -145,7 +145,7 @@ export function AccountStack({
         Showing {current.masked ? `${current.title} ${current.masked}` : current.title}
       </p>
       {gaps.length === 0 ? null : (
-        <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
+        <ul className="flex flex-col gap-2 text-label text-muted-foreground">
           {gaps.map(({ a, g }) => (
             <li key={`${a.id}-${g.from_date}-${g.to_date}`}>
               {a.bank} {a.masked_number}: between {day(g.from_date)} and {day(g.to_date)} your

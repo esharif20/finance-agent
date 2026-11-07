@@ -259,6 +259,43 @@ describe("Overview", () => {
     expect(screen.getByRole("table", { name: /by month/i })).toBeInTheDocument();
   });
 
+  it("marks the newest month as so far when the Ledger stops before its end", async () => {
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.startsWith("/api/transactions"))
+        return Response.json({ items: [{ id: 1, posted_on: "2026-02-14" }], total: 1 });
+      if (url.startsWith("/api/summary")) return Response.json(summary);
+      if (url.startsWith("/api/spending")) return Response.json(spending);
+      if (url.startsWith("/api/month-series")) return Response.json(series);
+      if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+      return Response.json([account()]);
+    });
+    vi.stubGlobal("fetch", fetcher);
+    renderOverview();
+    const feb = await screen.findByRole("button", { name: /February 2026 so far, to 14 Feb/ });
+    expect(feb.querySelector("[data-partial]")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /January 2026/ }).querySelector("[data-partial]")).toBeNull();
+    expect(screen.getByText(/Feb so far, to 14 Feb/)).toBeInTheDocument();
+  });
+
+  it("does not mark a month that the Ledger covers to its last day", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.startsWith("/api/transactions"))
+          return Response.json({ items: [{ id: 1, posted_on: "2026-02-28" }], total: 1 });
+        if (url.startsWith("/api/summary")) return Response.json(summary);
+        if (url.startsWith("/api/spending")) return Response.json(spending);
+        if (url.startsWith("/api/month-series")) return Response.json(series);
+        if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+        return Response.json([account()]);
+      }),
+    );
+    renderOverview();
+    await screen.findByRole("button", { name: /January 2026/ });
+    await screen.findByLabelText("Net");
+    expect(screen.queryByText(/so far/)).not.toBeInTheDocument();
+  });
+
   it("keeps amounts out of the bar labels in privacy mode", async () => {
     stubApi();
     localStorage.setItem("fa-private", "1");

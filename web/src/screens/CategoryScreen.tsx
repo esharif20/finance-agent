@@ -30,8 +30,8 @@ function Bars({
       {rows.map((r) => (
         <li key={r.name}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate font-medium">{r.name}</span>
-            <Money value={{ minor: r.minor, currency }} />
+            <span className="min-w-0 truncate text-row font-medium">{r.name}</span>
+            <Money value={{ minor: r.minor, currency }} className="text-row font-semibold" />
           </div>
           <div className="mt-1.5 h-2 rounded-full bg-raised" aria-hidden="true">
             <div className="h-full rounded-full" style={{ width: `${width(r.minor, max)}%`, background: colour }} />
@@ -53,19 +53,19 @@ function Trend({ data, colour }: { data: CategoryDetail; colour: string }) {
           <li key={p.month} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
             <Money
               value={p.amount}
-              className={`text-center text-xs ${current ? "font-semibold" : "text-muted-foreground"}`}
+              className={`text-center text-meta ${current ? "font-semibold" : "text-muted-foreground"}`}
             />
             <div className="flex flex-1 items-end">
               <div
                 className="w-full rounded-t-lg"
                 style={{
                   height: `${Math.max(width(p.amount.minor, max), p.amount.minor > 0 ? 4 : 1)}%`,
-                  background: colour,
-                  opacity: current ? 1 : 0.4,
+                  // a pale step of the hue, not opacity: opacity muddies it over the dark card
+                  background: current ? colour : `color-mix(in oklab, ${colour} 34%, var(--card))`,
                 }}
               />
             </div>
-            <span className="text-center text-xs text-muted-foreground">{label(p.month)}</span>
+            <span className="text-center text-meta text-muted-foreground">{label(p.month)}</span>
           </li>
         );
       })}
@@ -78,14 +78,14 @@ function Transactions({ data }: { data: CategoryDetail }) {
     <Card aria-labelledby="txns-title">
       <CardHeader>
         <CardTitle id="txns-title">Transactions</CardTitle>
-        <span className="text-sm text-muted-foreground">{data.transactions.length}</span>
+        <span className="text-label text-muted-foreground">{data.transactions.length}</span>
       </CardHeader>
       <ul className="divide-y divide-border">
         {data.transactions.map((t) => (
           <li key={t.id} className="flex min-h-14 items-center gap-3 py-2">
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{t.merchant ?? t.description}</p>
-              <p className="truncate text-sm text-muted-foreground">
+              <p className="truncate text-row font-semibold">{t.merchant ?? t.description}</p>
+              <p className="truncate text-label font-normal text-muted-foreground">
                 {new Date(`${t.posted_on}T00:00:00Z`).toLocaleDateString("en-GB", {
                   day: "numeric",
                   month: "short",
@@ -94,7 +94,7 @@ function Transactions({ data }: { data: CategoryDetail }) {
                 {t.subcategory ? ` · ${t.subcategory}` : ""}
               </p>
             </div>
-            <Money value={t.amount as Point} sign />
+            <Money value={t.amount as Point} sign className="text-row font-semibold" />
           </li>
         ))}
       </ul>
@@ -139,7 +139,7 @@ export function CategoryScreen({
     if (detail.error instanceof NoData) {
       return (
         <Card>
-          <h2 className="text-[18px] font-semibold">Nothing in {category} this month</h2>
+          <h2 className="text-heading">Nothing in {category} this month</h2>
           <p className="mt-2 text-muted-foreground">Pick another month, or go back to the Overview.</p>
         </Card>
       );
@@ -147,7 +147,7 @@ export function CategoryScreen({
     if (detail.error || months.error) {
       return (
         <Card role="alert">
-          <h2 className="text-[18px] font-semibold">Can't reach the local server</h2>
+          <h2 className="text-heading">Can't reach the local server</h2>
           <p className="mt-2 text-muted-foreground">Run `fa` in a terminal to start it, then try again.</p>
           <button
             type="button"
@@ -164,10 +164,10 @@ export function CategoryScreen({
     return (
       <div className="flex flex-col gap-6">
         <Card aria-labelledby="cat-total" className="flex flex-col gap-1">
-          <span id="cat-total" className="text-sm text-muted-foreground">
+          <span id="cat-total" className="text-label text-muted-foreground">
             Spent on {d.name}, {monthLabel(d.month)}
           </span>
-          <Money value={d.total} className="text-[40px] leading-[48px] font-semibold tracking-[-0.02em]" />
+          <Money value={d.total} className="figure mt-1 block text-hero" />
         </Card>
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <Card aria-labelledby="subs-title">
@@ -217,7 +217,7 @@ export function CategoryScreen({
         {back}
         {months.data && month && <MonthSwitcher months={months.data} month={month} onChange={go} />}
       </div>
-      <h1 className="flex items-center gap-3 text-[28px] leading-9 font-semibold tracking-[-0.01em]">
+      <h1 className="flex items-center gap-3 text-title">
         <span aria-hidden="true" className="size-4 rounded-full" style={{ background: colour }} />
         {category}
       </h1>
