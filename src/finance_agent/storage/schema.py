@@ -88,6 +88,8 @@ transaction = Table(
     Column("status", String(16), nullable=False),
     # "csv" or "simplefin": the source that created it (ADR 0014 matching)
     Column("origin", String(16), nullable=False, server_default="csv"),
+    # the Bank's own GBP amount on a foreign-currency Transaction (#156)
+    Column("gbp_minor", BigInteger),
     # ADR 0006 identity; not unique: a purchase, refund, same purchase again
     # on one day repeats the key, and both are real Transactions
     Index(
@@ -355,6 +357,21 @@ subscription_entry = Table(
     # set when the Review Queue undoes the user decision this row records (#110)
     Column("reverted_at", DateTime(timezone=True)),
     Index("ix_subscription_entry_merchant", "user_id", "merchant_id"),
+)
+
+# FX rates the user entered (#156): GBP per unit of `currency` from `rate_on`,
+# a Decimal string (never a float); one per currency and date, re-entering
+# replaces it. Rates are never fetched.
+fx_rate = Table(
+    "fx_rate",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("rate", String(32), nullable=False),
+    Column("rate_on", Date, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("user_id", "currency", "rate_on"),
 )
 
 # Review Queue decisions (#110), append-only: an answer or a skip of one item,

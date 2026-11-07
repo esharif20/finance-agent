@@ -5,11 +5,12 @@ Started Date, Completed Date, Description, Amount, Fee, Currency, State,
 Balance; dates `YYYY-MM-DD HH:MM:SS`, oldest first. UNVERIFIED against a real
 export: confirm the header row only, and change it here.
 
-GBP only (FX is #156): a row in another currency refuses the whole file, as any
-rejected row does for every Bank. Only COMPLETED rows are imported; PENDING and
-REVERTED rows are never stored as settled, and the import report counts them. The
-Fee column is separate from Amount, so a row's amount is Amount - Fee, which
-keeps the Balance chain intact. One Account per Product.
+Each row keeps its own currency (#156): one Account per Product and currency,
+since the Balance column runs per currency; a GBP Account keeps the ref it had
+before FX. Amounts are hundredths in every currency. Only COMPLETED rows are
+imported; PENDING and REVERTED rows are never stored as settled, and the import
+report counts them. The Fee column is separate from Amount, so a row's amount
+is Amount - Fee, which keeps the Balance chain intact.
 """
 
 import csv
@@ -35,6 +36,7 @@ HEADER = (
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 _MONEY = re.compile(r"-?\d+(\.\d{1,2})?", re.ASCII)
 _DROPPED = {"PENDING", "REVERTED"}
+_CURRENCY = re.compile(r"[A-Z]{3}", re.ASCII)
 
 
 def _minor(text: str) -> int:
@@ -55,8 +57,8 @@ def _parse_row(cells: list[str], line: int) -> ParsedRow | None:
         return None
     if state != "COMPLETED":
         raise _Malformed("unknown state")
-    if cur != "GBP":
-        raise _Malformed("non-GBP row: foreign currency support is coming (#156)")
+    if not _CURRENCY.fullmatch(cur):
+        raise _Malformed("invalid currency")
     try:
         posted_on = datetime.strptime(completed or started, DATE_FORMAT).date()
     except ValueError:
@@ -66,10 +68,11 @@ def _parse_row(cells: list[str], line: int) -> ParsedRow | None:
         raise _Malformed("invalid amount, fee or balance")
     if not desc or not product:
         raise _Malformed("missing description or product")
+    pocket = product if cur == "GBP" else f"{product}:{cur}"
     return ParsedRow(
         line=line,
-        account_ref=hashlib.sha256(f"revolut:{product}".encode()).hexdigest(),
-        masked_number=product[:24],
+        account_ref=hashlib.sha256(f"revolut:{pocket}".encode()).hexdigest(),
+        masked_number=pocket.replace(":", " ")[:24],
         posted_on=posted_on,
         bank_type=typ,
         description=desc,

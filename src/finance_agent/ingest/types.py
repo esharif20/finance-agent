@@ -17,6 +17,9 @@ class ParsedRow:
     balance_minor: int | None
     currency: str
     account_name: str = ""  # the new Account's name; "" means "Account <masked>"
+    # the GBP the Bank charged for a foreign-currency row, when its export says
+    # (#156 rate source 1); no supported export carries it yet
+    gbp_minor: int | None = None
 
 
 @dataclass(frozen=True)

@@ -43,11 +43,22 @@ def test_revolut_fee_is_folded_into_the_row_and_keeps_the_balance_chain() -> Non
         assert b.balance_minor - b.amount_minor == a.balance_minor
 
 
-def test_revolut_non_gbp_is_rejected_with_a_reason() -> None:
-    p = parse(revolut_export(1, 2, currency="EUR").encode())
-    assert [r.reason for r in p.rejected] == [
-        "non-GBP row: foreign currency support is coming (#156)"
-    ] * 2
+def test_revolut_foreign_rows_are_kept_in_their_own_currency_and_account() -> None:
+    """#156: one Account per Product and currency (the Balance column runs per
+    currency); a GBP Account keeps the ref it had before FX."""
+    gbp = parse(revolut_export(1, 2).encode()).rows
+    eur = parse(revolut_export(1, 2, currency="EUR").encode())
+    assert eur.rejected == []
+    assert {r.currency for r in eur.rows} == {"EUR"}
+    assert [r.amount_minor for r in eur.rows] == [r.amount_minor for r in gbp]
+    assert eur.rows[0].account_ref != gbp[0].account_ref
+    assert eur.rows[0].masked_number != gbp[0].masked_number
+
+
+@pytest.mark.parametrize("cur", ["eur", "EURO", "E1R", "", "€"])
+def test_revolut_a_malformed_currency_is_rejected(cur: str) -> None:
+    p = parse(revolut_export(1, 1, currency=cur).encode())
+    assert [r.reason for r in p.rejected] == ["invalid currency"]
 
 
 @pytest.mark.parametrize("state", ["PENDING", "REVERTED"])

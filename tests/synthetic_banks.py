@@ -53,3 +53,19 @@ def revolut_export(
             f"{money(amount)},{money(fee)},{currency},{state},{money(balance)}"
         )
     return "\n".join(out) + "\n"
+
+
+def revolut_pockets(rows: list[tuple[str, str, date, str, int]]) -> str:
+    """One Revolut export over several currencies, from (Type, currency, day,
+    description, amount in hundredths); each currency's Balance runs on its own.
+    An exchange is two EXCHANGE rows on one day, one per currency (#156)."""
+    balance: dict[str, int] = {}
+    out = ["# synthetic", REVOLUT_HEADER]
+    for i, (typ, cur, day, desc, amount) in enumerate(rows):
+        balance[cur] = balance.get(cur, 100_000) + amount
+        when = f"{day:%Y-%m-%d} 10:{i % 60:02d}:00"
+        out.append(
+            f"{typ},Current,{when},{when},{desc},{money(amount)},0.00,{cur},"
+            f"COMPLETED,{money(balance[cur])}"
+        )
+    return "\n".join(out) + "\n"

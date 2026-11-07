@@ -18,6 +18,7 @@ from sqlalchemy import Connection, Engine
 from finance_agent import categorise
 from finance_agent.api import (
     card_art,
+    fx,
     merchants,
     notes,
     review_queue,
@@ -273,7 +274,7 @@ def _transaction(t: Transaction) -> TransactionOut:
         id=t.id,
         posted_on=t.posted_on.isoformat(),
         description=t.description,
-        amount=_money(t.amount, CURRENCY),
+        amount=_money(t.amount, t.currency),
         account_id=t.account_id,
         kind=c.kind if c else None,
         merchant_id=c.merchant_id if c else None,
@@ -310,7 +311,7 @@ def _txn(t: Transaction) -> CategoryTxnOut:
         id=t.id,
         posted_on=t.posted_on.isoformat(),
         description=t.description,
-        amount=_money(t.amount, CURRENCY),
+        amount=_money(t.amount, t.currency),
         merchant_id=c.merchant_id if c else None,
         merchant=c.merchant if c else None,
         subcategory=c.category[1] if c and c.category else None,
@@ -580,6 +581,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     app.include_router(splits.router)
     app.include_router(notes.router)
     app.include_router(merchants.router)
+    app.include_router(fx.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
