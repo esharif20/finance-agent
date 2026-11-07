@@ -341,6 +341,7 @@ def test_accounts_report_bank_and_ledger_balances_that_differ_by_the_gaps(
 
     assert acct.masked_number.endswith(h.account_number[-4:])
     assert acct.bank_balance == Decimal(h.txns[39].balance_minor + 1234) / 100
+    assert acct.bank_balance is not None and acct.ledger_balance is not None
     assert acct.bank_balance - acct.ledger_balance == Decimal("12.34")
     assert [g.amount for g in acct.gaps] == [Decimal("12.34")]
 

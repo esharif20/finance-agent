@@ -1,3 +1,4 @@
+import gzip
 import os
 import random
 import shutil
@@ -240,6 +241,37 @@ def test_evals_datasets_follow_the_synthetic_header_rule(tmp_path: Path) -> None
     assert find_violations(tmp_path, [ok, bad]) == [
         f"{bad}: synthetic fixture must start with '# synthetic'"
     ]
+
+
+HEADERLESS = b'03/01/2026,"TESCO STORES",-23.45\n02/01/2026,SALARY,1500.00\n'
+
+
+@pytest.mark.parametrize(
+    ("rel", "content"),
+    [
+        ("hsbc.txt", HEADERLESS),  # header-less export, any name
+        ("hsbc", b"# note\n" + HEADERLESS),
+        ("x.bin", gzip.compress(LLOYDS)),  # gzipped export, any name
+        ("x.dat", gzip.compress(HEADERLESS)),
+        ("x.dat", gzip.compress(gzip.compress(HEADERLESS))),  # nested
+        ("hsbc.txt", b"03/01/2026,SALARY,1500\n"),  # whole pounds, as HSBC accepts
+    ],
+)
+def test_headerless_and_gzipped_exports_are_caught(
+    tmp_path: Path, rel: str, content: bytes
+) -> None:
+    write(tmp_path, rel, content)
+    assert find_violations(tmp_path, [rel]) == [f"{rel}: {OUTSIDE}"]
+
+
+def test_gzip_inside_synthetic_folder_needs_the_header_too(tmp_path: Path) -> None:
+    rel = write(tmp_path, "tests/fixtures/synthetic/a.dat", gzip.compress(HEADERLESS))
+    assert find_violations(tmp_path, [rel])
+
+
+def test_gzip_bomb_is_bounded_and_not_flagged(tmp_path: Path) -> None:
+    rel = write(tmp_path, "docs/a.bin", gzip.compress(b"\0" * 50_000_000))
+    assert find_violations(tmp_path, [rel]) == []
 
 
 def test_the_repository_itself_passes() -> None:

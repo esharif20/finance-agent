@@ -33,3 +33,11 @@ This holds two guarantees. A purchase that a complete source lists is never merg
 Rejected: the issue's first proposal, which paired only rows inside both coverages and surfaced every row in the 3-day band. It surfaces boundary rows even where the other source must hold their counterpart, such as a CSV row near the sync's start, inside a CSV that covers the sync. Choosing the explanation with the least date skew was rejected too: it is a guess, and a wrong guess hides a purchase.
 
 Shortcut: a sync's coverage ends at its last posted row, not its `balance-date`, because only the rows are stored per Statement Import. Storing each sync's requested start and `balance-date` would extend coverage to the fetch time and resolve edge bands sooner. Upgrade if edge bands stay surfaced too long in real use.
+
+## Known limits
+
+**Banks whose CSV has no balance or account number (HSBC, #130).** HSBC UK's export is `date, description, amount`: no running balance and no account number, and neither its filename nor its rows carry a masked number. Its rows store a NULL running balance, exactly as synced rows do, so:
+
+- An HSBC Account is never reconciled and never opens a Reconciliation Gap. A missing or doubled HSBC row is therefore not detected; the Accounts screen says "balance not provided by this bank" instead of showing a figure. Linking it to a synced Account (`fa connect --link`) is the only way to reconcile it, through the synced balance above.
+- ADR 0006's key becomes (Account, date, description, amount), still placed by sequence alignment. Without the balance, same-day twins are identical more often, so more rows are counted in `ImportReport.ambiguous`; the window model still keeps both twins of a file.
+- Every HSBC file lands in one Account, named "All HSBC accounts (the export has no account number)". If the user holds two HSBC accounts, their files mix in it, and a row in one account's file can be aligned onto an identical row (same date, description and amount) from the other's, so a real purchase can be taken as already known. Import one HSBC account's files only until the importer can tell accounts apart (a user-chosen Account at import time is the likely fix).
