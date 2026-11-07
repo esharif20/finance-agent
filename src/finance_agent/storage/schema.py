@@ -17,6 +17,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -276,4 +277,47 @@ correction = Table(
         text("(transaction_id IS NULL) != (merchant_id IS NULL)"),
         name="ck_correction_one_target",
     ),
+)
+
+# Subscription registry (#103), append-only like `correction`: the latest row per
+# Merchant is its entry, the rest is the history. `source` is "user" or
+# "detection"; once a Merchant has a user row, detection never writes for it.
+# A negative entry ("not a subscription") has status `not_subscription`.
+subscription_entry = Table(
+    "subscription_entry",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("merchant_id", Integer, ForeignKey("merchant.id"), nullable=False),
+    Column("source", String(16), nullable=False),
+    Column("kind", String(16)),  # "subscription" or "bill"; NULL when negative
+    Column("group_name", String(64)),  # a leaf of Subscriptions or Bills
+    Column("status", String(16), nullable=False),
+    Column("reason", String(16)),  # NULL when negative
+    Column("evidence_on", Date, nullable=False),
+    Column("charge_count", Integer),
+    Column("interval", String(16)),  # "weekly", "monthly" or "annual"
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    # set when the Review Queue undoes the user decision this row records (#110)
+    Column("reverted_at", DateTime(timezone=True)),
+    Index("ix_subscription_entry_merchant", "user_id", "merchant_id"),
+)
+
+# Review Queue decisions (#110), append-only: an answer or a skip of one item,
+# identified by its type and key, holding while the item's inputs still hash
+# to `item_version`. `effect_id` is what the answer wrote, read by the item's
+# type (a Correction id, a registry row id, or NULL). Undo sets `undone_at`.
+review_decision = Table(
+    "review_decision",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("item_type", String(32), nullable=False),
+    Column("item_key", Text, nullable=False),
+    Column("item_version", String(64), nullable=False),
+    Column("action", String(16), nullable=False),  # "answer" or "skip"
+    Column("effect_id", Integer),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("undone_at", DateTime(timezone=True)),
+    Index("ix_review_decision_user", "user_id"),
 )

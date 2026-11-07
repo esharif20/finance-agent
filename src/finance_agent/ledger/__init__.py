@@ -29,8 +29,8 @@ from sqlalchemy import (
 
 from finance_agent import ingest
 from finance_agent.ingest import simplefin
+from finance_agent.ledger.taxonomy import TAXONOMY, current
 from finance_agent.ledger.taxonomy import UNCATEGORISED as UNCATEGORISED
-from finance_agent.ledger.taxonomy import current
 from finance_agent.storage import Scoped, keyed_ref, schema
 
 TRANSFER_TYPES = ("TFR",)  # Lloyds Type that favours a pair; not required
@@ -119,6 +119,37 @@ class Correction:
 
 class UnknownTarget(ValueError):
     """No such Transaction, Merchant, Category or Correction for this user."""
+
+
+# Subscription registry (#103). kind -> the top-level Category its groups come from
+REGISTRY_KINDS = {"subscription": "Subscriptions", "bill": "Bills"}
+DETECTED_REASONS = ("known_service", "pattern")  # user_confirmed, user_added: user only
+DETECTED_STATUSES = ("suggested", "active")  # suggested: ask "Is this a subscription?"
+INTERVALS = ("weekly", "monthly", "annual")
+NOT_SUBSCRIPTION = "not_subscription"  # a negative entry
+
+
+@dataclass(frozen=True)
+class SubscriptionEntry:
+    """A Merchant's place in the registry: why it is (or is not) a Subscription
+    or Bill, and who said so last."""
+
+    merchant_id: int
+    merchant: str
+    kind: str | None  # "subscription" or "bill"; None for a negative entry
+    group: str | None
+    status: str  # suggested, active, user_cancelled or not_subscription
+    reason: str | None  # known_service, user_confirmed, pattern or user_added
+    source: str  # "user" or "detection": who made the latest change
+    evidence_on: date
+    charge_count: int | None
+    interval: str | None
+    created_at: datetime  # when the Merchant first entered the registry
+    changed_at: datetime
+
+
+class InvalidEntry(ValueError):
+    """A kind and group not in the taxonomy, or a reason or status not allowed."""
 
 
 CATEGORISED_KINDS = ("Spending", "Refund")  # the only Kinds that take a Category
@@ -1563,6 +1594,194 @@ class Ledger:
         )
         self._db.bump_ledger_version()
         return next(k for k in self.corrections() if k.id == cid)
+
+    def subscriptions(self) -> list[SubscriptionEntry]:
+        """Every registry entry, negative ones included, by Merchant name."""
+        e, m = schema.subscription_entry, schema.merchant
+        rows = self._db.execute(
+            self._db.select(e, e, m.c.name.label("merchant"))
+            .join(m, self._db.on(m, m.c.id == e.c.merchant_id))
+            .where(e.c.reverted_at.is_(None))
+            .order_by(e.c.id)
+        )
+        first: dict[int, datetime] = {}
+        latest: dict[int, Any] = {}
+        for r in rows:
+            first.setdefault(r.merchant_id, r.created_at)
+            prior = latest.get(r.merchant_id)
+            # a detection that lost a race with a user write never wins
+            if r.source == "detection" and prior is not None and prior.source == "user":
+                continue
+            latest[r.merchant_id] = r
+        return sorted(
+            (
+                SubscriptionEntry(
+                    r.merchant_id,
+                    r.merchant,
+                    r.kind,
+                    r.group_name,
+                    r.status,
+                    r.reason,
+                    r.source,
+                    r.evidence_on,
+                    r.charge_count,
+                    r.interval,
+                    first[r.merchant_id],
+                    r.created_at,
+                )
+                for r in latest.values()
+            ),
+            key=lambda x: (x.merchant, x.merchant_id),
+        )
+
+    def subscription(self, merchant_id: int) -> SubscriptionEntry | None:
+        return next(
+            (x for x in self.subscriptions() if x.merchant_id == merchant_id), None
+        )
+
+    def add_subscription(self, merchant_id: int, kind: str, group: str) -> None:
+        """The user lists a Merchant as a Subscription or Bill."""
+        self._registry(
+            merchant_id, "user", kind, group, "active", "user_added", date.today()
+        )
+
+    def regroup_subscription(self, merchant_id: int, kind: str, group: str) -> None:
+        """The user moves an entry to another kind or group; the rest is kept."""
+        x = self._listed(merchant_id)
+        self._registry(
+            merchant_id,
+            "user",
+            kind,
+            group,
+            x.status,
+            x.reason,
+            x.evidence_on,
+            x.charge_count,
+            x.interval,
+        )
+
+    def confirm_subscription(
+        self, merchant_id: int, kind: str | None = None, group: str | None = None
+    ) -> int:
+        """The user says yes, it is one (to a suggestion, or after removing it).
+        Returns the registry row written."""
+        x = self.subscription(merchant_id)
+        if x is None:
+            raise UnknownTarget("no such registry entry")
+        return self._registry(
+            merchant_id,
+            "user",
+            kind or x.kind,
+            group or x.group,
+            "active",
+            "user_confirmed",
+            date.today(),
+            x.charge_count,
+            x.interval,
+        )
+
+    def not_a_subscription(self, merchant_id: int) -> int:
+        """Remove or dismiss: remembered as "not a subscription", never deleted.
+        Returns the registry row written."""
+        return self._registry(
+            merchant_id, "user", None, None, NOT_SUBSCRIPTION, None, date.today()
+        )
+
+    def revert_subscription_decision(self, entry_id: int) -> None:
+        """Undo one user decision: the row stays as history, marked reverted,
+        and the Merchant's entry is what it was before."""
+        e = schema.subscription_entry
+        res = self._db.execute(
+            self._db.update(e)
+            .where(e.c.id == entry_id, e.c.source == "user", e.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active registry decision")
+        self._db.bump_ledger_version()
+
+    def record_detection(
+        self,
+        merchant_id: int,
+        kind: str,
+        group: str,
+        reason: str,
+        status: str,
+        evidence_on: date,
+        charge_count: int | None = None,
+        interval: str | None = None,
+    ) -> bool:
+        """Recognition's write. A user decision always wins: once the user has
+        touched this Merchant nothing is written. Repeating the latest
+        detection writes nothing either. True when an entry was written."""
+        if reason not in DETECTED_REASONS or status not in DETECTED_STATUSES:
+            raise InvalidEntry("not a detection reason or status")
+        e = schema.subscription_entry
+        decided = self._db.execute(
+            self._db.select(e, e.c.id).where(
+                e.c.merchant_id == merchant_id,
+                e.c.source == "user",
+                e.c.reverted_at.is_(None),
+            )
+        ).first()
+        if decided is not None:
+            return False
+        x = self.subscription(merchant_id)
+        same = (kind, group, status, reason, evidence_on, charge_count, interval)
+        if x is not None and same == (
+            x.kind,
+            x.group,
+            x.status,
+            x.reason,
+            x.evidence_on,
+            x.charge_count,
+            x.interval,
+        ):
+            return False
+        self._registry(merchant_id, "detection", *same)
+        return True
+
+    def _listed(self, merchant_id: int) -> SubscriptionEntry:
+        x = self.subscription(merchant_id)
+        if x is None or x.status == NOT_SUBSCRIPTION:
+            raise UnknownTarget("not in the registry")
+        return x
+
+    def _registry(
+        self,
+        merchant_id: int,
+        source: str,
+        kind: str | None,
+        group: str | None,
+        status: str,
+        reason: str | None,
+        evidence_on: date,
+        charge_count: int | None = None,
+        interval: str | None = None,
+    ) -> int:
+        m = schema.merchant
+        self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
+        if status != NOT_SUBSCRIPTION and (
+            kind not in REGISTRY_KINDS or group not in TAXONOMY[REGISTRY_KINDS[kind]]
+        ):
+            raise InvalidEntry("kind and group must be a Subscriptions or Bills leaf")
+        if interval is not None and interval not in INTERVALS:
+            raise InvalidEntry("interval must be weekly, monthly or annual")
+        entry_id = self._db.insert(
+            schema.subscription_entry,
+            merchant_id=merchant_id,
+            source=source,
+            kind=kind,
+            group_name=group,
+            status=status,
+            reason=reason,
+            evidence_on=evidence_on,
+            charge_count=charge_count,
+            interval=interval,
+            created_at=datetime.now(UTC),
+        )
+        self._db.bump_ledger_version()
+        return entry_id
 
     def _exists(self, stmt: Select[Any]) -> int:
         row = self._db.execute(stmt).first()

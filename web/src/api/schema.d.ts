@@ -166,6 +166,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue */
+        get: operations["queue_api_review_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review-queue/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo
+         * @description Undo the latest answer or skip.
+         */
+        post: operations["undo_api_review_queue_undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review-queue/{item_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer */
+        post: operations["answer_api_review_queue__item_id__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review-queue/{item_id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip */
+        post: operations["skip_api_review_queue__item_id__skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spending": {
         parameters: {
             query?: never;
@@ -183,6 +254,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subscriptions
+         * @description Every entry, negative ("not a subscription") ones included.
+         */
+        get: operations["subscriptions_api_subscriptions_get"];
+        put?: never;
+        /** Add */
+        post: operations["add_api_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/{merchant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove
+         * @description Take an entry off the list: remembered as "not a subscription".
+         */
+        delete: operations["remove_api_subscriptions__merchant_id__delete"];
+        options?: never;
+        head?: never;
+        /** Regroup */
+        patch: operations["regroup_api_subscriptions__merchant_id__patch"];
+        trace?: never;
+    };
+    "/api/subscriptions/{merchant_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm_api_subscriptions__merchant_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/{merchant_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss
+         * @description No to a suggestion: remembered as "not a subscription".
+         */
+        post: operations["dismiss_api_subscriptions__merchant_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/summary": {
         parameters: {
             query?: never;
@@ -194,6 +344,26 @@ export interface paths {
         get: operations["summary_api_summary_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync
+         * @description The same sync as `fa sync`; errors say the class at most, never data.
+         */
+        post: operations["sync_api_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -272,6 +442,32 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** AddIn */
+        AddIn: {
+            /** Group */
+            group: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "subscription" | "bill";
+            /** Merchant Id */
+            merchant_id: number;
+        };
+        /** AnswerIn */
+        AnswerIn: {
+            /** Category */
+            category?: [
+                string,
+                string
+            ] | null;
+            /** Choice */
+            choice?: string | null;
+            /** Transaction Id */
+            transaction_id?: number | null;
+            /** Version */
+            version: string;
+        };
         /** CategoryDetailOut */
         CategoryDetailOut: {
             /** Currency */
@@ -319,6 +515,13 @@ export interface components {
             /** Subcategory */
             subcategory: string | null;
         };
+        /** ConfirmIn */
+        ConfirmIn: {
+            /** Group */
+            group?: string | null;
+            /** Kind */
+            kind?: ("subscription" | "bill") | null;
+        };
         /** CorrectionIn */
         CorrectionIn: {
             /** Category */
@@ -335,6 +538,15 @@ export interface components {
             /** Ledger Version */
             ledger_version: number;
         };
+        /** EvidenceOut */
+        EvidenceOut: {
+            /** Charge Count */
+            charge_count: number | null;
+            /** Interval */
+            interval: string | null;
+            /** On */
+            on: string;
+        };
         /** GapOut */
         GapOut: {
             amount: components["schemas"]["Money"];
@@ -342,6 +554,16 @@ export interface components {
             from_date: string;
             /** To Date */
             to_date: string;
+        };
+        /** GroupIn */
+        GroupIn: {
+            /** Group */
+            group: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "subscription" | "bill";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -352,6 +574,27 @@ export interface components {
         HealthOut: {
             /** App */
             app: string;
+        };
+        /** ItemOut */
+        ItemOut: {
+            /** Choices */
+            choices: string[];
+            /** Id */
+            id: string;
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Skipped */
+            skipped: boolean;
+            /** Title */
+            title: string;
+            /** Transaction Ids */
+            transaction_ids: number[];
+            /** Type */
+            type: string;
+            /** Version */
+            version: string;
+            /** Weight */
+            weight: number;
         };
         /** MerchantSpendOut */
         MerchantSpendOut: {
@@ -377,6 +620,15 @@ export interface components {
             /** Month */
             month: string;
         };
+        /** QueueOut */
+        QueueOut: {
+            /** Items */
+            items: components["schemas"]["ItemOut"][];
+            /** Ledger Version */
+            ledger_version: number;
+            /** Remaining */
+            remaining: number;
+        };
         /** SpendingOut */
         SpendingOut: {
             /** Categories */
@@ -393,6 +645,28 @@ export interface components {
             total: components["schemas"]["Money"];
             unmatched_refunds: components["schemas"]["Money"];
         };
+        /** SubscriptionOut */
+        SubscriptionOut: {
+            /** Changed At */
+            changed_at: string;
+            /** Created At */
+            created_at: string;
+            evidence: components["schemas"]["EvidenceOut"];
+            /** Group */
+            group: string | null;
+            /** Kind */
+            kind: string | null;
+            /** Merchant */
+            merchant: string;
+            /** Merchant Id */
+            merchant_id: number;
+            /** Reason */
+            reason: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+        };
         /** SummaryOut */
         SummaryOut: {
             /** Accounts */
@@ -408,6 +682,15 @@ export interface components {
             net: components["schemas"]["Money"];
             transfers_in: components["schemas"]["Money"];
             transfers_out: components["schemas"]["Money"];
+        };
+        /** SyncOut */
+        SyncOut: {
+            /** Added */
+            added: number;
+            /** Already Known */
+            already_known: number;
+            /** Matched */
+            matched: number;
         };
         /**
          * SyncStatusOut
@@ -480,6 +763,11 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VersionIn */
+        VersionIn: {
+            /** Version */
+            version: string;
         };
     };
     responses: never;
@@ -752,6 +1040,116 @@ export interface operations {
             };
         };
     };
+    queue_api_review_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+        };
+    };
+    undo_api_review_queue_undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+        };
+    };
+    answer_api_review_queue__item_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_api_review_queue__item_id__skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     spending_api_spending_get: {
         parameters: {
             query?: {
@@ -771,6 +1169,191 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpendingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subscriptions_api_subscriptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"][];
+                };
+            };
+        };
+    };
+    add_api_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_subscriptions__merchant_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                merchant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regroup_api_subscriptions__merchant_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                merchant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_api_subscriptions__merchant_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                merchant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_api_subscriptions__merchant_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                merchant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
                 };
             };
             /** @description Validation Error */
@@ -812,6 +1395,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_api_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncOut"];
                 };
             };
         };

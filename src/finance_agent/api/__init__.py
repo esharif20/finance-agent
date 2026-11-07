@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.api import card_art
+from finance_agent.api import card_art, review_queue, subscriptions
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -31,7 +31,9 @@ from finance_agent.ledger import (
     Transaction,
     UnknownTarget,
 )
-from finance_agent.storage import backup, default_db_path, open_db
+from finance_agent.ledger.sync import NotConnected, run_sync
+from finance_agent.storage import backup, default_db_path, is_encrypted, open_db
+from finance_agent.storage.lock import Busy
 
 # shortcut: located relative to the source tree, so only a checkout serves the UI
 WEB_DIST = Path(__file__).resolve().parents[3] / "web" / "dist"
@@ -66,6 +68,12 @@ class SummaryOut(BaseModel):
     transfers_in: Money
     transfers_out: Money
     accounts: list[AccountMonthOut]  # combined view only: each Account's part
+
+
+class SyncOut(BaseModel):
+    added: int
+    matched: int  # merged into an existing CSV Transaction
+    already_known: int
 
 
 class AccountOut(BaseModel):
@@ -459,6 +467,27 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             backup_warning=bk.warning,
         )
 
+    @app.post("/api/sync")
+    def sync(request: Request) -> SyncOut:
+        """The same sync as `fa sync`; errors say the class at most, never data."""
+        if not is_encrypted(default_db_path()):  # the CLI's gate (ADR 0002)
+            raise HTTPException(409, "Sync needs the encrypted database.")
+        try:
+            reports = run_sync(request.app.state.engine, current_user())
+        except Busy:
+            raise HTTPException(409, "A sync is already running.") from None
+        except NotConnected:
+            raise HTTPException(409, "Not connected. Run `fa connect` first.") from None
+        except Exception:  # the failure class is kept in sync status for `fa status`
+            raise HTTPException(
+                502, "Couldn't reach your bank. Try again in a little while."
+            ) from None
+        return SyncOut(
+            added=sum(r.added for r in reports),
+            matched=sum(r.matched for r in reports),
+            already_known=sum(r.already_known for r in reports),
+        )
+
     @app.get(
         "/api/card-art/{key}",
         response_class=Response,
@@ -531,6 +560,9 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         except UnknownTarget:
             raise HTTPException(404, "no such active Correction") from None
         return CorrectionOut(id=correction_id, ledger_version=led.ledger_version())
+
+    app.include_router(subscriptions.router)
+    app.include_router(review_queue.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
