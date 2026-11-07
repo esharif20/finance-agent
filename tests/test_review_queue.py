@@ -258,6 +258,72 @@ def test_another_user_can_neither_see_nor_answer_my_items() -> None:
         assert [i.skipped for i in mine.items()] == [True]
 
 
+def test_undo_after_a_later_correction_keeps_the_later_one() -> None:
+    """Adversarial: the user corrects the Merchant again outside the queue;
+    undoing the queue's answer must not lose or override that later decision."""
+    with ledger_with([("SYNTH CAFE", -350)] * 3) as (conn, led):
+        q = ReviewQueue(conn, 1)
+        (item,) = q.items()
+        assert item.merchant_id is not None
+        q.answer(item.id, item.version, Answer(category=("Travel", "Hotels")))
+        later = ("Food & Drink", "Coffee")
+        led.correct_merchant(item.merchant_id, later)
+        settled = categories(led)
+
+        q.undo()
+
+        assert categories(led) == settled
+        assert set(settled.values()) == {(later, "correction")}
+        assert category_items(q) == []
+
+
+def test_undo_after_a_later_registry_decision_keeps_the_later_one() -> None:
+    """Adversarial: a yes from the queue, then "not a subscription" from the
+    Subscriptions page; the queue's undo leaves the later decision in force and
+    detection still cannot write."""
+    with ledger_with([("SYNTH STREAMBOX", -999)] * 2) as (conn, led):
+        m = next(x.id for x in led.merchants() if x.name == "SYNTH STREAMBOX")
+        led.record_detection(
+            m, "subscription", "Streaming", "pattern", "suggested", START, 2
+        )
+        q = ReviewQueue(conn, 1)
+        sub = next(i for i in q.items() if i.type == "subscription")
+        q.answer(sub.id, sub.version, Answer(choice="yes"))
+        led.not_a_subscription(m)
+        decided = led.subscription(m)
+
+        q.undo()
+
+        assert led.subscription(m) == decided
+        assert decided is not None and decided.status == "not_subscription"
+        assert not led.record_detection(
+            m, "subscription", "Streaming", "pattern", "active", START, 3
+        )
+        assert all(i.type != "subscription" for i in q.items())
+
+
+def test_an_answer_racing_a_new_import_is_refused_as_stale() -> None:
+    """Adversarial: the item was shown, then an import added a row for the same
+    Merchant; the old version must not be answered blind."""
+    rows = [("SYNTH CAFE", -350)] * 2
+    with ledger_with(rows) as (conn, led):
+        q = ReviewQueue(conn, 1)
+        (shown,) = q.items()
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "later.csv"
+            p.write_text(export([*rows, ("SYNTH CAFE", -420)]))
+            led.import_files([p])
+            categorise.run(conn, 1)
+        v = led.ledger_version()
+
+        with pytest.raises(StaleItem):
+            q.answer(shown.id, shown.version, Answer(category=("Travel", "Hotels")))
+
+        assert led.corrections() == [] and led.ledger_version() == v
+        (now,) = q.items()
+        assert now.id == shown.id and now.weight == 3
+
+
 # --- property tests -------------------------------------------------------
 
 ROWS = st.lists(

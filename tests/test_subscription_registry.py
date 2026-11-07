@@ -3,11 +3,13 @@ decisions that detection never overwrites, and negative entries."""
 
 import tempfile
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -235,3 +237,69 @@ def test_a_detection_row_after_a_user_decision_never_wins(
     )
 
     assert led.subscription(m) == decided
+
+
+USER_ACTION = st.sampled_from(["add", "regroup", "confirm", "remove"])
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    steps=st.lists(
+        st.tuples(
+            st.sampled_from(["user", "raced", "revert"]),
+            USER_ACTION,
+            st.sampled_from(GROUPS),
+            DETECTION,
+        ),
+        min_size=1,
+        max_size=8,
+    ),
+    after=st.lists(DETECTION, min_size=1, max_size=4),
+)
+def test_detection_never_overrides_a_user_decision_with_reverts(
+    steps: list[Any], after: list[Any]
+) -> None:
+    """#121's property with Review Queue undos (#110) mixed in: whenever any
+    user decision is still in force, the entry is the latest such decision and
+    neither a raced detection row nor a later detection replaces it."""
+    with tempfile.TemporaryDirectory() as d:
+        engine = open_db(Path(d) / "ledger.db")
+        with engine.begin() as conn:
+            led = Ledger(conn, 1)
+            m = merchant(led, "SYNTH SERVICE")
+            live: list[tuple[int, Any]] = []  # (entry id, entry it made)
+            for kind, action, group, ((k, g), *rest) in steps:
+                if kind == "revert":
+                    if live:
+                        eid, _ = live.pop(len(live) // 2)
+                        led.revert_subscription_decision(eid)
+                    continue
+                if kind == "raced":  # a detection that checked before the user
+                    led._registry(m, "detection", k, g, *rest)  # pyright: ignore[reportPrivateUsage]
+                    continue
+                x = led.subscription(m)
+                if action in ("regroup", "confirm") and (
+                    x is None or x.status == "not_subscription"
+                ):
+                    action = "add"
+                if action == "confirm":
+                    eid = led.confirm_subscription(m, *group)
+                elif action == "remove":
+                    eid = led.not_a_subscription(m)
+                else:  # add and regroup return nothing: the newest row is theirs
+                    if action == "add":
+                        led.add_subscription(m, *group)
+                    else:
+                        led.regroup_subscription(m, *group)
+                    e = schema.subscription_entry
+                    eid = conn.execute(sa.select(sa.func.max(e.c.id))).scalar_one()
+                live.append((eid, led.subscription(m)))
+
+            for (k, g), *rest in after:
+                wrote = led.record_detection(m, k, g, *rest)
+                assert wrote == (not live)
+            if live:
+                e = led.subscription(m)
+                assert e is not None and e.source == "user"
+                assert e == replace(live[-1][1], created_at=e.created_at)
+        engine.dispose()
