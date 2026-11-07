@@ -13,7 +13,6 @@ upgraded (#116 renames v1 Categories; none of the labels used here merge).
 
 import csv
 import hashlib
-import importlib
 import io
 import json
 import random
@@ -25,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from finance_agent import categorise
+from finance_agent.ledger import taxonomy
 from metrics import expected_calibration_error, macro_f1, per_category
 
 SEED = 112
@@ -40,22 +40,9 @@ type Category = tuple[str, str]
 type Prediction = tuple[Category | None, float]
 
 
-def _resolver() -> Callable[[int, Category], Category]:
-    try:
-        taxonomy = importlib.import_module("finance_agent.ledger.taxonomy")
-    except ModuleNotFoundError:
-        # shortcut: before #116 there is only taxonomy v1; drop this branch once
-        # ledger.taxonomy exists on main
-        return lambda _version, category: category
-    return taxonomy.current
-
-
-_current = _resolver()
-
-
 def resolve(category: Category) -> Category:
     """A gold label in the current taxonomy's names."""
-    return _current(LABEL_TAXONOMY_VERSION, category)
+    return taxonomy.current(LABEL_TAXONOMY_VERSION, category)
 
 
 @dataclass(frozen=True)

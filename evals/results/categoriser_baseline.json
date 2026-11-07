@@ -4,7 +4,7 @@
   "dataset_sha256": "d333f04534915ab77689764b950fbea74652d154ea0121590d817349289d09dc",
   "seed": 112,
   "label_taxonomy_version": 1,
-  "taxonomy_version": 1,
+  "taxonomy_version": 2,
   "model": "corrections+rules",
   "model_version": null,
   "rows": {
@@ -38,22 +38,27 @@
     }
   },
   "per_category": {
-    "Bills & Utilities / Council tax": {
+    "Bills / Council tax": {
       "precision": 1.0,
       "recall": 0.8,
       "support": 5
     },
-    "Bills & Utilities / Energy": {
+    "Bills / Energy": {
       "precision": 1.0,
       "recall": 0.375,
       "support": 8
     },
-    "Bills & Utilities / Phone & internet": {
+    "Bills / Phone & broadband": {
       "precision": 1.0,
       "recall": 0.375,
       "support": 8
     },
-    "Bills & Utilities / Water": {
+    "Bills / Rent or mortgage": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 5
+    },
+    "Bills / Water": {
       "precision": 1.0,
       "recall": 0.6,
       "support": 5
@@ -112,11 +117,6 @@
       "precision": 1.0,
       "recall": 0.5,
       "support": 6
-    },
-    "Housing / Rent": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "support": 5
     },
     "Personal care / Hair & beauty": {
       "precision": 1.0,

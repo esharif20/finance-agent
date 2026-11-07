@@ -59,6 +59,9 @@ def test_committed_results_match_a_fresh_run() -> None:
     assert categoriser.regressions(fresh, committed) == []
     assert fresh["model"] == committed["model"] == "corrections+rules"
     assert fresh["seed"] == categoriser.SEED
+    # the record names the taxonomy it was scored under, not a stale one
+    assert committed["taxonomy_version"] == categorise.TAXONOMY_VERSION
+    assert committed["per_category"].keys() == fresh["per_category"].keys()
 
 
 def test_a_worse_score_or_a_changed_dataset_is_a_regression() -> None:
