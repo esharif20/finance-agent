@@ -50,6 +50,7 @@ export const fetchTransactions = (f: TxnFilters, limit: number) => {
   for (const [k, v] of Object.entries(f)) if (v) p.set(k, v);
   return get<TxnPage>(`/api/transactions?${p}`);
 };
+export const fetchTransaction = (id: number) => get<TxnPage["items"][number]>(`/api/transactions/${id}`);
 export const fetchCategories = () => get<CategoryGroup[]>("/api/categories");
 
 export type CorrectionOut = components["schemas"]["CorrectionOut"];
