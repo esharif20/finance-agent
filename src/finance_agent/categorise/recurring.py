@@ -10,9 +10,11 @@ its median is one run. Otherwise the run grows back from the latest charge
 while each earlier charge falls one cadence window before the next and within
 ±5% of the run's median so far, and the run stays within ±5% of its own
 median; the first charge that fails ends it. A run is flagged when it has
-at least `MIN_CHARGES` charges (the ADR 0015 gate). A price step therefore
-starts a new run; judging the step itself is the price-rise detector's job
-(#148). Drifting amounts break the run every
+at least `MIN_CHARGES` charges (the ADR 0015 gate) and every earlier charge
+at its price is whole periods from the next one, so a price bought more
+often than the cadence (a café whose last visits happen to be a week apart)
+is not a series. A price step starts a new run; judging the step itself is
+the price-rise detector's job (#148). Drifting amounts break the run every
 couple of charges and are not flagged (precision first; `evals/recurring.py`
 measures the cost in recall).
 """
@@ -80,17 +82,28 @@ def detect_recurring(
             break
         insort(amounts, amount)
         first -= 1
-    if len(amounts) < min_charges:
+    median = _median(amounts)
+    # earlier charges at the run's price must be whole periods apart: one price
+    # bought more often than, or off, the cadence is ad hoc (a café), not a series
+    same = [d for d, a in rows[: first + 1] if _within(a, median)]
+    gaps = ((b - a).days for a, b in zip(same, same[1:], strict=False))
+    if len(amounts) < min_charges or not all(_periods(g, lo, hi) for g in gaps):
         return None
-    return Recurrence(
-        interval, len(amounts), rows[first][0], rows[-1][0], _median(amounts)
-    )
+    return Recurrence(interval, len(amounts), rows[first][0], rows[-1][0], median)
 
 
 def _median(sorted_amounts: list[int]) -> int:
     return sorted_amounts[
         len(sorted_amounts) // 2
     ]  # upper median: integer, deterministic
+
+
+def _periods(gap: int, lo: int, hi: int) -> bool:
+    """`gap` days is a whole number of cadence periods (skipped charges): k
+    times the window's centre, give or take half the window."""
+    mid, half = (lo + hi) // 2, (hi - lo) // 2
+    k = (gap + mid // 2) // mid
+    return k >= 1 and abs(gap - k * mid) <= half
 
 
 def _within(amount: int, median: int) -> bool:

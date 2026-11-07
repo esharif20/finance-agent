@@ -20,7 +20,7 @@ from typing import Any
 from finance_agent.categorise.recurring import detect_recurring
 
 SEED = 104
-DATASET_VERSION = 1
+DATASET_VERSION = 2
 PER_CASE = 40
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "recurring_baseline.json"
@@ -125,6 +125,15 @@ def generate(seed: int = SEED) -> list[Case]:
                 strict=True,
             )
         )
+
+    @case("fixed_price_irregular", False)
+    def _() -> Charges:  # a café visit at one price: some runs look weekly
+        n, a, d = rnd.randint(4, 20), amt(), start
+        out: Charges = []
+        for _ in range(n):
+            d += timedelta(rnd.randint(3, 12))
+            out.append((d, a))
+        return out
 
     return [
         (name, gold, f()) for name, (gold, f) in makers.items() for _ in range(PER_CASE)
