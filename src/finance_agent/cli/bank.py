@@ -171,6 +171,8 @@ def _print(r: SyncReport) -> None:
         print(
             f"  {r.provider_duplicates} rows are Possible Duplicates; kept, not merged"
         )
+    if r.skipped_accounts:
+        print(f"  {r.skipped_accounts} account skipped: unsupported currency")
     if r.provider_errors:
         print(f"  the provider reported {r.provider_errors} messages")
     for g in r.gaps:
