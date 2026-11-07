@@ -540,3 +540,28 @@ def test_a_guessed_pairing_never_strands_a_later_csv_row() -> None:
         coffees = {t.id for t in led.transactions() if "NERO" in t.description.upper()}
         surfaced = {i for g in led.possible_duplicates() for i in g}
         assert len(coffees) == 2 or coffees & surfaced
+
+
+def test_hsbc_csv_links_to_a_sync_without_double_counting(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    """Verifier (#162): an HSBC CSV (no balance, no account number) linked to its
+    synced Account merges the overlap like Lloyds does and lists no Gap."""
+    from synthetic_banks import money
+
+    rows = [
+        f"{t.date:%d/%m/%Y},{t.description},{money(t.amount_minor)}"
+        for t in H.txns[:30]
+    ]
+    led = ledger_for(1)
+    led.import_files([write_export("# synthetic\n" + "\n".join(reversed(rows)) + "\n")])
+    (csv_account,) = led.accounts()
+    assert csv_account.bank == "HSBC" and csv_account.bank_balance is None
+    led.link_synced_account("ACC-1", csv_account.id)
+    led.apply_sync(response(H, 20, 30))
+    r = led.apply_sync(response(H, 25, 40))
+    assert r.gaps == [] and led.ambiguous_matches() == [] and led.gaps() == []
+    assert len(led.transactions()) == 40
+    assert sum(t.amount for t in led.transactions()) == Decimal(
+        sum(t.amount_minor for t in H.txns[:40])
+    ).scaleb(-2)

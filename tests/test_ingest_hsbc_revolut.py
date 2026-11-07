@@ -157,3 +157,10 @@ def test_import_then_reimport_is_idempotent(seed: int, n: int, bank: str) -> Non
             assert again.added == 0
             assert len(ledger.transactions()) == count
         engine.dispose()
+
+
+def test_concatenated_gzip_members_are_refused_not_silently_truncated() -> None:
+    """Verifier (#162): a second gzip member must not be dropped without a word."""
+    a, b = hsbc_export(1, 3), hsbc_export(2, 3).split("\n", 1)[1]
+    with pytest.raises(UnreadableFile):
+        parse(gzip.compress(a.encode()) + gzip.compress(b.encode()))

@@ -24,7 +24,7 @@ DATA_SUFFIXES = {".csv", ".tsv", ".db", ".sqlite", ".sqlite3"}
 SNIFF_BYTES = 64 * 1024
 _DATE = re.compile(r"date", re.I)
 _DATE_CELL = re.compile(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}([ T]\d{2}:\d{2}(:\d{2})?)?")
-_MONEY_CELL = re.compile(r"[-+£$€]?\d[\d,]*\.\d{2}")
+_MONEY_CELL = re.compile(r"[-+£$€]?\d[\d,]*(\.\d{1,2})?")  # HSBC allows whole pounds
 _CELL = re.compile(r"\w[\w &/().%£$€-]{0,39}")  # a column name, not prose or code
 _MONEY = re.compile(r"amount|debit|credit|balance|paid (in|out)|money (in|out)", re.I)
 

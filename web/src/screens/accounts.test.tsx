@@ -63,6 +63,8 @@ describe("AccountStack", () => {
     const cards = within(screen.getByRole("group", { name: "Accounts" })).getAllByRole("button");
     expect(cards[0]).not.toHaveTextContent("£"); // a total missing HSBC would be wrong
     expect(cards[0]).not.toHaveTextContent("Matches ledger");
+    // Revolut and Lloyds do give a balance: the total is what's unknown, not every bank's
+    expect(cards[0]).toHaveTextContent("Total unknown: a bank gives no balance");
     expect(cards[2]).toHaveTextContent("No balance from bank");
     expect(cards[2]).not.toHaveTextContent("£");
   });

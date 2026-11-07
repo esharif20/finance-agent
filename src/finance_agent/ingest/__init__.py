@@ -1,4 +1,4 @@
-"""Ingest: one Importer per Bank, chosen by the file's header row.
+"""Ingest: one Importer per Bank, chosen by the file's first row.
 Full account numbers stay inside this module."""
 
 import zlib
@@ -35,6 +35,8 @@ def _gunzip(data: bytes) -> bytes:
         raise UnreadableFile(1, "file too large")
     if not d.eof:
         raise UnreadableFile(1, "truncated gzip file")
+    if d.unused_data:  # a second member would otherwise be dropped silently
+        raise UnreadableFile(1, "more than one gzip member")
     return out
 
 

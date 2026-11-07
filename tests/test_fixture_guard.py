@@ -254,6 +254,7 @@ HEADERLESS = b'03/01/2026,"TESCO STORES",-23.45\n02/01/2026,SALARY,1500.00\n'
         ("x.bin", gzip.compress(LLOYDS)),  # gzipped export, any name
         ("x.dat", gzip.compress(HEADERLESS)),
         ("x.dat", gzip.compress(gzip.compress(HEADERLESS))),  # nested
+        ("hsbc.txt", b"03/01/2026,SALARY,1500\n"),  # whole pounds, as HSBC accepts
     ],
 )
 def test_headerless_and_gzipped_exports_are_caught(

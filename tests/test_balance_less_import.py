@@ -148,3 +148,59 @@ def test_fa_import_reports_skipped_rows_as_a_count_without_amounts(
     out = capsys.readouterr().out
     assert "3 pending or reverted rows skipped" in out
     assert "SECRET" not in out and "." not in out.replace("..", "")
+
+
+@settings(max_examples=30, deadline=None)
+@given(
+    st.integers(0, 2**16),
+    st.integers(3, 12),
+    st.one_of(st.none(), st.tuples(st.integers(1, 10), st.integers(1, 3))),
+    st.lists(st.sets(st.integers(0, 11), min_size=1), max_size=3),
+    st.permutations(range(5)),
+)
+def test_interleaved_banks_gaps_open_only_for_real_holes_in_balanced_accounts(
+    seed: int,
+    n: int,
+    hole: tuple[int, int] | None,
+    hsbc_windows: list[set[int]],
+    order: list[int],
+) -> None:
+    """Verifier (#162): Lloyds, Revolut and holed HSBC files in any order. Only a
+    real hole in the Revolut file opens a Gap; Lloyds stays whole and HSBC, with
+    no balance, never opens one, whatever it is interleaved with."""
+    from synthetic_lloyds import generate_histories, render_export
+
+    h = generate_histories(seed, 20)[0]
+    k = len(h.txns)
+    lloyds = [render_export(h, 0, k // 2 + 1).text, render_export(h, k // 2, k).text]
+    full = revolut_export(seed, n)
+    rows = parse(full.encode()).rows
+    lines = full.splitlines()
+    missing = 0
+    if hole is not None:
+        a = min(hole[0], n - 2)
+        b = min(a + hole[1], n - 1)  # interior: first and last rows stay
+        missing = sum(r.amount_minor for r in rows[a:b])
+        lines = lines[: 2 + a] + lines[2 + b :]
+    revolut = "\n".join(lines) + "\n"
+    hsbc_full = hsbc_export(seed, 12)
+    hsbc = [_drop(hsbc_full, keep) for keep in hsbc_windows] or [hsbc_full]
+    files = [lloyds[0], lloyds[1], revolut, hsbc[0], "".join(hsbc[1:2])]
+    with tempfile.TemporaryDirectory() as d:
+        engine = open_db(Path(d) / "ledger.db")
+        with engine.begin() as conn:
+            ledger = Ledger(conn, 1)
+            for i in order:
+                if files[i]:
+                    p = Path(d) / f"f{i}.csv"
+                    p.write_text(files[i])
+                    ledger.import_files([p])
+            by_bank = {a.bank: a for a in ledger.accounts()}
+            assert by_bank["HSBC"].bank_balance is None and by_bank["HSBC"].gaps == []
+            assert by_bank["Lloyds"].gaps == []
+            assert by_bank["Lloyds"].bank_balance == by_bank["Lloyds"].ledger_balance
+            rev = by_bank["Revolut"]
+            assert sum(g.amount for g in rev.gaps) == Decimal(missing).scaleb(-2)
+            assert rev.bank_balance - rev.ledger_balance == Decimal(missing).scaleb(-2)  # type: ignore[operator]
+            assert {g.account.id for g in ledger.gaps()} <= {rev.id}
+        engine.dispose()

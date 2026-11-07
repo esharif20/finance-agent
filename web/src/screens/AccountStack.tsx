@@ -410,7 +410,7 @@ export function AccountStack({
               ) : null}
               <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
                 {f.matches === null ? (
-                  "No balance from bank"
+                  f.id === undefined ? "Total unknown: a bank gives no balance" : "No balance from bank"
                 ) : f.matches ? (
                   <>
                     <Check className="size-3.5" aria-hidden="true" />
