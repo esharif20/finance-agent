@@ -773,6 +773,11 @@ class Ledger:
         """Every stored Transaction, oldest first."""
         return self._transactions()
 
+    def transaction(self, transaction_id: int) -> Transaction | None:
+        """One Transaction of this user, or None."""
+        rows = self._transactions(schema.transaction.c.id == transaction_id)
+        return rows[0] if rows else None
+
     def search_transactions(
         self,
         account_id: int | None = None,

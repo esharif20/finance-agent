@@ -11,6 +11,7 @@ from typing import Annotated
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Path as PathParam
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
@@ -550,6 +551,15 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         return TransactionsOut(
             items=[_transaction(t) for t in page.items], total=page.total
         )
+
+    @app.get("/api/transactions/{transaction_id}")
+    def one_transaction(
+        led: Led, transaction_id: Annotated[int, PathParam(ge=1, le=2**63 - 1)]
+    ) -> TransactionOut:
+        t = led.transaction(transaction_id)
+        if t is None:
+            raise HTTPException(404, "no such Transaction")
+        return _transaction(t)
 
     @app.post("/api/corrections", status_code=201)
     def correct(led: Led, conn: Conn, body: CorrectionIn) -> CorrectionOut:

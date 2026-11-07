@@ -295,6 +295,19 @@ describe("Review Queue renderers", () => {
     await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toEqual({ version: "v1", category: ["Food & Drink", "Groceries"] }));
   });
 
+  it("always_ask: Split it reads the one payment, not a search", async () => {
+    const calls = api({
+      "GET /api/categories": groups,
+      "GET /api/review-queue": queue(item({ id: "always_ask:7", type: "always_ask" })),
+      "GET /api/transactions/7": txn(),
+    });
+    render(wrap(<ReviewQueue />));
+    await userEvent.click(await screen.findByRole("button", { name: "Split it" }));
+    expect(await screen.findByRole("form", { name: "Split payment" })).toBeInTheDocument();
+    expect(calls.some((c) => c.url === "/api/transactions/7")).toBe(true);
+    expect(calls.some((c) => c.url.startsWith("/api/transactions?"))).toBe(false);
+  });
+
   it("split_recheck: offers Re-split and Undo the split; nothing is rescaled", async () => {
     const calls = api({
       "GET /api/categories": groups,
