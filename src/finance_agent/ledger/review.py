@@ -274,6 +274,41 @@ class SplitRefundItems:
         CategoryItems().undo(led, effect_id)
 
 
+class AlwaysAskItems:
+    """ "What was this?": one payment at an "Always ask" Merchant (#125), which
+    counts under To review until answered with a Category for that payment
+    only (a per-Transaction Correction), or split or corrected elsewhere."""
+
+    name = "always_ask"
+
+    def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
+        for t in txns:
+            c = t.categorisation
+            if c is not None and c.source == "always_ask":
+                yield Item(
+                    self.name,
+                    str(t.id),
+                    _version(t.id, c.merchant_id),
+                    1,
+                    c.merchant or "",
+                    c.merchant_id,
+                    (t.id,),
+                )
+
+    def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
+        (txn,) = item.transaction_ids
+        if (
+            answer.category is None
+            or answer.choice is not None
+            or answer.transaction_id not in (None, txn)
+        ):
+            raise InvalidAnswer("a What was this? item takes this payment's Category")
+        return led.correct_transaction(txn, (answer.category[0], answer.category[1])).id
+
+    def undo(self, led: Ledger, effect_id: int) -> None:
+        CategoryItems().undo(led, effect_id)
+
+
 ITEM_TYPES: dict[str, ItemType] = {
     t.name: t
     for t in (
@@ -282,6 +317,7 @@ ITEM_TYPES: dict[str, ItemType] = {
         DuplicateItems(),
         SplitRecheckItems(),
         SplitRefundItems(),
+        AlwaysAskItems(),
     )
 }
 

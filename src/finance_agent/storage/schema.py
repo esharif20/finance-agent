@@ -170,7 +170,13 @@ merchant = Table(
     Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
     Column("name", String(64), nullable=False),
     Column("default_category_id", Integer, ForeignKey("category.id")),
+    # "Always ask" (#125): how the user set it, 'user' or 'suggestion'; NULL is
+    # off. Never set by the app itself.
+    Column("always_ask", String(16)),
     UniqueConstraint("user_id", "name"),
+    CheckConstraint(
+        "always_ask IN ('user', 'suggestion')", name="ck_merchant_always_ask"
+    ),
 )
 
 # Derived, recomputed by `categorise.run`; never edited by hand (Corrections are

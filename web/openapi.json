@@ -156,6 +156,58 @@
         "title": "AddIn",
         "type": "object"
       },
+      "AlwaysAskIn": {
+        "properties": {
+          "on": {
+            "title": "On",
+            "type": "boolean"
+          },
+          "source": {
+            "default": "user",
+            "enum": [
+              "user",
+              "suggestion"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "on"
+        ],
+        "title": "AlwaysAskIn",
+        "type": "object"
+      },
+      "AlwaysAskOut": {
+        "properties": {
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          },
+          "merchant": {
+            "$ref": "#/components/schemas/MerchantOut"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "switched_off_corrections": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Switched Off Corrections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "merchant",
+          "switched_off_corrections",
+          "message",
+          "ledger_version"
+        ],
+        "title": "AlwaysAskOut",
+        "type": "object"
+      },
       "AnswerIn": {
         "properties": {
           "category": {
@@ -635,6 +687,72 @@
         "title": "ItemOut",
         "type": "object"
       },
+      "MerchantOut": {
+        "properties": {
+          "always_ask": {
+            "title": "Always Ask",
+            "type": "boolean"
+          },
+          "always_ask_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "user",
+                  "suggestion"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Always Ask Source"
+          },
+          "default_category": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Category"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "suggest_always_ask": {
+            "title": "Suggest Always Ask",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "default_category",
+          "always_ask",
+          "always_ask_source",
+          "suggest_always_ask"
+        ],
+        "title": "MerchantOut",
+        "type": "object"
+      },
       "MerchantSpendOut": {
         "properties": {
           "amount": {
@@ -662,6 +780,27 @@
           "amount"
         ],
         "title": "MerchantSpendOut",
+        "type": "object"
+      },
+      "MerchantsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MerchantOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "ledger_version"
+        ],
+        "title": "MerchantsOut",
         "type": "object"
       },
       "Money": {
@@ -1750,6 +1889,75 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/merchants": {
+      "get": {
+        "operationId": "merchants_api_merchants_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Merchants"
+      }
+    },
+    "/api/merchants/{merchant_id}/always-ask": {
+      "put": {
+        "operationId": "set_always_ask_api_merchants__merchant_id__always_ask_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchant_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Merchant Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlwaysAskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlwaysAskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Always Ask"
       }
     },
     "/api/month-series": {
