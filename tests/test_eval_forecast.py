@@ -31,7 +31,7 @@ def test_naive_baselines_on_a_hand_case() -> None:
 def test_backtest_of_a_perfect_seasonal_forecaster() -> None:
     result = forecast.backtest(SEASONAL, forecast.seasonal_naive)
     assert result.mase == 0.0 and result.coverage == 1.0
-    assert forecast.backtest(SEASONAL, forecast.naive).mase > 0.5
+    assert (forecast.backtest(SEASONAL, forecast.naive).mase or 0) > 0.5
 
 
 def test_backtest_uses_only_the_past_and_starts_at_the_adr_gate() -> None:
@@ -43,7 +43,7 @@ def test_backtest_uses_only_the_past_and_starts_at_the_adr_gate() -> None:
         return forecast.naive(history, horizon)
 
     forecast.backtest(SEASONAL, spy)
-    assert forecast.MIN_TRAIN == 13  # ADR 0015: ETS needs 13 months
+    assert forecast.MIN_TRAIN == 13  # ADR 0015: the starting gate is 13 months
     assert lengths == list(range(13, len(SEASONAL)))
 
 
@@ -74,3 +74,20 @@ def test_committed_results_are_reproducible_from_the_seed() -> None:
         assert f"{sh.label(cat)}.mase" in metrics
     assert forecast.lower_is_better("overall.mase")
     assert forecast.lower_is_better("overall.coverage_gap")
+
+
+def test_a_constant_or_sparse_category_backtests_without_raising() -> None:
+    # verifier #171: naive_scale raises on a constant training window
+    flat = forecast.backtest([1_500] * 20, forecast.naive)
+    assert flat.mase is None and flat.coverage == 1.0
+    sparse = [0] * 14 + [4_000] + [0] * 5  # one late spike
+    result = forecast.backtest(sparse, forecast.MODELS["candidate"][2])
+    assert result.mase is not None and 0.0 <= result.coverage <= 1.0
+
+
+def test_the_candidate_is_ets_and_beats_seasonal_naive() -> None:
+    committed = json.loads(forecast.RESULTS.read_text())["models"]
+    assert committed["candidate"]["model"] == "ets-ana-log"
+    ets, sn = committed["candidate"]["metrics"], committed["seasonal_naive"]["metrics"]
+    assert ets["overall.mase"] < sn["overall.mase"]
+    assert ets["overall.coverage_gap"] < sn["overall.coverage_gap"]

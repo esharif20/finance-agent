@@ -5,11 +5,14 @@ rolling-origin backtest, against naive and seasonal-naive baselines.
     uv run python evals/forecast.py            # CI: results reproduce
     uv run python evals/forecast.py --write    # refresh (see gate.py)
 
-The ETS ticket (#149) implements `Forecaster` and replaces `stub` in MODELS.
+The candidate is `engine.forecast` (#149): ETS(A,N,A) on log spend.
 A forecaster gets the monthly totals so far (pence) and returns `horizon`
 forecasts with an interval at `LEVEL`. Origins run from `MIN_TRAIN` months
-(ADR 0015's ETS gate) to the end, up to `HORIZON` months ahead. MASE scales
-each origin's errors by its training window's one-step naive error.
+(ADR 0015's starting ETS gate; the engine serves seasonal naive below 24) to
+the end, up to `HORIZON` months ahead. MASE scales each origin's errors by
+its training window's one-step naive error; an origin whose window is
+constant has no scale, so it counts for coverage only (verifier #171), and a
+series with no scalable origin has no MASE.
 `coverage_gap` is |coverage - LEVEL|, so too-wide intervals score no better
 than too-narrow ones.
 """
@@ -22,6 +25,7 @@ from typing import Any, NamedTuple, Protocol
 
 import gate
 import synthetic_history as sh
+from finance_agent.engine.forecast import forecast_category
 from metrics import interval_coverage, mase, naive_scale
 
 RESULTS = Path(__file__).parent / "results" / "forecast_baseline.json"
@@ -44,7 +48,7 @@ class Forecaster(Protocol):
 
 
 class Backtest(NamedTuple):
-    mase: float
+    mase: float | None  # None when no training window has a naive error
     coverage: float
 
 
@@ -70,16 +74,16 @@ def seasonal_naive(history: Sequence[int], horizon: int) -> list[Forecast]:
     return [_band(history[n + h - 1 - SEASON], q) for h in range(1, horizon + 1)]
 
 
-def stub(history: Sequence[int], horizon: int) -> list[Forecast]:
-    """Placeholder until #149: the training mean, with no interval."""
-    mean = sum(history) // len(history)
-    return [Forecast(mean, mean, mean)] * horizon
+def ets(history: Sequence[int], horizon: int) -> list[Forecast]:
+    """The engine's forecaster: seasonal naive below its 24-month ETS gate."""
+    bands = forecast_category(history, horizon).months
+    return [Forecast(b.point, b.lower, b.upper) for b in bands]
 
 
 MODELS: dict[str, tuple[str, str, Forecaster]] = {
     "naive": ("naive", "1", naive),
     "seasonal_naive": ("seasonal-naive", "1", seasonal_naive),
-    "candidate": ("stub", "0", stub),
+    "candidate": ("ets-ana-log", "1", ets),
 }
 
 
@@ -94,10 +98,17 @@ def backtest(series: Sequence[int], model: Forecaster) -> Backtest:
             raise ValueError(
                 "a forecaster must return `horizon` intervals around points"
             )
-        scaled.append(mase(test, [f.point for f in fs], naive_scale(train)))
+        if any(a != b for a, b in zip(train[1:], train, strict=False)):
+            scaled.append(mase(test, [f.point for f in fs], naive_scale(train)))
         actual += test
         bands += [(f.lower, f.upper) for f in fs]
-    return Backtest(sum(scaled) / len(scaled), interval_coverage(actual, bands))
+    score = sum(scaled) / len(scaled) if scaled else None
+    return Backtest(score, interval_coverage(actual, bands))
+
+
+def _mean_mase(runs: Sequence[Backtest]) -> float:
+    scores = [r.mase for r in runs if r.mase is not None]
+    return round(sum(scores) / len(scores), 6)
 
 
 def evaluate() -> dict[str, Any]:
@@ -114,15 +125,11 @@ def evaluate() -> dict[str, Any]:
             ]
             everything += runs
             cov = sum(r.coverage for r in runs) / len(runs)
-            metrics[f"{sh.label(cat)}.mase"] = round(
-                sum(r.mase for r in runs) / len(runs), 6
-            )
+            metrics[f"{sh.label(cat)}.mase"] = _mean_mase(runs)
             metrics[f"{sh.label(cat)}.coverage_gap"] = round(abs(cov - LEVEL), 6)
             coverage[sh.label(cat)] = round(cov, 6)
         cov = sum(r.coverage for r in everything) / len(everything)
-        metrics["overall.mase"] = round(
-            sum(r.mase for r in everything) / len(everything), 6
-        )
+        metrics["overall.mase"] = _mean_mase(everything)
         metrics["overall.coverage_gap"] = round(abs(cov - LEVEL), 6)
         coverage["overall"] = round(cov, 6)
         models[key] = {

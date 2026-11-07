@@ -75,35 +75,35 @@
       }
     },
     "candidate": {
-      "model": "stub",
-      "model_version": "0",
+      "model": "ets-ana-log",
+      "model_version": "1",
       "metrics": {
-        "Food & Drink / Coffee.mase": 0.695442,
-        "Food & Drink / Coffee.coverage_gap": 0.8,
-        "Food & Drink / Eating out.mase": 0.944533,
-        "Food & Drink / Eating out.coverage_gap": 0.8,
-        "Food & Drink / Groceries.mase": 0.923493,
-        "Food & Drink / Groceries.coverage_gap": 0.8,
-        "Food & Drink / Takeaway.mase": 1.127209,
-        "Food & Drink / Takeaway.coverage_gap": 0.797475,
-        "Shopping / Online.mase": 1.204308,
-        "Shopping / Online.coverage_gap": 0.8,
-        "Transport / Public transport.mase": 0.686393,
-        "Transport / Public transport.coverage_gap": 0.8,
-        "Travel / Holidays.mase": 1.596264,
-        "Travel / Holidays.coverage_gap": 0.8,
-        "overall.mase": 1.025378,
-        "overall.coverage_gap": 0.799639
+        "Food & Drink / Coffee.mase": 0.926635,
+        "Food & Drink / Coffee.coverage_gap": 0.085354,
+        "Food & Drink / Eating out.mase": 0.64783,
+        "Food & Drink / Eating out.coverage_gap": 0.090404,
+        "Food & Drink / Groceries.mase": 1.090483,
+        "Food & Drink / Groceries.coverage_gap": 0.027273,
+        "Food & Drink / Takeaway.mase": 0.818332,
+        "Food & Drink / Takeaway.coverage_gap": 0.062626,
+        "Shopping / Online.mase": 0.745886,
+        "Shopping / Online.coverage_gap": 0.062626,
+        "Transport / Public transport.mase": 0.592277,
+        "Transport / Public transport.coverage_gap": 0.05,
+        "Travel / Holidays.mase": 0.314064,
+        "Travel / Holidays.coverage_gap": 0.032323,
+        "overall.mase": 0.733644,
+        "overall.coverage_gap": 0.058658
       },
       "coverage": {
-        "Food & Drink / Coffee": 0.0,
-        "Food & Drink / Eating out": 0.0,
-        "Food & Drink / Groceries": 0.0,
-        "Food & Drink / Takeaway": 0.002525,
-        "Shopping / Online": 0.0,
-        "Transport / Public transport": 0.0,
-        "Travel / Holidays": 0.0,
-        "overall": 0.000361
+        "Food & Drink / Coffee": 0.714646,
+        "Food & Drink / Eating out": 0.709596,
+        "Food & Drink / Groceries": 0.772727,
+        "Food & Drink / Takeaway": 0.737374,
+        "Shopping / Online": 0.737374,
+        "Transport / Public transport": 0.75,
+        "Travel / Holidays": 0.767677,
+        "overall": 0.741342
       }
     }
   }

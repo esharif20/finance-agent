@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.14.3",
     "sqlalchemy>=2.1.8",
     "sqlcipher3-wheels>=0.5.7",
+    "statsmodels>=0.15.0",
     "uvicorn>=0.54.0",
 ]
 
@@ -85,6 +86,19 @@ source_modules = [
     "finance_agent.gateway",
 ]
 forbidden_modules = ["finance_agent.cli", "finance_agent.api"]
+
+# #149: engine reads categorise (recurring detection) and the Ledger, never
+# the other way round.
+[[tool.importlinter.contracts]]
+name = "nothing below engine imports it"
+type = "forbidden"
+source_modules = [
+    "finance_agent.storage",
+    "finance_agent.ingest",
+    "finance_agent.ledger",
+    "finance_agent.categorise",
+]
+forbidden_modules = ["finance_agent.engine"]
 
 # #135: the Assistant reads through engine and the ledger read views; it never
 # imports storage (writes), ingest (untrusted input), api or cli directly.
