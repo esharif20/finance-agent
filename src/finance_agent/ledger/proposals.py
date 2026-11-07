@@ -216,25 +216,29 @@ class Proposals:
 
     def confirm(self, proposal_id: int) -> Proposal:
         """Apply the Proposal through the Ledger; a second confirm is a no-op
-        that returns the first result. The caller's transaction must commit or
-        roll back as one: a failed write leaves the Proposal pending."""
+        that returns the first result. A failed write leaves the Proposal
+        pending: claim and write share one savepoint."""
         p = schema.proposal
         current = self.get(proposal_id)
         if current.status == "confirmed":
             return current
         if current.status == "rejected" or current.draft is None:
             raise AlreadyDecided("this Proposal was rejected")
-        claimed = self._db.execute(
-            self._db.update(p)
-            .where(p.c.id == proposal_id, p.c.status == "pending")
-            .values(status="confirmed", decided_at=datetime.now(UTC), payload="{}")
-        )
+        with self._conn.begin_nested():  # a failed write undoes the claim too
+            claimed = self._db.execute(
+                self._db.update(p)
+                .where(p.c.id == proposal_id, p.c.status == "pending")
+                .values(status="confirmed", decided_at=datetime.now(UTC), payload="{}")
+            )
+            if claimed.rowcount == 1:
+                result = self._apply(current.draft, proposal_id)
+                self._db.execute(
+                    self._db.update(p)
+                    .where(p.c.id == proposal_id)
+                    .values(result_id=result)
+                )
         if claimed.rowcount != 1:  # decided between the read and the claim
             return self.confirm(proposal_id)
-        result = self._apply(current.draft, proposal_id)
-        self._db.execute(
-            self._db.update(p).where(p.c.id == proposal_id).values(result_id=result)
-        )
         return self.get(proposal_id)
 
     def reject(self, proposal_id: int) -> Proposal:

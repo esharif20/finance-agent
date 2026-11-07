@@ -367,20 +367,21 @@ def test_proposals_never_write_until_confirmed(ops: list[tuple[str, int, Any]]) 
                 pass  # refused: still nothing written
             assert state(conn) == before
         pending = props.pending()
-        writes = 0
         for p in pending:
+            prior = state(conn)
             try:
                 props.confirm(p.id)
-                writes += p.kind == "correction"
+                changed = state(conn)
+                assert changed != prior  # the first confirm wrote it
             except ValueError:
-                pass  # a later confirm can conflict (a Split replaced, ...)
-            again = state(conn)
+                # a later confirm can conflict (its Split part replaced, ...);
+                # the request's transaction would roll it back
+                continue
             try:
                 props.confirm(p.id)
             except ValueError:
                 pass
-            assert state(conn) == again  # the second confirm wrote nothing
-        assert Ledger(conn, ME).ledger_version() == before[0] + writes
+            assert state(conn) == changed  # the second confirm wrote nothing
         outer.rollback()
 
 
@@ -540,6 +541,11 @@ def test_a_failed_confirm_leaves_the_proposal_pending(
         led.revert_split(tesco)  # part 1 is gone before the user confirms
     assert client.post(f"/api/proposals/{p.id}/confirm").status_code == 404
     assert client.get(f"/api/proposals/{p.id}").json()["status"] == "pending"
+    with engine.begin() as conn:  # in-process too, with no rollback by a caller
+        props = Proposals(conn, ME)
+        with pytest.raises(UnknownTarget):
+            props.confirm(p.id)
+        assert props.get(p.id).status == "pending"
 
 
 def test_memory_and_note_text_never_reach_the_logs(
