@@ -254,6 +254,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/splits/{transaction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_api_splits__transaction_id__get"];
+        /**
+         * Save
+         * @description Split the Transaction; a live Split is replaced and kept in the history.
+         */
+        put: operations["save_api_splits__transaction_id__put"];
+        post?: never;
+        /**
+         * Revert
+         * @description Undo the live Split as a whole; it stays in the history, reverted.
+         */
+        delete: operations["revert_api_splits__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/splits/{transaction_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview
+         * @description The parts as they would be saved; nothing is written.
+         */
+        post: operations["preview_api_splits__transaction_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/subscriptions": {
         parameters: {
             query?: never;
@@ -620,6 +665,25 @@ export interface components {
             /** Month */
             month: string;
         };
+        /** PartIn */
+        PartIn: {
+            /** Amount Minor */
+            amount_minor?: number | null;
+            /** Category */
+            category: string[];
+        };
+        /** PartOut */
+        PartOut: {
+            /** Amount Minor */
+            amount_minor: number;
+            /** Category */
+            category: string[];
+        };
+        /** PreviewOut */
+        PreviewOut: {
+            /** Parts */
+            parts: components["schemas"]["PartOut"][];
+        };
         /** QueueOut */
         QueueOut: {
             /** Items */
@@ -628,6 +692,13 @@ export interface components {
             ledger_version: number;
             /** Remaining */
             remaining: number;
+        };
+        /** RevertOut */
+        RevertOut: {
+            /** Id */
+            id: number;
+            /** Ledger Version */
+            ledger_version: number;
         };
         /** SpendingOut */
         SpendingOut: {
@@ -644,6 +715,28 @@ export interface components {
             refunds: components["schemas"]["Money"];
             total: components["schemas"]["Money"];
             unmatched_refunds: components["schemas"]["Money"];
+        };
+        /** SplitIn */
+        SplitIn: {
+            /** Parts */
+            parts: components["schemas"]["PartIn"][];
+        };
+        /** SplitOut */
+        SplitOut: {
+            /** Amount Minor */
+            amount_minor: number;
+            /** Currency */
+            currency: string;
+            /** Id */
+            id: number;
+            /** Ledger Version */
+            ledger_version: number;
+            /** Needs Recheck */
+            needs_recheck: boolean;
+            /** Parts */
+            parts: components["schemas"]["PartOut"][];
+            /** Transaction Id */
+            transaction_id: number;
         };
         /** SubscriptionOut */
         SubscriptionOut: {
@@ -1169,6 +1262,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpendingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_api_splits__transaction_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SplitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_api_splits__transaction_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SplitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SplitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_api_splits__transaction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevertOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_splits__transaction_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SplitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
                 };
             };
             /** @description Validation Error */

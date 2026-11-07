@@ -100,9 +100,18 @@ class Categorisation:
     kind: str  # Spending, Income, Transfer, Refund or Fee
     merchant: str | None
     category: tuple[str, str] | None  # (top level, subcategory)
-    source: str  # "correction", "merchant:<name>", "rule:<id>" or "default"
+    # "correction", "split", "split_refund", "merchant:<name>", "rule:<id>" or
+    # "default"
+    source: str
     taxonomy_version: int
     merchant_id: int | None = None
+    # a split Transaction's parts as totals count them, adding up to its amount
+    # (one whole part when the Split needs re-checking); `category` is then
+    # the largest part's
+    parts: tuple["SplitPart", ...] = ()
+    # a Refund counted against this split Transaction's largest part until
+    # the user says which part it was for
+    refund_of: int | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +129,61 @@ class Correction:
 
 class UnknownTarget(ValueError):
     """No such Transaction, Merchant, Category or Correction for this user."""
+
+
+SPLIT_PARTS = range(2, 11)  # a Split has 2-10 parts
+
+
+@dataclass(frozen=True)
+class SplitPart:
+    amount_minor: int  # signed as the Transaction: spending negative
+    category: tuple[str, str]
+
+
+@dataclass(frozen=True)
+class Split:
+    """A Split Correction (#123): one Transaction divided into parts, each in
+    its own Category. The parts added up to the Transaction when made; if the
+    amount has changed since, `needs_recheck` is set and they are never
+    rescaled (the whole amount counts under the largest part's Category)."""
+
+    id: int  # the Correction's id
+    transaction_id: int
+    parts: tuple[SplitPart, ...]
+    created_at: datetime
+    reverted_at: datetime | None
+    amount_minor: int  # the Transaction's amount now
+    needs_recheck: bool = False
+
+    @property
+    def largest(self) -> SplitPart:
+        """The largest part by size; the first one on a tie."""
+        return max(self.parts, key=lambda p: abs(p.amount_minor))
+
+
+class InvalidSplit(ValueError):
+    """Parts that are not 2-10 non-zero integers of the Transaction's sign
+    adding up to it exactly, or a Transaction that cannot be split."""
+
+
+def split_parts(total_minor: int, amounts: Sequence[int | None]) -> list[int]:
+    """Every part's amount in minor units, the last one as the remainder when
+    it is None. Plain arithmetic (ADR 0007); refuses anything that is not an
+    exact split of `total_minor`."""
+    if len(amounts) not in SPLIT_PARTS:
+        raise InvalidSplit("a Split has 2 to 10 parts")
+    *typed, last = amounts
+    if any(type(a) is not int for a in typed) or type(last) not in (int, type(None)):
+        raise InvalidSplit("only the last part may be left for the remainder")
+    out: list[int] = [a for a in typed if type(a) is int]
+    out.append(total_minor - sum(out) if last is None else last)
+    if total_minor == 0 or any(a == 0 for a in out):
+        raise InvalidSplit("no part may be zero")
+    if any((a < 0) != (total_minor < 0) for a in out):
+        raise InvalidSplit("every part takes the Transaction's sign")
+    if sum(out) != total_minor:
+        raise InvalidSplit("the parts must add up to the Transaction exactly")
+    return out
 
 
 # Subscription registry (#103). kind -> the top-level Category its groups come from
@@ -320,6 +384,14 @@ class BankOrderRow:
     description: str
     amount_minor: int
     running_balance_minor: int
+
+
+def _shares(c: Categorisation, amount_minor: int) -> list[tuple[tuple[str, str], int]]:
+    """(Category, minor units) that a Transaction of `amount_minor` counts as:
+    its Split parts when it has a live Split, else all of it in its Category."""
+    if c.parts:
+        return [(p.category, p.amount_minor) for p in c.parts]
+    return [(c.category, amount_minor)] if c.category else []
 
 
 def _decimal(minor: int) -> Decimal:
@@ -644,7 +716,11 @@ class Ledger:
             x
             for x in reversed(self._transactions(*terms))
             if category is None
-            or ((k := x.categorisation) and k.category and k.category[0] == category)
+            or (
+                (k := x.categorisation)
+                and k.category
+                and any(top == category for (top, _), _ in _shares(k, 0))
+            )
         ]
         return TransactionPage(rows[offset : offset + limit], len(rows))
 
@@ -1318,10 +1394,10 @@ class Ledger:
         tree: dict[str, dict[str, dict[tuple[int | None, str], int]]] = {}
         for txn_id, c in self._categorisations().items():
             if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
-                top, sub = c.category
-                merchants = tree.setdefault(top, {}).setdefault(sub, {})
-                key = (c.merchant_id, c.merchant or "Unknown")
-                merchants[key] = merchants.get(key, 0) - amounts[txn_id]
+                for (top, sub), minor in _shares(c, amounts[txn_id]):
+                    merchants = tree.setdefault(top, {}).setdefault(sub, {})
+                    key = (c.merchant_id, c.merchant or "Unknown")
+                    merchants[key] = merchants.get(key, 0) - minor
 
         def level(nodes: dict[Any, Any]) -> tuple[Spend, ...]:
             out: list[Spend] = []
@@ -1373,7 +1449,7 @@ class Ledger:
             and (c := t.categorisation)
             and c.kind in ("Spending", "Refund")
             and c.category
-            and c.category[0] == name
+            and any(top == name for (top, _), _ in _shares(c, 0))
         )
         return CategoryDetail(
             name,
@@ -1408,8 +1484,16 @@ class Ledger:
                 fees -= t.amount
             elif c.kind == "Refund":
                 refunds += t.amount
-                if c.category and c.category[0] == UNCATEGORISED:
-                    unmatched -= t.amount
+                # only the Uncategorised share: a split Refund's other parts
+                # are matched in their own Categories
+                unmatched -= sum(
+                    (
+                        _decimal(minor)
+                        for (top, _), minor in _shares(c, int(t.amount.scaleb(2)))
+                        if top == UNCATEGORISED
+                    ),
+                    Decimal(0),
+                )
         cats: list[Spend] = []
         for sp in spends:
             if sp.name == UNCATEGORISED:
@@ -1499,7 +1583,78 @@ class Ledger:
             out[r.transaction_id] = Categorisation(
                 r.kind, r.merchant, category, source, r.taxonomy_version, r.merchant_id
             )
+        return self._split_overlay(out, set(by_txn))
+
+    def _split_overlay(
+        self, out: dict[int, Categorisation], corrected: set[int]
+    ) -> dict[int, Categorisation]:
+        """Live Splits beat every Category Correction on their Transaction; a
+        Refund linked to one counts under its largest part until the user picks
+        a part with a Correction (`corrected`)."""
+        splits = {
+            s.transaction_id: s
+            for s in self.splits()
+            if (c := out.get(s.transaction_id)) and c.kind in CATEGORISED_KINDS
+        }
+        if not splits:
+            return out
+        for s in splits.values():
+            parts = (SplitPart(s.amount_minor, s.largest.category),)
+            out[s.transaction_id] = replace(
+                out[s.transaction_id],
+                category=s.largest.category,
+                source="split",
+                parts=parts if s.needs_recheck else s.parts,
+            )
+        t = schema.transaction
+        rows = {
+            r.id: r
+            for r in self._db.execute(
+                self._db.select(
+                    t, t.c.id, t.c.posted_on, t.c.account_id, t.c.amount_minor
+                )
+            )
+        }
+        for refund_id, c in out.items():
+            if (
+                c.kind != "Refund"
+                or c.merchant_id is None
+                or refund_id in corrected
+                or c.source == "split"  # the user split the Refund itself
+            ):
+                continue
+            purchase = self._refunded_split(rows[refund_id], c.merchant_id, out, rows)
+            if purchase is not None:
+                out[refund_id] = replace(
+                    c,
+                    category=splits[purchase].largest.category,
+                    source="split_refund",
+                    refund_of=purchase,
+                )
         return out
+
+    @staticmethod
+    def _refunded_split(
+        refund: Any,
+        merchant_id: int,
+        out: dict[int, Categorisation],
+        rows: dict[int, Any],
+    ) -> int | None:
+        """The split purchase a Refund is for, if any.
+        shortcut: there is no Refund link yet (ADR 0004 "when matched"), so this
+        is the latest split Spending of the same Merchant and Account on or
+        before the Refund, no smaller than it; use the real link once it lands."""
+        found = [
+            (p.posted_on, p.id)
+            for i, c in out.items()
+            if c.source == "split"
+            and c.kind == "Spending"
+            and c.merchant_id == merchant_id
+            and (p := rows[i]).account_id == refund.account_id
+            and p.posted_on <= refund.posted_on
+            and -p.amount_minor >= refund.amount_minor
+        ]
+        return max(found)[1] if found else None
 
     def ledger_version(self) -> int:
         """Bumped by every import that stores a file and every Correction."""
@@ -1529,19 +1684,155 @@ class Ledger:
         return self._correct(self._category_id(category), merchant_id=merchant_id)
 
     def revert_correction(self, correction_id: int) -> None:
-        """Undo a Correction; it stays in the history, marked reverted."""
+        """Undo a Category Correction; it stays in the history, marked
+        reverted. A Split is undone with `revert_split`."""
+        self._revert(correction_id, "category")
+
+    def _revert(self, correction_id: int, kind: str) -> None:
         k = schema.correction
         res = self._db.execute(
             self._db.update(k)
-            .where(k.c.id == correction_id, k.c.reverted_at.is_(None))
+            .where(k.c.id == correction_id, k.c.kind == kind, k.c.reverted_at.is_(None))
             .values(reverted_at=datetime.now(UTC))
         )
         if res.rowcount != 1:
             raise UnknownTarget("no such active Correction")
         self._db.bump_ledger_version()
 
+    # --- Splits (#123) ---------------------------------------------------------
+
+    def preview_split(
+        self,
+        transaction_id: int,
+        parts: Sequence[tuple[int | None, tuple[str, str]]],
+    ) -> tuple[SplitPart, ...]:
+        """The parts as they would be saved, the last one's amount computed as
+        the remainder when it is None. Writes nothing."""
+        t, c = schema.transaction, schema.categorisation
+        total = self._exists(
+            self._db.select(t, t.c.amount_minor).where(t.c.id == transaction_id)
+        )
+        cats = [(cat[0], cat[1]) for _, cat in parts]
+        for cat in cats:
+            self._category_id(cat)  # an unknown one is a 404 first
+        kind = self._db.execute(
+            self._db.select(c, c.c.kind).where(c.c.transaction_id == transaction_id)
+        ).scalar()
+        if kind is not None and kind not in CATEGORISED_KINDS:
+            raise KindHasNoCategory(f"{kind} takes no Category")
+        if transaction_id in self._transfer_legs():
+            raise InvalidSplit("a Transfer cannot be split")
+        amounts = split_parts(total, [a for a, _ in parts])
+        return tuple(SplitPart(a, cat) for a, cat in zip(amounts, cats, strict=True))
+
+    def split_transaction(
+        self,
+        transaction_id: int,
+        parts: Sequence[tuple[int | None, tuple[str, str]]],
+    ) -> Split:
+        """Split one Transaction into `parts`; a live Split is replaced (it is
+        reverted and stays in the history)."""
+        made = self.preview_split(transaction_id, parts)
+        if (live := self.split(transaction_id)) is not None:
+            self._revert(live.id, "split")
+        return self._write_split(transaction_id, made)
+
+    def revert_split(self, transaction_id: int) -> int:
+        """Undo the live Split as a whole; returns its Correction id."""
+        live = self.split(transaction_id)
+        if live is None:
+            raise UnknownTarget("no live Split")
+        self._revert(live.id, "split")
+        return live.id
+
+    def restore_split(self, correction_id: int) -> Split:
+        """Bring a reverted Split back as a new Correction with the same parts,
+        as they were (an undo; a Split that needed re-checking still does)."""
+        old = next((s for s in self._splits(live=False) if s.id == correction_id), None)
+        if old is None or old.reverted_at is None:
+            raise UnknownTarget("no such reverted Split")
+        if (live := self.split(old.transaction_id)) is not None:
+            self._revert(live.id, "split")
+        return self._write_split(old.transaction_id, old.parts)
+
+    def split(self, transaction_id: int) -> Split | None:
+        """The Transaction's live Split, if any."""
+        return next(
+            (s for s in self.splits() if s.transaction_id == transaction_id), None
+        )
+
+    def splits(self) -> list[Split]:
+        """Every live Split, oldest first."""
+        return self._splits(live=True)
+
+    def _splits(self, live: bool) -> list[Split]:
+        k, p, t = schema.correction, schema.split_part, schema.transaction
+        sub, top = schema.category.alias("sub"), schema.category.alias("top")
+        stmt = (
+            self._db.select(
+                k,
+                k.c.id,
+                k.c.transaction_id,
+                k.c.created_at,
+                k.c.reverted_at,
+                t.c.amount_minor.label("total"),
+                p.c.amount_minor,
+                top.c.name.label("top"),
+                sub.c.name.label("sub"),
+                sub.c.taxonomy_version.label("version"),
+            )
+            .join(p, self._db.on(p, p.c.correction_id == k.c.id))
+            .join(t, self._db.on(t, t.c.id == k.c.transaction_id))
+            .join(sub, self._db.on(sub, sub.c.id == p.c.category_id))
+            .join(top, self._db.on(top, top.c.id == sub.c.parent_id))
+            .where(k.c.kind == "split")
+            .order_by(k.c.id, p.c.ordinal)
+        )
+        if live:
+            stmt = stmt.where(k.c.reverted_at.is_(None))
+        rows: dict[int, list[Any]] = {}
+        for r in self._db.execute(stmt):
+            rows.setdefault(r.id, []).append(r)
+        out: list[Split] = []
+        for cid, rs in rows.items():
+            parts = tuple(
+                SplitPart(r.amount_minor, current(r.version, (r.top, r.sub)))
+                for r in rs
+            )
+            r = rs[0]
+            out.append(
+                Split(
+                    cid,
+                    r.transaction_id,
+                    parts,
+                    r.created_at,
+                    r.reverted_at,
+                    r.total,
+                    sum(x.amount_minor for x in parts) != r.total,
+                )
+            )
+        return out
+
+    def _write_split(self, transaction_id: int, parts: Sequence[SplitPart]) -> Split:
+        cid = self._db.insert(
+            schema.correction,
+            kind="split",
+            transaction_id=transaction_id,
+            created_at=datetime.now(UTC),
+        )
+        for i, part in enumerate(parts):
+            self._db.insert(
+                schema.split_part,
+                correction_id=cid,
+                ordinal=i,
+                amount_minor=part.amount_minor,
+                category_id=self._category_id(part.category),
+            )
+        self._db.bump_ledger_version()
+        return next(s for s in self.splits() if s.id == cid)
+
     def corrections(self) -> list[Correction]:
-        """Every Correction, reverted ones included, oldest first."""
+        """Every Category Correction, reverted ones included, oldest first."""
         k, sub, top = (
             schema.correction,
             schema.category.alias("sub"),
@@ -1561,6 +1852,7 @@ class Ledger:
             )
             .join(sub, self._db.on(sub, sub.c.id == k.c.category_id))
             .join(top, self._db.on(top, top.c.id == sub.c.parent_id))
+            .where(k.c.kind == "category")
             .order_by(k.c.id)
         )
         return [

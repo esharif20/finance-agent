@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.api import card_art, review_queue, subscriptions
+from finance_agent.api import card_art, review_queue, splits, subscriptions
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -567,6 +567,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
 
     app.include_router(subscriptions.router)
     app.include_router(review_queue.router)
+    app.include_router(splits.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():

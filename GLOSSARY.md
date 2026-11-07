@@ -48,6 +48,10 @@ _Avoid_: Conflict, clash
 A timestamped change the user makes on top of a Transaction (a new Category, a transfer link) that never alters the Transaction itself.
 _Avoid_: Edit, override, fix
 
+**Split**:
+A Correction that divides one Transaction into 2–10 parts, each with its own amount and Category, adding up to the Transaction exactly. The Transaction itself is unchanged; a Split whose Transaction amount later changes needs re-checking and is never rescaled.
+_Avoid_: Allocation, itemisation, sub-transaction
+
 ## Categorisation
 
 **Category**:

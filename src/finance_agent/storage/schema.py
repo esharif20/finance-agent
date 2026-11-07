@@ -263,6 +263,8 @@ possible_duplicate = Table(
 # User Corrections (ADR 0001): never edited or deleted, only reverted, so they
 # are an audit trail. Exactly one target: one Transaction or every Transaction
 # of a Merchant. Read-time overlay on `categorisation`; rules never see them.
+# `kind` "category" sets one Category; "split" (#123) divides one Transaction
+# into its `split_part` rows and has no Category of its own.
 correction = Table(
     "correction",
     metadata,
@@ -270,13 +272,36 @@ correction = Table(
     Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
     Column("transaction_id", Integer, ForeignKey("transaction.id")),
     Column("merchant_id", Integer, ForeignKey("merchant.id")),
-    Column("category_id", Integer, ForeignKey("category.id"), nullable=False),
+    Column("category_id", Integer, ForeignKey("category.id")),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("reverted_at", DateTime(timezone=True)),
+    Column("kind", String(16), nullable=False, server_default="category"),
     CheckConstraint(
         text("(transaction_id IS NULL) != (merchant_id IS NULL)"),
         name="ck_correction_one_target",
     ),
+    CheckConstraint(
+        text(
+            "(kind = 'category' AND category_id IS NOT NULL) OR "
+            "(kind = 'split' AND category_id IS NULL AND transaction_id IS NOT NULL)"
+        ),
+        name="ck_correction_kind",
+    ),
+)
+
+# The parts of a `split` Correction (#123), written once with it and never
+# edited: 2-10 per Correction, non-zero, one sign, adding up to the Transaction
+# amount when made. Re-splitting reverts the Correction and writes a new one.
+split_part = Table(
+    "split_part",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("correction_id", Integer, ForeignKey("correction.id"), primary_key=True),
+    Column("ordinal", Integer, primary_key=True),
+    Column("amount_minor", BigInteger, nullable=False),
+    Column("category_id", Integer, ForeignKey("category.id"), nullable=False),
+    CheckConstraint(text("amount_minor != 0"), name="ck_split_part_nonzero"),
+    CheckConstraint(text("ordinal BETWEEN 0 AND 9"), name="ck_split_part_ordinal"),
 )
 
 # Subscription registry (#103), append-only like `correction`: the latest row per
