@@ -225,6 +225,7 @@ DETECTED_REASONS = ("known_service", "pattern")  # user_confirmed, user_added: u
 DETECTED_STATUSES = ("suggested", "active")  # suggested: ask "Is this a subscription?"
 INTERVALS = ("weekly", "monthly", "annual")
 NOT_SUBSCRIPTION = "not_subscription"  # a negative entry
+USER_CANCELLED = "user_cancelled"  # the user cancelled it; a further charge is a flag
 
 
 @dataclass(frozen=True)
@@ -2273,6 +2274,23 @@ class Ledger:
             x.interval,
         )
 
+    def cancel_subscription(self, merchant_id: int) -> int:
+        """The user says they cancelled it: its kind, group and evidence stay,
+        and it leaves the totals. Confirming it lists it as active again.
+        Returns the registry row written."""
+        x = self._listed(merchant_id)
+        return self._registry(
+            merchant_id,
+            "user",
+            x.kind,
+            x.group,
+            USER_CANCELLED,
+            x.reason,
+            x.evidence_on,
+            x.charge_count,
+            x.interval,
+        )
+
     def not_a_subscription(self, merchant_id: int) -> int:
         """Remove or dismiss: remembered as "not a subscription", never deleted.
         Returns the registry row written."""
@@ -2469,6 +2487,14 @@ class Ledger:
         ):
             out[r.id] = (r, self._convert(r, rates))
         return out
+
+    def foreign_in_gbp(self) -> dict[int, int | None]:
+        """{Transaction id: GBP minor units} for every foreign-currency
+        Transaction; None is rate needed."""
+        return {
+            i: None if c is None else c.gbp_minor
+            for i, (_, c) in self._conversions().items()
+        }
 
     @staticmethod
     def _convert(r: Any, rates: list[fx.Rate]) -> fx.Conversion | None:

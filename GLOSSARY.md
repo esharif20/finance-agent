@@ -86,6 +86,13 @@ _Avoid_: Pending, Uncategorised
 Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence, a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
 _Avoid_: Inbox, uncategorised
 
+**Subscription status**:
+Derived each time from a registry entry and its Merchant's last charge (#105): **active**; **overdue**, past the next expected charge plus a grace of 2 days (weekly), 5 (monthly) or 15 (annual); **lapsed**, two expected charges missed; **cancelled**, set only by the user; or **suggested**, still awaiting "is this a subscription?". Only active and overdue entries count in the monthly totals.
+_Avoid_: Expired, inactive
+
+**Monthly cost**:
+A Subscription's or Bill's last charge in GBP as a monthly equivalent, in exact pence (weekly × 52 ÷ 12, annual ÷ 12), rounded half-even to the penny only when shown. Totals per group and per kind are the exact sums, rounded once. A foreign-currency charge is in GBP through the Ledger's one FX rate; without a rate it has no Monthly cost ("rate needed") and stays out of the totals, never guessed.
+
 ## Intelligence
 
 **Insight**:

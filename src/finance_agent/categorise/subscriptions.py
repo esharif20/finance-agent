@@ -3,13 +3,27 @@ from their first charge, descriptor patterns asked about straight away, then
 recurring detection (`categorise.recurring`). Every write goes through
 `Ledger.record_detection`, which never overrides a user decision and writes
 nothing when the evidence is unchanged, so re-running is idempotent.
+
+Status and monthly cost (#105): read-only, derived from the registry and the
+Merchant's charges each time, in exact pence, rounded once for display.
 """
 
+import calendar
 import logging
 import re
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import date, timedelta
+from fractions import Fraction
 
 from finance_agent.categorise.recurring import detect_recurring
-from finance_agent.ledger import REGISTRY_KINDS, Ledger, Transaction
+from finance_agent.ledger import (
+    NOT_SUBSCRIPTION,
+    REGISTRY_KINDS,
+    Ledger,
+    SubscriptionEntry,
+    Transaction,
+)
 
 log = logging.getLogger(__name__)  # counts only
 
@@ -107,14 +121,19 @@ def pattern_group(description: str) -> str | None:
 _KIND_OF_TOP = {top: kind for kind, top in REGISTRY_KINDS.items()}
 
 
-def recognise(led: Ledger) -> int:
-    """Record a detection for every Merchant whose Spending is recognised;
-    returns how many registry entries were written."""
+def _merchant_spending(led: Ledger) -> dict[int, list[Transaction]]:
     by_merchant: dict[int, list[Transaction]] = {}
     for t in led.transactions():
         c = t.categorisation
         if c and c.kind == "Spending" and c.merchant_id is not None:
             by_merchant.setdefault(c.merchant_id, []).append(t)
+    return by_merchant
+
+
+def recognise(led: Ledger) -> int:
+    """Record a detection for every Merchant whose Spending is recognised;
+    returns how many registry entries were written."""
+    by_merchant = _merchant_spending(led)
     written = 0
     for merchant_id, ts in sorted(by_merchant.items()):
         c = ts[0].categorisation
@@ -147,3 +166,135 @@ def recognise(led: Ledger) -> int:
         )
     log.info("subscriptions_recognised written=%d", written)
     return written
+
+
+# --- Status and monthly cost (#105) ------------------------------------------
+
+GRACE_DAYS = {"weekly": 2, "monthly": 5, "annual": 15}
+COUNTED = ("active", "overdue")  # lapsed, cancelled and suggested never count
+
+
+@dataclass(frozen=True)
+class Charge:
+    merchant_id: int
+    posted_on: date
+    minor: int  # positive, money out, in `currency`'s minor units
+    currency: str = "GBP"  # anything else is a charge still needing an FX rate
+
+
+@dataclass(frozen=True)
+class SubscriptionCost:
+    entry: SubscriptionEntry
+    status: str  # active, overdue, lapsed, cancelled or suggested
+    interval: str | None
+    last_charge_on: date | None
+    monthly: Fraction | None  # exact GBP pence a month; round only with `display`
+    cost_note: str | None  # rate_needed, interval_needed or no_charge, when no cost
+    counted: bool  # in the totals
+
+
+@dataclass(frozen=True)
+class CostSummary:
+    items: list[SubscriptionCost]
+    kind_totals: dict[str, Fraction]  # kind -> exact pence a month
+    group_totals: dict[tuple[str, str], Fraction]  # (kind, group) -> exact pence
+    rate_needed: int  # listed items left out of totals for want of an FX rate
+
+
+def display(pence: Fraction) -> int:
+    """Whole pence, rounded half-even: the only rounding step."""
+    return round(pence)
+
+
+def _due(last: date, interval: str, n: int) -> date:
+    """The n-th charge expected after `last`; months clamp to the month end."""
+    if interval == "weekly":
+        return last + timedelta(weeks=n)
+    months = last.month - 1 + n * (12 if interval == "annual" else 1)
+    y, m = last.year + months // 12, months % 12 + 1
+    return date(y, m, min(last.day, calendar.monthrange(y, m)[1]))
+
+
+def _monthly(minor: int, interval: str) -> Fraction:
+    if interval == "weekly":
+        return Fraction(minor * 52, 12)
+    return Fraction(minor, 12) if interval == "annual" else Fraction(minor)
+
+
+def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> SubscriptionCost:
+    last = max(charges, key=lambda c: (c.posted_on, c.currency, c.minor), default=None)
+    rec = detect_recurring(((c.posted_on, c.minor) for c in charges), min_charges=2)
+    interval = e.interval or (rec.interval if rec else None)
+    status = {"user_cancelled": "cancelled", "suggested": "suggested"}.get(
+        e.status, "active"
+    )
+    if status == "active" and last and interval:
+        grace = timedelta(GRACE_DAYS[interval])
+        if today > _due(last.posted_on, interval, 2) + grace:
+            status = "lapsed"
+        elif today > _due(last.posted_on, interval, 1) + grace:
+            status = "overdue"
+    monthly, note = None, None
+    if last is None:
+        note = "no_charge"
+    elif last.currency != "GBP":
+        note = "rate_needed"  # the latest charge had no FX rate: never guessed
+    elif interval is None:
+        note = "interval_needed"
+    else:
+        monthly = _monthly(last.minor, interval)
+    return SubscriptionCost(
+        e,
+        status,
+        interval,
+        last.posted_on if last else None,
+        monthly,
+        note,
+        status in COUNTED and monthly is not None,
+    )
+
+
+def subscription_costs(
+    entries: Iterable[SubscriptionEntry], charges: Iterable[Charge], today: date
+) -> CostSummary:
+    """Each listed entry's status and monthly cost, with totals that are the
+    exact sums of the counted items. Negative entries are left out. The result
+    does not depend on the order of `entries` or `charges`."""
+    by_merchant: dict[int, list[Charge]] = {}
+    for c in charges:
+        by_merchant.setdefault(c.merchant_id, []).append(c)
+    items = sorted(
+        (
+            _cost(e, by_merchant.get(e.merchant_id, []), today)
+            for e in entries
+            if e.status != NOT_SUBSCRIPTION and e.kind and e.group
+        ),
+        key=lambda x: (x.entry.merchant, x.entry.merchant_id),
+    )
+    kinds: dict[str, Fraction] = {}
+    groups: dict[tuple[str, str], Fraction] = {}
+    for x in items:
+        if x.counted and x.monthly is not None and x.entry.kind and x.entry.group:
+            kinds[x.entry.kind] = kinds.get(x.entry.kind, Fraction(0)) + x.monthly
+            g = (x.entry.kind, x.entry.group)
+            groups[g] = groups.get(g, Fraction(0)) + x.monthly
+    rate_needed = sum(x.cost_note == "rate_needed" for x in items)
+    return CostSummary(items, kinds, groups, rate_needed)
+
+
+def costs(led: Ledger, today: date) -> CostSummary:
+    """`subscription_costs` over the Ledger's registry and Spending charges."""
+    in_gbp = led.foreign_in_gbp()  # the Ledger's one rate choice (#156)
+    charges: list[Charge] = []
+    for m, ts in _merchant_spending(led).items():
+        for t in (t for t in ts if t.amount < 0):  # refunds are not charges
+            own = int(-t.amount * 100)
+            gbp = own if t.currency == "GBP" else in_gbp.get(t.id)
+            if gbp is None:  # rate needed: kept in its own currency, never guessed
+                charges.append(Charge(m, t.posted_on, own, t.currency))
+            else:  # a converted charge keeps its sign
+                charges.append(Charge(m, t.posted_on, abs(gbp)))
+    s = subscription_costs(led.subscriptions(), charges, today)
+    counted = sum(x.counted for x in s.items)
+    log.info("subscription_costs items=%d counted=%d", len(s.items), counted)
+    return s
