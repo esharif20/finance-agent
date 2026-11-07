@@ -83,8 +83,8 @@ class AccountOut(BaseModel):
     name: str
     kind: str
     currency: str
-    bank_balance: Money
-    ledger_balance: Money
+    bank_balance: Money | None  # None: this Bank's export gives no balance (HSBC)
+    ledger_balance: Money | None
     gaps: list[GapOut]
     art: str | None  # key for /api/card-art/{art}; None means the generic face
     last_import: str | None  # ISO time of the newest statement with its rows
@@ -246,8 +246,12 @@ def _account(a: AccountBalance) -> AccountOut:
         name=a.name,
         kind=a.kind,
         currency=a.currency,
-        bank_balance=_money(a.bank_balance, a.currency),
-        ledger_balance=_money(a.ledger_balance, a.currency),
+        bank_balance=None
+        if a.bank_balance is None
+        else _money(a.bank_balance, a.currency),
+        ledger_balance=None
+        if a.ledger_balance is None
+        else _money(a.ledger_balance, a.currency),
         gaps=[_gap(g, a.currency) for g in a.gaps],
         art=card_art.art_key(a.bank),
         last_import=a.last_import.isoformat() if a.last_import else None,

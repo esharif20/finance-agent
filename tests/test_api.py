@@ -148,6 +148,7 @@ def test_accounts_carry_balances_and_gaps(
     [acct] = client.get("/api/accounts").json()
 
     assert acct["masked_number"] == want.masked_number
+    assert want.bank_balance is not None and want.ledger_balance is not None
     assert acct["bank_balance"]["minor"] == int(want.bank_balance * 100)
     assert acct["ledger_balance"]["minor"] == int(want.ledger_balance * 100)
     assert acct["gaps"][0]["amount"]["minor"] == 1240

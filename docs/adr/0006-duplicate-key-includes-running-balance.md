@@ -4,7 +4,7 @@ status: accepted
 ---
 # A Transaction's identity includes the running balance
 
-Bank CSV exports have no transaction ID, and Lloyds caps each export at about 150 rows, so overlapping exports are normal. The importer identifies a Transaction by (Account, date, description, amount, running balance). The running balance is what tells two identical same-day purchases apart. A row matching an existing Transaction is recorded as also present in the new Statement Import and is never imported twice. A Bank whose export lacks a balance column needs its own decision. Rows within one file are always distinct Transactions: a row only matches an existing Transaction not already linked to the same Statement Import, so a purchase, a refund and the same purchase again on one day (same key, same balance) stay two Transactions.
+Bank CSV exports have no transaction ID, and Lloyds caps each export at about 150 rows, so overlapping exports are normal. The importer identifies a Transaction by (Account, date, description, amount, running balance). The running balance is what tells two identical same-day purchases apart. A row matching an existing Transaction is recorded as also present in the new Statement Import and is never imported twice. A Bank whose export lacks a balance column needs its own decision; for HSBC (#130) the balance is NULL in the key and its limits are in [ADR 0014's known limits](0014-synced-transaction-identity.md#known-limits). Rows within one file are always distinct Transactions: a row only matches an existing Transaction not already linked to the same Statement Import, so a purchase, a refund and the same purchase again on one day (same key, same balance) stay two Transactions.
 
 ## Amendment (#34): rows are placed by sequence alignment
 
