@@ -2,6 +2,17 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol
 
+# ISO 4217 codes whose minor unit is not a hundredth (exponent 0, 3 or 4, or
+# none). Amounts are stored in hundredths for every currency, so these are
+# refused at import, never stored 100x or 10x off (#156).
+NOT_HUNDREDTHS = frozenset(
+    "BIF CLP DJF GNF ISK JPY KMF KRW PYG RWF UGX UYI VND VUV XAF XOF XPF"  # 0
+    " BHD IQD JOD KWD LYD OMR TND"  # 3
+    " CLF UYW"  # 4
+    " XAG XAU XBA XBB XBC XBD XDR XPD XPT XSU XTS XUA XXX".split()  # none
+)
+NOT_HUNDREDTHS_REASON = "currency without a two-digit minor unit"
+
 
 @dataclass(frozen=True)
 class ParsedRow:

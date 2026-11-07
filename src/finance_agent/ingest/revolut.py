@@ -7,7 +7,8 @@ export: confirm the header row only, and change it here.
 
 Each row keeps its own currency (#156): one Account per Product and currency,
 since the Balance column runs per currency; a GBP Account keeps the ref it had
-before FX. Amounts are hundredths in every currency. Only COMPLETED rows are
+before FX. Amounts are hundredths in every currency, so a currency whose
+minor unit is not a hundredth (JPY, KWD) is refused. Only COMPLETED rows are
 imported; PENDING and REVERTED rows are never stored as settled, and the import
 report counts them. The Fee column is separate from Amount, so a row's amount
 is Amount - Fee, which keeps the Balance chain intact.
@@ -19,7 +20,14 @@ import re
 from datetime import datetime
 from decimal import Decimal
 
-from finance_agent.ingest.types import ParsedFile, ParsedRow, RejectedRow, body
+from finance_agent.ingest.types import (
+    NOT_HUNDREDTHS,
+    NOT_HUNDREDTHS_REASON,
+    ParsedFile,
+    ParsedRow,
+    RejectedRow,
+    body,
+)
 
 HEADER = (
     "Type",
@@ -59,6 +67,8 @@ def _parse_row(cells: list[str], line: int) -> ParsedRow | None:
         raise _Malformed("unknown state")
     if not _CURRENCY.fullmatch(cur):
         raise _Malformed("invalid currency")
+    if cur in NOT_HUNDREDTHS:
+        raise _Malformed(NOT_HUNDREDTHS_REASON)
     try:
         posted_on = datetime.strptime(completed or started, DATE_FORMAT).date()
     except ValueError:

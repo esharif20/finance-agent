@@ -1135,7 +1135,7 @@
             "type": "string"
           },
           "rate": {
-            "pattern": "^\\d{1,7}(\\.\\d{1,12})?$",
+            "pattern": "^[0-9]{1,7}(\\.[0-9]{1,12})?$",
             "title": "Rate",
             "type": "string"
           }

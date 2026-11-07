@@ -63,7 +63,7 @@ class RateIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     # digits only: no exponent, sign, NaN or Infinity; the range is checked too
-    rate: str = Field(pattern=r"^\d{1,7}(\.\d{1,12})?$")
+    rate: str = Field(pattern=r"^[0-9]{1,7}(\.[0-9]{1,12})?$")  # ASCII
     on: date
 
 

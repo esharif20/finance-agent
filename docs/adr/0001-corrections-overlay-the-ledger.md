@@ -20,3 +20,5 @@ A Correction can now divide one Transaction into parts instead of giving it one 
 ## Amendment (#156): FX conversions are derived, never written onto a Transaction
 
 A foreign-currency Transaction keeps its own amount and currency. Its GBP figure in totals is derived on every read from exactly one Rate: the Bank's own GBP amount on that Transaction, else the rate implied by the user's own exchanges that day (EXCHANGE legs linked as a Transfer; a day exchanging GBP with two currencies implies none), else the latest rate the user entered on or before its date. Rates are never fetched. With none, the Transaction is "rate needed": left out of every total and reported, never converted at a guess. Entered rates live in their own table and can be replaced; changing one bumps the ledger version. Split parts are converted by share with the remainder on the last, so Categories still add up to Money out exactly.
+
+Amounts are stored in hundredths in every currency, so a currency whose ISO 4217 minor unit is not a hundredth (JPY, KRW, KWD and the like) is refused at import and for rates, never stored 100x or 10x off; the web reads `minor` as hundredths too.

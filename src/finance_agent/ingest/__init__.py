@@ -6,7 +6,14 @@ import zlib
 from finance_agent.ingest.hsbc import Hsbc
 from finance_agent.ingest.lloyds import Lloyds
 from finance_agent.ingest.revolut import Revolut
-from finance_agent.ingest.types import Importer, ParsedFile, ParsedRow, RejectedRow
+from finance_agent.ingest.types import (
+    NOT_HUNDREDTHS,
+    NOT_HUNDREDTHS_REASON,
+    Importer,
+    ParsedFile,
+    ParsedRow,
+    RejectedRow,
+)
 
 IMPORTERS: list[Importer] = [Lloyds(), Revolut(), Hsbc()]
 MAX_BYTES = 64 * 1024 * 1024  # after decompression; a gzip bomb stops here
@@ -57,6 +64,8 @@ def parse(data: bytes) -> ParsedFile:
 
 __all__ = [
     "IMPORTERS",
+    "NOT_HUNDREDTHS",
+    "NOT_HUNDREDTHS_REASON",
     "Importer",
     "ParsedFile",
     "ParsedRow",

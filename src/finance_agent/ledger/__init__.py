@@ -2389,6 +2389,8 @@ class Ledger:
         for the same currency and date replaces it."""
         if currency == fx.GBP or not fx.CURRENCY_CODE.fullmatch(currency):
             raise fx.InvalidRate("a rate is for a foreign currency code")
+        if currency in ingest.NOT_HUNDREDTHS:  # never imported, so never used
+            raise fx.InvalidRate(ingest.NOT_HUNDREDTHS_REASON)
         fx.check_rate(rate)
         r = schema.fx_rate
         self._db.execute(

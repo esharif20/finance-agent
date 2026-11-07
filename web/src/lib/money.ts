@@ -10,10 +10,10 @@ export function formatMoneyParts(
   opts: { sign?: boolean } = {},
 ): MoneyParts {
   const fmt = new Intl.NumberFormat("en-GB", { style: "currency", currency });
-  const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
-  // integer arithmetic on a BigInt string: no float ever touches the amount
-  const abs = BigInt(Math.abs(minor)).toString().padStart(digits + 1, "0");
-  const decimal = digits ? `${abs.slice(0, -digits)}.${abs.slice(-digits)}` : abs;
+  // integer arithmetic on a BigInt string: no float ever touches the amount. The API's
+  // minor is hundredths in every currency (#156); Intl then shows the currency's own digits
+  const abs = BigInt(Math.abs(minor)).toString().padStart(3, "0");
+  const decimal = `${abs.slice(0, -2)}.${abs.slice(-2)}`;
   const parts = fmt.formatToParts(decimal as unknown as number);
   const fraction = parts.find((p) => p.type === "fraction")?.value;
   const body = parts
