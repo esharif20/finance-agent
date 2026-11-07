@@ -123,6 +123,7 @@ class SpendingSummaryOut(BaseModel):
     unmatched_refunds: Money
     categories: list[CategoryRow]
     truncated: bool
+    incomplete: bool  # an import Gap touches the month, as /api/summary's gaps
 
 
 def spending_summary(led: Reads, inp: SpendingSummaryIn) -> SpendingSummaryOut:
@@ -146,6 +147,7 @@ def spending_summary(led: Reads, inp: SpendingSummaryIn) -> SpendingSummaryOut:
         unmatched_refunds=_money(b.unmatched_refunds),
         categories=rows[:MAX_ROWS],
         truncated=len(rows) > MAX_ROWS,
+        incomplete=bool(s.gaps),
     )
 
 
@@ -186,7 +188,8 @@ def category_trend(led: Reads, inp: CategoryTrendIn) -> CategoryTrendOut:
         for p, a in d.trend
     ]
     return CategoryTrendOut(
-        evidence_id=f"cat:{m}:{d.name}",
+        # not "cat:": the drill-down's Uncategorised is net, the breakdown's gross
+        evidence_id=f"detail:{m}:{d.name}",
         category=d.name,
         month=m,
         total=_money(d.total),

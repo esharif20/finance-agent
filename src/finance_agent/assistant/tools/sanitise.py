@@ -16,18 +16,28 @@ _LOOKALIKES = str.maketrans(
     "aeopcyxijsldqwABEKMHOPCTXIJSoaivktpuABEHIKMNOPTYX",
 )
 
-# Cut at: markup and tool-call syntax, URLs, role markers, and imperatives aimed
-# at the model. Bank text never needs any of them.
+# Matched against a de-leeted copy (1GN0RE reads as IGNORE), same length, so the
+# cut lands at the same place in the kept text.
+_LEET = str.maketrans("0134578@$", "oieastbas")
+
+# Cut at: markup, quotes and tool-call syntax, URLs, role markers, tool names,
+# spelt-out words, and imperatives aimed at the model. Bank text never needs
+# them; a false positive only shortens a description.
 _MARKER = re.compile(
-    r"""[<>{}\[\]|#`\\]
+    r"""[<>{}\[\]|#`\\"] | \*\* | __
     | https?:// | \bwww\.
-    | \b(?:system|assistant|user|tool|developer|human)\s*:
-    | \b(?:ignore|disregard|forget|override|bypass|jailbreak|pretend|roleplay)\b
+    | \b(?:system|assistant|user|tool|developer|human|ai|llm|gpt|model|bot)\s*:
+    | \b(?:ignor|disregard|forget|overrid|bypass|jailbreak|pretend|roleplay|obey)
     | \b(?:you\s+are\s+(?:now|an?)|act\s+as|instructions?|prompt|please)\b
     | \b(?:call|use|run|invoke)\s+(?:the\s+|a\s+)?(?:tool|function)
-    | \b(?:tell|ask)\s+the\s+user\b
-    | \b(?:say|respond|reply|answer)\s+(?:that|with|you)\b
-    | \brepeat\s+after\b
+    | \b(?:say|tell|respond|reply|reveal)\b | \brepeat\s+after\b
+    | \banswer\s+(?:that|with|you)\b
+    | \b(?:you|assistant|ai|model)\s+(?:must|should|shall|will|need)\b
+    | \b(?:do\s+not|don'?t|never)\s+(?:mention|show|list|include|report)\b
+    | \b(?:new|next)\s+(?:rules?|task)\b | \bnote\s+to\b | \bend\s+of\s+data\b
+    | \b(?:output|print|show)\s+(?:the\s+|your\s+)?(?:system|memory|hidden)\b
+    | \b[a-z]+_[a-z_]+\b
+    | \b(?:[a-z][\s.*_-]+){3,}[a-z]\b
     """,
     re.IGNORECASE | re.VERBOSE,
 )
@@ -48,6 +58,6 @@ def _fold(text: str) -> str:
 def sanitise(text: str) -> str:
     """Short, inert, printable ASCII; idempotent."""
     text = _fold(text)[:MAX_TEXT]
-    if m := _MARKER.search(text):
-        text = text[: m.start()]
+    while m := _MARKER.search(text.translate(_LEET)):  # a cut can expose a marker
+        text = text[: m.start()].rstrip()
     return text.strip()

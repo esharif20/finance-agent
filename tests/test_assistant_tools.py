@@ -146,6 +146,7 @@ def assert_matches_api(engine: Engine, c: TestClient) -> None:
         assert money(s.money_out) == minor_of(sm["money_out"])
         assert money(s.money_in) == minor_of(sm["money_in"])
         assert money(s.net) == minor_of(sm["net"])
+        assert s.incomplete == bool(sm["gaps"])
         assert [(r.name, *money(r.amount)) for r in s.categories] == [
             (x["name"], *minor_of(x["amount"])) for x in sp["categories"]
         ]
@@ -342,3 +343,79 @@ def test_outputs_reject_unsanitised_or_unknown_fields() -> None:
     assert Data(data=EVIL).data == "TESCO STORES"
     with pytest.raises(ValidationError):
         FindTransactionsOut(rows=[], total=0, truncated=False, note="x")  # type: ignore[call-arg]
+
+
+# --- verifier #166 -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("subgraph", "name"),
+    [
+        ("ask", "Spending_Summary"),
+        ("ask", "SPENDING_SUMMARY"),
+        ("ask", " spending_summary"),
+        ("ask", "spending_summary\n"),
+        ("ask", "spending_summary​"),  # zero-width space
+        ("ask", "ѕpending_summary"),  # Cyrillic s
+        ("ask", "ｓpending_summary"),  # fullwidth s
+        ("ask", "find_transactions"),  # another sub-graph's tool
+        ("Ask", "spending_summary"),  # not a sub-graph name
+        ("ask ", "spending_summary"),
+        ("correct", "find_transactions "),
+    ],
+)
+def test_tool_name_tricks_are_refused(engine: Engine, subgraph: str, name: str) -> None:
+    with pytest.raises(ToolNotAllowed):
+        call(engine, subgraph, name)
+
+
+def test_no_tool_writes_to_the_database(two_users: Engine) -> None:
+    """Read-only at runtime, not just in the `Reads` typing: no row changes."""
+    with two_users.begin() as conn:
+        raw: Any = conn.connection.driver_connection
+        before = raw.total_changes
+        s: Any = run("ask", ToolCall(name="spending_summary", arguments={}), conn)
+        calls: list[tuple[str, str, dict[str, Any]]] = [
+            ("ask", "spending_summary", {"month": s.month}),
+            ("ask", "category_trend", {"category": s.categories[0].name}),
+            ("ask", "list_subscriptions", {}),
+            ("correct", "find_transactions", {}),
+            ("correct", "find_transactions", {"query": "a", "kind": "Spending"}),
+        ]
+        for sg, name, args in calls:
+            run(sg, ToolCall(name=name, arguments=args), conn)
+        assert raw.total_changes == before
+
+
+def test_one_evidence_id_names_one_figure(two_users: Engine) -> None:
+    """Across tools, an evidence ID never names two different figures (the
+    Uncategorised row is gross in the breakdown and net in the drill-down)."""
+    seen: dict[str, tuple[int, str]] = {}
+
+    def note(eid: str, m: Any) -> None:
+        assert seen.setdefault(eid, money(m)) == money(m), eid
+
+    with two_users.begin() as conn:
+        months = Ledger(conn, ME).months()
+    for m in months:
+        s = call(two_users, "ask", "spending_summary", month=m)
+        for r in s.categories:
+            note(r.evidence_id, r.amount)
+            try:
+                t = call(two_users, "ask", "category_trend", category=r.name, month=m)
+            except NoData:
+                continue
+            note(t.evidence_id, t.total)
+            for p in t.points:
+                note(p.evidence_id, p.amount)
+
+
+def test_a_month_with_an_import_gap_says_its_figures_are_incomplete(
+    engine: Engine, tmp_path: Path
+) -> None:
+    seed(engine, ME, history([(1, "DEB", "TESCO STORES", -500)]), tmp_path)
+    assert call(engine, "ask", "spending_summary").incomplete is False
+    # the Bank's balance then jumps by £90 more than the row: something is missing
+    gap = Txn(START + timedelta(days=3), "DEB", "TESCO STORES", -500, 99000 - 9000)
+    seed(engine, ME, History(SORT_CODE, "00000001", [gap]), tmp_path)
+    assert call(engine, "ask", "spending_summary").incomplete is True
