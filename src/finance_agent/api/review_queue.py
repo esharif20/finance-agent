@@ -20,7 +20,8 @@ from finance_agent.ledger.review import (
 
 class ItemOut(BaseModel):
     id: str  # "<type>:<key>"; the path parameter of answer and skip
-    type: str  # category, subscription or possible_duplicate; more may come
+    type: str  # category, subscription, possible_duplicate, split_recheck,
+    # split_refund or always_ask; more may come
     version: str  # send it back with an answer or skip
     weight: int  # Transactions an answer touches ("Apply to N similar")
     title: str  # the Merchant's name, if any

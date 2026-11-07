@@ -6,7 +6,7 @@ every rule (ADR 0001); ML comes later, after rules.
 
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -107,13 +107,15 @@ def classify(
     *,
     transfer: bool,
     defaults: Mapping[str, tuple[str, str] | None] = SEED_DEFAULTS,
+    ask: Collection[str] = (),
 ) -> Classification:
     """Kind first; then, for Spending and Refunds only, Merchant and Category:
     the Merchant's default (`defaults`, from the merchant table), then
     descriptor rules, then Uncategorised.
 
     `transfer` comes from the Ledger's Transfer links; Kind is never the Bank's
-    Transaction Type (a TFR row to someone else is Spending).
+    Transaction Type (a TFR row to someone else is Spending). For a Merchant in
+    `ask` ("Always ask", #125) it abstains: no default, rule or guess.
     """
     d = _upper(description)
     if transfer:
@@ -124,6 +126,8 @@ def classify(
         return Classification("Income", None, None, "default")
     kind = "Spending" if amount <= 0 else "Refund"
     merchant = normalise(d) or None
+    if merchant in ask:
+        return Classification(kind, merchant, None, "always_ask")
     category = defaults.get(merchant) if merchant else None
     if merchant and category:
         return Classification(kind, merchant, category, f"merchant:{merchant}")
@@ -178,6 +182,9 @@ def run(conn: Connection, user_id: int) -> int:
         for m in ledger.merchants()
         if m.default_category in ids
     }
+    # "Always ask" Merchants: abstain, and (when learning lands, ADR 0015)
+    # never learn from them
+    ask = {m.name for m in ledger.merchants() if m.always_ask}
     db.execute(db.delete(schema.categorisation))
     txns = ledger.transactions()
     for t in txns:
@@ -187,6 +194,7 @@ def run(conn: Connection, user_id: int) -> int:
             t.bank_type,
             transfer=t.transfer_with is not None,
             defaults=defaults,
+            ask=ask,
         )
         if c.merchant and c.merchant not in merchant_ids:
             merchant_ids[c.merchant] = db.insert(schema.merchant, name=c.merchant)

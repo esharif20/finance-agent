@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0011"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0012"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -219,4 +219,33 @@ def test_migration_0011_adds_and_drops_only_the_note_table(tmp_path: Path) -> No
             )
         command.downgrade(cfg, "0010")
         assert set(inspect(conn).get_table_names()) == tables
+    eng.dispose()
+
+
+def test_migration_0012_adds_and_drops_the_always_ask_flag(tmp_path: Path) -> None:
+    """0011 -> 0012 adds merchant.always_ask, keeping Merchant rows, with only
+    'user' or 'suggestion' as its source; 0012 -> 0011 drops it (#125)."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0011")
+        conn.execute(text("INSERT INTO user (id, created_at) VALUES (1, '2026-01-01')"))
+        conn.execute(text("INSERT INTO merchant (user_id, name) VALUES (1, 'SYNTH')"))
+        command.upgrade(cfg, "0012")
+        rows = conn.execute(text("SELECT name, always_ask FROM merchant")).all()
+        assert [tuple(r) for r in rows] == [("SYNTH", None)]
+        conn.execute(text("UPDATE merchant SET always_ask = 'suggestion'"))
+        with pytest.raises(Exception, match="CHECK"):
+            conn.execute(text("UPDATE merchant SET always_ask = 'categoriser'"))
+        command.downgrade(cfg, "0011")
+        cols = {c["name"] for c in inspect(conn).get_columns("merchant")}
+        assert "always_ask" not in cols
+        names = conn.execute(text("SELECT name FROM merchant")).scalars().all()
+        assert names == ["SYNTH"]
     eng.dispose()

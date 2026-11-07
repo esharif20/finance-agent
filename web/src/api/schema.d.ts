@@ -129,6 +129,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/merchants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Merchants */
+        get: operations["merchants_api_merchants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/merchants/{merchant_id}/always-ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Always Ask */
+        put: operations["set_always_ask_api_merchants__merchant_id__always_ask_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/month-series": {
         parameters: {
             query?: never;
@@ -524,6 +558,27 @@ export interface components {
             /** Merchant Id */
             merchant_id: number;
         };
+        /** AlwaysAskIn */
+        AlwaysAskIn: {
+            /** On */
+            on: boolean;
+            /**
+             * Source
+             * @default user
+             * @enum {string}
+             */
+            source: "user" | "suggestion";
+        };
+        /** AlwaysAskOut */
+        AlwaysAskOut: {
+            /** Ledger Version */
+            ledger_version: number;
+            merchant: components["schemas"]["MerchantOut"];
+            /** Message */
+            message: string;
+            /** Switched Off Corrections */
+            switched_off_corrections: number[];
+        };
         /** AnswerIn */
         AnswerIn: {
             /** Category */
@@ -666,6 +721,24 @@ export interface components {
             /** Weight */
             weight: number;
         };
+        /** MerchantOut */
+        MerchantOut: {
+            /** Always Ask */
+            always_ask: boolean;
+            /** Always Ask Source */
+            always_ask_source: ("user" | "suggestion") | null;
+            /** Default Category */
+            default_category: [
+                string,
+                string
+            ] | null;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Suggest Always Ask */
+            suggest_always_ask: boolean;
+        };
         /** MerchantSpendOut */
         MerchantSpendOut: {
             amount: components["schemas"]["Money"];
@@ -673,6 +746,13 @@ export interface components {
             merchant_id: number | null;
             /** Name */
             name: string;
+        };
+        /** MerchantsOut */
+        MerchantsOut: {
+            /** Items */
+            items: components["schemas"]["MerchantOut"][];
+            /** Ledger Version */
+            ledger_version: number;
         };
         /** Money */
         Money: {
@@ -1144,6 +1224,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    merchants_api_merchants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantsOut"];
+                };
+            };
+        };
+    };
+    set_always_ask_api_merchants__merchant_id__always_ask_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                merchant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlwaysAskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlwaysAskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

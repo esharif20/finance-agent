@@ -66,8 +66,16 @@ _Avoid_: Tag, label, bucket
 The normalised party a Transaction is with (raw "TESCO STORES 3021" → Tesco). Never a Category; a Merchant has a default Category that a Correction can override per Transaction. Transfers between the user's own Accounts have no Merchant.
 _Avoid_: Payee, vendor, shop, counterparty
 
+**"Always ask"**:
+A Merchant flag, set only by the user, for shops where a guessed Category is usually wrong. The categoriser never assigns a Category to its payments and never learns from them; each one is a "What was this?" Review Queue item and counts under **To review** until answered per payment (a Correction, a Split or both). Turning it on switches off that Merchant's Merchant-wide Correction; turning it off restores nothing. The app suggests it once a Merchant has been corrected to two or more different Categories.
+_Avoid_: Ask mode, manual Merchant
+
+**To review**:
+The bucket in Category totals and the donut holding "Always ask" payments not yet answered. Not a Category; money-out still includes them.
+_Avoid_: Pending, Uncategorised
+
 **Review Queue**:
-Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence, a Possible Duplicate, or "is this a subscription?".
+Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence, a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
 _Avoid_: Inbox, uncategorised
 
 ## Intelligence

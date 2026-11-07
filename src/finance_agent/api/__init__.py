@@ -16,11 +16,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.api import card_art, notes, review_queue, splits, subscriptions
+from finance_agent.api import (
+    card_art,
+    merchants,
+    notes,
+    review_queue,
+    splits,
+    subscriptions,
+)
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
     AccountBalance,
+    AlwaysAskMerchant,
     Breakdown,
     CategoryDetail,
     Gap,
@@ -554,6 +562,8 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             ) from None
         except KindHasNoCategory as e:
             raise HTTPException(422, f"{e}: only Spending and Refunds do") from None
+        except AlwaysAskMerchant as e:
+            raise HTTPException(409, str(e)) from None
         return CorrectionOut(id=k.id, ledger_version=led.ledger_version())
 
     @app.delete("/api/corrections/{correction_id}")
@@ -569,6 +579,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     app.include_router(review_queue.router)
     app.include_router(splits.router)
     app.include_router(notes.router)
+    app.include_router(merchants.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
