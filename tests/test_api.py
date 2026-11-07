@@ -211,7 +211,7 @@ def test_correction_round_trip_changes_category_and_totals(
     )
     new = ["Entertainment", "Games"]
     if spend["category"] == new:
-        new = ["Housing", "Rent"]
+        new = ["Bills", "Rent or mortgage"]
     with engine.begin() as conn:
         before = Ledger(conn, 1).spending_by_category(categorised)
 
@@ -255,9 +255,16 @@ def test_correction_for_a_merchant_covers_all_its_transactions(
     "body,status",
     [
         ({"category": ["Entertainment", "Games"]}, 422),  # no target
-        ({"transaction_id": 1, "merchant_id": 1, "category": ["Housing", "Rent"]}, 422),
-        ({"transaction_id": 1, "category": ["Housing"]}, 422),
-        ({"transaction_id": 10**9, "category": ["Housing", "Rent"]}, 404),
+        (
+            {
+                "transaction_id": 1,
+                "merchant_id": 1,
+                "category": ["Bills", "Rent or mortgage"],
+            },
+            422,
+        ),
+        ({"transaction_id": 1, "category": ["Bills"]}, 422),
+        ({"transaction_id": 10**9, "category": ["Bills", "Rent or mortgage"]}, 404),
         ({"transaction_id": 1, "category": ["Nope", "Nope"]}, 404),
     ],
 )
@@ -273,7 +280,10 @@ def test_a_correction_on_a_categoryless_kind_is_a_422(
     income = next(t for t in _all(client) if t["kind"] == "Income")
     res = client.post(
         "/api/corrections",
-        json={"transaction_id": income["id"], "category": ["Housing", "Rent"]},
+        json={
+            "transaction_id": income["id"],
+            "category": ["Bills", "Rent or mortgage"],
+        },
     )
     assert res.status_code == 422
     assert "Income" in res.json()["detail"]
@@ -282,8 +292,8 @@ def test_a_correction_on_a_categoryless_kind_is_a_422(
 def test_deleting_a_correction_reverts_it(client: TestClient, categorised: str) -> None:
     spend = next(t for t in _all(client) if t["kind"] == "Spending")
     new = (
-        ["Housing", "Rent"]
-        if spend["category"] != ["Housing", "Rent"]
+        ["Bills", "Rent or mortgage"]
+        if spend["category"] != ["Bills", "Rent or mortgage"]
         else ["Travel", "Hotels"]
     )
     made = client.post(
@@ -315,7 +325,7 @@ def test_deleting_an_unknown_or_another_users_correction_is_a_404(
             for t in theirs.transactions()
             if t.categorisation and t.categorisation.kind == "Spending"
         )
-        k = theirs.correct_transaction(spend.id, ("Housing", "Rent"))
+        k = theirs.correct_transaction(spend.id, ("Bills", "Rent or mortgage"))
 
     assert client.delete("/api/corrections/999999").status_code == 404
     assert client.delete("/api/corrections/abc").status_code == 422

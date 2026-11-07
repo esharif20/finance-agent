@@ -14,27 +14,14 @@ from sqlalchemy import Connection
 
 from finance_agent.ledger import UNCATEGORISED as _NONE
 from finance_agent.ledger import Ledger
+from finance_agent.ledger.taxonomy import TAXONOMIES
+from finance_agent.ledger.taxonomy import TAXONOMY as TAXONOMY  # re-exported
+from finance_agent.ledger.taxonomy import TAXONOMY_VERSION as TAXONOMY_VERSION
 from finance_agent.storage import Scoped, schema
 
 log = logging.getLogger(__name__)  # counts only
 
-TAXONOMY_VERSION = 1
 UNCATEGORISED = (_NONE, _NONE)
-
-# Two levels: top level -> subcategories (<= 8 each). Bump TAXONOMY_VERSION on change.
-TAXONOMY: dict[str, tuple[str, ...]] = {
-    "Food & Drink": ("Groceries", "Eating out", "Takeaway", "Coffee"),
-    "Transport": ("Public transport", "Taxi", "Fuel", "Parking"),
-    "Shopping": ("Online", "Clothing", "Electronics", "Household"),
-    "Bills & Utilities": ("Energy", "Water", "Phone & internet", "Council tax"),
-    "Subscriptions": ("Streaming", "Software", "Memberships"),
-    "Housing": ("Rent", "Mortgage", "Maintenance"),
-    "Health": ("Pharmacy", "Fitness", "Medical"),
-    "Entertainment": ("Events", "Games", "Hobbies"),
-    "Travel": ("Flights", "Hotels", "Holidays"),
-    "Personal care": ("Hair & beauty", "Toiletries"),
-    _NONE: (_NONE,),
-}
 
 # Merchant -> (descriptor pattern, default Category). Matched against the raw
 # upper-case Bank description; first match wins.
@@ -86,11 +73,11 @@ RULES: tuple[tuple[str, re.Pattern[str], tuple[str, str]], ...] = (
     ("pharmacy", re.compile(r"\bPHARMACY\b"), ("Health", "Pharmacy")),
     ("taxi", re.compile(r"\b(UBER|TAXI|CABS?)\b"), ("Transport", "Taxi")),
     ("fuel", re.compile(r"\b(PETROL|FUEL)\b"), ("Transport", "Fuel")),
-    ("rent", re.compile(r"\bRENT\b"), ("Housing", "Rent")),
+    ("rent", re.compile(r"\bRENT\b"), ("Bills", "Rent or mortgage")),
     (
         "council-tax",
         re.compile(r"\bCOUNCIL TAX\b"),
-        ("Bills & Utilities", "Council tax"),
+        ("Bills", "Council tax"),
     ),
     ("gym", re.compile(r"\b(GYM|FITNESS)\b"), ("Health", "Fitness")),
 )
@@ -146,22 +133,24 @@ def classify(
     return Classification(kind, merchant, UNCATEGORISED, "default")
 
 
-def _seed_taxonomy(db: Scoped) -> dict[tuple[str, str], int]:
-    """This user's Category ids for TAXONOMY_VERSION, inserting them once."""
+def seed_taxonomy(
+    conn: Connection, user_id: int, version: int = TAXONOMY_VERSION
+) -> dict[tuple[str, str], int]:
+    """This user's Category ids for taxonomy `version`, inserting them once.
+    Older versions' rows stay: Corrections made on them still point there."""
+    db = Scoped(conn, user_id)
     cat = schema.category
     rows = db.execute(
         db.select(cat, cat.c.id, cat.c.parent_id, cat.c.name).where(
-            cat.c.taxonomy_version == TAXONOMY_VERSION
+            cat.c.taxonomy_version == version
         )
     ).all()
     if not rows:
-        for top, subs in TAXONOMY.items():
-            parent = db.insert(cat, name=top, taxonomy_version=TAXONOMY_VERSION)
+        for top, subs in TAXONOMIES[version].items():
+            parent = db.insert(cat, name=top, taxonomy_version=version)
             for sub in subs:
-                db.insert(
-                    cat, name=sub, parent_id=parent, taxonomy_version=TAXONOMY_VERSION
-                )
-        return _seed_taxonomy(db)
+                db.insert(cat, name=sub, parent_id=parent, taxonomy_version=version)
+        return seed_taxonomy(conn, user_id, version)
     names = {r.id: r.name for r in rows}
     return {(names[r.parent_id], r.name): r.id for r in rows if r.parent_id}
 
@@ -175,15 +164,15 @@ def run(conn: Connection, user_id: int) -> int:
     """
     db = Scoped(conn, user_id)
     ledger = Ledger(conn, user_id)
-    ids = _seed_taxonomy(db)
+    ids = seed_taxonomy(conn, user_id)
     merchant_ids = {m.name: m.id for m in ledger.merchants()}
     for name, (_, category) in MERCHANTS.items():
         if name not in merchant_ids:
             merchant_ids[name] = db.insert(
                 schema.merchant, name=name, default_category_id=ids[category]
             )
-    # the merchant table is the source of defaults; one from a retired taxonomy
-    # version no longer names a current Category, so rules decide instead
+    # the merchant table is the source of defaults; the Ledger gives them in
+    # today's names, so one set on an older taxonomy version still applies
     defaults = {
         m.name: m.default_category
         for m in ledger.merchants()

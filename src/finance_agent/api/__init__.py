@@ -13,7 +13,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
 from finance_agent.api import card_art
@@ -318,10 +318,17 @@ def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
     )
 
 
-def _ledger(request: Request) -> Iterator[Ledger]:
+def _conn(request: Request) -> Iterator[Connection]:
     engine: Engine = request.app.state.engine
     with engine.begin() as conn:
-        yield Ledger(conn, current_user())
+        yield conn
+
+
+Conn = Annotated[Connection, Depends(_conn)]  # one per request, shared with Led
+
+
+def _ledger(conn: Conn) -> Ledger:
+    return Ledger(conn, current_user())
 
 
 Led = Annotated[Ledger, Depends(_ledger)]
@@ -490,10 +497,12 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         )
 
     @app.post("/api/corrections", status_code=201)
-    def correct(led: Led, body: CorrectionIn) -> CorrectionOut:
+    def correct(led: Led, conn: Conn, body: CorrectionIn) -> CorrectionOut:
         if (body.transaction_id is None) == (body.merchant_id is None):
             raise HTTPException(422, "give exactly one of transaction_id, merchant_id")
         cat = (body.category[0], body.category[1])
+        # /api/categories offers the current version even before the next import
+        categorise.seed_taxonomy(conn, current_user())
         try:
             if body.transaction_id is not None:
                 k = led.correct_transaction(body.transaction_id, cat)
