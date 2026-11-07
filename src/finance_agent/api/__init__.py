@@ -485,7 +485,11 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         if not is_encrypted(default_db_path()):  # the CLI's gate (ADR 0002)
             raise HTTPException(409, "Sync needs the encrypted database.")
         try:
-            reports = run_sync(request.app.state.engine, current_user())
+            engine = request.app.state.engine
+            reports = run_sync(engine, current_user())
+            if any(r.added for r in reports):  # same as `fa import`
+                with engine.begin() as conn:
+                    categorise.run(conn, current_user())
         except Busy:
             raise HTTPException(409, "A sync is already running.") from None
         except NotConnected:

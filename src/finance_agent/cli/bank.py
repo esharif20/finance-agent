@@ -11,6 +11,7 @@ from datetime import datetime
 from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
+from finance_agent import categorise
 from finance_agent.cli import gbp
 from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
@@ -207,12 +208,15 @@ def _alert(engine: Engine, user_id: int, notify: Notifier) -> None:
 def sync(user_id: int, notify: Notifier | None = None) -> int:
     engine = _encrypted_db()
     try:
-        run_sync(
+        reports = run_sync(
             engine,
             user_id,
             _print,
             (lambda: _alert(engine, user_id, notify)) if notify else None,
         )
+        if any(r.added for r in reports):  # same as `fa import`
+            with engine.begin() as conn:
+                categorise.run(conn, user_id)
     except NotConnected as e:
         return _err(str(e))
     except Busy:
