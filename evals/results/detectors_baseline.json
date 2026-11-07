@@ -75,15 +75,15 @@
       }
     },
     "candidate": {
-      "model": "stub",
-      "model_version": "0",
+      "model": "engine-detectors",
+      "model_version": "1",
       "metrics": {
-        "category_spike.precision": 0.0,
-        "category_spike.recall": 0.0,
+        "category_spike.precision": 0.346154,
+        "category_spike.recall": 1.0,
         "forgotten_renewal.precision": 0.0,
         "forgotten_renewal.recall": 0.0,
-        "overall.precision": 0.0,
-        "overall.recall": 0.0,
+        "overall.precision": 0.346154,
+        "overall.recall": 0.428571,
         "payday_shortfall.precision": 0.0,
         "payday_shortfall.recall": 0.0,
         "price_rise.precision": 0.0,
@@ -91,9 +91,9 @@
       },
       "counts": {
         "category_spike": {
-          "tp": 0,
-          "fp": 0,
-          "fn": 18
+          "tp": 18,
+          "fp": 34,
+          "fn": 0
         },
         "forgotten_renewal": {
           "tp": 0,
@@ -101,9 +101,9 @@
           "fn": 12
         },
         "overall": {
-          "tp": 0,
-          "fp": 0,
-          "fn": 42
+          "tp": 18,
+          "fp": 34,
+          "fn": 24
         },
         "payday_shortfall": {
           "tp": 0,

@@ -20,7 +20,7 @@ uv run pyright
 uv run lint-imports
 uv run pytest -q
 uv run python evals/categoriser.py
-for h in detectors ranking forecast; do uv run python "evals/$h.py"; done
+for h in detectors baselines ranking forecast; do uv run python "evals/$h.py"; done
 pnpm --dir web install --frozen-lockfile
 pnpm --dir web run gen
 git diff --exit-code -- web/openapi.json web/src/api/schema.d.ts

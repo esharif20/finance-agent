@@ -59,7 +59,23 @@ def test_baseline_rules_on_hand_cases() -> None:
     assert Detection("price_rise", date(2024, 3, 5), "STREAMLY") in found
     # a once-a-year Merchant is predicted to renew 358 days on
     assert Detection("forgotten_renewal", date(2025, 1, 1), "CLOUDNOTE ANNUAL") in found
-    assert detectors.stub(rows) == []
+    # too little history for a personal baseline: the candidate stays quiet
+    assert detectors.candidate(rows) == []
+
+
+def test_the_candidate_flags_a_spike_against_the_personal_baseline() -> None:
+    cat = ("Food & Drink", "Takeaway")
+    rows = [
+        Row(m, date(2024, m, 10), "WOKWAY KITCHEN", cat, -1_000, 0) for m in range(1, 8)
+    ]
+    rows += [  # July: 1,000, then 600 more crosses 1.5 x the 1,000 normal
+        Row(8, date(2024, 7, 20), "WOKWAY KITCHEN", cat, -600, 0),
+        Row(9, date(2024, 7, 25), "WOKWAY KITCHEN", cat, -600, 0),
+    ]
+    found = detectors.candidate(rows)
+    assert found == [Detection("category_spike", date(2024, 7, 20), sh.label(cat))]
+    # the same July a month short of the six-month gate is not flagged
+    assert detectors.candidate([r for r in rows if r.id != 1]) == []
 
 
 def test_committed_results_are_reproducible_from_the_seed() -> None:
