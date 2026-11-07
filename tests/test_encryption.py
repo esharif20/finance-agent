@@ -11,7 +11,6 @@ from pathlib import Path
 
 import keyring
 import pytest
-from sqlalchemy import select
 
 from finance_agent import storage
 from finance_agent.ingest.lloyds import account_ref
@@ -111,9 +110,9 @@ def test_account_ref_is_an_hmac_not_the_unkeyed_digest(
     ledger = ledger_for(1)
     ledger.import_files([export])
 
-    stored = ledger._db.execute(  # pyright: ignore[reportPrivateUsage]
-        select(schema.account.c.external_ref)
-    ).scalar_one()
+    db = ledger._db  # pyright: ignore[reportPrivateUsage]
+    a = schema.account
+    stored = db.execute(db.select(a, a.c.external_ref)).scalar_one()
     raw = account_ref(h.sort_code, h.account_number)
     key = keychain.secret(keychain.HMAC_SERVICE)
     assert stored != raw
