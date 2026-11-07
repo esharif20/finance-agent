@@ -8,6 +8,7 @@ const TILT = 10; // max degrees towards the pointer
 const FAN_DEG = 1.6; // small, so a fanned card's corner never reaches the label of the one behind
 const FAN_X = 6;
 const REVEAL = 22; // the cards in front of a hovered one move down this far to show more of it
+const FLIP_LIFT = 48; // a turning card comes forward so its edge never cuts the card behind
 
 /** Sizes for `count` cards (All accounts first) of height `cardH`: All accounts is a compact
     half card; fanned, each account shows half its face; chosen, the cards behind share what
@@ -41,6 +42,8 @@ export function stackPoses(
     reduce: boolean;
     hover?: Hover | null;
     rising?: number | null;
+    /** Drag progress of the front card, -1..1: it turns that far through a half turn (#93). */
+    flip?: number;
     peek?: number;
     fanPeek?: number;
   },
@@ -81,6 +84,11 @@ export function stackPoses(
       if (n.layer > lifted.layer) n.y += REVEAL;
       if (n.layer === lifted.layer - 1) n.s *= 0.985;
     }
+  }
+  const f = o.flip ? poses[front] : undefined;
+  if (f && o.flip) {
+    f.ry += o.flip * 180;
+    f.z += Math.abs(Math.sin(o.flip * Math.PI)) * FLIP_LIFT;
   }
   const r = o.rising == null ? undefined : poses[o.rising];
   if (r) {

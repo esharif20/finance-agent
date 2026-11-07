@@ -74,6 +74,21 @@ describe("stackPoses", () => {
   });
 });
 
+describe("stackPoses flip (#93)", () => {
+  it("turns the front card about its vertical axis as the stack is dragged, showing its back past halfway", () => {
+    const half = stackPoses(4, 2, { fan: false, reduce: false, flip: 0.5 });
+    expect(half[2]?.ry).toBe(90); // edge-on
+    expect(half[2]?.z).toBeGreaterThan(stackPoses(4, 2, { fan: false, reduce: false })[2]?.z as number); // lifts clear of the pile
+    expect(stackPoses(4, 2, { fan: false, reduce: false, flip: -1 })[2]?.ry).toBe(-180); // back in view
+    expect(half[0]?.ry).toBe(0); // only the front card turns
+  });
+
+  it("never turns a card under reduced motion", () => {
+    const p = stackPoses(4, 2, { fan: false, reduce: true, flip: 0.5 });
+    expect(p.every((c) => c.ry === 0)).toBe(true);
+  });
+});
+
 describe("stackLayout", () => {
   it("keeps All accounts compact and the stack one height in both modes", () => {
     const l = stackLayout(4, 328);
