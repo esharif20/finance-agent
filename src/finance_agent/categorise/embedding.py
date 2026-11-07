@@ -29,7 +29,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, Engine
 
 from finance_agent.ledger import Ledger
 from finance_agent.storage import Scoped, schema
@@ -281,15 +281,9 @@ def stored_model(embedder: Embedder) -> str | None:
     return f"{embedder.model}@{digest[:12]}" if digest else embedder.model
 
 
-def refresh(conn: Connection, user_id: int, embedder: Embedder) -> int | None:
-    """Embed every categorised Merchant that has no vector from `embedder`'s
-    model version yet; returns how many, or None when the local model is off
-    (the rules carry on alone). Drops vectors whose Merchant no longer names
-    any Transaction. Call after `categorise.run`."""
-    model = stored_model(embedder)
-    if model is None:
-        log.info("embeddings local model off")
-        return None
+def _pending(conn: Connection, user_id: int, model: str) -> dict[int, str]:
+    """Drop vectors whose Merchant names nothing; the Merchants (id -> name)
+    still lacking a vector for `model`."""
     db = Scoped(conn, user_id)
     me, cat = schema.merchant_embedding, schema.categorisation
     named = db.select(cat, cat.c.merchant_id).where(cat.c.merchant_id.is_not(None))
@@ -298,26 +292,69 @@ def refresh(conn: Connection, user_id: int, embedder: Embedder) -> int | None:
         db.execute(db.select(me, me.c.merchant_id).where(me.c.model == model)).scalars()
     )
     wanted = set(db.execute(named.distinct()).scalars()) - have
-    names = {m.id: m.name for m in Ledger(conn, user_id).merchants() if m.id in wanted}
+    return {m.id: m.name for m in Ledger(conn, user_id).merchants() if m.id in wanted}
+
+
+def _store(
+    conn: Connection, user_id: int, model: str, ids: Sequence[int], vecs: list[Vector]
+) -> int:
+    """Write the vectors, skipping any Merchant deleted since `_pending`."""
+    db = Scoped(conn, user_id)
+    me, cat = schema.merchant_embedding, schema.categorisation
+    named = set(
+        db.execute(
+            db.select(cat, cat.c.merchant_id).where(cat.c.merchant_id.in_(ids))
+        ).scalars()
+    )
+    keep = [(i, v) for i, v in zip(ids, vecs, strict=True) if i in named]
+    db.execute(db.delete(me).where(me.c.merchant_id.in_([i for i, _ in keep])))
+    for i, v in keep:  # (deleting first drops another model's vector)
+        db.insert(me, merchant_id=i, model=model, dims=len(v), vector=_pack(v))
+    log.info("embeddings merchants=%d", len(keep))
+    return len(keep)
+
+
+def refresh(conn: Connection, user_id: int, embedder: Embedder) -> int | None:
+    """Embed every categorised Merchant that has no vector from `embedder`'s
+    model version yet; returns how many, or None when the local model is off
+    (the rules carry on alone). Drops vectors whose Merchant no longer names
+    any Transaction. One connection throughout: import and sync use
+    `refresh_quietly`, which holds no transaction during the network calls."""
+    model = stored_model(embedder)
+    if model is None:
+        log.info("embeddings local model off")
+        return None
+    names = _pending(conn, user_id, model)
     ids = sorted(names)
     try:
-        vectors = embedder.embed([names[i] for i in ids])
+        vecs = embedder.embed([names[i] for i in ids])
     except EmbeddingUnavailable:
         log.info("embeddings local model off")
         return None
-    db.execute(db.delete(me).where(me.c.merchant_id.in_(ids)))  # another model's
-    for i, v in zip(ids, vectors, strict=True):
-        db.insert(me, merchant_id=i, model=model, dims=len(v), vector=_pack(v))
-    log.info("embeddings merchants=%d", len(ids))
-    return len(ids)
+    return _store(conn, user_id, model, ids, vecs)
 
 
-def refresh_quietly(conn: Connection, user_id: int) -> None:
-    """`refresh` with the real local model for import and sync: it never raises
-    and never delays them past Ollama's own timeouts (#114). Off means the
-    rules carry on alone."""
+def refresh_quietly(engine: Engine, user_id: int) -> None:
+    """`refresh` with the real local model for import and sync (#114). It never
+    raises. Ollama is asked with no transaction open (so a slow model never
+    blocks other writers): a short one reads what is missing, a second writes
+    the vectors. Off means the rules carry on alone."""
     try:
-        refresh(conn, user_id, OllamaEmbedder())
+        embedder = OllamaEmbedder()
+        model = stored_model(embedder)
+        if model is None:
+            log.info("embeddings local model off")
+            return
+        with engine.begin() as conn:
+            names = _pending(conn, user_id, model)
+        ids = sorted(names)
+        try:
+            vecs = embedder.embed([names[i] for i in ids])
+        except EmbeddingUnavailable:
+            log.info("embeddings local model off")
+            return
+        with engine.begin() as conn:
+            _store(conn, user_id, model, ids, vecs)
     except Exception as e:  # noqa: BLE001
         log.warning("embeddings refresh failed: %s", type(e).__name__)
 

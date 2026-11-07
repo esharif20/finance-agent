@@ -4,6 +4,7 @@ suggestion is a button: nothing here is ever assigned."""
 
 import logging
 from collections.abc import Iterator, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from finance_agent.categorise import embedding
 from finance_agent.categorise.embedding import OllamaEmbedder, TrigramEmbedder
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.review import ReviewQueue
+from finance_agent.storage import schema
 from test_categorise_embedding import (
     FakeConnection,
     FakeResponse,
@@ -102,16 +104,66 @@ def test_a_suggestion_does_not_change_the_item_version(conn: Connection) -> None
 # --- refresh in import and sync -------------------------------------------------
 
 
+@pytest.fixture
+def committed(engine: Engine, tmp_path: Path) -> Engine:
+    with engine.begin() as c:
+        _import(c, tmp_path, 1, [(n, -500) for n in KNOWN + NEW])
+    return engine
+
+
+def _stored(engine: Engine) -> int:
+    with engine.begin() as c:
+        return len(embedding.vectors(c, 1, TrigramEmbedder.model))
+
+
 def test_refresh_quietly_embeds_with_the_local_model(
-    conn: Connection, monkeypatch: pytest.MonkeyPatch
+    committed: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(embedding, "OllamaEmbedder", TrigramEmbedder)
-    embedding.refresh_quietly(conn, 1)
-    assert len(embedding.vectors(conn, 1, TrigramEmbedder.model)) == len(KNOWN + NEW)
+    embedding.refresh_quietly(committed, 1)
+    assert _stored(committed) == len(KNOWN + NEW)
+
+
+def test_no_transaction_is_open_while_the_embedder_runs(
+    committed: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A slow Ollama must not hold SQLite's write lock: a write from another
+    connection inside `embed` succeeds at once."""
+    wrote: list[bool] = []
+
+    class Slow(TrigramEmbedder):
+        def embed(self, texts: Sequence[str]) -> list[embedding.Vector]:
+            with committed.begin() as other:  # would block or raise if locked
+                other.execute(text("PRAGMA busy_timeout = 0"))
+                other.execute(
+                    schema.user.insert().values(id=99, created_at=datetime.now(UTC))
+                )
+            wrote.append(True)
+            return super().embed(texts)
+
+    monkeypatch.setattr(embedding, "OllamaEmbedder", Slow)
+    embedding.refresh_quietly(committed, 1)
+    assert wrote == [True] and _stored(committed) == len(KNOWN + NEW)
+
+
+def test_a_merchant_deleted_while_embedding_is_skipped(
+    committed: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Racing(TrigramEmbedder):
+        def embed(self, texts: Sequence[str]) -> list[embedding.Vector]:
+            with committed.begin() as other:  # the last Transaction naming it goes
+                other.execute(text("DELETE FROM categorisation"))
+            return super().embed(texts)
+
+    monkeypatch.setattr(embedding, "OllamaEmbedder", Racing)
+    embedding.refresh_quietly(committed, 1)
+    assert _stored(committed) == 0
 
 
 def test_refresh_quietly_never_raises_nor_logs_names(
-    conn: Connection, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    committed: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     class Boom(TrigramEmbedder):
         def embed(self, texts: Sequence[str]) -> list[embedding.Vector]:
@@ -119,7 +171,7 @@ def test_refresh_quietly_never_raises_nor_logs_names(
 
     monkeypatch.setattr(embedding, "OllamaEmbedder", Boom)
     with caplog.at_level(logging.DEBUG):
-        embedding.refresh_quietly(conn, 1)
+        embedding.refresh_quietly(committed, 1)
     assert "RuntimeError" in caplog.text and "ZZQ" not in caplog.text
 
 
@@ -130,7 +182,7 @@ def test_import_and_watch_call_refresh_after_categorise(
 
     calls: list[int] = []
 
-    def spy(conn: Connection, user_id: int) -> None:
+    def spy(engine: Engine, user_id: int) -> None:
         calls.append(user_id)
 
     monkeypatch.setattr(embedding, "refresh_quietly", spy)

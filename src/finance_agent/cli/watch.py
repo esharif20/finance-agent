@@ -62,7 +62,7 @@ def run(folder: Path, notify: Notifier = osascript) -> int:
         with engine.begin() as conn:
             r = Ledger(conn, LOCAL_USER).import_files(files)
             categorise.run(conn, LOCAL_USER)  # same as `fa import`
-            embedding.refresh_quietly(conn, LOCAL_USER)
+        embedding.refresh_quietly(engine, LOCAL_USER)  # no transaction held
     except (OSError, ValueError, LookupError):
         notify(TITLE, "Import failed")
         return 1
