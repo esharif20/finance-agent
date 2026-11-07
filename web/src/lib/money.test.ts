@@ -24,8 +24,11 @@ describe("formatMoney", () => {
     expect(formatMoney(gbp(9007199254740991))).toBe("£90,071,992,547,409.91");
   });
 
-  it("respects the currency's own minor-unit digits", () => {
-    expect(formatMoney({ minor: 1500, currency: "JPY" })).toBe("JP¥1,500");
+  it("reads minor as hundredths in every currency, as the API stores them (#156)", () => {
+    // Intl may show fewer digits (JPY, LAK), but never 100x the amount
+    expect(formatMoney({ minor: 150000, currency: "JPY" })).toBe("JP¥1,500");
+    expect(formatMoney({ minor: 150000, currency: "LAK" })).toMatch(/^[^0-9]*1,500$/);
+    expect(formatMoney({ minor: 1234, currency: "EUR" })).toBe("€12.34");
   });
 });
 
@@ -35,6 +38,6 @@ describe("formatMoneyParts", () => {
       main: "−£1,234",
       fraction: ".56",
     });
-    expect(formatMoneyParts({ minor: 1500, currency: "JPY" }).fraction).toBe("");
+    expect(formatMoneyParts({ minor: 150000, currency: "JPY" })).toEqual({ main: "JP¥1,500", fraction: "" });
   });
 });

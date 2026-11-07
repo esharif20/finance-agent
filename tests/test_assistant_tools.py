@@ -4,6 +4,7 @@ ways, scoped to `current_user`, and figure-for-figure the dashboard API's."""
 import tempfile
 from collections.abc import Iterator
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from finance_agent.assistant.tools import (
 )
 from finance_agent.ledger import Ledger
 from finance_agent.storage import open_db
+from synthetic_banks import revolut_pockets
 from synthetic_lloyds import History, Txn, generate_histories, render_export
 from synthetic_lloyds.generator import MAX_ROWS as MAX_EXPORT
 from synthetic_lloyds.generator import SORT_CODE, START
@@ -146,7 +148,8 @@ def assert_matches_api(engine: Engine, c: TestClient) -> None:
         assert money(s.money_out) == minor_of(sm["money_out"])
         assert money(s.money_in) == minor_of(sm["money_in"])
         assert money(s.net) == minor_of(sm["net"])
-        assert s.incomplete == bool(sm["gaps"])
+        fx = c.get("/api/fx/month", params={"month": month}).json()
+        assert s.incomplete == (bool(sm["gaps"]) or bool(fx["rate_needed"]))
         assert [(r.name, *money(r.amount)) for r in s.categories] == [
             (x["name"], *minor_of(x["amount"])) for x in sp["categories"]
         ]
@@ -205,6 +208,47 @@ def test_tool_figures_equal_the_api_on_random_histories(seed_: int, days: int) -
     with tempfile.TemporaryDirectory() as d:
         engine = open_db(Path(d) / "ledger.db")
         seed(engine, ME, generate_histories(seed_, days)[0], Path(d))
+        with TestClient(api.create_app(engine)) as c:
+            assert_matches_api(engine, c)
+        engine.dispose()
+
+
+@settings(max_examples=6, deadline=None)
+@given(
+    st.lists(
+        st.tuples(
+            st.sampled_from(["GBP", "EUR", "USD"]),
+            st.integers(0, 59),
+            st.integers(-40_000, 40_000).filter(bool),
+        ),
+        min_size=1,
+        max_size=25,
+    ),
+    st.booleans(),
+)
+def test_foreign_currency_totals_agree_across_overview_category_and_tools(
+    spends: list[tuple[str, int, int]], with_rate: bool
+) -> None:
+    """#156 with #166: converted, exchanged and rate-needed figures are the same
+    in /api/summary, /api/spending, /api/categories and the Assistant's tools."""
+    rows = [
+        ("EXCHANGE", "GBP", START, "Exchanged to EUR", -20_000),
+        ("EXCHANGE", "EUR", START, "Exchanged from GBP", 23_100),
+    ]
+    descs = ["TESCO 3214", "PRET 0231", "SPOTIFY", "ACME LTD SALARY"]
+    rows += [
+        ("CARD_PAYMENT", cur, START + timedelta(days=day), descs[day % 4], amount)
+        for cur, day, amount in sorted(spends, key=lambda x: x[1])
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        engine = open_db(Path(d) / "ledger.db")
+        (Path(d) / "r.csv").write_text(revolut_pockets(rows))
+        with engine.begin() as conn:
+            led = Ledger(conn, ME)
+            assert led.import_files([Path(d) / "r.csv"]).rejected == []
+            if with_rate:
+                led.set_rate("USD", Decimal("0.79"), START)
+            categorise.run(conn, ME)
         with TestClient(api.create_app(engine)) as c:
             assert_matches_api(engine, c)
         engine.dispose()

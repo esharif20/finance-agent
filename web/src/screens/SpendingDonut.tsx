@@ -1,9 +1,12 @@
+import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
+import { fetchReviewQueue } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { groupSpending } from "@/lib/categories";
+import { TO_REVIEW, groupSpending } from "@/lib/categories";
 import { categoryHref } from "@/lib/route";
+import { REVIEW_KEY } from "./ReviewQueue";
 import "./categories.css";
 
 type Spending = components["schemas"]["SpendingOut"];
@@ -26,9 +29,21 @@ function arcs(minors: number[]) {
   });
 }
 
+/** How many payments wait for an answer; only mounted on the To review row. */
+function Waiting() {
+  const queue = useQuery({ queryKey: REVIEW_KEY, queryFn: fetchReviewQueue });
+  const waiting = queue.data?.items.filter((i) => i.type === "always_ask").length ?? 0;
+  if (waiting === 0) return null;
+  return (
+    <span className="shrink-0 rounded-full bg-warning px-2 text-meta text-warning-foreground">{waiting} waiting</span>
+  );
+}
+
 export function SpendingDonut({ spending, account }: { spending: Spending; account?: number }) {
   const reduce = useReducedMotion();
   const { slices, rows } = groupSpending(spending.categories);
+  // To review links to the queue, where each payment waits for its answer
+  const href = (name: string) => (name === TO_REVIEW ? "#review" : categoryHref(name, spending.month, account));
   const placed = arcs(slices.map((s) => s.minor));
   const summary = rows
     .filter((r) => r.percent > 0)
@@ -69,7 +84,7 @@ export function SpendingDonut({ spending, account }: { spending: Spending; accou
                     // pointer shortcut; keyboard and screen readers use the legend links
                     style={s.key === "other" ? undefined : { cursor: "pointer" }}
                     onClick={() => {
-                      if (s.key !== "other") window.location.hash = categoryHref(s.name, spending.month, account);
+                      if (s.key !== "other") window.location.hash = href(s.name);
                     }}
                     initial={reduce ? false : { strokeDasharray: `0 ${C}`, strokeDashoffset: -a.start }}
                     animate={{ strokeDasharray: dash, strokeDashoffset: -a.start }}
@@ -103,12 +118,10 @@ export function SpendingDonut({ spending, account }: { spending: Spending; accou
                         className="size-3 shrink-0 rounded-full"
                         style={{ background: r.colour }}
                       />
-                      <a
-                        href={categoryHref(r.name, spending.month, account)}
-                        className="truncate rounded-md underline-offset-4 hover:underline"
-                      >
+                      <a href={href(r.name)} className="truncate rounded-md underline-offset-4 hover:underline">
                         {r.name}
                       </a>
+                      {r.name === TO_REVIEW && <Waiting />}
                     </span>
                   </th>
                   <td className="pl-3 text-right">

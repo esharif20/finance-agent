@@ -31,6 +31,12 @@ export const fetchAccounts = () => get<Account[]>("/api/accounts");
 export const fetchSpending = (month: string, accountId?: number) =>
   get<Spending>(`/api/spending${query(month, accountId)}`);
 
+export type FxMonth = components["schemas"]["FxMonthOut"];
+export type FxBalances = components["schemas"]["BalancesOut"];
+export const fetchFxMonth = (month: string, accountId?: number) =>
+  get<FxMonth>(`/api/fx/month${query(month, accountId)}`);
+export const fetchFxBalances = () => get<FxBalances>("/api/fx/balances");
+
 export type TxnFilters = {
   account_id?: string;
   kind?: string;
@@ -123,3 +129,54 @@ export const answerReview = (item: ReviewItem, answer: ReviewAnswer) =>
   review(itemUrl(item.id, "answer"), { version: item.version, ...answer });
 export const skipReview = (item: ReviewItem) => review(itemUrl(item.id, "skip"), { version: item.version });
 export const undoReview = () => review("/api/review-queue/undo");
+
+// Splits, notes and "Always ask" (#122). A refusal throws the API's own reason; it never quotes a note.
+export type SplitOut = components["schemas"]["SplitOut"];
+export type SplitIn = components["schemas"]["SplitIn"];
+export type NoteOut = components["schemas"]["NoteOut"];
+export type MerchantRow = components["schemas"]["MerchantOut"];
+export type AlwaysAskResult = components["schemas"]["AlwaysAskOut"];
+
+async function call<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const j: unknown = await res.json().catch(() => null);
+    const detail = (j as { detail?: unknown } | null)?.detail;
+    throw new Error(typeof detail === "string" ? detail : "Couldn't save that. Try again.");
+  }
+  return (await res.json()) as T;
+}
+const json = (method: string, body: object): RequestInit => ({
+  method,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+/** The live Split of a Transaction, or null when it has none. */
+export async function fetchSplit(txn: number): Promise<SplitOut | null> {
+  const res = await fetch(`/api/splits/${txn}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`split ${txn}: ${res.status}`);
+  return (await res.json()) as SplitOut;
+}
+export const saveSplit = (txn: number, parts: SplitIn["parts"]) =>
+  call<SplitOut>(`/api/splits/${txn}`, json("PUT", { parts }));
+export const revertSplit = (txn: number) => call<{ id: number }>(`/api/splits/${txn}`, { method: "DELETE" });
+
+const notePath = (txn: number, part?: number | null) =>
+  `/api/notes/${txn}${part === null || part === undefined ? "" : `?part=${part}`}`;
+/** The live note, or null when there is none. */
+export async function fetchNote(txn: number, part?: number | null): Promise<NoteOut | null> {
+  const res = await fetch(notePath(txn, part));
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`note ${txn}: ${res.status}`);
+  return (await res.json()) as NoteOut;
+}
+export const saveNote = (txn: number, text: string, part?: number | null) =>
+  call<NoteOut>(notePath(txn, part), json("PUT", { text }));
+export const purgeNote = (txn: number, part?: number | null) =>
+  call<{ purged: number }>(notePath(txn, part), { method: "DELETE" });
+
+export const fetchMerchants = () => get<{ items: MerchantRow[] }>("/api/merchants").then((r) => r.items);
+export const setAlwaysAsk = (merchant: number, on: boolean, source: "user" | "suggestion" = "user") =>
+  call<AlwaysAskResult>(`/api/merchants/${merchant}/always-ask`, json("PUT", { on, source }));

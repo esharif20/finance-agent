@@ -3,6 +3,9 @@ import type { Money } from "./money";
 /** The donut and the pound strip show the top 5 Categories in colour, the rest grey. */
 export const TOP_N = 5;
 export const OTHER_COLOUR = "var(--cat-other)";
+/** Payments at "Always ask" Merchants not yet answered: money out, but not yet any Category's. */
+export const TO_REVIEW = "To review";
+export const REVIEW_COLOUR = "var(--cat-review)";
 export const OTHER_NAME = "Other categories";
 
 type CategorySpend = { name: string; amount: Money };
@@ -25,17 +28,18 @@ export function groupSpending(categories: CategorySpend[]): { slices: Slice[]; r
   const drawable = categories.filter((c) => c.amount.minor > 0);
   const top = new Set(
     drawable
-      .filter((c) => c.name !== "Uncategorised")
+      .filter((c) => c.name !== "Uncategorised" && c.name !== TO_REVIEW)
       .slice(0, TOP_N)
       .map((c) => c.name),
   );
   const drawn = drawable.reduce((n, c) => n + c.amount.minor, 0);
-  const colourOf = (name: string) => (top.has(name) ? categoryColour(name) : OTHER_COLOUR);
+  const colourOf = (name: string) =>
+    name === TO_REVIEW ? REVIEW_COLOUR : top.has(name) ? categoryColour(name) : OTHER_COLOUR;
 
   const slices: Slice[] = drawable
-    .filter((c) => top.has(c.name))
+    .filter((c) => top.has(c.name) || c.name === TO_REVIEW)
     .map((c) => ({ key: c.name, name: c.name, minor: c.amount.minor, colour: colourOf(c.name) }));
-  const restMinor = drawable.filter((c) => !top.has(c.name)).reduce((n, c) => n + c.amount.minor, 0);
+  const restMinor = drawable.filter((c) => !top.has(c.name) && c.name !== TO_REVIEW).reduce((n, c) => n + c.amount.minor, 0);
   if (restMinor > 0) {
     slices.push({ key: "other", name: OTHER_NAME, minor: restMinor, colour: OTHER_COLOUR });
   }

@@ -10,26 +10,16 @@ import {
   postCorrection,
   revertCorrection,
 } from "@/api/client";
-import { CategoryChip, type Category } from "@/components/CategoryChip";
+import { type Category } from "@/components/CategoryChip";
 import { CountTick } from "@/components/CountTick";
-import { ManageLink } from "@/components/ManageLink";
-import { Money } from "@/components/Money";
-import { isSubscription } from "@/lib/manageLinks";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TxnRow } from "./TxnRow";
 
 const PAGE = 100;
 const KINDS = ["Spending", "Income", "Refund", "Fee", "Transfer"];
 const field =
   "min-h-11 rounded-full border border-[var(--control)] bg-card px-4 text-sm font-medium";
-
-const day = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 
 function Pick({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -152,6 +142,7 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
             {groups.map((g) => (
               <option key={g.name}>{g.name}</option>
             ))}
+            {!groups.some((g) => g.name === "To review") && <option>To review</option>}
           </select>
         </Pick>
         {scope.month === undefined && <label className={`${field} flex items-center gap-2`}>
@@ -194,46 +185,13 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
           </p>
           <ul aria-label="Transactions">
             {page.data.items.map((t) => (
-              <li
+              <TxnRow
                 key={t.id}
-                aria-label={`${t.description}, ${day(t.posted_on)}`}
-                className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised sm:grid-cols-[96px_1fr_auto_auto]"
-              >
-                <time dateTime={t.posted_on} className="order-3 text-label text-muted-foreground sm:order-none">
-                  {day(t.posted_on)}
-                </time>
-                <div className="order-1 min-w-0 sm:order-none">
-                  <p className="truncate text-row font-semibold">{t.merchant ?? t.description}</p>
-                  <p className="truncate text-label font-normal text-muted-foreground">
-                    {t.merchant ? `${t.description} · ` : ""}
-                    {accountName(t.account_id)?.masked_number}
-                  </p>
-                </div>
-                <div className="order-2 text-right sm:order-none sm:min-w-28">
-                  <Money
-                    value={t.amount}
-                    sign
-                    className={`text-row font-semibold tracking-[-0.01em] ${t.amount.minor > 0 ? "text-positive" : ""}`}
-                  />
-                </div>
-                <div className="order-4 justify-self-end sm:order-none sm:min-w-44 sm:justify-self-start">
-                  {t.kind === "Spending" || t.kind === "Refund" ? (
-                    <CategoryChip
-                      value={t.category as Category | null}
-                      groups={groups}
-                      merchant={t.merchant}
-                      onChange={(c, all) => save(t, c, all)}
-                    />
-                  ) : (
-                    <span className="text-label text-muted-foreground">{t.kind}</span>
-                  )}
-                  {isSubscription(t.category) && (
-                    <div className="mt-1.5">
-                      <ManageLink merchant={t.merchant} />
-                    </div>
-                  )}
-                </div>
-              </li>
+                t={t}
+                mask={accountName(t.account_id)?.masked_number}
+                groups={groups}
+                onCategory={(c, all) => save(t, c, all)}
+              />
             ))}
           </ul>
           {page.data.items.length < page.data.total && (

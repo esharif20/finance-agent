@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered } from "lucide-react";
+import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, Settings as SettingsIcon } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
 import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
@@ -10,6 +10,7 @@ import { useRoute } from "@/lib/route";
 import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Overview } from "@/screens/Overview";
 import { ReviewQueue, useReviewCount } from "@/screens/ReviewQueue";
+import { Settings } from "@/screens/Settings";
 import { Transactions } from "@/screens/Transactions";
 
 const queryClient = new QueryClient();
@@ -52,7 +53,7 @@ function Shell() {
   const route = useRoute();
   const review = useReviewCount();
   const TABS = tabs(review);
-  const tab = route.name === "transactions" || route.name === "review" ? route.name : "overview";
+  const tab = route.name === "transactions" || route.name === "review" ? route.name : route.name === "settings" ? "" : "overview";
   return (
     <>
       <Ambient />
@@ -67,6 +68,14 @@ function Shell() {
             item="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold"
           />
           <SyncNow />
+          <a
+            href="#settings"
+            aria-label="Settings"
+            aria-current={route.name === "settings" ? "page" : undefined}
+            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors [@media(hover:hover)]:hover:bg-active ${route.name === "settings" ? "bg-foreground/10" : ""}`}
+          >
+            <SettingsIcon className="size-4" aria-hidden="true" />
+          </a>
           <HideAmounts />
         </header>
         <main>
@@ -80,7 +89,7 @@ function Shell() {
           ) : (
             <>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <h1 className="text-title">{TABS.find((t) => t.id === tab)?.label}</h1>
+                <h1 className="text-title">{route.name === "settings" ? "Settings" : TABS.find((t) => t.id === tab)?.label}</h1>
                 {route.name === "overview" && review > 0 && (
                   <a href="#review" className="text-sm font-semibold underline-offset-4 hover:underline">
                     {review} to review
@@ -92,6 +101,8 @@ function Shell() {
                 <Transactions />
               ) : route.name === "review" ? (
                 <ReviewQueue />
+              ) : route.name === "settings" ? (
+                <Settings />
               ) : (
                 <Overview account={route.account} />
               )}

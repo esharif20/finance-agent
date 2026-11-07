@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0012"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0013"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -290,4 +290,65 @@ def test_migration_0012_keeps_rows_that_reference_a_merchant(tmp_path: Path) -> 
                 command.upgrade(cfg, target)
             assert conn.execute(text(sub)).scalars().all() == [7]
             assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+    eng.dispose()
+
+
+def test_migration_0013_adds_fx_and_keeps_rows_that_reference_a_transaction(
+    tmp_path: Path,
+) -> None:
+    """0013 (#156) adds transaction.gbp_minor in place and a new fx_rate table:
+    with foreign keys on, rows pointing at a Transaction survive up, down, up."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, event, inspect, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+
+    def fk_on(dbapi_conn: Any, _record: Any) -> None:
+        dbapi_conn.execute("PRAGMA foreign_keys = ON")
+
+    event.listen(eng, "connect", fk_on)
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0012")
+        for sql in (
+            "INSERT INTO user (id, created_at) VALUES (1, '2026-01-01')",
+            "INSERT INTO bank (id, user_id, name) VALUES (1, 1, 'Synth')",
+            "INSERT INTO account (id, user_id, bank_id, external_ref, name, kind,"
+            " masked_number, currency) VALUES (1, 1, 1, 'r', 'A', 'current', 'x',"
+            " 'EUR')",
+            'INSERT INTO "transaction" (id, user_id, account_id, posted_on,'
+            " bank_type, description, amount_minor, currency, status) VALUES"
+            " (9, 1, 1, '2026-01-02', 'CARD', 'SYNTH', -1000, 'EUR', 'completed')",
+            "INSERT INTO note (user_id, transaction_id, text, created_at)"
+            " VALUES (1, 9, 'synthetic', '2026-01-02')",
+        ):
+            conn.execute(text(sql))
+    notes = "SELECT transaction_id FROM note"
+    for target in ("0013", "0012", "0013"):
+        with eng.begin() as conn:
+            cfg.attributes["connection"] = conn
+            if target == "0012":
+                command.downgrade(cfg, target)
+            else:
+                command.upgrade(cfg, target)
+            assert conn.execute(text(notes)).scalars().all() == [9]
+            assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+            tables = inspect(conn).get_table_names()
+            cols = {c["name"] for c in inspect(conn).get_columns("transaction")}
+            assert ("fx_rate" in tables) == (target == "0013")
+            assert ("gbp_minor" in cols) == (target == "0013")
+    with eng.begin() as conn:
+        assert conn.execute(text('SELECT gbp_minor FROM "transaction"')).all() == [
+            (None,)
+        ]
+        add = (
+            "INSERT INTO fx_rate (user_id, currency, rate, rate_on, created_at)"
+            " VALUES (1, 'EUR', :r, '2026-01-01', '2026-01-01')"
+        )
+        conn.execute(text(add), {"r": "0.85"})
+        with pytest.raises(Exception, match="UNIQUE"):
+            conn.execute(text(add), {"r": "0.9"})
     eng.dispose()

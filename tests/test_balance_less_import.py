@@ -109,18 +109,28 @@ def test_revolut_pending_and_reverted_rows_are_counted_not_imported() -> None:
         engine.dispose()
 
 
-def test_revolut_foreign_currency_refuses_the_file_and_says_fx_is_coming() -> None:
+def test_revolut_mixed_currencies_import_each_into_its_own_account() -> None:
+    """#156: a EUR row no longer refuses the file; it lands in a EUR Account in
+    euros. A malformed currency still refuses the whole file, as Lloyds."""
     text = revolut_export(1, 2) + revolut_export(2, 1, currency="EUR").split("\n", 2)[2]
-    p = parse(text.encode())
-    assert len(p.rejected) == 1 and "#156" in p.rejected[0].reason
+    bad = revolut_export(1, 2) + revolut_export(2, 1, currency="eur").split("\n", 2)[2]
+    assert parse(text.encode()).rejected == []
     with tempfile.TemporaryDirectory() as d:
         engine = open_db(Path(d) / "ledger.db")
-        f = Path(d) / "r.csv"
+        f, g = Path(d) / "r.csv", Path(d) / "bad.csv"
         f.write_text(text)
+        g.write_text(bad)
         with engine.begin() as conn:
             ledger = Ledger(conn, 1)
-            r = ledger.import_files([f])
-            assert r.added == 0 and ledger.transactions() == []  # atomic, as Lloyds
+            assert ledger.import_files([g]).added == 0 and ledger.transactions() == []
+            assert ledger.import_files([f]).added == 3
+            got = {(a.currency, len(a.masked_number) > 0) for a in ledger.accounts()}
+            assert got == {("GBP", True), ("EUR", True)}
+            assert sorted(t.currency for t in ledger.transactions()) == [
+                "EUR",
+                "GBP",
+                "GBP",
+            ]
         engine.dispose()
 
 

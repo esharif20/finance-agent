@@ -1,6 +1,50 @@
 {
   "components": {
     "schemas": {
+      "AccountGbpOut": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "gbp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "account_id",
+          "currency",
+          "balance",
+          "gbp",
+          "rate"
+        ],
+        "title": "AccountGbpOut",
+        "type": "object"
+      },
       "AccountMonthOut": {
         "properties": {
           "account_id": {
@@ -262,6 +306,33 @@
           "version"
         ],
         "title": "AnswerIn",
+        "type": "object"
+      },
+      "BalancesOut": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountGbpOut"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "total",
+          "accounts"
+        ],
+        "title": "BalancesOut",
         "type": "object"
       },
       "CategoryDetailOut": {
@@ -549,6 +620,35 @@
           "interval"
         ],
         "title": "EvidenceOut",
+        "type": "object"
+      },
+      "FxMonthOut": {
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "rate_needed": {
+            "items": {
+              "$ref": "#/components/schemas/RateNeededOut"
+            },
+            "title": "Rate Needed",
+            "type": "array"
+          },
+          "rates": {
+            "items": {
+              "$ref": "#/components/schemas/RateUsedOut"
+            },
+            "title": "Rates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "month",
+          "rates",
+          "rate_needed"
+        ],
+        "title": "FxMonthOut",
         "type": "object"
       },
       "GapOut": {
@@ -1019,6 +1119,122 @@
           "ledger_version"
         ],
         "title": "QueueOut",
+        "type": "object"
+      },
+      "RateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "rate": {
+            "pattern": "^[0-9]{1,7}(\\.[0-9]{1,12})?$",
+            "title": "Rate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "rate",
+          "on"
+        ],
+        "title": "RateIn",
+        "type": "object"
+      },
+      "RateNeededOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "count"
+        ],
+        "title": "RateNeededOut",
+        "type": "object"
+      },
+      "RateOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "on": {
+            "title": "On",
+            "type": "string"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "bank",
+              "exchange",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "rate",
+          "on",
+          "source"
+        ],
+        "title": "RateOut",
+        "type": "object"
+      },
+      "RateUsedOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "on": {
+            "title": "On",
+            "type": "string"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "bank",
+              "exchange",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "rate",
+          "on",
+          "source",
+          "count"
+        ],
+        "title": "RateUsedOut",
         "type": "object"
       },
       "RevertOut": {
@@ -1871,6 +2087,139 @@
           }
         },
         "summary": "Revert"
+      }
+    },
+    "/api/fx/balances": {
+      "get": {
+        "operationId": "balances_api_fx_balances_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalancesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Balances"
+      }
+    },
+    "/api/fx/month": {
+      "get": {
+        "operationId": "month_api_fx_month_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}$",
+              "title": "Month",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxMonthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Month"
+      }
+    },
+    "/api/fx/rates": {
+      "get": {
+        "description": "Rates from the user's own exchanges, then those entered.",
+        "operationId": "rates_api_fx_rates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RateOut"
+                  },
+                  "title": "Response Rates Api Fx Rates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rates"
+      },
+      "put": {
+        "operationId": "set_rate_api_fx_rates_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Rate"
       }
     },
     "/api/health": {
