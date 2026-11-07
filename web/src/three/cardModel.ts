@@ -135,7 +135,7 @@ export function createCardParts(width: number, height = width / ASPECT) {
 }
 
 /** One card: body, face (with `texture`), the chip unless the art prints its own, and the
-    back (with `back`, the face faded towards the page; #93). */
+    back (with `back`, the generic reverse; #93, #129). */
 export function createPaymentCardModel(parts: CardParts, texture: THREE.Texture, withChip: boolean, back: THREE.Texture) {
   const group = new THREE.Group();
   group.name = "payment-card";
@@ -164,11 +164,13 @@ export function createPaymentCardModel(parts: CardParts, texture: THREE.Texture,
   const scrim = new THREE.Mesh(parts.face, scrimMaterial);
   scrim.name = "label-scrim";
   scrim.visible = false;
-  // The face's own shape and UVs, drawn from behind: a turned card shows its face mirrored, as
-  // if printed through. Unlit, so the fade reads as the page colour whatever the light.
-  const backMaterial = new THREE.MeshBasicMaterial({ map: back, side: THREE.BackSide, toneMapped: false });
+  // The face's shape turned half a turn about y, so from behind its image reads the right way
+  // round (#129; drawn from behind it came out mirrored). Unlit, so the fade reads as the page
+  // colour whatever the light.
+  const backMaterial = new THREE.MeshBasicMaterial({ map: back, toneMapped: false });
   const backFace = new THREE.Mesh(parts.face, backMaterial);
   backFace.name = "card-back";
+  backFace.rotation.y = Math.PI;
   backFace.position.z = -parts.w * CARD_SPEC.thickness - 0.6; // the body's back is at -t - 0.3
   group.add(shadow, new THREE.Mesh(parts.body, parts.bodyMaterial), face, scrim, backFace);
   if (withChip) {
