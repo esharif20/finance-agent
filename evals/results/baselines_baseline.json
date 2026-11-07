@@ -1,0 +1,54 @@
+{
+  "harness": "baselines",
+  "dataset": "synthetic_history",
+  "dataset_version": 2,
+  "dataset_sha256": "d36833c4c58203794a1dedf9ab79bd400797b39fe30013fda7e8395e542715b6",
+  "seed": 146,
+  "histories": 6,
+  "months": 36,
+  "gates": {
+    "months": 6,
+    "cycles": 6
+  },
+  "scored": {
+    "seasonal": 1242,
+    "payday_week1": 1260,
+    "insufficient": 252
+  },
+  "models": {
+    "baseline": {
+      "model": "trailing-3-month-mean",
+      "model_version": "1",
+      "metrics": {
+        "payday_week1.all.wape": 0.629179,
+        "seasonal.Food & Drink / Coffee.wape": 0.056821,
+        "seasonal.Food & Drink / Eating out.wape": 0.156284,
+        "seasonal.Food & Drink / Groceries.wape": 0.096467,
+        "seasonal.Food & Drink / Takeaway.wape": 0.118397,
+        "seasonal.Shopping / Online.wape": 0.253676,
+        "seasonal.Transport / Public transport.wape": 0.136974,
+        "seasonal.Travel / Holidays.wape": 0.753695,
+        "seasonal.after_year1.wape": 0.184038,
+        "seasonal.all.wape": 0.190363,
+        "seasonal.year1.wape": 0.213966
+      }
+    },
+    "candidate": {
+      "model": "personal-baselines",
+      "model_version": "1",
+      "metrics": {
+        "payday_week1.all.wape": 0.4722,
+        "seasonal.Food & Drink / Coffee.wape": 0.07882,
+        "seasonal.Food & Drink / Eating out.wape": 0.085708,
+        "seasonal.Food & Drink / Groceries.wape": 0.076681,
+        "seasonal.Food & Drink / Takeaway.wape": 0.087136,
+        "seasonal.Shopping / Online.wape": 0.111291,
+        "seasonal.Transport / Public transport.wape": 0.094942,
+        "seasonal.Travel / Holidays.wape": 0.260922,
+        "seasonal.after_year1.wape": 0.078423,
+        "seasonal.all.wape": 0.102031,
+        "seasonal.year1.wape": 0.190128
+      }
+    }
+  }
+}
