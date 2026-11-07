@@ -34,6 +34,7 @@ Status: draft for review. Grows with each milestone.
 | Cloud provider sees personal data | Placeholders, allowlist, opt-in, payload log (ADR 0011) | Patterns inferable from generic Category names and month-level timing |
 | Runaway cloud spend | Cost meter with hard £7 cap (ADR 0012) | None beyond the cap |
 | Arbitrary file access through the app | No tool reads files; `ingest` reads only paths given on the CLI; the API has no file-path parameters; the app refuses to read data from inside the repo | |
+| Card art endpoint used to read other files | `/api/card-art/{key}` takes only allowlisted keys (`lloyds`, `hsbc`, `revolut`), resolves inside `card-art/` in the data directory, opens once with no symlinks followed and reads at most 2 MB from that handle (no TOCTOU), refuses FIFOs and devices, sniffs PNG/JPEG/WebP magic bytes (else 415), caps at 2 MB (413), sends `no-store` and `nosniff` (#58) | Anyone who can write to the data directory can change the picture |
 | Local network attacker | Server binds to `127.0.0.1` only | Other local processes on the same Mac can reach the port; acceptable for one user |
 | Logs leak data | Structured logging with a redaction filter: amounts, descriptions and account fields are never logged; a test asserts it | |
 | Unauthorised financial actions | No payment or transfer capability exists anywhere; Open Banking access is read-only (AIS) | |

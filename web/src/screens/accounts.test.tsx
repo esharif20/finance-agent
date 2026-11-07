@@ -20,6 +20,7 @@ const account = (over: Partial<Account> = {}): Account => ({
   bank_balance: m(117979),
   ledger_balance: m(117979),
   gaps: [],
+  art: null,
   ...over,
 });
 const saver = account({
@@ -115,6 +116,46 @@ describe("AccountStack", () => {
   it("says there are no accounts yet", () => {
     render(<AccountStack accounts={[]} onSelect={() => {}} />);
     expect(screen.getByText(/fa import/)).toBeInTheDocument();
+  });
+});
+
+describe("AccountStack card faces (#58)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("draws static CSS cards when WebGL is not available, with no canvas", () => {
+    render(<AccountStack accounts={[account(), saver]} onSelect={() => {}} />);
+    const group = screen.getByRole("group", { name: "Accounts" });
+    expect(group.querySelector("canvas")).toBeNull();
+    expect(group).toHaveAttribute("data-gl", "false");
+    for (const card of within(group).getAllByRole("button"))
+      expect(card).toHaveAttribute("data-art", "false");
+  });
+
+  it("asks the API for local art by key only, and keeps the generic face when there is none", async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 404 }));
+    vi.stubGlobal("fetch", fetch);
+    render(
+      <AccountStack
+        accounts={[account({ art: "hsbc", bank: "HSBC UK" }), saver]}
+        onSelect={() => {}}
+      />,
+    );
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/card-art/hsbc"));
+    expect(fetch).toHaveBeenCalledTimes(1); // the saver has no art key
+    expect(screen.getByRole("button", { name: /HSBC UK/ })).toHaveAttribute("data-art", "false");
+  });
+
+  it("brings the chosen card to the front without moving it in the focus order", () => {
+    const { rerender } = render(<AccountStack accounts={[account(), saver]} onSelect={() => {}} />);
+    const cards = () => within(screen.getByRole("group", { name: "Accounts" })).getAllByRole("button");
+    expect(cards()[0]).toHaveAttribute("data-front", "true"); // All accounts
+
+    rerender(<AccountStack accounts={[account(), saver]} selected={1} onSelect={() => {}} />);
+    const [all, lloyds, other] = cards();
+    expect(lloyds).toHaveTextContent("••••0001"); // DOM order unchanged
+    expect(lloyds).toHaveAttribute("data-front", "true");
+    const z = (el?: HTMLElement) => Number(el?.style.zIndex);
+    expect(z(lloyds)).toBeGreaterThan(Math.max(z(all), z(other)));
   });
 });
 

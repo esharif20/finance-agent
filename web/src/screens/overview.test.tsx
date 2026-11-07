@@ -53,6 +53,7 @@ const account = (over: Partial<Account> = {}): Account => ({
   bank_balance: m(117979),
   ledger_balance: m(117979),
   gaps: [],
+  art: null,
   ...over,
 });
 
