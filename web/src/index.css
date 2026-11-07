@@ -493,6 +493,22 @@ html[data-private] .money {
 .account-card[data-tucked="true"] > * {
   opacity: 0; /* not visibility: the labels still name the button */
 }
+/* Turning the stack over (#93): touch keeps vertical scrolling for the page and gives the
+   sideways drag to the stack. A card turned past edge-on hides its labels; over WebGL its
+   back is the faded mirror the scene draws. */
+.card-stack {
+  touch-action: pan-y;
+}
+.account-card[data-back="true"] > *,
+.card-stack[data-gl="true"] .account-card[data-turned="true"] > * {
+  opacity: 0; /* over WebGL the labels are flat and would part from the turning 3D card */
+}
+/* shortcut: without WebGL a turned card fades as a whole rather than to the page colour;
+   that path only runs when WebGL is missing, so it is not worth a second face in CSS. */
+.card-stack:not([data-gl="true"]) .account-card[data-back="true"] {
+  opacity: 0.35;
+}
+
 /* With WebGL the canvas draws the face, the edge and the sheen. */
 .card-stack[data-gl="true"] .account-card {
   background: none;
@@ -520,6 +536,10 @@ html[data-private] .money {
 }
 .card-stack[data-gl="true"] .account-card[data-selected="true"] {
   box-shadow: 0 0 0 2px var(--foreground);
+}
+.card-stack[data-gl="true"] .account-card[data-turned="true"] {
+  /* the ring is flat like the labels; !important: it beats the hover ring's longer selector */
+  box-shadow: none !important;
 }
 @media (hover: hover) and (pointer: fine) {
   .account-card[data-hover="true"]:not([data-selected="true"]) {
@@ -620,19 +640,23 @@ html[data-private] .money {
 
 /* balance odometer: columns of 0-9 roll from 0 and rest on the real digit (--d) */
 .odometer .odo-col {
+  /* one whole-pixel step drives window, line and offset: a fractional em step snapped each
+     digit's line differently from its translate, so digits drifted and clipped (#100) */
+  --odo-h: round(up, 1.15em, 1px);
   display: inline-block;
-  height: 1.15em;
+  height: var(--odo-h);
   overflow: hidden;
-  line-height: 1.15em;
+  line-height: var(--odo-h);
   vertical-align: bottom;
   font-variant-numeric: tabular-nums;
 }
 .odometer .odo-reel {
   display: block;
-  transform: translateY(calc(var(--d) * -1.15em));
+  transform: translateY(calc(var(--d) * var(--odo-h) * -1));
 }
 .odometer .odo-reel > span {
   display: block;
+  height: var(--odo-h);
 }
 .odometer[data-play] .odo-reel {
   animation: odo-roll 360ms cubic-bezier(0.23, 1, 0.32, 1) calc(min(var(--i), 8) * 10ms) both;
@@ -642,7 +666,7 @@ html[data-private] .money {
     transform: translateY(0);
   }
   to {
-    transform: translateY(calc(var(--d) * -1.15em));
+    transform: translateY(calc(var(--d) * var(--odo-h) * -1));
   }
 }
 
@@ -663,3 +687,4 @@ html[data-private] .money {
     transition: none;
   }
 }
+

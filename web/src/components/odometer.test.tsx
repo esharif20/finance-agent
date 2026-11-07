@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Money } from "@/components/Money";
@@ -44,6 +46,20 @@ describe("balance odometer", () => {
     expect(resting(container)).toBe("099");
     render(<Money value={v} odometer="d" />); // remounting later: plain
     expect(document.body.querySelectorAll(".odometer")).toHaveLength(1);
+  });
+
+  it("reel geometry (#100): window, line, digit height and offset share one whole-pixel step", () => {
+    const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
+    const block = (sel: string) =>
+      css.match(new RegExp(`${sel.replace(/[.>\s]/g, (c) => `\\${c}`)}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+    const col = block(".odometer .odo-col");
+    expect(col).toMatch(/--odo-h:\s*round\(up,[^)]*1px\)/); // never a fractional step
+    expect(col).toMatch(/height:\s*var\(--odo-h\)/);
+    expect(col).toMatch(/line-height:\s*var\(--odo-h\)/);
+    expect(block(".odometer .odo-reel > span")).toMatch(/height:\s*var\(--odo-h\)/);
+    expect(block(".odometer .odo-reel")).toMatch(/var\(--d\) \* var\(--odo-h\)/); // rest
+    expect(css).toMatch(/to\s*\{\s*transform:\s*translateY\(calc\(var\(--d\) \* var\(--odo-h\) \* -1\)\)/); // roll end
+    expect(css).not.toMatch(/--d\) \* -1\.15em/); // no em-based offset left
   });
 
   it("shows no reel under Hide amounts", () => {
