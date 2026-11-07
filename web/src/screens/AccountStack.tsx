@@ -227,7 +227,7 @@ export function AccountStack({
   useLayoutEffect(() => {
     const el = stack.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.round(e?.contentRect.width ?? 0)));
+    const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e?.contentRect.width ?? 0)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
