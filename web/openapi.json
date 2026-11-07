@@ -560,6 +560,85 @@
         "title": "SummaryOut",
         "type": "object"
       },
+      "SyncStatusOut": {
+        "description": "Freshness and consent only: a failure is an error class and a count.",
+        "properties": {
+          "consent_days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Days Left"
+          },
+          "consent_expires_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Expires On"
+          },
+          "consent_warning": {
+            "title": "Consent Warning",
+            "type": "boolean"
+          },
+          "failure_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Class"
+          },
+          "failures_in_a_row": {
+            "title": "Failures In A Row",
+            "type": "integer"
+          },
+          "last_failure_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Failure At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          }
+        },
+        "required": [
+          "last_sync_at",
+          "last_failure_at",
+          "failure_class",
+          "failures_in_a_row",
+          "consent_expires_on",
+          "consent_days_left",
+          "consent_warning"
+        ],
+        "title": "SyncStatusOut",
+        "type": "object"
+      },
       "TransactionOut": {
         "properties": {
           "account_id": {
@@ -1207,6 +1286,24 @@
           }
         },
         "summary": "Summary"
+      }
+    },
+    "/api/sync-status": {
+      "get": {
+        "operationId": "sync_status_api_sync_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync Status"
       }
     },
     "/api/transactions": {

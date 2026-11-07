@@ -1,0 +1,35 @@
+# synthetic
+{
+  "errors": [],
+  "accounts": [
+    {
+      "org": {"domain": null, "id": "org-synthetic-1", "name": "Synthetic Bank", "sfin-url": "https://www.lunchflow.app/simplefin"},
+      "id": "acc-0f3a9c2e7b1d4e5f8a6b0c9d2e1f3a4b",
+      "name": "Synthetic Current",
+      "currency": "GBP",
+      "balance": "250.00",
+      "available-balance": "250.00",
+      "balance-date": 1772366400,
+      "extra": {},
+      "transactions": [
+        {"id": "a1b2c3d4e5f60718293a4b5c6d7e8f90", "posted": 1772323200, "amount": "-3.20", "description": "", "payee": "Synthetic Coffee", "pending": false, "transacted_at": 1772320000, "extra": {}},
+        {"id": "a1b2c3d4e5f60718293a4b5c6d7e8f91x", "posted": 1772323300, "amount": "-3.20", "description": "", "payee": "Synthetic Coffee", "pending": false, "transacted_at": 1772320100, "extra": {}},
+        {"id": "pending-row-0000000000000000000000001", "posted": 0, "amount": "-9.99", "description": "", "payee": "Synthetic Shop", "pending": true, "transacted_at": 1772360000, "extra": {}}
+      ]
+    },
+    {
+      "org": {"domain": null, "id": "org-synthetic-2", "name": "Other Synthetic Bank", "sfin-url": "https://www.lunchflow.app/simplefin"},
+      "id": "acc-11112222333344445555666677778888",
+      "name": "Synthetic Card",
+      "currency": "GBP",
+      "balance": "-40.00",
+      "available-balance": "-40.00",
+      "balance-date": 1772366400,
+      "extra": {},
+      "transactions": [
+        {"id": "0000000000000000000000000000000000001", "posted": 1772323200, "amount": "-40.00", "description": "CARD PAYMENT REF 123", "payee": "Synthetic Grocer", "pending": false, "transacted_at": 1772300000, "extra": {}},
+        {"id": "0000000000000000000000000000000000002", "posted": 1772323201, "amount": "12.00", "description": "Synthetic Grocer", "payee": "Synthetic Grocer", "pending": false, "transacted_at": 1772300001, "extra": {}}
+      ]
+    }
+  ]
+}

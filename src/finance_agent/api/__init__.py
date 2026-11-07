@@ -4,6 +4,7 @@ Money crosses the wire as integer minor units plus a currency; the frontend
 formats it in one place."""
 
 from collections.abc import Iterator
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
@@ -171,6 +172,18 @@ class CategoryDetailOut(BaseModel):
     merchants: list[MerchantSpendOut]  # top 5 across Subcategories
     trend: list[TrendPointOut]  # trailing 6 months, oldest first
     transactions: list[CategoryTxnOut]  # newest first
+
+
+class SyncStatusOut(BaseModel):
+    """Freshness and consent only: a failure is an error class and a count."""
+
+    last_sync_at: str | None
+    last_failure_at: str | None
+    failure_class: str | None
+    failures_in_a_row: int
+    consent_expires_on: str | None
+    consent_days_left: int | None
+    consent_warning: bool
 
 
 class HealthOut(BaseModel):
@@ -416,6 +429,23 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.get("/api/accounts")
     def accounts(led: Led) -> list[AccountOut]:
         return [_account(a) for a in led.accounts()]
+
+    @app.get("/api/sync-status")
+    def sync_status(led: Led) -> SyncStatusOut:
+        st = led.sync_status()
+
+        def iso(v: object) -> str | None:
+            return v.isoformat() if isinstance(v, (date, datetime)) else None
+
+        return SyncStatusOut(
+            last_sync_at=iso(st.last_sync_at),
+            last_failure_at=iso(st.last_failure_at),
+            failure_class=st.failure_class,
+            failures_in_a_row=st.failures_in_a_row,
+            consent_expires_on=iso(st.consent_expires_on),
+            consent_days_left=st.consent_days_left,
+            consent_warning=st.consent_warning,
+        )
 
     @app.get(
         "/api/card-art/{key}",

@@ -7,6 +7,7 @@ Status: draft for review.
 - Real data: `~/Library/Application Support/FinanceAgent/` only, in the SQLCipher database. The app refuses to open a database inside the repository.
 - Development and CI: synthetic data only, in `tests/fixtures/synthetic/` and `evals/datasets/`.
 - No real data in Git, issues, PRs, fixtures, logs, telemetry or third-party tracing. Ever.
+- Off the Mac, real data reaches only the SimpleFIN aggregator the user connects (which already relays it from the Banks) and encrypted backup chunks (ADR 0013). The SimpleFIN provider is Lunch Flow, which relays through GoCardless Bank Account Data, a regulated provider. Bank consent lasts 90 days and then needs renewing (`fa summary` and the dashboard warn 14 days ahead). Lunch Flow keeps the data it relays for 90 days; the app's own encrypted copy has no such limit, so deleting it at Lunch Flow does not delete it here, and the reverse.
 
 ## Retention
 
@@ -27,7 +28,7 @@ A `fa forget` command lists and deletes Memories, summaries and feedback. Deleti
 
 ## Secrets
 
-SQLCipher key, restic password and API keys live in the macOS Keychain, never in files or environment variables committed anywhere. `.env` files are git-ignored.
+SQLCipher key, restic password, the SimpleFIN access token and API keys live in the macOS Keychain, never in files or environment variables committed anywhere. `.env` files are git-ignored.
 
 ## Backups
 

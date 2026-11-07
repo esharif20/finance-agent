@@ -51,7 +51,7 @@ Acceptance:
 
 ## M3: Real data readiness and learning categories
 
-SQLCipher with Keychain key (gate for real data, ADR 0002); restic backups and `fa restore`; HSBC and Revolut importers; FX conversion with provenance; Transfer detection; Review Queue; ML classifier if it beats the rules baseline; model registry and shadow mode; Enable Banking prototype.
+SQLCipher with Keychain key (gate for real data, ADR 0002); restic backups and `fa restore`; HSBC and Revolut importers; FX conversion with provenance; Transfer detection; Review Queue; ML classifier if it beats the rules baseline; model registry and shadow mode; read-only bank sync through one SimpleFIN aggregator (ADR 0013, ADR 0014).
 
 ## M4: Assistant
 
@@ -71,4 +71,4 @@ Landing page with scroll story; demo at `/app` with per-visitor synthetic data; 
 
 ## Later
 
-Open Banking daily sync (after the prototype), email-based subscription signals, native mobile.
+Another aggregator or egress host only with a new ADR (ADR 0013), email-based subscription signals, native mobile.
