@@ -392,3 +392,22 @@ review_decision = Table(
     Column("undone_at", DateTime(timezone=True)),
     Index("ix_review_decision_user", "user_id"),
 )
+
+# Derived (#113): one local-model vector per Merchant (its normalised
+# descriptor), int16 components. Deleted with its Merchant (cascade), with the
+# last Transaction naming it (trigger `merchant_embedding_source_gone`,
+# migration 0014) and by `fa forget-embeddings`. No weights, only these rows.
+merchant_embedding = Table(
+    "merchant_embedding",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "merchant_id",
+        Integer,
+        ForeignKey("merchant.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("model", String(64), nullable=False),
+    Column("dims", Integer, nullable=False),
+    Column("vector", LargeBinary, nullable=False),
+)

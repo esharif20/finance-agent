@@ -73,13 +73,13 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id`, and `storage.backup`: encrypted copies to a registered drive, their manifest and retention, and restore (#95) | nothing |
 | `ingest` | One parser per Bank, the `Importer` interface, account-number masking, and `ingest.simplefin`: the read-only SimpleFIN client, the only module that may import a network client, besides `cli.launcher`'s probe of our own server on 127.0.0.1 and `assistant.ollama` on localhost:11434 (ADR 0013, `tests/test_network_boundary.py`). Untrusted input: it touches neither the database nor the Ledger | nothing |
 | `ledger` | Transactions, duplicate detection (ADR 0006), Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance, and `ledger.review`: the Review Queue, whose answers are Corrections and registry decisions the Ledger owns (#110); a later scorer from `categorise` is passed in | `storage`, `ingest` |
-| `categorise` | Taxonomy (versioned; the data is in `ledger.taxonomy` so the Ledger can show old Corrections in current names), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005) | `ledger`, `storage` (its own derived tables) |
+| `categorise` | Taxonomy (versioned; the data is in `ledger.taxonomy` so the Ledger can show old Corrections in current names), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005). `categorise.embedding` (#113): `OllamaEmbedder` (nomic-embed-text, `http.client` to `localhost:11434` only, `keep_alive` 1m) and `TrigramEmbedder` (the stand-in for tests and CI); vectors are int16, so no float enters `categorise` | `ledger`, `storage` (its own derived tables) |
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry. `engine.forecast` (#149) fits ETS with `statsmodels` (with its `scipy`, `numpy` and `pandas`): the standard ETS with prediction intervals, not worth re-implementing. It is the one module outside the money rule allowed to use `float`, inside the model fit only; every output is rounded to integer pence (`tests/test_no_float.py`) | `ledger`, `categorise` (read-only: recurring detection; `categorise` never imports `engine`, import-linter contract), `memory` |
 | `memory` | Memories, Proposals, feedback, retention | `storage` |
 | `assistant` | The LangGraph graph (`langgraph` pinned; LangSmith tracing forced off on import, ADR 0008), tool allowlist, grounding check, answer cache (ADR 0010), and the `ChatModel` interface with `FakeChatModel` (scripted, for tests and CI) and `OllamaChatModel` (`http.client` to `localhost:11434` only: any other host, redirect or proxy is refused; malformed tool calls are rejected) (#135) | `engine`, `ledger` (read-only views), `memory`. Never `storage`, `ingest`, `api` or `cli` directly (import-linter contract) |
 | `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0013). No database access. | nothing except the payload it is handed |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
-| `cli` | The `fa` command. `fa import`, `fa summary`, `fa connect` / `disconnect` / `sync` (SimpleFIN, ADR 0013/0014) and `fa watch` (watched-folder import) call the Ledger interface in process; `fa backup` / `fa restore` call `storage.backup` (the scheduled sync backs up after it succeeds); `fa sync --install`, `fa watch install` and `fa backup setup` write `launchd` agents; `fa` (open dashboard) talks to the running server | `ledger`, `categorise`, `storage` (opening the database, the Keychain), `ingest.simplefin` (fetching), `identity` (in-process); `api` only over HTTP |
+| `cli` | The `fa` command. `fa import`, `fa summary`, `fa connect` / `disconnect` / `sync` (SimpleFIN, ADR 0013/0014) and `fa watch` (watched-folder import) call the Ledger interface in process; `fa backup` / `fa restore` call `storage.backup`; `fa forget-embeddings` calls `categorise.embedding.forget` (the scheduled sync backs up after it succeeds); `fa sync --install`, `fa watch install` and `fa backup setup` write `launchd` agents; `fa` (open dashboard) talks to the running server | `ledger`, `categorise`, `storage` (opening the database, the Keychain), `ingest.simplefin` (fetching), `identity` (in-process); `api` only over HTTP |
 
 Dependency direction is enforced by an import-linter check in CI: nothing imports `assistant` except `api`, and `gateway` imports nothing from the core.
 
@@ -122,6 +122,7 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 | `category` | id, parent_id, name, taxonomy_version, archived_at |
 | `correction` | id, user_id, transaction_id, field, new_value, origin (ui, chat), created_at, superseded_by |
 | `categorisation` | transaction_id, category_id, kind, source (correction, rule, model), confidence, model_version |
+| `merchant_embedding` | user_id, merchant_id, model, dims, vector (int16): one local-model vector per Merchant (#113). Cascades from `merchant`; a trigger on `transaction` delete drops vectors of Merchants no Transaction names any more |
 | `transfer_link` | from_transaction_id, to_transaction_id, confidence, confirmed |
 | `reconciliation_gap` | account_id, from_date, to_date, amount_minor (Bank minus Ledger; rebuilt after every import) |
 | `insight` | id, user_id, type, impact_minor, confidence, relevance, evidence (JSON of ids), created_at, status |
@@ -151,9 +152,8 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 ├── tests/
 │   ├── unit/  property/  integration/
 │   └── fixtures/synthetic/        # the only place CSV fixtures may live
-├── evals/
+├── evals/                         # the harnesses (categoriser.py, ...), gate.py, metrics.py
 │   ├── datasets/                  # synthetic only
-│   ├── harness/                   # model and agent benchmarks
 │   └── results/                   # committed synthetic results
 ├── web/                           # Vite + React + TS + Tailwind + shadcn
 ├── scripts/                       # CI checks (fixture guard, egress test)

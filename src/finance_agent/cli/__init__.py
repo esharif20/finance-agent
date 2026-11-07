@@ -113,7 +113,30 @@ def _main(argv: Sequence[str] | None) -> int:
         action="store_true",
         help="on a new Mac: read the recovery key from stdin (never pass it here)",
     )
+    sub.add_parser(
+        "forget-embeddings",
+        help="delete every stored Merchant embedding (rebuilt when needed)",
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "forget-embeddings":
+        from finance_agent.categorise import embedding
+
+        try:
+            engine = open_db(create=False)
+        except (OSError, ValueError) as e:
+            print(f"fa: {e}", file=sys.stderr)
+            return 1
+        try:
+            with engine.begin() as conn:
+                n = embedding.forget(conn, LOCAL_USER)
+        finally:
+            engine.dispose()
+        print(
+            f"Deleted {n} Merchant embeddings; the local model rebuilds them "
+            "from your Transactions when it next runs"
+        )
+        return 0
 
     if args.command in ("backup", "restore"):
         from finance_agent.cli import backup

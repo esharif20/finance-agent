@@ -184,6 +184,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/local-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Local Model */
+        get: operations["local_model_api_local_model_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/merchants": {
         parameters: {
             query?: never;
@@ -800,6 +817,14 @@ export interface components {
             version: string;
             /** Weight */
             weight: number;
+        };
+        /** LocalModelOut */
+        LocalModelOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "on" | "off";
         };
         /** MerchantOut */
         MerchantOut: {
@@ -1458,6 +1483,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    local_model_api_local_model_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalModelOut"];
                 };
             };
         };
