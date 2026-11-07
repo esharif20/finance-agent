@@ -117,6 +117,8 @@ def open_db(path: Path | None = None, create: bool = True) -> Engine:
         # Raw 256-bit key: no passphrase KDF. Must be the first statement.
         dbapi_conn.execute(f"PRAGMA key = \"x'{key}'\"")
         dbapi_conn.execute("PRAGMA foreign_keys = ON")
+        # a purge (notes, #124) zeroes freed pages, whatever the build default
+        dbapi_conn.execute("PRAGMA secure_delete = ON")
 
     # hide_parameters: an error message never quotes amounts or descriptions
     engine = create_engine(f"sqlite:///{path}", module=sqlcipher, hide_parameters=True)

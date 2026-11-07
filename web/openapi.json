@@ -708,6 +708,68 @@
         "title": "MonthTotalsOut",
         "type": "object"
       },
+      "NoteIn": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "NoteIn",
+        "type": "object"
+      },
+      "NoteOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/VersionOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          },
+          "part": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "transaction_id": {
+            "title": "Transaction Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "transaction_id",
+          "part",
+          "text",
+          "created_at",
+          "history",
+          "ledger_version"
+        ],
+        "title": "NoteOut",
+        "type": "object"
+      },
       "PartIn": {
         "properties": {
           "amount_minor": {
@@ -774,6 +836,24 @@
           "parts"
         ],
         "title": "PreviewOut",
+        "type": "object"
+      },
+      "PurgeOut": {
+        "properties": {
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          },
+          "purged": {
+            "title": "Purged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purged",
+          "ledger_version"
+        ],
+        "title": "PurgeOut",
         "type": "object"
       },
       "QueueOut": {
@@ -1374,6 +1454,38 @@
         ],
         "title": "VersionIn",
         "type": "object"
+      },
+      "VersionOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "superseded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded At"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "created_at",
+          "superseded_at"
+        ],
+        "title": "VersionOut",
+        "type": "object"
       }
     }
   },
@@ -1723,6 +1835,191 @@
           }
         },
         "summary": "Months"
+      }
+    },
+    "/api/notes/{transaction_id}": {
+      "delete": {
+        "description": "Delete every version of the note. Backups keep it until they age out.",
+        "operationId": "purge_api_notes__transaction_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Part"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge"
+      },
+      "get": {
+        "operationId": "read_api_notes__transaction_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Part"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read"
+      },
+      "put": {
+        "description": "Set the note; the previous version is kept, superseded.",
+        "operationId": "save_api_notes__transaction_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Part"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save"
       }
     },
     "/api/review-queue": {
