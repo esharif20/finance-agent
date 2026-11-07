@@ -11,6 +11,7 @@ SRC = Path(finance_agent.__file__).parent
 ALLOWED = {
     "ingest/simplefin.py": "the one aggregator client (ADR 0013)",
     "cli/launcher.py": "probes our own server's /api/health on 127.0.0.1 only",
+    "assistant/ollama.py": "the local model on localhost:11434 only (#135)",
 }
 
 
@@ -61,6 +62,14 @@ def test_the_launcher_probe_only_talks_to_localhost() -> None:
     text = (SRC / "cli/launcher.py").read_text()
     assert network_imports(text) == {"urllib"}
     assert 'f"http://{HOST}:{port}/api/health"' in text
+
+
+def test_the_ollama_adapter_only_talks_to_localhost() -> None:
+    text = (SRC / "assistant/ollama.py").read_text()
+    assert network_imports(text) == {"http", "urllib"}  # urllib only for urlsplit
+    assert "from urllib.parse import urlsplit" in text
+    assert text.count("http.client.HTTPConnection(") == 1
+    assert "HTTPSConnection" not in text and "urllib.request" not in text
 
 
 def test_the_scan_catches_every_import_form() -> None:
