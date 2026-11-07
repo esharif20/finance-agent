@@ -28,11 +28,15 @@ def lowered(
     fresh: Results, committed: Results, lower_is_better: Callable[[str], bool]
 ) -> list[str]:
     """Why `fresh` would lower `committed`; [] when it would not."""
-    if fresh["dataset_version"] != committed["dataset_version"]:
+    new_data = fresh["dataset_sha256"] != committed["dataset_sha256"]
+    bumped = fresh["dataset_version"] > committed["dataset_version"]
+    if new_data and bumped:
         return []  # a new dataset version sets a new bar
     problems: list[str] = []
-    if fresh["dataset_sha256"] != committed["dataset_sha256"]:
+    if new_data:
         problems.append("dataset changed without a dataset_version bump")
+    if fresh["dataset_version"] < committed["dataset_version"]:
+        problems.append("dataset_version moved backwards")
     for key, old in committed["models"].items():
         new = fresh["models"].get(key)
         if new is None:

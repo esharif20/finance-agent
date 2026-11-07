@@ -68,3 +68,24 @@ def test_ci_fails_when_committed_results_are_not_a_fresh_run(tmp_path: Path) -> 
     assert gate.run("t", lambda: _results(0.9), path, _lower, []) == 1
     assert gate.run("t", lambda: _results(0.8), path, _lower, []) == 0
     assert gate.run("t", lambda: _results(0.9), path, _lower, ["--write"]) == 0
+
+
+def test_a_version_bump_alone_cannot_reset_the_bar() -> None:
+    # verifier #171: bumping dataset_version without changing the dataset, or
+    # moving it backwards, must not let --write lower a committed metric
+    old = _results(0.8, version=2)
+    assert len(gate.lowered(_results(0.1, version=3), old, _lower)) == 1
+    assert gate.lowered(_results(0.1, sha="b", version=1), old, _lower) != []
+
+
+def test_a_results_file_edited_to_claim_better_numbers_fails_ci(
+    tmp_path: Path,
+) -> None:
+    import detectors
+
+    path = tmp_path / "detectors.json"
+    claimed = json.loads(detectors.RESULTS.read_text())
+    claimed["models"]["candidate"]["metrics"]["overall.recall"] = 1.0
+    path.write_text(json.dumps(claimed))
+    run = gate.run("detectors", detectors.evaluate, path, detectors.lower_is_better, [])
+    assert run == 1

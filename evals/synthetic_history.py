@@ -12,7 +12,8 @@ Each history is one current Account of a fictional user:
 - **Planted events**, with ground truth in `History.events`:
   - `price_rise`: one subscription's monthly charge goes up for good;
   - `category_spike`: a Category's monthly spend at 2-3x its seasonal normal,
-    only once the ADR 0015 six-month baseline exists;
+    only once the ADR 0015 six-month baseline exists; one per history falls
+    just after a seasonal peak, under a trailing-mean threshold;
   - `forgotten_renewal`: an annual charge renewing 12 months on, with nothing
     from that Merchant in between;
   - `payday_shortfall`: an emergency expense early in one cycle that leaves the
@@ -27,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 SEED = 146
-DATASET_VERSION = 1
+DATASET_VERSION = 2  # 2: a post-peak spike per history (verifier #171)
 START = date(2023, 1, 1)
 MONTHS = 36
 MIN_MONTHS = 14  # room for a renewal 12 months on and a six-month baseline
@@ -129,6 +130,7 @@ DISCRETIONARY: dict[
         (50, 50, 50, 70, 90, 150, 300, 350, 120, 60, 50, 80),
     ),
 }
+POST_PEAK = {("Shopping", "Online"): 1, ("Travel", "Holidays"): 9}  # month after
 ENERGY_SEASON = (160, 150, 130, 110, 90, 70, 60, 60, 75, 100, 130, 155)
 SUBSCRIPTIONS: tuple[tuple[str, Category, int], ...] = (
     ("STREAMLY", ("Subscriptions", "Streaming"), 1_099),
@@ -326,6 +328,18 @@ def _history(seed: int, hid: int, months: int) -> History:
             rng.sample(sorted(DISCRETIONARY), 2),
             (rng.randint(BASELINE_MONTHS, months - 1) for _ in range(2)),
             strict=True,
+        )
+    )
+    # a hard case: a spike just after a seasonal peak, under a trailing-mean
+    # threshold, found only against last year's same month
+    spikes.add(
+        rng.choice(
+            [
+                (cat, m)
+                for m in range(12, months)
+                for cat, peak_after in POST_PEAK.items()
+                if month_start(m).month == peak_after
+            ]
         )
     )
     for cat, ((_, _), (lo, hi), merchants, season) in DISCRETIONARY.items():

@@ -1,14 +1,14 @@
 {
   "harness": "detectors",
   "dataset": "synthetic_history",
-  "dataset_version": 1,
-  "dataset_sha256": "fa43ab8514fb9003269bc1434d58ae228a1d434a00be2fb4fe1a29dfc5d894ef",
+  "dataset_version": 2,
+  "dataset_sha256": "d36833c4c58203794a1dedf9ab79bd400797b39fe30013fda7e8395e542715b6",
   "seed": 146,
   "histories": 6,
   "months": 36,
   "events": {
     "price_rise": 6,
-    "category_spike": 12,
+    "category_spike": 18,
     "forgotten_renewal": 12,
     "payday_shortfall": 6
   },
@@ -35,41 +35,41 @@
       "model": "trivial-rules",
       "model_version": "1",
       "metrics": {
-        "category_spike.precision": 0.061856,
-        "category_spike.recall": 1.0,
-        "forgotten_renewal.precision": 0.413793,
+        "category_spike.precision": 0.074866,
+        "category_spike.recall": 0.777778,
+        "forgotten_renewal.precision": 0.4,
         "forgotten_renewal.recall": 1.0,
-        "overall.precision": 0.043062,
-        "overall.recall": 1.0,
-        "payday_shortfall.precision": 0.037975,
+        "overall.precision": 0.046173,
+        "overall.recall": 0.904762,
+        "payday_shortfall.precision": 0.039474,
         "payday_shortfall.recall": 1.0,
-        "price_rise.precision": 0.013187,
+        "price_rise.precision": 0.013216,
         "price_rise.recall": 1.0
       },
       "counts": {
         "category_spike": {
-          "tp": 12,
-          "fp": 182,
-          "fn": 0
+          "tp": 14,
+          "fp": 173,
+          "fn": 4
         },
         "forgotten_renewal": {
           "tp": 12,
-          "fp": 17,
+          "fp": 18,
           "fn": 0
         },
         "overall": {
-          "tp": 36,
-          "fp": 800,
-          "fn": 0
+          "tp": 38,
+          "fp": 785,
+          "fn": 4
         },
         "payday_shortfall": {
           "tp": 6,
-          "fp": 152,
+          "fp": 146,
           "fn": 0
         },
         "price_rise": {
           "tp": 6,
-          "fp": 449,
+          "fp": 448,
           "fn": 0
         }
       }
@@ -93,7 +93,7 @@
         "category_spike": {
           "tp": 0,
           "fp": 0,
-          "fn": 12
+          "fn": 18
         },
         "forgotten_renewal": {
           "tp": 0,
@@ -103,7 +103,7 @@
         "overall": {
           "tp": 0,
           "fp": 0,
-          "fn": 36
+          "fn": 42
         },
         "payday_shortfall": {
           "tp": 0,

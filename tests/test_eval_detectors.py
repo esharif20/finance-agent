@@ -1,5 +1,6 @@
 """Detector evaluation (#146): precision and recall per planted event type,
-the trivial-rule baseline and the stub the detector tickets (#147) replace."""
+the trivial-rule baseline and the stub the detector tickets (#147, #148)
+replace."""
 
 import json
 from datetime import date
@@ -79,3 +80,16 @@ def test_committed_results_are_reproducible_from_the_seed() -> None:
         assert f"{t}.recall" in committed["models"]["baseline"]["metrics"]
     # every planted price rise is a monthly charge going up: the rule finds all
     assert committed["models"]["baseline"]["metrics"]["price_rise.recall"] == 1.0
+
+
+def test_baseline_survives_empty_and_single_row_histories() -> None:
+    assert detectors.baseline([]) == []
+    one = [_row(1, D, "STREAMLY", -1099)]
+    assert all(d.type in sh.EVENT_TYPES for d in detectors.baseline(one))
+
+
+def test_trivial_rules_cannot_saturate_spike_recall() -> None:
+    # verifier #171: post-peak spikes sit under a trailing-mean threshold, so a
+    # detector must know the seasonal normal to find them all
+    spikes = json.loads(detectors.RESULTS.read_text())["models"]["baseline"]
+    assert spikes["metrics"]["category_spike.recall"] < 1.0

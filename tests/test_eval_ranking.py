@@ -1,5 +1,5 @@
 """Ranking evaluation (#146): NDCG@k against the planted-relevance oracle, with
-ranking by £ impact as the baseline the ranking ticket (#148) must beat."""
+ranking by £ impact as the baseline the ranking ticket (#150) must beat."""
 
 import json
 from collections.abc import Sequence

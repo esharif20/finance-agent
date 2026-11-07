@@ -43,8 +43,8 @@ Status: draft for review.
 
 | Harness | Interface | Metric | Baselines |
 | --- | --- | --- | --- |
-| `evals/detectors.py` | `Detector` (#147) | precision and recall per event type | trivial rules |
-| `evals/ranking.py` | `Ranker` (#148) | NDCG@3 and @5 against the planted-relevance oracle | rank by £ impact |
+| `evals/detectors.py` | `Detector` (#148) | precision and recall per event type | trivial rules |
+| `evals/ranking.py` | `Ranker` (#150) | NDCG@3 and @5 against the planted-relevance oracle | rank by £ impact |
 | `evals/forecast.py` | `Forecaster` (#149) | MASE and 80% interval coverage gap, rolling origin from 13 months | naive, seasonal naive |
 
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.

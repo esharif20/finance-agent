@@ -10,7 +10,7 @@ the user's planted care for its type and its Category (`History.care_type`,
 `History.care_category`), hidden from rankers. After each round the user sees
 the top `SHOWN` Insights of a fixed logging policy (£ impact) and rates each
 one, liked with probability care_type x care_category; a `Ranker` gets every
-earlier rating, as the Beta-Bernoulli relevance posterior (#148) will.
+earlier rating, as the Beta-Bernoulli relevance posterior (#150) will.
 """
 
 import random
@@ -98,7 +98,7 @@ def baseline(slate: Sequence[Insight], feedback: Sequence[Feedback]) -> list[Ins
 
 
 def stub(slate: Sequence[Insight], feedback: Sequence[Feedback]) -> list[Insight]:
-    """Placeholder until #148: the slate as given."""
+    """Placeholder until #150: the slate as given."""
     return list(slate)
 
 

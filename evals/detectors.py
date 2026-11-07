@@ -4,7 +4,7 @@ planted event type on the synthetic histories, against a trivial-rule baseline.
     uv run python evals/detectors.py            # CI: results reproduce
     uv run python evals/detectors.py --write    # refresh (see gate.py)
 
-The detector tickets (#147) implement `Detector` and replace `stub` in MODELS.
+The detector tickets (#147, #148) implement `Detector` and replace `stub`.
 A detector sees only what the Ledger holds (`Row`), never the ground truth,
 and returns dated `Detection`s for the whole history. A detection matches an
 unmatched planted event of its type and key when its date falls in that
@@ -177,7 +177,7 @@ def baseline(rows: Sequence[Row]) -> list[Detection]:
 
 
 def stub(rows: Sequence[Row]) -> list[Detection]:
-    """Placeholder until #147: detects nothing."""
+    """Placeholder until #148: detects nothing."""
     return []
 
 
