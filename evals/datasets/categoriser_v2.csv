@@ -1,5 +1,5 @@
 # synthetic
-# categoriser dataset v1, seed 112, labels in taxonomy v1
+# categoriser dataset v2, seed 112, labels in taxonomy v1
 id,split,case,descriptor,amount_minor,top,sub
 1,correction,clean,MARLOW GROCERS,-15919,Food & Drink,Groceries
 2,correction,noise,marlow grocers,-23069,Food & Drink,Groceries
@@ -308,3 +308,275 @@ id,split,case,descriptor,amount_minor,top,sub
 305,test,refund,HILLTOP CINEMA REFUND,20879,Entertainment,Events
 306,test,refund,HARGREAVE CLOTHING,1032,Shopping,Clothing
 307,test,refund,SUNTRAIL HOLIDAYS,2263,Travel,Holidays
+308,correction,clean,HOLLYBANK GROCERY,-2739,Food & Drink,Groceries
+309,correction,noise,HOLLYBANK GROCERY 3098,-13877,Food & Drink,Groceries
+310,correction,clean,PENROSE PANTRY,-498,Food & Drink,Groceries
+311,correction,noise,PENROSE PANTRY 23JUN,-4167,Food & Drink,Groceries
+312,correction,clean,THISTLE FOODSTORE,-18054,Food & Drink,Groceries
+313,correction,noise,THISTLE FOODSTORE 21NOV,-17457,Food & Drink,Groceries
+314,correction,clean,LARKFIELD MARKET,-12641,Food & Drink,Groceries
+315,correction,noise,larkfield market,-20542,Food & Drink,Groceries
+316,correction,clean,THE GILDED SPOON,-16696,Food & Drink,Eating out
+317,correction,noise,THE  GILDED  SPOON,-13834,Food & Drink,Eating out
+318,correction,clean,SAFFRON TABLE,-23477,Food & Drink,Eating out
+319,correction,noise,SAFFRON TABLE,-16953,Food & Drink,Eating out
+320,correction,clean,OLD MILL TAVERN,-5678,Food & Drink,Eating out
+321,correction,noise,OLD MILL TAVERN LEEDS,-23843,Food & Drink,Eating out
+322,correction,clean,RIVERSTONE BRASSERIE,-22174,Food & Drink,Eating out
+323,correction,noise,RIVERSTONE BRASSERIE 6601,-9491,Food & Drink,Eating out
+324,correction,clean,DRAGON GATE TAKEAWAY,-2982,Food & Drink,Takeaway
+325,correction,noise,DRAGON GATE TAKEAWAY CD 2864,-23308,Food & Drink,Takeaway
+326,correction,clean,CRUSTWORKS PIZZA,-22534,Food & Drink,Takeaway
+327,correction,noise,CRUSTWORKS PIZZA BRISTOL,-11426,Food & Drink,Takeaway
+328,correction,clean,NOODLE NEST,-20204,Food & Drink,Takeaway
+329,correction,noise,noodle nest,-9339,Food & Drink,Takeaway
+330,correction,clean,FRYDAY CHIPPY,-7922,Food & Drink,Takeaway
+331,correction,noise,fryday chippy,-5676,Food & Drink,Takeaway
+332,correction,clean,DRIFTWOOD COFFEE,-19712,Food & Drink,Coffee
+333,correction,noise,driftwood coffee,-21473,Food & Drink,Coffee
+334,correction,clean,PERCOLATE CAFE,-13868,Food & Drink,Coffee
+335,correction,noise,PERCOLATE CAFE 3803,-9638,Food & Drink,Coffee
+336,correction,clean,BREWHOUSE ESPRESSO,-17782,Food & Drink,Coffee
+337,correction,noise,SUMUP *BREWHOUSE ESPRESSO,-21651,Food & Drink,Coffee
+338,correction,clean,MORNING GRIND,-9645,Food & Drink,Coffee
+339,correction,noise,ZTL*MORNING GRIND,-11719,Food & Drink,Coffee
+340,correction,clean,VALLEY BUSWAYS,-9586,Transport,Public transport
+341,correction,noise,VALLEY BUSWAYS 26JAN,-5342,Transport,Public transport
+342,correction,clean,COASTLINE TRAMS,-12202,Transport,Public transport
+343,correction,noise,SQ *COASTLINE TRAMS,-20871,Transport,Public transport
+344,correction,clean,HARBOURLINE FERRIES,-9675,Transport,Public transport
+345,correction,noise,ZTL*HARBOURLINE FERRIES,-8057,Transport,Public transport
+346,correction,clean,REDWING COACHES,-18162,Transport,Public transport
+347,correction,noise,REDWING  COACHES,-455,Transport,Public transport
+348,correction,clean,NIGHTOWL CARS,-16568,Transport,Taxi
+349,correction,noise,SUMUP *NIGHTOWL CARS,-3186,Transport,Taxi
+350,correction,clean,RAPIDRIDE MINICABS,-2940,Transport,Taxi
+351,correction,noise,RAPIDRIDE MINICABS 3495,-1899,Transport,Taxi
+352,correction,clean,CITYHOP CHAUFFEURS,-13807,Transport,Taxi
+353,correction,noise,cityhop chauffeurs,-11623,Transport,Taxi
+354,correction,clean,BLUELINE PRIVATE HIRE,-6960,Transport,Taxi
+355,correction,noise,BLUELINE PRIVATE HIRE 0297,-7320,Transport,Taxi
+356,correction,clean,STARLIGHT RIDES,-16932,Transport,Taxi
+357,correction,noise,STARLIGHT RIDES CD 6820,-15122,Transport,Taxi
+358,correction,clean,CROSSROADS FORECOURT,-18752,Transport,Fuel
+359,correction,noise,CROSSROADS FORE,-16754,Transport,Fuel
+360,correction,clean,HIGHWAY SERVICE STATION,-21729,Transport,Fuel
+361,correction,noise,HIGHWAY SERVICE,-5427,Transport,Fuel
+362,correction,clean,GREENPUMP DIESEL,-12904,Transport,Fuel
+363,correction,noise,greenpump diesel,-7510,Transport,Fuel
+364,correction,clean,MILESTONE GARAGE,-3185,Transport,Fuel
+365,correction,noise,MILESTONE  GARAGE,-9134,Transport,Fuel
+366,correction,clean,TOPUP FILLING STATION,-20399,Transport,Fuel
+367,correction,noise,TOPUP  FILLING  STATION,-18539,Transport,Fuel
+368,correction,clean,CASTLEGATE CAR PARK,-20726,Transport,Parking
+369,correction,noise,CASTLEGATE CAR PARK CD 1513,-12347,Transport,Parking
+370,correction,clean,PARKSAFE BAYS,-7655,Transport,Parking
+371,correction,noise,PARKSAFE BAYS 2756,-16733,Transport,Parking
+372,correction,clean,KERBSIDE PAY AND DISPLAY,-21813,Transport,Parking
+373,correction,noise,kerbside pay and display,-24850,Transport,Parking
+374,correction,clean,MULTISTOREY SQUARE,-20837,Transport,Parking
+375,correction,noise,MULTISTOREY SQUARE 6326,-13916,Transport,Parking
+376,correction,clean,STATIONSIDE PARKING,-17715,Transport,Parking
+377,correction,noise,STATIONSIDE  PARKING,-1003,Transport,Parking
+378,correction,clean,CLICKCART MARKETPLACE,-1994,Shopping,Online
+379,correction,noise,CLICKCART MARKE,-10655,Shopping,Online
+380,correction,clean,PARCELPOINT SHOP,-7763,Shopping,Online
+381,correction,noise,PARCELPOINT  SHOP,-4773,Shopping,Online
+382,correction,clean,BASKETBAY ONLINE,-19165,Shopping,Online
+383,correction,noise,BASKETBAY ONLIN,-8980,Shopping,Online
+384,correction,clean,NETMART DIRECT,-9561,Shopping,Online
+385,correction,noise,NETMART DIRECT 20JUN,-20747,Shopping,Online
+386,correction,clean,SHOPSTREAM WEB,-3221,Shopping,Online
+387,correction,noise,SHOPSTREAM  WEB,-13545,Shopping,Online
+388,correction,clean,TAILOR AND THREAD,-5213,Shopping,Clothing
+389,correction,noise,TAILOR AND THREAD LONDON GB,-20330,Shopping,Clothing
+390,correction,clean,DENIM DEPOT,-12116,Shopping,Clothing
+391,correction,noise,DENIM DEPOT LEEDS,-17183,Shopping,Clothing
+392,correction,clean,WOOLLEN WARDROBE,-2744,Shopping,Clothing
+393,correction,noise,WOOLLEN WARDROB,-7287,Shopping,Clothing
+394,correction,clean,STRIDE FOOTWEAR,-10168,Shopping,Clothing
+395,correction,noise,STRIDE FOOTWEAR GBR,-22854,Shopping,Clothing
+396,correction,clean,CIRCUITRY HOUSE,-3442,Shopping,Electronics
+397,correction,noise,CIRCUITRY HOUSE 2779,-15535,Shopping,Electronics
+398,correction,clean,GADGETRY STORE,-24815,Shopping,Electronics
+399,correction,noise,GADGETRY STORE 08JAN,-22139,Shopping,Electronics
+400,correction,clean,PIXEL AND PLUG,-9819,Shopping,Electronics
+401,correction,noise,PIXEL  AND  PLUG,-13796,Shopping,Electronics
+402,correction,clean,AMPERE TECH,-19808,Shopping,Electronics
+403,correction,noise,AMPERE TECH CD 8253,-531,Shopping,Electronics
+404,correction,clean,HOMESTEAD HOMEWARES,-14443,Shopping,Household
+405,correction,noise,SUMUP *HOMESTEAD HOMEWARES,-22918,Shopping,Household
+406,correction,clean,KITCHENKIND,-8113,Shopping,Household
+407,correction,noise,SUMUP *KITCHENKIND,-479,Shopping,Household
+408,correction,clean,LINEN AND LAMP,-17154,Shopping,Household
+409,correction,noise,LINEN AND LAMP 24JAN,-12969,Shopping,Household
+410,correction,clean,DUSTPAN SUPPLIES,-3388,Shopping,Household
+411,correction,noise,DUSTPAN  SUPPLIES,-14012,Shopping,Household
+412,correction,clean,SUNRISE POWER,-3104,Bills & Utilities,Energy
+413,correction,noise,SUNRISE POWER,-5189,Bills & Utilities,Energy
+414,correction,clean,NORTHWIND ELECTRIC,-1405,Bills & Utilities,Energy
+415,correction,noise,NORTHWIND ELECTRIC 2997,-19240,Bills & Utilities,Energy
+416,correction,clean,EMBER GAS SUPPLY,-13186,Bills & Utilities,Energy
+417,correction,noise,EMBER GAS SUPPL,-1711,Bills & Utilities,Energy
+418,correction,clean,BRIGHTGRID ENERGY,-8867,Bills & Utilities,Energy
+419,correction,noise,BRIGHTGRID ENERGY 10JUN,-17617,Bills & Utilities,Energy
+420,correction,clean,RIVERVALE WATER,-18781,Bills & Utilities,Water
+421,correction,noise,RIVERVALE WATER 21JAN,-4425,Bills & Utilities,Water
+422,correction,clean,DEEPWELL WATER SERVICES,-15888,Bills & Utilities,Water
+423,correction,noise,DEEPWELL WATER SERVICES GBR,-16017,Bills & Utilities,Water
+424,correction,clean,AQUAFLOW UTILITIES,-17493,Bills & Utilities,Water
+425,correction,noise,AQUAFLOW  UTILITIES,-18314,Bills & Utilities,Water
+426,correction,clean,MOORLAND WATER,-10507,Bills & Utilities,Water
+427,correction,noise,SUMUP *MOORLAND WATER,-15519,Bills & Utilities,Water
+428,correction,clean,SIGNALPEAK MOBILE,-15142,Bills & Utilities,Phone & internet
+429,correction,noise,SUMUP *SIGNALPEAK MOBILE,-4189,Bills & Utilities,Phone & internet
+430,correction,clean,FIBRENEST BROADBAND,-23479,Bills & Utilities,Phone & internet
+431,correction,noise,FIBRENEST BROADBAND 04JUN,-12470,Bills & Utilities,Phone & internet
+432,correction,clean,ECHOLINE TELECOM,-963,Bills & Utilities,Phone & internet
+433,correction,noise,echoline telecom,-23538,Bills & Utilities,Phone & internet
+434,correction,clean,ORBITAL WIFI,-7702,Bills & Utilities,Phone & internet
+435,correction,noise,ZTL*ORBITAL WIFI,-1036,Bills & Utilities,Phone & internet
+436,correction,clean,BRAMBLEDOWN COUNCIL TAX,-6473,Bills & Utilities,Council tax
+437,correction,noise,BRAMBLEDOWN COUNCIL TAX 17JUN,-14487,Bills & Utilities,Council tax
+438,correction,clean,ELMSWORTH BOROUGH COUNCIL,-328,Bills & Utilities,Council tax
+439,correction,noise,elmsworth borough council,-23598,Bills & Utilities,Council tax
+440,correction,clean,KINGSMERE BOROUGH COUNCIL,-5567,Bills & Utilities,Council tax
+441,correction,noise,KINGSMERE BOROUGH COUNCIL LONDON GB,-24387,Bills & Utilities,Council tax
+442,correction,clean,WESTHOLLOW DISTRICT COUNCIL,-13531,Bills & Utilities,Council tax
+443,correction,noise,ZTL*WESTHOLLOW DISTRICT COUNCIL,-14272,Bills & Utilities,Council tax
+444,correction,clean,STONEBRIDGE COUNTY COUNCIL,-12095,Bills & Utilities,Council tax
+445,correction,noise,STONEBRIDGE COUNTY COUNCIL 01JUN,-12553,Bills & Utilities,Council tax
+446,correction,clean,FLIXWAVE,-18823,Subscriptions,Streaming
+447,correction,noise,FLIXWAVE,-14808,Subscriptions,Streaming
+448,correction,clean,TUNEBOX MUSIC,-19306,Subscriptions,Streaming
+449,correction,noise,TUNEBOX MUSIC 18NOV,-23951,Subscriptions,Streaming
+450,correction,clean,REELSTREAM TV,-9786,Subscriptions,Streaming
+451,correction,noise,REELSTREAM TV,-3590,Subscriptions,Streaming
+452,correction,clean,SOUNDSPHERE,-678,Subscriptions,Streaming
+453,correction,noise,soundsphere,-19662,Subscriptions,Streaming
+454,correction,clean,CODECRAFT TOOLS,-4352,Subscriptions,Software
+455,correction,noise,CODECRAFT  TOOLS,-21601,Subscriptions,Software
+456,correction,clean,DOCUFLOW PRO,-21153,Subscriptions,Software
+457,correction,noise,DOCUFLOW PRO,-7468,Subscriptions,Software
+458,correction,clean,TASKNEST APP,-22659,Subscriptions,Software
+459,correction,noise,tasknest app,-954,Subscriptions,Software
+460,correction,clean,BYTEVAULT SOFTWARE,-6695,Subscriptions,Software
+461,correction,noise,BYTEVAULT SOFTWARE GBR,-23638,Subscriptions,Software
+462,correction,clean,HERITAGE TRUST MEMBERSHIP,-672,Subscriptions,Memberships
+463,correction,noise,ZTL*HERITAGE TRUST MEMBERSHIP,-14044,Subscriptions,Memberships
+464,correction,clean,WILDLIFE FRIENDS CLUB,-12201,Subscriptions,Memberships
+465,correction,noise,WILDLIFE FRIEND,-22783,Subscriptions,Memberships
+466,correction,clean,CHESS SOCIETY DUES,-437,Subscriptions,Memberships
+467,correction,noise,CHESS SOCIETY DUES LONDON GB,-8209,Subscriptions,Memberships
+468,correction,clean,HILLWALKERS CIRCLE,-8577,Subscriptions,Memberships
+469,correction,noise,HILLWALKERS CIR,-18205,Subscriptions,Memberships
+470,correction,clean,OAKTREE PROPERTY RENT,-1372,Housing,Rent
+471,correction,noise,OAKTREE PROPERTY RENT BRISTOL,-22336,Housing,Rent
+472,correction,clean,HAVEN HOMES LETTINGS,-24815,Housing,Rent
+473,correction,noise,HAVEN HOMES LETTINGS BRISTOL,-24246,Housing,Rent
+474,correction,clean,CORNERSTONE ESTATES,-870,Housing,Rent
+475,correction,noise,CORNERSTONE ESTATES LEEDS,-355,Housing,Rent
+476,correction,clean,KEYSTONE RESIDENTIAL,-19540,Housing,Rent
+477,correction,noise,KEYSTONE RESIDENTIAL 11JAN,-16935,Housing,Rent
+478,correction,clean,REDBRICK LANDLORDS,-5202,Housing,Rent
+479,correction,noise,REDBRICK LANDLORDS CD 3334,-24577,Housing,Rent
+480,correction,clean,HANDYHELP REPAIRS,-3256,Housing,Maintenance
+481,correction,noise,SUMUP *HANDYHELP REPAIRS,-16225,Housing,Maintenance
+482,correction,clean,BOILERCARE SERVICES,-2098,Housing,Maintenance
+483,correction,noise,BOILERCARE  SERVICES,-15443,Housing,Maintenance
+484,correction,clean,ROOFRIGHT ROOFING,-9746,Housing,Maintenance
+485,correction,noise,ZTL*ROOFRIGHT ROOFING,-16462,Housing,Maintenance
+486,correction,clean,SPARKWISE ELECTRICIANS,-9980,Housing,Maintenance
+487,correction,noise,SPARKWISE ELECTRICIANS CD 7356,-22602,Housing,Maintenance
+488,correction,clean,GREENCROSS CHEMIST,-7360,Health,Pharmacy
+489,correction,noise,ZTL*GREENCROSS CHEMIST,-24478,Health,Pharmacy
+490,correction,clean,WELLSPRING DISPENSARY,-17111,Health,Pharmacy
+491,correction,noise,WELLSPRING DISP,-13811,Health,Pharmacy
+492,correction,clean,HEALWELL CHEMISTS,-4993,Health,Pharmacy
+493,correction,noise,HEALWELL CHEMISTS LEEDS,-1023,Health,Pharmacy
+494,correction,clean,MEDIQUICK DRUGSTORE,-12876,Health,Pharmacy
+495,correction,noise,MEDIQUICK DRUGSTORE 14JUN,-24951,Health,Pharmacy
+496,correction,clean,CORNER APOTHECARY,-24328,Health,Pharmacy
+497,correction,noise,CORNER APOTHECARY CD 5847,-23535,Health,Pharmacy
+498,correction,clean,PEAKFORM STUDIO,-13124,Health,Fitness
+499,correction,noise,PEAKFORM STUDIO 22JUN,-20094,Health,Fitness
+500,correction,clean,IRONCLAD BOXING,-19159,Health,Fitness
+501,correction,noise,IRONCLAD BOXING CD 8165,-23415,Health,Fitness
+502,correction,clean,FLOWSTATE YOGA,-8581,Health,Fitness
+503,correction,noise,ZTL*FLOWSTATE YOGA,-11660,Health,Fitness
+504,correction,clean,RIPTIDE SWIM CLUB,-21267,Health,Fitness
+505,correction,noise,riptide swim club,-17880,Health,Fitness
+506,correction,clean,CORESTRENGTH PILATES,-18740,Health,Fitness
+507,correction,noise,CORESTRENGTH PILATES CD 4467,-5617,Health,Fitness
+508,correction,clean,BRIGHTSMILE ORTHODONTICS,-16634,Health,Medical
+509,correction,noise,BRIGHTSMILE ORTHODONTICS 0436,-8022,Health,Medical
+510,correction,clean,CLEARVIEW OPTICIANS,-24134,Health,Medical
+511,correction,noise,CLEARVIEW  OPTICIANS,-6378,Health,Medical
+512,correction,clean,KINDCARE CLINIC,-2803,Health,Medical
+513,correction,noise,KINDCARE CLINIC,-2447,Health,Medical
+514,correction,clean,STEADYSTEP PHYSIO,-16584,Health,Medical
+515,correction,noise,steadystep physio,-13557,Health,Medical
+516,correction,clean,GRAND ARENA TICKETS,-12846,Entertainment,Events
+517,correction,noise,GRAND ARENA TICKETS CD 9737,-21182,Entertainment,Events
+518,correction,clean,LIVEWIRE GIGS,-11554,Entertainment,Events
+519,correction,noise,LIVEWIRE GIGS 3894,-12706,Entertainment,Events
+520,correction,clean,OPEN AIR FESTIVALS,-9009,Entertainment,Events
+521,correction,noise,OPEN AIR FESTIVALS 4724,-19740,Entertainment,Events
+522,correction,clean,LAUGHTRACK COMEDY CLUB,-19498,Entertainment,Events
+523,correction,noise,LAUGHTRACK COME,-21041,Entertainment,Events
+524,correction,clean,DICE AND DRAGONS,-1265,Entertainment,Games
+525,correction,noise,DICE AND DRAGONS 28JAN,-13929,Entertainment,Games
+526,correction,clean,CONSOLE CORNER,-21227,Entertainment,Games
+527,correction,noise,CONSOLE CORNER LONDON GB,-12531,Entertainment,Games
+528,correction,clean,PIXELPLAY ARCADE,-23696,Entertainment,Games
+529,correction,noise,PIXELPLAY  ARCADE,-24764,Entertainment,Games
+530,correction,clean,QUESTLINE GAMES,-3204,Entertainment,Games
+531,correction,noise,QUESTLINE GAMES BRISTOL,-13592,Entertainment,Games
+532,correction,clean,YARN AND NEEDLE,-4644,Entertainment,Hobbies
+533,correction,noise,yarn and needle,-15996,Entertainment,Hobbies
+534,correction,clean,MODELWORKS HOBBIES,-19810,Entertainment,Hobbies
+535,correction,noise,MODELWORKS HOBBIES CD 6251,-12536,Entertainment,Hobbies
+536,correction,clean,BRUSHSTROKE STUDIO,-2209,Entertainment,Hobbies
+537,correction,noise,BRUSHSTROKE STUDIO CD 9370,-634,Entertainment,Hobbies
+538,correction,clean,GREENTHUMB GARDENING,-15415,Entertainment,Hobbies
+539,correction,noise,ZTL*GREENTHUMB GARDENING,-18570,Entertainment,Hobbies
+540,correction,clean,BLUEJET AIRWAYS,-17922,Travel,Flights
+541,correction,noise,SQ *BLUEJET AIRWAYS,-23078,Travel,Flights
+542,correction,clean,CLOUDHOPPER AIR,-13911,Travel,Flights
+543,correction,noise,cloudhopper air,-11009,Travel,Flights
+544,correction,clean,HORIZON WINGS,-15538,Travel,Flights
+545,correction,noise,SUMUP *HORIZON WINGS,-9551,Travel,Flights
+546,correction,clean,ALBATROSS AIRLINES,-16654,Travel,Flights
+547,correction,noise,ALBATROSS AIRLINES LONDON GB,-3799,Travel,Flights
+548,correction,clean,CASTLE KEEP INN,-9748,Travel,Hotels
+549,correction,noise,castle keep inn,-17079,Travel,Hotels
+550,correction,clean,SEAFRONT SUITES,-9837,Travel,Hotels
+551,correction,noise,SEAFRONT SUITES CD 3808,-13125,Travel,Hotels
+552,correction,clean,MERIDIAN STAY,-21355,Travel,Hotels
+553,correction,noise,meridian stay,-22474,Travel,Hotels
+554,correction,clean,LANTERN HOUSE HOTEL,-19139,Travel,Hotels
+555,correction,noise,LANTERN HOUSE HOTEL BRISTOL,-22517,Travel,Hotels
+556,correction,clean,WANDERLUST TOURS,-15576,Travel,Holidays
+557,correction,noise,WANDERLUST  TOURS,-3204,Travel,Holidays
+558,correction,clean,ISLAND ESCAPES,-6588,Travel,Holidays
+559,correction,noise,ISLAND  ESCAPES,-7125,Travel,Holidays
+560,correction,clean,SUNSEEKER BREAKS,-2650,Travel,Holidays
+561,correction,noise,sunseeker breaks,-329,Travel,Holidays
+562,correction,clean,ALPINE ADVENTURES,-3353,Travel,Holidays
+563,correction,noise,ALPINE ADVENTURES CD 4398,-24682,Travel,Holidays
+564,correction,clean,GLOSS AND GLAMOUR,-13722,Personal care,Hair & beauty
+565,correction,noise,GLOSS AND GLAMOUR LONDON GB,-1923,Personal care,Hair & beauty
+566,correction,clean,FADE MASTERS BARBERS,-23436,Personal care,Hair & beauty
+567,correction,noise,FADE MASTERS BARBERS 5447,-19761,Personal care,Hair & beauty
+568,correction,clean,SERENITY NAIL BAR,-17565,Personal care,Hair & beauty
+569,correction,noise,SERENITY NAIL B,-20345,Personal care,Hair & beauty
+570,correction,clean,LUSTRE SALON,-3196,Personal care,Hair & beauty
+571,correction,noise,lustre salon,-9301,Personal care,Hair & beauty
+572,correction,clean,FRESHFACE SKINCARE,-2742,Personal care,Toiletries
+573,correction,noise,FRESHFACE SKINCARE CD 4064,-7988,Personal care,Toiletries
+574,correction,clean,SUDSWORTH SOAPS,-19100,Personal care,Toiletries
+575,correction,noise,SUDSWORTH SOAPS,-22465,Personal care,Toiletries
+576,correction,clean,MINTLEAF ORAL CARE,-7764,Personal care,Toiletries
+577,correction,noise,MINTLEAF ORAL CARE 15JUN,-13157,Personal care,Toiletries
+578,correction,clean,CLEANSLATE GROOMING,-5876,Personal care,Toiletries
+579,correction,noise,CLEANSLATE GROO,-6980,Personal care,Toiletries
