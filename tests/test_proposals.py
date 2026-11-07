@@ -614,3 +614,26 @@ def test_dry_run_and_confirm_never_commit_or_undo_the_callers_transaction(
     with engine.begin() as conn:
         assert state(conn) == before
         assert conn.execute(text("SELECT count(*) FROM proposal")).scalar() == 0
+
+
+def test_a_reject_that_loses_the_race_to_a_confirm_records_no_feedback(
+    engine: Engine, txns: dict[str, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Confirmed between reject's read and its update: the reject refuses, and
+    no "rejected" signal is written for a Proposal the user confirmed."""
+    with engine.begin() as conn:
+        props = Proposals(conn, ME)
+        p = props.propose_correction(category(txns["DELIVEROO 2BX9"]))
+        stale = props.get(p.id)
+        props.confirm(p.id)
+        real = Proposals.get
+        seen: list[int] = []
+
+        def first_read_is_stale(self: Proposals, pid: int) -> Any:
+            seen.append(pid)
+            return stale if len(seen) == 1 else real(self, pid)
+
+        monkeypatch.setattr(Proposals, "get", first_read_is_stale)
+        with pytest.raises(AlreadyDecided):
+            props.reject(p.id)
+        assert conn.execute(text("SELECT count(*) FROM feedback")).scalar() == 0
