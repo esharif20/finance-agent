@@ -30,6 +30,7 @@ from finance_agent.ledger import (
     Ledger,
     UnknownTarget,
 )
+from finance_agent.ledger.answer_cache import AnswerCache
 from finance_agent.storage import Scoped, schema
 
 MEMORY_MAX = 280  # characters
@@ -142,6 +143,7 @@ class Proposals:
         self._conn = conn
         self._db = Scoped(conn, user_id)
         self._led = Ledger(conn, user_id)
+        self._cache = AnswerCache(conn, user_id)
 
     # --- proposing ----------------------------------------------------------
 
@@ -232,6 +234,8 @@ class Proposals:
             )
             if claimed.rowcount == 1:
                 result = self._apply(current.draft, proposal_id)
+                if isinstance(current.draft, MemoryDraft):
+                    self._cache.clear()  # answers may have leant on Memories
                 self._db.execute(
                     self._db.update(p)
                     .where(p.c.id == proposal_id)
@@ -310,6 +314,7 @@ class Proposals:
             raise UnknownTarget("no such Memory")
         self._db.execute(self._db.delete(m).where(m.c.id == memory_id))
         self._db.execute(self._db.delete(p).where(p.c.id == pid))
+        self._cache.clear()  # DATA_POLICY: gone from caches too
 
     def forget_feedback(self) -> int:
         """Wipe the feedback and the rejected Proposals it points at."""
