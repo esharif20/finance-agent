@@ -17,7 +17,7 @@ import json
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 TOLERANCE = 1e-9
 
@@ -55,13 +55,36 @@ def _normal(results: Results) -> Results:
     return json.loads(json.dumps(results))
 
 
+def differences(
+    fresh: Any, committed: Any, tolerance: float, at: str = ""
+) -> list[str]:
+    """Where `fresh` differs from `committed`. Two floats may differ by up to
+    `tolerance`; everything else (text, integers, structure) must be equal."""
+    if isinstance(fresh, dict) and isinstance(committed, dict):
+        new, old = cast(Results, fresh), cast(Results, committed)
+        return [
+            d
+            for k in sorted(new.keys() | old.keys())
+            for d in differences(new.get(k), old.get(k), tolerance, f"{at}/{k}")
+        ]
+    if isinstance(fresh, float) and isinstance(committed, float):
+        if abs(fresh - committed) <= tolerance:
+            return []
+    elif fresh == committed:
+        return []
+    return [f"{at or '/'}: {committed!r} -> {fresh!r}"]
+
+
 def run(
     name: str,
     evaluate: Callable[[], Results],
     path: Path,
     lower_is_better: Callable[[str], bool],
     argv: Sequence[str],
+    tolerance: float = 0.0,
 ) -> int:
+    """`tolerance` is for a harness whose model fits in float, where another
+    platform's arithmetic can move a score in its last digits (#149)."""
     fresh = _normal(evaluate())
     if "--write" in argv:
         problems = (
@@ -75,7 +98,10 @@ def run(
             print(f"{name} eval: not written; pass --accept-lower", file=sys.stderr)
             return 1
         path.write_text(json.dumps(fresh, indent=2) + "\n")
-    if fresh != json.loads(path.read_text()):
+    diffs = differences(fresh, json.loads(path.read_text()), tolerance)
+    if diffs:
+        for d in diffs[:20]:
+            print(f"{name} eval: {d}", file=sys.stderr)
         print(
             f"{name} eval: {path.name} is not a fresh run; use --write", file=sys.stderr
         )

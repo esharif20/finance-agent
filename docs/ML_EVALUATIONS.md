@@ -67,6 +67,25 @@ It loses on one Category, Coffee (0.079 against 0.057). That Category has no sea
 
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
 
+### Forecasting (#149)
+
+`engine.forecast.forecast_category` is ETS(A,N,A) on log(1 + monthly spend), with the initial states estimated, an error variance divided by its degrees of freedom (residuals less the 14 estimated parameters) and a Student's t interval. `cash_flow` adds recurring payments, projected from their schedules (`categorise.recurring`, minus registry entries the user marked not a subscription or cancelled), to the Category forecasts; Category bounds add as if fully correlated, so the total band is conservative. Recurring income (Income credits from one payer, scheduled from its last six so an old pay rise does not hide a salary) is projected with its dates for the what-if (#151); one-off credits are not.
+
+The backtest (`evals/forecast.py`, seed 146, dataset v2, origins from 13 months, horizon 3) first ran ETS from 13 months with the first year as its initial seasonal states. It lost to seasonal naive on 13 to 23 months of training on all three seeds tried (146, 149, 7) and won from 24, so the ETS gate is tuned to 24 months and seasonal naive serves 12 to 23. Committed results (MASE, then 80% interval coverage):
+
+| Category | ETS | Seasonal naive |
+| --- | --- | --- |
+| Coffee | 0.927, 0.803 | 1.035, 0.712 |
+| Eating out | 0.648, 0.808 | 0.688, 0.682 |
+| Groceries | 1.090, 0.788 | 1.047, 0.778 |
+| Takeaway | 0.818, 0.768 | 0.919, 0.775 |
+| Online | 0.746, 0.828 | 0.789, 0.684 |
+| Public transport | 0.592, 0.833 | 0.623, 0.758 |
+| Holidays | 0.314, 0.876 | 0.368, 0.722 |
+| Overall | 0.734, 0.815 | 0.781, 0.730 |
+
+ETS beats seasonal naive on overall MASE and coverage gap and on MASE in six of seven Categories; Groceries is the exception. On the untuned seeds 149 and 7, overall MASE is 0.803 against 0.823 and 0.785 against 0.814. The engine's seasonal-naive band pools month-to-month and same-month errors: from same-month errors alone (one at 13 months) it covered about 68% at 12 to 23 months, so the verifier of #179 widened it, and overall coverage moved from 0.741 to 0.815. Holidays, the lumpiest Category, now over-covers (0.876). Groceries loses on MASE on seed 146 but not on every seed: across seven seeds the ETS losses from 24 months are scattered (Groceries on 3, Online on 4, Coffee on 3) while ETS wins overall on every seed, so no Category falls back to seasonal naive. A constant training window has no MASE scale, so the harness scores that origin for coverage only (verifier #171).
+
 ## Minimum-data gates (ADR 0015)
 
 A learned component runs live only when the user's own data clears its gate. Below the gate, the baseline or rules decide, and the "How well I know you" page says which gate is not yet met. Gates are starting values: each ticket confirms or tunes its gate in its evaluation.
@@ -77,7 +96,7 @@ A learned component runs live only when the user's own data clears its gate. Bel
 | Categoriser: calibrated classifier on embeddings + amount/day features | Beats the embedding nearest-neighbour model on macro F1 and calibration | Embedding nearest neighbours |
 | Recurring detection | ≥ 3 occurrences of the series | Not flagged |
 | Personal baselines and anomaly scores | ≥ 6 months for the Category, counted from its first Transaction (seasonal); ≥ 6 complete pay cycles ending after that first Transaction (payday). Both count spending after Refunds. Confirmed by #147: the seasonal baseline beats the trailing mean from month six | No anomaly Insight; the baseline returns `Insufficient` |
-| Forecasting (ETS) | ≥ 13 months of history | Seasonal naive at ≥ 12 months; none before |
+| Forecasting (ETS) | ≥ 24 months of history (tuned from 13 by #149's backtest) | Seasonal naive at ≥ 12 months; "insufficient" before |
 | Change-point detection | ≥ 9 months for the series | None |
 | Preference prediction / contextual bandit | Starts from priors on day one, and needs no gate | Rank by £ impact |
 
