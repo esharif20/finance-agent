@@ -12,6 +12,7 @@ import {
 } from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlwaysAskExtras, SplitRecheck, SplitRefund } from "./ReviewSplitItems";
 
 export const REVIEW_KEY = ["review-queue"] as const;
 
@@ -20,8 +21,11 @@ const TYPE_LABEL: Record<string, string> = {
   category: "Category",
   subscription: "Is this a subscription?",
   possible_duplicate: "Possible duplicate",
+  always_ask: "What was this?",
+  split_recheck: "Split needs a re-check",
+  split_refund: "Which part?",
 };
-const CHOICE_LABEL: Record<string, string> = { yes: "Yes", no: "No", keep_both: "Keep both" };
+const CHOICE_LABEL: Record<string, string> = { yes: "Yes", no: "No", keep_both: "Keep both", revert: "Undo the split" };
 
 // the latest picks lead the suggestions; shortcut: replaced by the categoriser's ranking (slice 2)
 const recent: Cat[] = [];
@@ -73,7 +77,8 @@ export function ReviewQueue() {
   const idx = Math.min(at, Math.max(items.length - 1, 0));
   const item: ReviewItem | undefined = items[idx];
   const groups = categories.data ?? [];
-  const picks = item?.type === "category" ? suggestions(groups) : [];
+  const asksCategory = item?.type === "category" || item?.type === "always_ask";
+  const picks = asksCategory ? suggestions(groups) : [];
   const many = (item?.weight ?? 0) > 1 && item?.transaction_ids.length;
   const justOne = !all && !!many;
 
@@ -191,7 +196,7 @@ export function ReviewQueue() {
           )}
         </div>
 
-        {item.type === "category" && (
+        {asksCategory && (
           <>
             {!!many && (
               <div role="group" aria-label="Scope" className="flex gap-1 self-start rounded-full bg-raised p-1">
@@ -255,10 +260,14 @@ export function ReviewQueue() {
                 aria-hidden="true"
               />
             </label>
+            {item.type === "always_ask" && <AlwaysAskExtras item={item} groups={groups} />}
           </>
         )}
 
-        {item.type !== "category" && (
+        {item.type === "split_recheck" && <SplitRecheck item={item} groups={groups} busy={act.isPending} choose={choose} />}
+        {item.type === "split_refund" && <SplitRefund item={item} groups={groups} busy={act.isPending} pick={pick} />}
+
+        {!asksCategory && item.type !== "split_recheck" && item.type !== "split_refund" && (
           <div className="grid gap-2 sm:grid-cols-2">
             {item.choices.map((c, i) => (
               <button

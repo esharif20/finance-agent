@@ -8,6 +8,7 @@ export type Category = [string, string];
 
 /** One hue per top-level Category, in taxonomy order; "Uncategorised" is neutral. */
 export function hueFor(top: string, groups: CategoryGroup[]): string {
+  if (top === "To review") return "var(--cat-review)";
   const i = groups.findIndex((g) => g.name === top);
   return top === "Uncategorised" || i < 0 ? "var(--cat-other)" : `var(--cat-${i % 10})`;
 }

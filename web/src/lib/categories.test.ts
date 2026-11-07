@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OTHER_COLOUR, groupSpending } from "./categories";
+import { OTHER_COLOUR, REVIEW_COLOUR, groupSpending } from "./categories";
 
 const c = (name: string, minor: number) => ({
   name,
@@ -61,5 +61,16 @@ describe("groupSpending", () => {
 
   it("has nothing to draw when there is no spending", () => {
     expect(groupSpending([]).slices).toEqual([]);
+  });
+
+  it("keeps To review out of the top 5: its own amber slice, never merged into the grey", () => {
+    const withReview = [c("Housing", 90000), c("To review", 50000), c("Food & Drink", 40000), c("Shopping", 30000)];
+    const { slices, rows } = groupSpending(withReview);
+
+    expect(slices.map((s) => s.name)).toEqual(["Housing", "To review", "Food & Drink", "Shopping"]);
+    expect(slices[1]).toMatchObject({ minor: 50000, colour: REVIEW_COLOUR });
+    expect(rows.find((r) => r.name === "To review")?.colour).toBe(REVIEW_COLOUR);
+    // it takes none of the five coloured places
+    expect(groupSpending([...eight, c("To review", 50000)]).rows.slice(0, 6).filter((r) => r.colour !== OTHER_COLOUR).map((r) => r.name)).toContain("Travel");
   });
 });

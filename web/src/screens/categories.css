@@ -13,6 +13,7 @@
   --cat-entertainment: #7a5636;
   --cat-personal-care: #5f6b0f;
   --cat-other: #8a8f94;
+  --cat-review: #a15c00; /* amber, hue 35: waiting for an answer */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,5 +29,6 @@
     --cat-entertainment: #cfa57c;
     --cat-personal-care: #b5c94a;
     --cat-other: #7d838a;
+    --cat-review: #f5b04c;
   }
 }
