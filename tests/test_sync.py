@@ -324,3 +324,23 @@ def test_rows_missing_from_a_later_feed_are_never_deleted(
         before = snapshot(led)
         led.apply_sync(response(h, 0, n, drop=gone))
         assert snapshot(led) == before
+
+
+def test_another_users_sync_never_reaches_this_users_views(
+    ledger_for: LedgerFor,
+) -> None:
+    # Adversarial: two users sync the same provider IDs on one database; the
+    # synced-key and gap joins must keep each user's rows apart (Scoped.on).
+    doc = json.loads(response(H, 0, 1))
+    row = doc["accounts"][0]["transactions"][0]
+    doc["accounts"][0]["transactions"] += [row | {"id": "7"}]
+    a, b = ledger_for(1), ledger_for(2)
+    a.apply_sync(response(H, 0, 10))
+    a.apply_sync(response(H, 8, 20, drop={14}))
+    a.apply_sync(json.dumps(doc).encode())
+    r = b.apply_sync(response(H, 0, 10))
+    assert (r.added, r.already_known, r.gaps) == (10, 0, [])
+    assert len(b.transactions()) == 10
+    assert b.sync_gaps() == []
+    assert b.possible_duplicates() == same_day_repeats(b)
+    assert {t.id for t in a.transactions()}.isdisjoint(t.id for t in b.transactions())

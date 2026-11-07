@@ -12,13 +12,14 @@ from decimal import Decimal
 
 from sqlalchemy import Connection
 
+from finance_agent.ledger import UNCATEGORISED as _NONE
 from finance_agent.ledger import Ledger
 from finance_agent.storage import Scoped, schema
 
 log = logging.getLogger(__name__)  # counts only
 
 TAXONOMY_VERSION = 1
-UNCATEGORISED = ("Uncategorised", "Uncategorised")
+UNCATEGORISED = (_NONE, _NONE)
 
 # Two levels: top level -> subcategories (<= 8 each). Bump TAXONOMY_VERSION on change.
 TAXONOMY: dict[str, tuple[str, ...]] = {
@@ -32,7 +33,7 @@ TAXONOMY: dict[str, tuple[str, ...]] = {
     "Entertainment": ("Events", "Games", "Hobbies"),
     "Travel": ("Flights", "Hotels", "Holidays"),
     "Personal care": ("Hair & beauty", "Toiletries"),
-    "Uncategorised": ("Uncategorised",),
+    _NONE: (_NONE,),
 }
 
 # Merchant -> (descriptor pattern, default Category). Matched against the raw

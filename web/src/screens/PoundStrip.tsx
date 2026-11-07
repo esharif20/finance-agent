@@ -1,10 +1,19 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useId } from "react";
+import type { Slice } from "@/lib/categories";
 import { usePrivacy } from "@/lib/privacy";
-import { poundStrip } from "@/lib/strip";
+import { poundStrip, splitSpent } from "@/lib/strip";
 
 /** One bar that answers "where did my income go?": spent, then the hatched part kept. */
-export function PoundStrip({ inMinor, outMinor }: { inMinor: number; outMinor: number }) {
+export function PoundStrip({
+  inMinor,
+  outMinor,
+  slices = [],
+}: {
+  inMinor: number;
+  outMinor: number;
+  slices?: Slice[];
+}) {
   const reduce = useReducedMotion();
   const { hidden } = usePrivacy();
   const pattern = `hatch-${useId().replace(/:/g, "")}`;
@@ -16,6 +25,14 @@ export function PoundStrip({ inMinor, outMinor }: { inMinor: number; outMinor: n
     : strip.overspent
     ? "More went out than came in this month."
     : `Of every £1 that came in, ${strip.spentPence}p went out and ${strip.keptPence}p stayed.`;
+  // the spent part is split by Category; without any it stays one bar
+  const parts = strip.spentPence > 0 && slices.length > 0
+    ? splitSpent(strip.spentPence, slices.map((s) => s.minor)).map((pence, i) => ({
+        key: slices[i]?.key ?? String(i),
+        pence,
+        colour: slices[i]?.colour ?? "var(--spent)",
+      }))
+    : [{ key: "spent", pence: strip.spentPence, colour: "var(--spent)" }];
   const grow = reduce
     ? {}
     : {
@@ -31,13 +48,17 @@ export function PoundStrip({ inMinor, outMinor }: { inMinor: number; outMinor: n
         aria-label={label}
         className="flex h-4 w-full gap-[3px] overflow-hidden rounded-full"
       >
-        {strip.spentPence > 0 && (
-          <motion.div
-            {...grow}
-            style={{ width: `${strip.spentPence}%`, originX: 0 }}
-            className="rounded-full bg-spent"
-          />
-        )}
+        {parts
+          .filter((p) => p.pence > 0)
+          .map((p) => (
+            <motion.div
+              key={p.key}
+              {...grow}
+              layout={!reduce}
+              style={{ width: `${p.pence}%`, originX: 0, background: p.colour }}
+              className="rounded-full"
+            />
+          ))}
         {strip.keptPence > 0 && (
           <motion.div
             {...grow}
@@ -55,7 +76,7 @@ export function PoundStrip({ inMinor, outMinor }: { inMinor: number; outMinor: n
           </motion.div>
         )}
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">
+      <p className="mt-3 text-label text-muted-foreground">
         {strip.overspent ? (
           <span className="money">{label}</span>
         ) : (

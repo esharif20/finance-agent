@@ -10,7 +10,7 @@
   --border: #e4e7ea;
   --control: #d6d9dd;
   --foreground: #1b1d1f;
-  --muted-foreground: #5c6064;
+  --muted-foreground: #53575b;
   --accent: #0b66c3;
   --primary: #1b1d1f;
   --primary-foreground: #ffffff;
@@ -18,9 +18,13 @@
   --warning-bg: #fff4e0;
   --warning-fg: #8a4b00;
   --spent: #3b4045;
+  --data: #0e6f8a; /* single-series chart hue, 195: between the ambient blue and teal */
   --ring: #0b66c3;
-  --glow-a: rgb(11 102 195 / 0.17);
-  --glow-b: rgb(16 160 140 / 0.13);
+  /* Ambient fields: blue 210, teal 172, sky 198, apricot 22. None in 235-290. */
+  --field-a: rgb(40 128 222 / 0.36);
+  --field-b: rgb(22 176 152 / 0.3);
+  --field-c: rgb(60 170 230 / 0.2);
+  --field-d: rgb(255 168 120 / 0.21);
   --glass-bg: rgb(255 255 255 / 0.58);
   --glass-edge: rgb(255 255 255 / 0.75);
   --glass-shadow: 0 8px 24px rgb(27 29 31 / 0.08);
@@ -38,7 +42,7 @@
     --border: #1f2225;
     --control: #3a3e43;
     --foreground: #f4f5f6;
-    --muted-foreground: #a9aeb4;
+    --muted-foreground: #b6bbc1;
     --accent: #7da2f7;
     --primary: #f4f5f6;
     --primary-foreground: #111214;
@@ -46,9 +50,12 @@
     --warning-bg: #3a2a12;
     --warning-fg: #f5c27a;
     --spent: #c9cdd2;
+    --data: #5cc3dc;
     --ring: #7da2f7;
-    --glow-a: rgb(30 120 225 / 0.34);
-    --glow-b: rgb(20 170 150 / 0.22);
+    --field-a: rgb(30 110 220 / 0.5);
+    --field-b: rgb(16 160 136 / 0.42);
+    --field-c: rgb(40 150 210 / 0.26);
+    --field-d: rgb(214 120 80 / 0.24);
     --glass-bg: rgb(40 44 48 / 0.5);
     --glass-edge: rgb(255 255 255 / 0.16);
     --glass-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
@@ -75,35 +82,53 @@
   --color-spent: var(--spent);
   --color-ring: var(--ring);
   --radius-card: var(--radius);
+
+  /* Type scale (docs/design/DIRECTIONS.md, "Type"). Six sizes: 12 / 13 / 15 / 17 / 28 / 40.
+     Figures are set lighter and tighter than headings, as calm money screens do. */
+  --text-hero: clamp(2.125rem, 1.7rem + 1.3vw, 2.5rem);
+  --text-hero--line-height: 1.05;
+  --text-hero--letter-spacing: -0.035em;
+  --text-hero--font-weight: 500;
+  --text-figure: 1.75rem;
+  --text-figure--line-height: 1.15;
+  --text-figure--letter-spacing: -0.028em;
+  --text-figure--font-weight: 500;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.03em;
+  --text-title--font-weight: 650;
+  --text-heading: 1.0625rem;
+  --text-heading--line-height: 1.4;
+  --text-heading--letter-spacing: -0.015em;
+  --text-heading--font-weight: 650;
+  --text-row: 0.9375rem;
+  --text-row--line-height: 1.45;
+  --text-row--letter-spacing: -0.006em;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.35;
+  --text-meta--letter-spacing: 0.005em;
+  --text-meta--font-weight: 500;
 }
 
 @layer base {
   * {
     border-color: var(--border);
   }
-  body {
+  html {
     background: var(--background);
+  }
+  body {
+    background: transparent;
     color: var(--foreground);
     font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     min-height: 100dvh;
-  }
-  body {
     position: relative;
     isolation: isolate;
-  }
-  /* Static depth: a soft glow behind the header and hero card (blue and teal, outside the violet band). */
-  body::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: min(760px, 100%);
-    z-index: -1;
-    pointer-events: none;
-    background:
-      radial-gradient(ellipse 55% 60% at 22% 0%, var(--glow-a), transparent 70%),
-      radial-gradient(ellipse 40% 50% at 88% 6%, var(--glow-b), transparent 70%);
   }
   /* Film grain over everything, 3-5%. Never intercepts input. */
   body::after {
@@ -119,6 +144,96 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+}
+
+/* Ambient: four large soft colour fields drifting on 24-38s loops (unequal, so the pattern
+   never visibly repeats). Fixed to the viewport, so it covers the whole document in both
+   schemes with no seam. Transform only: compositor work, no repaint per frame. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.ambient i {
+  position: absolute;
+  width: 78vmax;
+  height: 78vmax;
+  border-radius: 50%;
+  will-change: transform;
+  /* Longhands: the build minifier turns a nameless `animation` shorthand into `animation:none`. */
+  animation-duration: 31s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+}
+.ambient i:nth-child(1) {
+  left: -26vmax;
+  top: -34vmax;
+  background: radial-gradient(closest-side, var(--field-a), transparent);
+  animation-name: drift-1;
+}
+.ambient i:nth-child(2) {
+  right: -30vmax;
+  top: -22vmax;
+  background: radial-gradient(closest-side, var(--field-b), transparent);
+  animation-name: drift-2;
+  animation-duration: 38s;
+}
+.ambient i:nth-child(3) {
+  left: 4vmax;
+  bottom: -34vmax;
+  background: radial-gradient(closest-side, var(--field-c), transparent);
+  animation-name: drift-3;
+  animation-duration: 34s;
+}
+.ambient i:nth-child(4) {
+  right: -18vmax;
+  bottom: -26vmax;
+  width: 62vmax;
+  height: 62vmax;
+  background: radial-gradient(closest-side, var(--field-d), transparent);
+  animation-name: drift-4;
+  animation-duration: 24s;
+}
+@keyframes drift-1 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(30vmax, 18vmax, 0) scale(1.16); }
+  100% { transform: translate3d(12vmax, 38vmax, 0) scale(0.92); }
+}
+@keyframes drift-2 {
+  0% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-28vmax, 26vmax, 0) scale(0.9); }
+  100% { transform: translate3d(-10vmax, 50vmax, 0) scale(1.14); }
+}
+@keyframes drift-3 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(32vmax, -22vmax, 0) scale(1.18); }
+  100% { transform: translate3d(54vmax, -8vmax, 0) scale(0.93); }
+}
+@keyframes drift-4 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-38vmax, -18vmax, 0) scale(1.22); }
+  100% { transform: translate3d(-15vmax, -40vmax, 0) scale(1); }
+}
+.ambient[data-paused] i {
+  animation-play-state: paused;
+}
+
+/* Figures. Big standalone amounts use proportional digits (tabular ones look loose at
+   display sizes); columns keep the body's tabular digits. Pence a step smaller and
+   lighter, never under 11px. */
+.figure {
+  font-variant-numeric: proportional-nums;
+}
+.money-minor {
+  font-size: max(0.58em, 11px);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
 }
 
 /* Glass: chrome only (header, pills, tab bar). Figures, charts and lists stay on solid cards. */
@@ -137,12 +252,45 @@
   }
 }
 
+/* Month bars: one series in its polarity hue (money in green, money out the data hue). The chosen
+   month is full strength, the others a pale step of the same hue. A month the Ledger has
+   not reached the end of is hatched: it reads as "so far", not as a drop. */
+.month-bar {
+  --bar: var(--data);
+  background: color-mix(in oklab, var(--bar) 30%, var(--card));
+  transition: background-color 160ms ease;
+}
+.month-bar.is-in {
+  --bar: var(--positive);
+}
+.group:hover .month-bar:not([data-selected]) {
+  background: color-mix(in oklab, var(--bar) 48%, var(--card));
+}
+.month-bar[data-selected] {
+  background: var(--bar);
+}
+.month-bar[data-partial] {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--bar) 30%, var(--card)) 0 3px,
+    transparent 3px 6px
+  );
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--bar) 45%, var(--card));
+}
+.month-bar[data-partial][data-selected] {
+  background: repeating-linear-gradient(135deg, var(--bar) 0 3px, color-mix(in oklab, var(--bar) 35%, var(--card)) 3px 6px);
+  box-shadow: none;
+}
+
 /* Privacy mode (H): blur every amount; text can't be selected or copied out. */
 html[data-private] .money {
   filter: blur(8px);
   user-select: none;
 }
 @media (prefers-reduced-motion: reduce) {
+  .ambient i {
+    animation: none !important;
+  }
   *,
   *::before,
   *::after {
@@ -151,3 +299,239 @@ html[data-private] .money {
     scroll-behavior: auto !important;
   }
 }
+
+/* Account cards (#44, #58): a stack of ID-1 cards. The DOM card carries the text, focus and
+   clicks; with WebGL its face is drawn by the one canvas behind the stack (three.js, same
+   perspective), otherwise this CSS face is the card. Generic faces use the project's own
+   hues (--h, never 235-290): no logos, no brand marks. The user's own art, when present,
+   arrives as a background image from the local card-art folder. */
+.card-stack {
+  position: relative;
+}
+.card-canvas {
+  position: absolute;
+  pointer-events: none;
+}
+.account-card {
+  --h: 200;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "title balance" "status status";
+  column-gap: 12px;
+  width: 100%;
+  padding: 14px 18px 16px;
+  border-radius: 16px;
+  color: #fff;
+  cursor: pointer;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.14), transparent 45%),
+    repeating-linear-gradient(-62deg, transparent 0 9%, rgb(255 255 255 / 0.06) 9% 13%, transparent 13% 22%),
+    linear-gradient(145deg, oklch(0.47 0.12 var(--h)), oklch(0.31 0.085 calc(var(--h) + 18)));
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 10px 24px rgb(0 0 0 / 0.18);
+  transition: box-shadow 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+/* The generic face's chip (the WebGL card has a real one; bank art prints its own). */
+.account-card:not([data-all="true"]):not([data-art="true"])::before {
+  content: "";
+  position: absolute;
+  left: 10.6%;
+  top: 35.3%;
+  width: 12.8%;
+  height: 16.6%;
+  border-radius: 14%;
+  background:
+    linear-gradient(90deg, transparent 47%, rgb(90 76 40 / 0.55) 47% 52%, transparent 52%),
+    linear-gradient(0deg, transparent 30%, rgb(90 76 40 / 0.45) 30% 34%, transparent 34% 66%, rgb(90 76 40 / 0.45) 66% 70%, transparent 70%),
+    linear-gradient(135deg, #efe2b6, #c9b276);
+  pointer-events: none;
+}
+.account-card[data-art="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.16), transparent 42%);
+  pointer-events: none;
+}
+.account-card > * {
+  position: relative; /* above the face's ::before/::after */
+}
+.account-card [data-slot="title"] {
+  grid-area: title;
+}
+.account-card .account-balance {
+  grid-area: balance;
+  justify-self: end;
+}
+.account-card [data-slot="status"] {
+  grid-area: status;
+  align-self: end;
+}
+/* The front card is the one in view: its balance becomes the figure, beside the status. */
+.account-card[data-front="true"] {
+  grid-template-areas: "title title" "balance status";
+}
+.account-card[data-front="true"] .account-balance {
+  align-self: end;
+  justify-self: start;
+  font-size: var(--text-figure);
+  line-height: var(--text-figure--line-height);
+  letter-spacing: var(--text-figure--letter-spacing);
+  font-weight: var(--text-figure--font-weight);
+  font-variant-numeric: proportional-nums;
+}
+.account-card[data-front="true"] [data-slot="status"] {
+  justify-self: end;
+  padding-bottom: 4px;
+}
+/* A back card's status sits under the next card. */
+.account-card:not([data-front="true"]) [data-slot="status"] {
+  visibility: hidden;
+}
+.account-card .money-minor {
+  color: inherit;
+  opacity: 0.78;
+}
+.account-card[data-all="true"] {
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.13), transparent 45%),
+    linear-gradient(145deg, oklch(0.38 0.02 205), oklch(0.26 0.02 205));
+}
+/* Over a bank's own art the name is already on the card: keep it for screen readers. The
+   masked number and balance sit in one darkened band (--band, from AccountStack): the bottom
+   of what shows of a card behind, or the bottom of the front card's face; never over the
+   art's top edge, where banks print their marks. */
+.account-card[data-art="true"] {
+  grid-template-rows: auto;
+  align-content: start;
+  padding-top: calc(var(--band, 0px) + 24px);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}
+/* A card peeking from behind: the masked number moves right, beside the balance, clear of the
+   chip banks print on the left. */
+.account-card[data-art="true"]:not([data-front="true"]) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: ". title balance" "status status status";
+  column-gap: 14px;
+}
+.account-card[data-art="true"]:not([data-front="true"]) [data-slot="title"] {
+  align-self: center;
+}
+.account-card[data-art="true"][data-front="true"] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto auto;
+  grid-template-areas: ". ." "balance title" "balance status";
+  align-content: stretch;
+  row-gap: 2px;
+  padding-top: 14px;
+}
+.account-card[data-art="true"][data-front="true"] [data-slot="title"] {
+  justify-self: end;
+}
+.account-card[data-art="true"] [data-slot="title"] > span:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.account-card[data-art="true"] [data-slot="title"] > span + span {
+  opacity: 0.92;
+}
+.account-card[data-art="true"][data-front="true"] .account-balance {
+  align-self: end;
+}
+.account-card[data-tucked="true"] > * {
+  opacity: 0; /* not visibility: the labels still name the button */
+}
+/* With WebGL the canvas draws the face, the edge and the sheen. */
+.card-stack[data-gl="true"] .account-card {
+  background: none;
+  border-color: transparent;
+  box-shadow: none; /* the scene draws each shadow behind its own card */
+}
+.card-stack[data-gl="true"] .account-card > * {
+  transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.card-stack[data-gl="true"] .account-card[data-settling="true"] > * {
+  opacity: 0;
+  transition-duration: 60ms;
+}
+.card-stack[data-gl="true"] .account-card::before,
+.card-stack[data-gl="true"] .account-card::after {
+  display: none;
+}
+.account-card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.account-card[data-selected="true"] {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 0 0 2px var(--foreground),
+    0 14px 30px rgb(0 0 0 / 0.24);
+}
+.card-stack[data-gl="true"] .account-card[data-selected="true"] {
+  box-shadow: 0 0 0 2px var(--foreground);
+}
+@media (hover: hover) and (pointer: fine) {
+  .account-card[data-hover="true"]:not([data-selected="true"]) {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 18px 32px rgb(0 0 0 / 0.28);
+  }
+  .card-stack[data-gl="true"] .account-card[data-hover="true"]:not([data-selected="true"]) {
+    box-shadow: none;
+  }
+}
+.account-card:active {
+  filter: brightness(0.97);
+}
+
+/* Per-account view (#59). The combined view's share bars wear each Account's card hue, with a
+   2px card-coloured gap between segments; the table under them is the legend and the figures.
+   Top merchants are one series, so one hue: --data. */
+.share-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--raised);
+}
+.share-bar > span,
+.share-key {
+  background: oklch(0.6 0.13 var(--h));
+}
+.share-bar > span {
+  flex-basis: 0;
+  min-width: 4px;
+}
+.share-key {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.merchant-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--raised);
+}
+.merchant-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 3px;
+  background: var(--data);
+}
+:root { --cat-0: #0b66c3; --cat-1: #0e7a82; --cat-2: #b45309; --cat-3: #c03a5e; --cat-4: #2f7a45; --cat-5: #8a6a00; --cat-6: #a03c96; --cat-7: #0a6fa8; --cat-8: #7a5636; --cat-9: #5f6b0f; --cat-other: #6b7075; --chip-ink-mix: black 42%; --chip-tint: 14%; }
+@media (prefers-color-scheme: dark) { :root:not(.light) { --cat-0: #7da2f7; --cat-1: #3fc1c4; --cat-2: #f0a04b; --cat-3: #f27b9b; --cat-4: #5ccf86; --cat-5: #dcb83c; --cat-6: #d886d0; --cat-7: #4fb4ec; --cat-8: #cfa57c; --cat-9: #b5c94a; --cat-other: #a9aeb4; --chip-ink-mix: white 35%; --chip-tint: 20%; } }

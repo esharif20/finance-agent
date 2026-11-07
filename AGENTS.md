@@ -50,6 +50,8 @@ Browser verification: after any UI change, check it in a real browser with the P
 
 Visual reference: `~/.claude/skill-library/awesome-design-md/design-md/revolut/DESIGN.md`. The goal is a strong Revolut feel with the project's own twist. Follow its structure (type scale, spacing, radii, pill buttons, dark/light surfaces), not its brand: no Revolut name, logo, exact primary colour or the commercial Aeonik Pro font. Revolut is one of the user's banks, and a look-alike would read as impersonation in a public demo.
 
+Real bank names and logos appear only in the local app, from the user's own images in `card-art/` under the data directory, served by `/api/card-art/{key}` (#58). They never go in the repo, fixtures, screenshots in the repo or the public demo; the code draws only a generic card and the art arrives as a runtime texture.
+
 ## Agent skills
 
 ### Issue tracker

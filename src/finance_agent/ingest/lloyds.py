@@ -98,7 +98,10 @@ class Lloyds:
         _, lines = _body(text)
         if not lines:
             return False
-        header = next(csv.reader([lines[0]]))
+        try:
+            header = next(csv.reader([lines[0]]))
+        except csv.Error:  # e.g. a field past the csv module's size limit
+            return False
         return tuple(c.strip() for c in header) == HEADER
 
     def parse(self, text: str) -> ParsedFile:
@@ -107,7 +110,14 @@ class Lloyds:
         rejected: list[RejectedRow] = []
         reader = csv.reader(lines[1:])
         line = skip + 2  # 1-based physical line where the next record starts
-        for cells in reader:
+        while True:
+            try:
+                cells = next(reader)
+            except StopIteration:
+                break
+            except csv.Error:  # an oversized field or broken quoting; stop here
+                rejected.append(RejectedRow(line, "malformed CSV"))
+                break
             line, start = skip + 2 + reader.line_num, line
             if not any(c.strip() for c in cells):
                 continue

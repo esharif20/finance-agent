@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Slice } from "@/lib/categories";
 import { PoundStrip } from "./PoundStrip";
 
 type Summary = components["schemas"]["SummaryOut"];
@@ -15,7 +16,15 @@ export function monthLabel(month: string): string {
   });
 }
 
-export function MonthCard({ summary }: { summary: Summary }) {
+export function MonthCard({
+  summary,
+  slices,
+  children,
+}: {
+  summary: Summary;
+  slices?: Slice[];
+  children?: React.ReactNode; // a line under the figures, e.g. Transfers between Accounts
+}) {
   const { money_in, money_out, net, gaps } = summary;
   const overspent = net.minor < 0;
   return (
@@ -25,31 +34,33 @@ export function MonthCard({ summary }: { summary: Summary }) {
       </CardHeader>
 
       <div role="group" aria-label="Net">
-        <p className="text-sm text-muted-foreground">Net</p>
+        <p className="text-label text-muted-foreground">Net</p>
         <Money
           value={net}
           sign
           countUp
-          className={`block text-[32px] leading-10 font-semibold tracking-[-0.02em] ${overspent ? "" : "text-positive"}`}
+          className={`figure mt-1 block text-hero ${overspent ? "" : "text-positive"}`}
         />
       </div>
 
       <dl className="grid grid-cols-2 gap-4">
         <div role="group" aria-label="Money in" className="rounded-[10px] bg-raised p-4">
-          <dt className="text-sm text-muted-foreground">Money in</dt>
-          <dd>
-            <Money value={money_in} countUp className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+          <dt className="text-label text-muted-foreground">Money in</dt>
+          <dd className="mt-0.5">
+            <Money value={money_in} countUp className="figure text-figure" />
           </dd>
         </div>
         <div role="group" aria-label="Money out" className="rounded-[10px] bg-raised p-4">
-          <dt className="text-sm text-muted-foreground">Money out</dt>
-          <dd>
-            <Money value={money_out} countUp className="text-[26px] leading-9 font-semibold tracking-[-0.01em]" />
+          <dt className="text-label text-muted-foreground">Money out</dt>
+          <dd className="mt-0.5">
+            <Money value={money_out} countUp className="figure text-figure" />
           </dd>
         </div>
       </dl>
 
-      <PoundStrip inMinor={money_in.minor} outMinor={money_out.minor} />
+      <PoundStrip inMinor={money_in.minor} outMinor={money_out.minor} slices={slices} />
+
+      {children}
 
       {gaps.length > 0 && (
         <p

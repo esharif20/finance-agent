@@ -26,7 +26,7 @@ export function Money({
       <span className="sr-only">{hidden ? "Amount hidden" : formatMoney(value, { sign })}</span>
       <span aria-hidden="true">
         {main}
-        <span className="text-[0.62em] font-medium text-muted-foreground">{fraction}</span>
+        <span className="money-minor">{fraction}</span>
       </span>
     </span>
   );
