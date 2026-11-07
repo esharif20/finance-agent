@@ -49,9 +49,21 @@ Detector v1: precision 1.0, recall 0.65. Baseline: precision 1.0, recall 0.12. S
 
 | Harness | Interface | Metric | Baselines |
 | --- | --- | --- | --- |
-| `evals/detectors.py` | `Detector` (#148) | precision and recall per event type | trivial rules |
+| `evals/baselines.py` | `engine.baselines` (#147) | WAPE of the seasonal baseline against the true seasonal normal (overall, per Category, first year and after), and of the payday baseline on each cycle's first-week spend | trailing three-month mean |
+| `evals/detectors.py` | `Detector` (#147 spikes, #148 the rest) | precision and recall per event type | trivial rules |
 | `evals/ranking.py` | `Ranker` (#150) | NDCG@3 and @5 against the planted-relevance oracle | rank by £ impact |
 | `evals/forecast.py` | `Forecaster` (#149) | MASE and 80% interval coverage gap, rolling origin from 13 months | naive, seasonal naive |
+
+**Personal baselines (#147).** `seasonal_baseline` is the median of the last six months until a year exists, then the median of the same calendar month in up to three earlier years. `payday_baseline` is the median cycle's spend times the share spent by each day into the cycle, pooled over complete cycles. On the committed run, against the trailing mean:
+
+| Metric (WAPE, lower is better) | Personal baseline | Trailing mean |
+| --- | --- | --- |
+| Seasonal, all Category-months | 0.102 | 0.190 |
+| Seasonal, first year | 0.190 | 0.214 |
+| Seasonal, after a year | 0.078 | 0.184 |
+| Payday, first week of a cycle | 0.472 | 0.629 |
+
+It loses on one Category, Coffee (0.079 against 0.057). That Category has no seasonality, so one earlier same month is noisier than three recent ones. Category spikes over 1.5× the seasonal baseline score precision 0.35 and recall 1.00, against the trivial rule's 0.07 and 0.78. All 34 false positives fall in a Category's first year, before the baseline can know the season.
 
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
 
@@ -83,7 +95,7 @@ A learned component runs live only when the user's own data clears its gate. Bel
 | Categoriser: embedding nearest neighbours (first M3 candidate) | ≥ 200 Corrections and ≥ 5 per Category it may assign | Corrections + rules |
 | Categoriser: calibrated classifier on embeddings + amount/day features | Beats the embedding nearest-neighbour model on macro F1 and calibration | Embedding nearest neighbours |
 | Recurring detection | ≥ 3 occurrences of the series | Not flagged |
-| Personal baselines and anomaly scores | ≥ 6 months for the Category | No anomaly Insight |
+| Personal baselines and anomaly scores | ≥ 6 months for the Category, counted from its first Transaction (seasonal); ≥ 6 complete pay cycles ending after that first Transaction (payday). Both count spending after Refunds. Confirmed by #147: the seasonal baseline beats the trailing mean from month six | No anomaly Insight; the baseline returns `Insufficient` |
 | Forecasting (ETS) | ≥ 24 months of history (tuned from 13 by #149's backtest) | Seasonal naive at ≥ 12 months; "insufficient" before |
 | Change-point detection | ≥ 9 months for the series | None |
 | Preference prediction / contextual bandit | Starts from priors on day one, and needs no gate | Rank by £ impact |

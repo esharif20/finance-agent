@@ -31,9 +31,10 @@ jobs:
       - run: uv run pytest
       - name: categoriser eval (blocks on regression)
         run: uv run python evals/categoriser.py
-      - name: detector, ranking and forecast evals (results reproduce)
+      - name: detector, baseline, ranking and forecast evals (results reproduce)
         run: |
           uv run python evals/detectors.py
+          uv run python evals/baselines.py
           uv run python evals/ranking.py
           uv run python evals/forecast.py
       - uses: pnpm/action-setup@v4
