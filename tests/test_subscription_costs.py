@@ -20,6 +20,7 @@ from finance_agent.categorise.subscriptions import (
     display,
     subscription_costs,
 )
+from finance_agent.engine.forecast import cash_flow
 from finance_agent.ledger import Ledger, SubscriptionEntry, UnknownTarget
 from synthetic_banks import revolut_pockets
 
@@ -324,3 +325,71 @@ def test_a_foreign_charge_costs_in_gbp_once_a_rate_exists(
         s = costs(led, TODAY)
     assert (s.items[0].monthly, s.items[0].cost_note) == (920, None)  # 11.50 EUR
     assert s.kind_totals == {"subscription": 920} and s.rate_needed == 0
+
+
+def test_a_cancel_survives_new_charges_and_confirm_brings_it_back(
+    engine: Engine, write_export: Export
+) -> None:
+    # verifier #185: a cancel racing a re-detection with new evidence
+    rows = [(date(2026, m, 3), "NETFLIX.COM", "-10.99") for m in (2, 3, 4)]
+    import_and_cost(engine, write_export, rows)
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        (e,) = led.subscriptions()
+        led.cancel_subscription(e.merchant_id)
+        more = [(date(2026, m, 3), "NETFLIX.COM", "-12.99") for m in (5, 6)]
+        led.import_files([write_export(hsbc(more))])
+        categorise.run(conn, 1)  # new evidence: detection still loses
+        (c,) = costs(led, TODAY).items
+        assert (c.status, c.counted, c.monthly) == ("cancelled", False, 1299)
+        led.confirm_subscription(e.merchant_id)
+        categorise.run(conn, 1)
+        s = costs(led, TODAY)
+    assert s.items[0].status == "active" and s.kind_totals == {"subscription": 1299}
+
+
+def test_the_forecast_stops_projecting_a_cancelled_subscription(
+    engine: Engine, write_export: Export
+) -> None:
+    rows = [(date(2026, m, 3), "NETFLIX.COM", "-10.99") for m in range(1, 7)]
+    import_and_cost(engine, write_export, rows)
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        (e,) = led.subscriptions()
+        projected = cash_flow(led, date(2026, 7, 10), 3)
+        led.cancel_subscription(e.merchant_id)
+        cancelled = cash_flow(led, date(2026, 7, 10), 3)
+    assert [r.months for r in projected.recurring] == [(1099,) * 3]
+    assert not cancelled.recurring
+    assert [m.recurring for m in cancelled.months] == [0] * 3
+    assert not cancelled.categories  # its charges are not discretionary spend
+
+
+INTERVAL_FACTOR = {
+    "weekly": Fraction(52, 12),
+    "monthly": Fraction(1),
+    "annual": Fraction(1, 12),
+}
+
+
+@given(
+    st.lists(
+        st.tuples(st.integers(1, 10**15), st.sampled_from(list(INTERVAL_FACTOR))),
+        min_size=1,
+        max_size=30,
+    )
+)
+def test_extreme_amounts_total_exactly_and_round_once(
+    parts: list[tuple[int, str]],
+) -> None:
+    # verifier #185: huge prices, every interval, one group
+    es = [entry(i, interval=iv) for i, (_, iv) in enumerate(parts)]
+    cs = [Charge(i, date(2026, 6, 10), p) for i, (p, _) in enumerate(parts)]
+    s = subscription_costs(es, cs, TODAY)
+    exact = sum((p * INTERVAL_FACTOR[iv] for p, iv in parts), Fraction(0))
+    assert s.kind_totals == {"subscription": exact}
+    assert s.group_totals == {("subscription", "Streaming"): exact}
+    shown = display(exact)
+    assert type(shown) is int and abs(shown - exact) <= Fraction(1, 2)
+    if exact - int(exact) == Fraction(1, 2):
+        assert shown % 2 == 0  # half-even
