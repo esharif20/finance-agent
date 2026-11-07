@@ -43,6 +43,18 @@ Status: draft for review.
 
 Detector v1: precision 1.0, recall 0.65. Baseline: precision 1.0, recall 0.12. Skipped months and price rises are missed by design (precision first). Known services and descriptor patterns cover them in recognition, and the user can add any entry.
 
+### Intelligence Engine harnesses (#146)
+
+`evals/synthetic_history.py` generates seeded 36-month histories for six fictional users, with payday cycles, seasonality (December, summer, winter energy) and planted events as ground truth: price rises, Category spikes against the seasonal normal, annual renewals and payday shortfalls. Each harness calls an interface the M5 tickets implement, with a stub until then, and reports per event type, per Category or per user, not only overall:
+
+| Harness | Interface | Metric | Baselines |
+| --- | --- | --- | --- |
+| `evals/detectors.py` | `Detector` (#148) | precision and recall per event type | trivial rules |
+| `evals/ranking.py` | `Ranker` (#150) | NDCG@3 and @5 against the planted-relevance oracle | rank by £ impact |
+| `evals/forecast.py` | `Forecaster` (#149) | MASE and 80% interval coverage gap, rolling origin from 13 months | naive, seasonal naive |
+
+`evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
+
 ## Minimum-data gates (ADR 0015)
 
 A learned component runs live only when the user's own data clears its gate. Below the gate, the baseline or rules decide, and the "How well I know you" page says which gate is not yet met. Gates are starting values: each ticket confirms or tunes its gate in its evaluation.
