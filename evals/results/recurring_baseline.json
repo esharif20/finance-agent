@@ -1,0 +1,37 @@
+{
+  "dataset_version": 1,
+  "seed": 104,
+  "schedules": 400,
+  "detector": {
+    "precision": 1.0,
+    "recall": 0.645833,
+    "flagged_rate_by_case": {
+      "monthly": 1.0,
+      "monthly_jitter": 0.875,
+      "weekly": 1.0,
+      "annual": 1.0,
+      "skipped_month": 0.0,
+      "price_rise": 0.0,
+      "irregular": 0.0,
+      "one_off": 0.0,
+      "monthly_varying_amounts": 0.0,
+      "drift": 0.0
+    }
+  },
+  "baseline": {
+    "precision": 1.0,
+    "recall": 0.116667,
+    "flagged_rate_by_case": {
+      "monthly": 0.5,
+      "monthly_jitter": 0.075,
+      "weekly": 0.05,
+      "annual": 0.075,
+      "skipped_month": 0.0,
+      "price_rise": 0.0,
+      "irregular": 0.0,
+      "one_off": 0.0,
+      "monthly_varying_amounts": 0.0,
+      "drift": 0.0
+    }
+  }
+}

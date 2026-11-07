@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from sqlalchemy import Connection
 
+from finance_agent.categorise import subscriptions
 from finance_agent.ledger import UNCATEGORISED as _NONE
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.taxonomy import TAXONOMIES
@@ -200,4 +201,5 @@ def run(conn: Connection, user_id: int) -> int:
             taxonomy_version=TAXONOMY_VERSION,
         )
     log.info("categorise transactions=%d", len(txns))
+    subscriptions.recognise(ledger)  # #104: needs the Merchants just assigned
     return len(txns)
