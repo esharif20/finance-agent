@@ -15,7 +15,7 @@ Two systems sit at the centre (ADR 0007):
 flowchart TB
   subgraph Sources["Sources (untrusted input)"]
     CSV[Bank CSV exports]
-    OB[Open Banking, later]
+    OB[SimpleFIN aggregator, ADR 0013]
   end
 
   subgraph Core["Local process: trusted core"]
@@ -71,7 +71,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | Module | Owns | Depends on |
 | --- | --- | --- |
 | `storage` | The single connection factory (SQLCipher switch, ADR 0002), migrations (Alembic), the data-access layer that scopes every query by `user_id` | nothing |
-| `ingest` | One parser per Bank, the `Importer` interface, account-number masking. Untrusted input: it touches neither the database nor the Ledger | nothing |
+| `ingest` | One parser per Bank, the `Importer` interface, account-number masking, and `ingest.simplefin`: the read-only SimpleFIN client, the only module that may import a network client (ADR 0013, `tests/test_network_boundary.py`). Untrusted input: it touches neither the database nor the Ledger | nothing |
 | `ledger` | Transactions, duplicate detection (ADR 0006), Corrections overlay (ADR 0001), Kinds, Transfers, reconciliation, FX conversion with provenance | `storage`, `ingest` |
 | `categorise` | Taxonomy (versioned), Merchant normalisation, the Corrections → rules → ML chain (ADR 0005), Review Queue | `ledger`, `storage` (its own derived tables) |
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry | `ledger`, `categorise`, `memory` |
@@ -79,7 +79,7 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `assistant` | The LangGraph graph, tool allowlist, grounding check, answer cache (ADR 0010), `ChatModel` interface and adapters | `engine`, `ledger` (read-only views), `memory` |
 | `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0013). No database access. | nothing except the payload it is handed |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
-| `cli` | The `fa` command. `fa import` and `fa summary` call the Ledger interface in process; `fa` (open dashboard) talks to the running server | `ledger`, `categorise` (in-process); `api` only over HTTP |
+| `cli` | The `fa` command. `fa import`, `fa summary`, `fa connect` / `disconnect` / `sync` (SimpleFIN, ADR 0013/0014) and `fa watch` (watched-folder import) call the Ledger interface in process; `fa sync --install` and `fa watch install` write `launchd` agents; `fa` (open dashboard) talks to the running server | `ledger`, `categorise`, `storage` (opening the database, the Keychain), `ingest.simplefin` (fetching), `identity` (in-process); `api` only over HTTP |
 
 Dependency direction is enforced by an import-linter check in CI: nothing imports `assistant` except `api`, and `gateway` imports nothing from the core.
 
@@ -165,6 +165,5 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 
 ## Extension points
 
-- **Open Banking**: a new `Importer` (Enable Banking first, after a prototype). Its rows merge with CSV rows by dedupe key.
-- **Daily sync**: a `launchd` job calling `fa sync`; nothing in the core changes.
+- **Bank sync**: one read-only SimpleFIN aggregator (ADR 0013). Synced rows are identified by provider transaction ID and matched to CSV rows (ADR 0014); a daily `launchd` job runs `fa sync --notify`.
 - **Hosted / mobile**: Postgres via the same migrations, real `current_user`, the React app is already responsive. Needs its own ADR first.
