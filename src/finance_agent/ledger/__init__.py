@@ -256,11 +256,23 @@ class KindHasNoCategory(ValueError):
     """Transfers, Income and Fees take no Category, so a Correction is refused."""
 
 
+# "Always ask" (#125): the bucket a flagged Merchant's unanswered payments count
+# in. Not a Category: nothing can be corrected to it.
+TO_REVIEW = "To review"
+ALWAYS_ASK_SOURCES = ("user", "suggestion")  # how the user set the flag
+SUGGEST_AFTER = 2  # distinct corrected Categories before "Always ask" is offered
+
+
+class AlwaysAskMerchant(ValueError):
+    """An "Always ask" Merchant takes no Merchant-wide Correction."""
+
+
 @dataclass(frozen=True)
 class Merchant:
     id: int  # stable across imports and rule changes
     name: str
     default_category: tuple[str, str] | None
+    always_ask: str | None = None  # its source when flagged, else None
 
 
 @dataclass(frozen=True)
@@ -388,7 +400,9 @@ class Breakdown:
     """A month's spending by Category and what separates it from Money out:
     money_out == spending_after_refunds + refunds + fees (ADR 0004)."""
 
-    categories: tuple[Spend, ...]  # Uncategorised is gross; never negative here
+    categories: tuple[
+        Spend, ...
+    ]  # Uncategorised and To review are gross; never negative
     unmatched_refunds: Decimal  # <= 0: Refunds with no Category, kept off the ring
     spending_after_refunds: Decimal  # == sum(categories) + unmatched_refunds
     refunds: Decimal  # all Refunds received in the month
@@ -1510,7 +1524,9 @@ class Ledger:
     ) -> Breakdown:
         start, end = _month_bounds(month)
         spends = self.spending_by_category(month, account_id)
-        refunds = fees = unmatched = Decimal(0)
+        refunds = fees = Decimal(0)
+        # per bucket: Refunds with no Category to net against (<= 0)
+        unmatched = {UNCATEGORISED: Decimal(0), TO_REVIEW: Decimal(0)}
         mine = None
         if account_id is not None:
             tt = schema.transaction
@@ -1529,27 +1545,22 @@ class Ledger:
                 fees -= t.amount
             elif c.kind == "Refund":
                 refunds += t.amount
-                # only the Uncategorised share: a split Refund's other parts
-                # are matched in their own Categories
-                unmatched -= sum(
-                    (
-                        _decimal(minor)
-                        for (top, _), minor in _shares(c, int(t.amount.scaleb(2)))
-                        if top == UNCATEGORISED
-                    ),
-                    Decimal(0),
-                )
+                # only the Uncategorised and To review shares: a split
+                # Refund's other parts are matched in their own Categories
+                for (top, _), minor in _shares(c, int(t.amount.scaleb(2))):
+                    if top in unmatched:
+                        unmatched[top] -= _decimal(minor)
         cats: list[Spend] = []
         for sp in spends:
-            if sp.name == UNCATEGORISED:
-                sp = replace(sp, amount=sp.amount - unmatched)
+            if sp.name in unmatched:  # gross, so never negative on the ring
+                sp = replace(sp, amount=sp.amount - unmatched[sp.name])
                 if sp.amount == 0:
                     continue
             cats.append(sp)
         total = sum((sp.amount for sp in spends), Decimal(0))
         return Breakdown(
             tuple(cats),
-            unmatched,
+            sum(unmatched.values(), Decimal(0)),
             total,
             refunds,
             fees,
@@ -1568,6 +1579,7 @@ class Ledger:
                 m,
                 m.c.id,
                 m.c.name,
+                m.c.always_ask,
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
                 sub.c.taxonomy_version.label("version"),
@@ -1581,6 +1593,7 @@ class Ledger:
                 r.id,
                 r.name,
                 current(r.version, (r.top, r.sub)) if r.sub is not None else None,
+                r.always_ask,
             )
             for r in rows
         ]
@@ -1599,6 +1612,7 @@ class Ledger:
                 c.c.kind,
                 c.c.merchant_id,
                 m.c.name.label("merchant"),
+                m.c.always_ask,
                 c.c.source,
                 c.c.taxonomy_version,
                 top.c.name.label("top"),
@@ -1620,9 +1634,16 @@ class Ledger:
         for r in rows:
             category = current(r.version, (r.top, r.sub)) if r.sub is not None else None
             source = r.source
+            if r.kind in CATEGORISED_KINDS and (r.always_ask or source == "always_ask"):
+                # the categoriser abstained (#125); held here too, so a flag set
+                # before the next `categorise.run` already counts as To review
+                category, source = (TO_REVIEW, TO_REVIEW), "always_ask"
             # Corrections beat every rule (ADR 0005); Kinds without a Category
-            # (Income, Transfer, Fee) ignore them
-            fix = by_txn.get(r.transaction_id) or by_merchant.get(r.merchant_id)
+            # (Income, Transfer, Fee) ignore them. A flagged Merchant's
+            # Merchant-wide Correction is off; per-Transaction ones stay.
+            fix = by_txn.get(r.transaction_id) or (
+                None if r.always_ask else by_merchant.get(r.merchant_id)
+            )
             if fix and r.kind in CATEGORISED_KINDS:
                 category, source = fix, "correction"
             out[r.transaction_id] = Categorisation(
@@ -1725,8 +1746,75 @@ class Ledger:
         """Give every Transaction of this Merchant (now and future) this Category;
         a Correction for one Transaction still beats it."""
         m = schema.merchant
+        flagged = self._db.execute(
+            self._db.select(m, m.c.always_ask).where(m.c.id == merchant_id)
+        ).first()
+        if flagged is None:
+            raise UnknownTarget("no such Merchant")
+        category_id = self._category_id(category)
+        if flagged.always_ask:
+            raise AlwaysAskMerchant("an Always ask Merchant is corrected per payment")
+        return self._correct(category_id, merchant_id=merchant_id)
+
+    def set_always_ask(
+        self, merchant_id: int, on: bool, source: str = "user"
+    ) -> list[int]:
+        """Flag or unflag a Merchant "Always ask" (#125); only ever on the
+        user's word. Turning it on reverts the Merchant's Merchant-wide
+        Corrections and returns their ids; per-Transaction ones stay. Turning
+        it off restores nothing. Run `categorise.run` afterwards."""
+        if source not in ALWAYS_ASK_SOURCES:
+            raise ValueError("source is 'user' or 'suggestion'")
+        m, k = schema.merchant, schema.correction
         self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
-        return self._correct(self._category_id(category), merchant_id=merchant_id)
+        self._db.execute(
+            self._db.update(m)
+            .where(m.c.id == merchant_id)
+            .values(always_ask=source if on else None)
+        )
+        reverted: list[int] = []
+        if on:
+            reverted = list(
+                self._db.execute(
+                    self._db.select(k, k.c.id).where(
+                        k.c.merchant_id == merchant_id,
+                        k.c.kind == "category",
+                        k.c.reverted_at.is_(None),
+                    )
+                ).scalars()
+            )
+            self._db.execute(
+                self._db.update(k)
+                .where(k.c.id.in_(reverted))
+                .values(reverted_at=datetime.now(UTC))
+            )
+        self._db.bump_ledger_version()
+        return reverted
+
+    def always_ask_suggested(self) -> set[int]:
+        """Unflagged Merchants whose active Corrections (per-Transaction, on
+        their Transactions, or Merchant-wide) name `SUGGEST_AFTER` or more
+        distinct Categories. Only a suggestion: nothing here sets the flag."""
+        c = schema.categorisation
+        merchant_of = {
+            r.transaction_id: r.merchant_id
+            for r in self._db.execute(
+                self._db.select(c, c.c.transaction_id, c.c.merchant_id)
+            )
+        }
+        # oldest first: a later Correction of the same target replaces it
+        live: dict[tuple[int | None, int | None], Correction] = {
+            (k.transaction_id, k.merchant_id): k
+            for k in self.corrections()
+            if k.reverted_at is None
+        }
+        seen: dict[int, set[tuple[str, str]]] = {}
+        for k in live.values():
+            mid = k.merchant_id or merchant_of.get(k.transaction_id or 0)
+            if mid is not None:
+                seen.setdefault(mid, set()).add(k.category)
+        flagged = {m.id for m in self.merchants() if m.always_ask}
+        return {m for m, cats in seen.items() if len(cats) >= SUGGEST_AFTER} - flagged
 
     def revert_correction(self, correction_id: int) -> None:
         """Undo a Category Correction; it stays in the history, marked
