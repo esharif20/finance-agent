@@ -5,18 +5,31 @@ never returns floats."""
 import hashlib
 import logging
 import time
-from collections import Counter
+import unicodedata
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from datetime import time as clock
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import ColumnElement, Connection, Select, and_, case, func, or_, union
+from sqlalchemy import (
+    ColumnElement,
+    Connection,
+    Select,
+    and_,
+    case,
+    func,
+    or_,
+    select,
+    union,
+)
 
 from finance_agent import ingest
-from finance_agent.storage import Scoped, schema
+from finance_agent.ingest import simplefin
+from finance_agent.storage import Scoped, keyed_ref, schema
 
 TRANSFER_TYPES = ("TFR",)  # Lloyds Type that favours a pair; not required
 TRANSFER_DAYS = 3  # the two legs post at most this many days apart
@@ -125,7 +138,7 @@ class Transaction:
     posted_on: date
     description: str
     amount: Decimal
-    running_balance: Decimal
+    running_balance: Decimal | None  # None for synced rows (no running balance)
     statement_imports: frozenset[str]  # file hashes of every import it appeared in
     id: int = 0
     bank_type: str = ""  # the Bank's Transaction Type code; not the Kind
@@ -138,6 +151,40 @@ class Transaction:
 class TransactionPage:
     items: list[Transaction]
     total: int  # every match, before limit and offset
+
+
+@dataclass(frozen=True)
+class SyncGap:
+    account: AffectedAccount
+    balance_at: datetime  # the provider's balance-date, UTC
+    amount: Decimal  # reported balance minus Ledger-implied balance (ADR 0014)
+
+
+@dataclass(frozen=True)
+class SyncStatus:
+    """Freshness of the feed. Failures carry an error class and a count only."""
+
+    last_sync_at: datetime | None  # UTC
+    last_failure_at: datetime | None  # UTC; cleared by the next success
+    failure_class: str | None
+    failures_in_a_row: int
+    consent_renewed_on: date | None
+    consent_expires_on: date | None
+    consent_days_left: int | None  # negative once expired
+    consent_warning: bool  # inside the warning window, or expired
+
+
+@dataclass(frozen=True)
+class SyncReport:
+    added: int  # new Transactions, after matching
+    matched: int  # synced rows merged into an existing CSV Transaction
+    already_known: int
+    changed_known: int  # known IDs arriving with other fields; stored rows unchanged
+    rejected_accounts: int  # one ID with differing rows: that Account's rows refused
+    provider_duplicates: int  # rows in new Possible Duplicates (ADR 0014 (a), (b))
+    provider_errors: int
+    gaps: list[SyncGap]
+    accounts: list[AffectedAccount]
 
 
 @dataclass(frozen=True)
@@ -253,6 +300,153 @@ def _only(account_id: int | None) -> list[ColumnElement[bool]]:
     return [] if account_id is None else [schema.transaction.c.account_id == account_id]
 
 
+MATCH_DAYS = 3  # ADR 0014; first guess until a superseding ADR
+
+
+def normalise(description: str) -> str:
+    """ADR 0014: NFKC, casefold, keep only Unicode letters and numbers."""
+    folded = unicodedata.normalize("NFKC", description).casefold()
+    return "".join(c for c in folded if unicodedata.category(c)[0] in "LN")
+
+
+def _end_of_day_ts(d: date) -> int:
+    nxt = datetime.combine(d + timedelta(days=1), clock(0), simplefin.LONDON)
+    return int(nxt.timestamp()) - 1
+
+
+@dataclass(frozen=True)
+class _MatchRow:
+    id: int
+    synced: bool
+    posted_on: date
+    order: str | int  # provider ID for synced rows, record order for CSV rows
+
+
+def _components(rows: list[_MatchRow]) -> list[list[_MatchRow]]:
+    """Connected components (size > 1) of the CSV-to-synced candidate graph."""
+    parent = list(range(len(rows)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            i = parent[i]
+        return i
+
+    for i, x in enumerate(rows):
+        for j, y in enumerate(rows):
+            if (
+                not x.synced
+                and y.synced
+                and abs((x.posted_on - y.posted_on).days) <= MATCH_DAYS
+            ):
+                parent[find(i)] = find(j)
+    out: dict[int, list[_MatchRow]] = defaultdict(list)
+    for i, x in enumerate(rows):
+        out[find(i)].append(x)
+    return [c for c in out.values() if len(c) > 1]
+
+
+def _within(complete: list[tuple[date, date]], d: date) -> bool:
+    """[d - MATCH_DAYS, d + MATCH_DAYS] lies inside one run of complete days, so
+    the other source must hold this row's counterpart (ADR 0014 amendment)."""
+    lo, hi = d - timedelta(MATCH_DAYS), d + timedelta(MATCH_DAYS)
+    start = end = date.min
+    for a, b in sorted(complete):
+        if end != date.min and a <= end + timedelta(1):
+            end = max(end, b)
+        else:
+            start, end = a, b
+        if start <= lo and hi <= end:
+            return True
+    return False
+
+
+def _pair(rows: list[_MatchRow], must: set[int]) -> list[tuple[int, int]] | None:
+    """ADR 0014 amendment: pairs for one component, or None when it is
+    ambiguous. A `must` row lies where the other source is complete, so it has
+    a counterpart; any other row may or may not. The component resolves only if
+    some matching pairs every `must` row and every such matching has the same
+    size and pairs the same rows (a smaller one would mean a purchase silently
+    lost; a different leftover row could strand a later import's row)."""
+    csv = sorted(
+        (m for m in rows if not m.synced), key=lambda m: (m.posted_on, m.order)
+    )
+    syn = sorted((m for m in rows if m.synced), key=lambda m: (m.posted_on, m.order))
+    adj = {
+        c.id: [s.id for s in syn if abs((c.posted_on - s.posted_on).days) <= MATCH_DAYS]
+        for c in csv
+    }
+    back: dict[int, list[int]] = defaultdict(list)
+    for c, ss in adj.items():
+        for s in ss:
+            back[s].append(c)
+    of_c: dict[int, int] = {}
+    of_s: dict[int, int] = {}
+
+    def augment(c: int, seen: set[int]) -> bool:
+        for s in adj[c]:
+            if s not in seen:
+                seen.add(s)
+                if s not in of_s or augment(of_s[s], seen):
+                    of_s[s], of_c[c] = c, s
+                    return True
+        return False
+
+    # a maximum matching; `must` CSV rows first, so it pairs all it can of them
+    for c in sorted(csv, key=lambda m: m.id not in must):
+        augment(c.id, set())
+    # then swap each unpaired `must` synced row in along an alternating path
+    # that frees a synced row nobody requires (CSV rows stay paired)
+    for s0 in [s.id for s in syn if s.id in must and s.id not in of_s]:
+        prev: dict[int, tuple[int, int]] = {}
+        queue, end = [s0], None
+        for s in queue:
+            if s != s0 and s not in must:
+                end = s
+                break
+            for c in back[s]:
+                nxt = of_c[c]  # every neighbour is paired, or the matching grows
+                if nxt != s0 and nxt not in prev:
+                    prev[nxt] = (c, s)
+                    queue.append(nxt)
+        if end is None:
+            return None
+        del of_s[end]
+        while end != s0:
+            c, end = prev[end]
+            of_s[end], of_c[c] = c, end
+    if any(c.id in must and c.id not in of_c for c in csv):
+        return None
+    # a smaller valid matching exists iff an alternating path runs, by paired
+    # edges at both ends, from an optional CSV row to an optional synced row
+    queue = [of_c[c.id] for c in csv if c.id in of_c and c.id not in must]
+    seen = set(queue)
+    for s in queue:
+        if s not in must:
+            return None
+        for c in back[s]:
+            nxt = of_c.get(c)
+            if nxt is not None and nxt not in seen:
+                seen.add(nxt)
+                queue.append(nxt)
+    # an equal-size matching that leaves a different row unpaired is a guess
+    # too: that row may be the one a later import's row needed. It exists iff
+    # an alternating path runs from an unpaired row to a paired optional row.
+    for side, mate, other in ((adj, of_c, of_s), (back, of_s, of_c)):
+        queue = [x for x in side if x not in mate]
+        seen = set(queue)
+        for x in queue:
+            for y in side[x]:
+                nxt = other[y]  # y is paired, or the matching was not maximum
+                if nxt not in must:
+                    return None
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append(nxt)
+    if len(of_c) == len(csv) == len(syn):  # perfect: date order, as before
+        return [(c.id, s.id) for c, s in zip(csv, syn, strict=True)]
+    return list(of_c.items())
+
+
 def _month_bounds(month: str) -> tuple[date, date]:
     start = datetime.strptime(month, "%Y-%m").date()
     end = date(start.year + start.month // 12, start.month % 12 + 1, 1)
@@ -352,6 +546,8 @@ class Ledger:
                 file_added,
                 (time.perf_counter_ns() - started) // 1_000_000,
             )
+        for account_id in accounts:
+            self._match(account_id)  # ADR 0014: after any Statement Import
         if added:
             self._link_transfers()
         if stored:
@@ -449,7 +645,9 @@ class Ledger:
                 r.posted_on,
                 r.description,
                 _decimal(r.amount_minor),
-                _decimal(r.running_balance_minor),
+                None
+                if r.running_balance_minor is None
+                else _decimal(r.running_balance_minor),
                 frozenset(hashes.get(r.id, ())),
                 r.id,
                 r.bank_type,
@@ -459,6 +657,608 @@ class Ledger:
             )
             for r in rows
         ]
+
+    # --- SimpleFIN sync (ADR 0014) -------------------------------------------
+
+    def apply_sync(self, raw: bytes) -> SyncReport:
+        """Apply one SimpleFIN `/accounts` response as one Statement Import.
+        Raises ingest's UnreadableResponse (a ValueError) and stores nothing
+        if the response breaks the protocol."""
+        started = time.perf_counter_ns()
+        parsed = simplefin.parse(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        si = schema.statement_import
+        if self._db.execute(
+            self._db.select(si, si.c.id).where(si.c.file_hash == digest)
+        ).first():
+            n = sum(len(a.rows) for a in parsed.accounts)
+            return SyncReport(
+                added=0,
+                matched=0,
+                already_known=n,
+                changed_known=0,
+                rejected_accounts=0,
+                provider_duplicates=0,
+                provider_errors=parsed.errors,
+                gaps=[],
+                accounts=[],
+            )
+        import_id = self._db.insert(
+            si,
+            source="simplefin",
+            file_hash=digest,
+            original_bytes=raw,  # pending rows live only here (ADR 0014)
+            imported_at=datetime.now(UTC),
+        )
+        self._db.bump_ledger_version()  # a stored Statement Import, as in import_files
+        added = known = changed = rejected = dupes = merged = 0
+        gaps: list[SyncGap] = []
+        touched: dict[int, str] = {}
+        position = 0
+        for acc in parsed.accounts:
+            if acc.conflicting_ids:
+                rejected += 1
+                continue
+            account_id, masked = self._synced_account(acc)
+            new_ids = {
+                row.provider_id
+                for row in acc.rows
+                if self._synced_key(account_id, row.provider_id) is None
+            }
+            for row in acc.rows:
+                position += 1
+                found = self._synced_key(account_id, row.provider_id)
+                if found is None:
+                    txn_id = self._db.insert(
+                        schema.transaction,
+                        account_id=account_id,
+                        posted_on=row.posted_on,
+                        bank_type="",
+                        description=row.description,
+                        amount_minor=row.amount_minor,
+                        currency=acc.currency,
+                        running_balance_minor=None,
+                        status="completed",
+                        origin="simplefin",
+                    )
+                    self._db.insert(
+                        schema.synced_key,
+                        account_id=account_id,
+                        provider_id=row.provider_id,
+                        transaction_id=txn_id,
+                        posted_ts=row.posted_ts,
+                        transacted_ts=row.transacted_ts,
+                        amount_minor=row.amount_minor,
+                        description=row.description,
+                    )
+                    added += 1
+                    touched[account_id] = masked
+                else:
+                    txn_id = int(found.transaction_id)
+                    known += 1
+                    if (found.amount_minor, found.description, found.posted_ts) != (
+                        row.amount_minor,
+                        row.description,
+                        row.posted_ts,
+                    ):
+                        changed += 1  # never rewrites the stored Transaction
+                self._db.insert(
+                    schema.transaction_source,
+                    transaction_id=txn_id,
+                    statement_import_id=import_id,
+                    row_number=position,
+                )
+            merged += self._match(account_id)[0]
+            dupes += self._record_duplicates(account_id, import_id, acc, new_ids)
+            gap = self._reconcile(account_id, masked, acc)
+            if gap is not None:
+                self._db.insert(
+                    schema.sync_gap,
+                    account_id=account_id,
+                    statement_import_id=import_id,
+                    balance_ts=acc.balance_ts,
+                    amount_minor=int(gap.amount.scaleb(2)),
+                )
+                gaps.append(gap)
+        self._link_transfers()  # synced rows are Transfer legs too
+        log.info(
+            "sync statement_import_id=%d added=%d known=%d changed=%d rejected=%d "
+            "duplicates=%d gaps=%d ms=%d",
+            import_id,
+            added,
+            known,
+            changed,
+            rejected,
+            dupes,
+            len(gaps),
+            (time.perf_counter_ns() - started) // 1_000_000,
+        )
+        return SyncReport(
+            added=added - merged,
+            matched=merged,
+            already_known=known,
+            changed_known=changed,
+            rejected_accounts=rejected,
+            provider_duplicates=dupes,
+            provider_errors=parsed.errors,
+            gaps=gaps,
+            accounts=[AffectedAccount(i, m) for i, m in sorted(touched.items())],
+        )
+
+    def link_synced_account(self, provider_account_id: str, account_id: int) -> None:
+        """Link a SimpleFIN Account to an existing (CSV) Account, once. If the
+        synced Account already has rows, they move into it, then rows match."""
+        a = schema.account
+        ref = keyed_ref("simplefin:" + provider_account_id)
+        target = self._db.execute(
+            self._db.select(a, a.c.provider_ref, a.c.currency).where(
+                a.c.id == account_id
+            )
+        ).first()
+        if target is None or target.provider_ref is not None:
+            raise ValueError("that Account does not exist or is already linked")
+        old = self._db.execute(
+            self._db.select(a, a.c.id, a.c.currency).where(a.c.provider_ref == ref)
+        ).first()
+        if old is not None:
+            if old.currency != target.currency:
+                raise ValueError("the Accounts have different currencies")
+            for table in (
+                schema.transaction,
+                schema.synced_key,
+                schema.sync_anchor,
+                schema.sync_gap,
+                schema.possible_duplicate,
+            ):
+                self._db.execute(
+                    self._db.update(table)
+                    .where(table.c.account_id == old.id)
+                    .values(account_id=account_id)
+                )
+            self._db.execute(self._db.delete(a).where(a.c.id == old.id))
+        self._db.execute(
+            self._db.update(a).where(a.c.id == account_id).values(provider_ref=ref)
+        )
+        self._match(account_id)
+        self._link_transfers()
+
+    def unlinked_csv_accounts(self) -> dict[str, int]:
+        """Accounts no synced Account is linked to, by masked number."""
+        a = schema.account
+        return {
+            str(r.masked_number): int(r.id)
+            for r in self._db.execute(
+                self._db.select(a, a.c.id, a.c.masked_number).where(
+                    a.c.provider_ref.is_(None)
+                )
+            )
+        }
+
+    def synced_account_linked(self, provider_account_id: str) -> bool:
+        """True once that SimpleFIN Account is linked to a CSV Account."""
+        a = schema.account
+        ref = keyed_ref("simplefin:" + provider_account_id)
+        return (
+            self._db.execute(
+                self._db.select(a, a.c.id).where(
+                    a.c.provider_ref == ref, a.c.external_ref != ref
+                )
+            ).first()
+            is not None
+        )
+
+    def unlinked_synced_accounts(self) -> int:
+        """Synced Accounts still standing alone (ADR 0014: two Accounts until
+        the user links them)."""
+        a = schema.account
+        return len(
+            self._db.execute(
+                self._db.select(a, a.c.id).where(a.c.provider_ref == a.c.external_ref)
+            ).all()
+        )
+
+    def ambiguous_matches(self) -> list[frozenset[int]]:
+        """ADR 0014 ambiguous CSV-to-sync components, re-evaluated each import."""
+        a = schema.account
+        out: list[frozenset[int]] = []
+        for (account_id,) in self._db.execute(
+            self._db.select(a, a.c.id).where(a.c.provider_ref.is_not(None))
+        ):
+            out += self._match(account_id, merge=False)[1]
+        return out
+
+    def possible_duplicates(self) -> list[frozenset[int]]:
+        """ADR 0014 Possible Duplicates: ambiguous matching components, then
+        provider duplicates (a) and re-issued IDs (b). Kept apart, surfaced."""
+        out = self.ambiguous_matches()
+        pd = schema.possible_duplicate
+        groups: dict[int, set[int]] = defaultdict(set)
+        for r in self._db.execute(
+            self._db.select(pd, pd.c.group_id, pd.c.transaction_id)
+        ):
+            groups[int(r.group_id)].add(int(r.transaction_id))
+        return out + [frozenset(g) for _, g in sorted(groups.items())]
+
+    def sync_gaps(self) -> list[SyncGap]:
+        g, a = schema.sync_gap, schema.account
+        rows = self._db.execute(
+            self._db.select(g, g.c.account_id, a.c.masked_number, g.c.balance_ts)
+            .add_columns(g.c.amount_minor)
+            .join(a, self._db.on(a, a.c.id == g.c.account_id))
+            .order_by(g.c.id)
+        )
+        return [
+            SyncGap(
+                AffectedAccount(r.account_id, r.masked_number),
+                datetime.fromtimestamp(r.balance_ts, UTC),
+                _decimal(r.amount_minor),
+            )
+            for r in rows
+        ]
+
+    def _status_row(self) -> Any:
+        t = schema.sync_status
+        return self._db.execute(self._db.select(t)).first()
+
+    def _set_status(self, **values: Any) -> None:
+        t = schema.sync_status
+        if self._status_row() is None:
+            self._db.insert(t, **values)
+        else:
+            self._db.execute(self._db.update(t).values(**values))
+
+    def record_sync_success(self, now: datetime) -> None:
+        self._set_status(
+            last_success_ts=int(now.timestamp()),
+            last_failure_ts=None,
+            failure_class=None,
+            failures_in_a_row=0,
+        )
+
+    def record_sync_failure(self, error_class: str, now: datetime) -> None:
+        """Only the exception class name is kept: messages may quote data."""
+        row = self._status_row()
+        self._set_status(
+            last_failure_ts=int(now.timestamp()),
+            failure_class=error_class[:64],
+            failures_in_a_row=(row.failures_in_a_row if row else 0) + 1,
+        )
+
+    def record_consent_renewed(self, on: date) -> None:
+        self._set_status(consent_renewed_on=on)
+
+    def sync_status(self, today: date | None = None) -> SyncStatus:
+        today = today or datetime.now(simplefin.LONDON).date()
+        row = self._status_row()
+
+        def at(ts: int | None) -> datetime | None:
+            return None if ts is None else datetime.fromtimestamp(ts, UTC)
+
+        renewed = row.consent_renewed_on if row else None
+        expires = renewed + timedelta(days=simplefin.CONSENT_DAYS) if renewed else None
+        left = (expires - today).days if expires else None
+        return SyncStatus(
+            last_sync_at=at(row.last_success_ts if row else None),
+            last_failure_at=at(row.last_failure_ts if row else None),
+            failure_class=row.failure_class if row else None,
+            failures_in_a_row=row.failures_in_a_row if row else 0,
+            consent_renewed_on=renewed,
+            consent_expires_on=expires,
+            consent_days_left=left,
+            consent_warning=left is not None and left <= simplefin.CONSENT_WARN_DAYS,
+        )
+
+    def alert_is_new(self, key: str | None) -> bool:
+        """Remember the alert last shown; True only when `key` differs from it,
+        so an unchanged problem is not announced again on every run. Pass None
+        when all is well: it clears the memory (and returns True, which the
+        caller ignores), so the same problem recurring later is announced."""
+        row = self._status_row()
+        if (row.notified if row else None) == key:
+            return False
+        self._set_status(notified=key)
+        return True
+
+    def sync_since(self, today: date) -> date:
+        """First day to fetch: the last synced posted date minus an overlap, or
+        the provider's history on a first sync."""
+        k = schema.synced_key
+        newest = (
+            self._db.select(k, func.max(k.c.posted_ts).label("ts"))
+            .group_by(k.c.account_id)
+            .subquery()
+        )
+        # the stalest Account decides, so no Account's late rows fall outside
+        last = self._db.execute(select(func.min(newest.c.ts))).scalar()
+        if last is None:
+            return today - timedelta(days=simplefin.FIRST_SYNC_DAYS)
+        posted = datetime.fromtimestamp(int(last), simplefin.LONDON).date()
+        return min(today, posted) - timedelta(days=simplefin.OVERLAP_DAYS)
+
+    def _synced_account(self, acc: simplefin.SyncedAccount) -> tuple[int, str]:
+        a = schema.account
+        ref = keyed_ref("simplefin:" + acc.provider_id)
+        found = self._db.execute(
+            self._db.select(a, a.c.id, a.c.masked_number).where(a.c.provider_ref == ref)
+        ).first()
+        if found is not None:
+            return int(found.id), str(found.masked_number)
+        masked = "••" + acc.provider_id[-4:]  # opaque provider ID, not a number
+        new = self._db.insert(
+            a,
+            bank_id=self._bank_id(acc.org[:64] or "SimpleFIN"),
+            external_ref=ref,
+            provider_ref=ref,
+            name=acc.name[:128] or "Synced account",
+            kind="current",
+            masked_number=masked,
+            currency=acc.currency,
+        )
+        return new, masked
+
+    def _synced_key(self, account_id: int, provider_id: str) -> Any:
+        k = schema.synced_key
+        return self._db.execute(
+            self._db.select(
+                k, k.c.transaction_id, k.c.amount_minor, k.c.description, k.c.posted_ts
+            ).where(k.c.account_id == account_id, k.c.provider_id == provider_id)
+        ).first()
+
+    def _record_duplicates(
+        self,
+        account_id: int,
+        import_id: int,
+        acc: simplefin.SyncedAccount,
+        new: set[str],
+    ) -> int:
+        """ADR 0014 Possible Duplicates for rows new in this response, kept and
+        surfaced, never merged: (a) same date, amount and raw text under distinct
+        IDs in this response; (b) same amount and text within MATCH_DAYS of a
+        known row whose ID is absent although this response covers its date
+        (a re-issued ID). Call after `_match`, so ids are final. Returns rows."""
+        if not new or not acc.rows:
+            return 0
+        k = schema.synced_key
+        txn_of = {
+            str(r.provider_id): int(r.transaction_id)
+            for r in self._db.execute(
+                self._db.select(k, k.c.provider_id, k.c.transaction_id).where(
+                    k.c.account_id == account_id
+                )
+            )
+        }
+        groups: list[set[int]] = []
+        same: dict[tuple[date, int, str], list[str]] = defaultdict(list)
+        for row in acc.rows:
+            same[(row.posted_on, row.amount_minor, row.description)].append(
+                row.provider_id
+            )
+        groups += [
+            {txn_of[i] for i in ids}
+            for ids in same.values()
+            if len(ids) > 1 and new.intersection(ids)
+        ]
+        seen = {row.provider_id for row in acc.rows}
+        lo = min(row.posted_on for row in acc.rows)
+        hi = max(row.posted_on for row in acc.rows)
+        absent = [
+            r
+            for r in self._db.execute(
+                self._db.select(k, k.c.provider_id, k.c.transaction_id, k.c.posted_ts)
+                .add_columns(k.c.amount_minor, k.c.description)
+                .where(k.c.account_id == account_id)
+            )
+            if r.provider_id not in seen
+        ]
+        for row in acc.rows:
+            if row.provider_id not in new:
+                continue
+            for r in absent:
+                on = datetime.fromtimestamp(int(r.posted_ts), simplefin.LONDON).date()
+                if (
+                    lo <= on <= hi
+                    and (r.amount_minor, r.description)
+                    == (row.amount_minor, row.description)
+                    and abs((on - row.posted_on).days) <= MATCH_DAYS
+                ):
+                    groups.append({int(r.transaction_id), txn_of[row.provider_id]})
+        pd = schema.possible_duplicate
+        rows = 0
+        for g in groups:
+            if len(g) < 2:
+                continue  # both rows matched into one CSV Transaction
+            group_id = 1 + int(
+                self._db.execute(
+                    self._db.select(pd, func.coalesce(func.max(pd.c.group_id), 0))
+                ).scalar()
+                or 0
+            )
+            for txn_id in g:
+                self._db.insert(
+                    pd,
+                    group_id=group_id,
+                    transaction_id=txn_id,
+                    account_id=account_id,
+                    statement_import_id=import_id,
+                )
+            rows += len(g)
+        return rows
+
+    def _match(
+        self, account_id: int, *, merge: bool = True
+    ) -> tuple[int, list[frozenset[int]]]:
+        """ADR 0014 CSV-to-sync matching over the Account's unmatched rows.
+        Pairs merge into the CSV Transaction; returns (pairs merged, ambiguous
+        components)."""
+        a, t, k = schema.account, schema.transaction, schema.synced_key
+        linked = self._db.execute(
+            self._db.select(a, a.c.provider_ref).where(a.c.id == account_id)
+        ).scalar()
+        if linked is None:
+            return 0, []
+        rows = self._db.execute(
+            self._db.select(
+                t,
+                t.c.id,
+                t.c.origin,
+                t.c.posted_on,
+                t.c.description,
+                t.c.amount_minor,
+                t.c.currency,
+                k.c.provider_id,
+            )
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
+            .where(t.c.account_id == account_id)
+        ).all()
+        groups: dict[tuple[int, str, str], list[_MatchRow]] = defaultdict(list)
+        for r in rows:
+            synced = r.origin == "simplefin"
+            if not synced and r.provider_id is not None:
+                continue  # a CSV row already matched: final
+            text = normalise(r.description)
+            if text:
+                groups[(r.amount_minor, r.currency, text)].append(
+                    _MatchRow(r.id, synced, r.posted_on, r.provider_id or r.id)
+                )
+        ambiguous: list[frozenset[int]] = []
+        merged = 0
+        complete = self._coverage(account_id) if groups else {}
+        for group in groups.values():
+            for component in _components(group):
+                must = {
+                    m.id
+                    for m in component
+                    if _within(
+                        complete["csv" if m.synced else "simplefin"], m.posted_on
+                    )
+                }
+                pairs = _pair(component, must)
+                if pairs is None:
+                    ambiguous.append(frozenset(m.id for m in component))
+                elif merge:
+                    for c, s in pairs:
+                        self._merge(c, s)
+                    merged += len(pairs)
+        return merged, ambiguous
+
+    def _coverage(self, account_id: int) -> dict[str, list[tuple[date, date]]]:
+        """ADR 0014 amendment: per source, the days each Statement Import holds
+        completely for the Account: from its first row's date (a sync asks from
+        London midnight; a CSV export may start mid-day, so not its first day)
+        to the day before its last row's (that day may still gain rows). A CSV
+        export whose dates are out of Bank order shows Bank order is not date
+        order, so no CSV export of the Account gives coverage."""
+        t, ts, si, k = (
+            schema.transaction,
+            schema.transaction_source,
+            schema.statement_import,
+            schema.synced_key,
+        )
+        days: dict[tuple[str, int], list[tuple[int, date]]] = defaultdict(list)
+        for r in self._db.execute(
+            self._db.select(
+                ts,
+                si.c.source,
+                ts.c.statement_import_id,
+                ts.c.bank_position,
+                t.c.posted_on,
+                k.c.posted_ts,
+            )
+            .join(si, self._db.on(si, si.c.id == ts.c.statement_import_id))
+            .join(t, self._db.on(t, t.c.id == ts.c.transaction_id))
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
+            .where(t.c.account_id == account_id)
+        ):
+            on = r.posted_on
+            if r.source == "simplefin" and r.posted_ts is not None:
+                on = datetime.fromtimestamp(int(r.posted_ts), simplefin.LONDON).date()
+            days[(str(r.source), int(r.statement_import_id))].append(
+                (int(r.bank_position), on)
+            )
+        unordered = any(
+            [d for _, d in sorted(rows)] != sorted(d for _, d in rows)
+            for (source, _), rows in days.items()
+            if source == "csv"
+        )
+        out: dict[str, list[tuple[date, date]]] = defaultdict(list)
+        for (source, _), rows in days.items():
+            if source == "csv" and unordered:
+                continue
+            ds = [d for _, d in rows]
+            lo = min(ds) + timedelta(0 if source == "simplefin" else 1)
+            hi = max(ds) - timedelta(1)
+            if lo <= hi:
+                out[source].append((lo, hi))
+        return out
+
+    def _merge(self, csv_id: int, synced_id: int) -> None:
+        """A matched pair becomes one Transaction: the CSV one stays and takes the
+        synced key and sources; the synced copy goes. Its Categorisation and
+        Transfer link are derived, so they go too and are rebuilt."""
+        t, tl, cat = schema.transaction, schema.transfer_link, schema.categorisation
+        self._db.execute(self._db.delete(cat).where(cat.c.transaction_id == synced_id))
+        self._db.execute(
+            self._db.delete(tl).where(
+                (tl.c.from_transaction_id == synced_id)
+                | (tl.c.to_transaction_id == synced_id)
+            )
+        )
+        for table in (
+            schema.synced_key,
+            schema.transaction_source,
+            schema.possible_duplicate,
+        ):
+            self._db.execute(
+                self._db.update(table)
+                .where(table.c.transaction_id == synced_id)
+                .values(transaction_id=csv_id)
+            )
+        self._db.execute(self._db.delete(t).where(t.c.id == synced_id))
+
+    def _reconcile(
+        self,
+        account_id: int,
+        masked: str,
+        acc: simplefin.SyncedAccount,
+    ) -> SyncGap | None:
+        """ADR 0014: B_k - B_1 - sum of Transactions with instant in (t_1, t_k].
+        B is the reported balance less pending rows: spike #26 found it includes
+        them (balance == available-balance with a pending row present)."""
+        balance = acc.balance_minor - acc.pending_minor
+        anchor = schema.sync_anchor
+        first = self._db.execute(
+            self._db.select(anchor, anchor.c.balance_minor, anchor.c.balance_ts).where(
+                anchor.c.account_id == account_id
+            )
+        ).first()
+        if first is None:
+            self._db.insert(
+                anchor,
+                account_id=account_id,
+                balance_minor=balance,
+                balance_ts=acc.balance_ts,
+            )
+            return None
+        t, k = schema.transaction, schema.synced_key
+        moved = 0
+        for r in self._db.execute(
+            self._db.select(t, t.c.posted_on, t.c.amount_minor, k.c.posted_ts)
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
+            .where(t.c.account_id == account_id)
+        ):
+            instant = (
+                r.posted_ts if r.posted_ts is not None else _end_of_day_ts(r.posted_on)
+            )
+            if first.balance_ts < instant <= acc.balance_ts:
+                moved += r.amount_minor
+        gap = balance - first.balance_minor - moved
+        if not gap:
+            return None
+        return SyncGap(
+            AffectedAccount(account_id, masked),
+            datetime.fromtimestamp(acc.balance_ts, UTC),
+            _decimal(gap),
+        )
 
     def spending_by_category(
         self, month: str, account_id: int | None = None
@@ -1053,7 +1853,14 @@ class Ledger:
                     t.c.description,
                     t.c.amount_minor,
                     t.c.running_balance_minor,
-                ).where(t.c.account_id == account_id)
+                ).where(
+                    t.c.account_id == account_id,
+                    # shortcut: synced rows have no running balance, so Bank order
+                    # and these balances cover CSV rows only; synced Accounts
+                    # reconcile through sync_gaps() (ADR 0014). Unify when the
+                    # Accounts screen shows synced balances.
+                    t.c.running_balance_minor.is_not(None),
+                )
             )
         }
         after: dict[int, set[int]] = {i: set() for i in rows}
@@ -1159,15 +1966,16 @@ class Ledger:
 
     def _account_id(self, bank_id: int, row: ingest.ParsedRow) -> int:
         a = schema.account
+        ref = keyed_ref(row.account_ref)
         found = self._db.execute(
-            self._db.select(a, a.c.id).where(a.c.external_ref == row.account_ref)
+            self._db.select(a, a.c.id).where(a.c.external_ref == ref)
         ).scalar()
         if found is not None:
             return int(found)
         new = self._db.insert(
             a,
             bank_id=bank_id,
-            external_ref=row.account_ref,
+            external_ref=ref,
             name=f"Account {row.masked_number}",
             kind="current",
             masked_number=row.masked_number,

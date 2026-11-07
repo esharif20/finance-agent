@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, sep } from "node:path";
+import { delimiter, dirname, join, sep } from "node:path";
 
 const require = createRequire(import.meta.url);
 // pnpm run leaves npm_config_* in the env, which makes `npm root -g` print a relative path
@@ -21,6 +21,14 @@ const { webkit } = require(process.env.PLAYWRIGHT_MODULE ?? `${globalRoot}/playw
 const temps = [tmpdir(), "/tmp"].filter(existsSync).map((d) => realpathSync(d));
 const underTemp = (file) => existsSync(file) && temps.some((t) => realpathSync(dirname(file)).startsWith(t + sep));
 let seeded; // the temp dir this run made, removed at the end
+// The ledger key comes from a throwaway keyring in its own temp dir: CI has no keychain and
+// the smoke run must never touch the login Keychain (web/e2e/smoke_keyring.py).
+const keyDir = mkdtempSync(join(tmpdir(), "fa-smoke-key-"));
+const keyringEnv = {
+  PYTHON_KEYRING_BACKEND: "smoke_keyring.SmokeKeyring",
+  FA_SMOKE_KEYRING_FILE: join(keyDir, "keyring.json"),
+  PYTHONPATH: [join(process.cwd(), "e2e"), process.env.PYTHONPATH].filter(Boolean).join(delimiter),
+};
 let db = process.env.FA_DB_PATH;
 if (!db) {
   seeded = mkdtempSync(join(tmpdir(), "fa-smoke-"));
@@ -30,7 +38,7 @@ if (!db) {
     .trim()
     .split("\n");
   execFileSync("uv", ["run", "fa", "import", ...files], {
-    env: { ...process.env, FA_DB_PATH: db },
+    env: { ...process.env, ...keyringEnv, FA_DB_PATH: db },
     cwd: "..",
     stdio: ["ignore", "ignore", "inherit"],
   });
@@ -41,7 +49,7 @@ if (!underTemp(db)) {
 }
 
 const port = process.env.FA_PORT ?? "8791";
-const env = { ...process.env, FA_DB_PATH: db, FA_PORT: port, FA_NO_BROWSER: "1" };
+const env = { ...process.env, ...keyringEnv, FA_DB_PATH: db, FA_PORT: port, FA_NO_BROWSER: "1" };
 const fa = (...args) => execFileSync("uv", ["run", "fa", ...args], { env, cwd: "..", stdio: "inherit" });
 const base = `http://127.0.0.1:${port}`;
 const shots = process.argv[2];
@@ -142,6 +150,7 @@ try {
 } finally {
   fa("stop");
   if (seeded) rmSync(seeded, { recursive: true, force: true });
+  rmSync(keyDir, { recursive: true, force: true });
 }
 if (failed) process.exit(1);
 console.log("smoke: Overview totals match the API");

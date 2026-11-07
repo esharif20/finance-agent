@@ -5,7 +5,9 @@ import { NoData, type CategoryDetail, fetchCategory, fetchMonths } from "@/api/c
 import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ManageLink } from "@/components/ManageLink";
 import { categoryColour } from "@/lib/categories";
+import { isSubscription } from "@/lib/manageLinks";
 import { accountHref, categoryHref } from "@/lib/route";
 import { MonthSwitcher } from "./MonthSwitcher";
 import { monthLabel } from "./MonthCard";
@@ -73,7 +75,7 @@ function Trend({ data, colour }: { data: CategoryDetail; colour: string }) {
   );
 }
 
-function Transactions({ data }: { data: CategoryDetail }) {
+function Transactions({ data, category }: { data: CategoryDetail; category: string }) {
   return (
     <Card aria-labelledby="txns-title">
       <CardHeader>
@@ -94,6 +96,7 @@ function Transactions({ data }: { data: CategoryDetail }) {
                 {t.subcategory ? ` · ${t.subcategory}` : ""}
               </p>
             </div>
+            {isSubscription([category, t.subcategory ?? ""]) && <ManageLink merchant={t.merchant} />}
             <Money value={t.amount as Point} sign className="text-row font-semibold" />
           </li>
         ))}
@@ -207,7 +210,7 @@ export function CategoryScreen({
           </CardHeader>
           <Trend data={d} colour={colour} />
         </Card>
-        <Transactions data={d} />
+        <Transactions data={d} category={category} />
       </div>
     );
   };

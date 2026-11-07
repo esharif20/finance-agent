@@ -1,0 +1,31 @@
+# synthetic
+{
+  "errors": ["synthetic provider notice"],
+  "accounts": [
+    {
+      "org": {"domain": "bank.example", "name": "Example Bank", "sfin-url": "https://bridge.example/simplefin"},
+      "id": "000123",
+      "name": "Synthetic Current",
+      "currency": "GBP",
+      "balance": "1050.25",
+      "available-balance": "1000.00",
+      "balance-date": 1772366400,
+      "transactions": [
+        {"id": "0001", "posted": 1772323200, "amount": "-4.50", "description": "CAFE NERO", "transacted_at": 1772200000},
+        {"id": "1", "posted": 1772323200, "amount": "-4.50", "description": "CAFE NERO"},
+        {"id": "1", "posted": 1772323200, "amount": "-4.50", "description": "CAFE NERO"},
+        {"id": "77", "posted": 1772290000, "amount": "2000", "description": "SALARY", "payee": "Employer", "memo": "x", "extra": {"k": "v"}},
+        {"id": "p9", "posted": 0, "amount": "-12.99", "description": "PENDING SHOP", "pending": true}
+      ]
+    },
+    {
+      "org": {"domain": "other.example", "name": "Other Bank"},
+      "id": "42",
+      "name": "Synthetic Saver",
+      "currency": "GBP",
+      "balance": "-0.01",
+      "balance-date": 1772366400,
+      "transactions": []
+    }
+  ]
+}

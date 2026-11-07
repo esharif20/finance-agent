@@ -32,7 +32,7 @@ from synthetic_lloyds.generator import SORT_CODE, START
 
 LedgerFor = Callable[[int], Ledger]
 WriteExport = Callable[[str], Path]
-Key = tuple[str, str, Decimal, Decimal]
+Key = tuple[str, str, Decimal, Decimal | None]
 
 
 def key(t: Txn) -> Key:

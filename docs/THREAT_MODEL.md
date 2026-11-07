@@ -20,6 +20,7 @@ Status: draft for review. Grows with each milestone.
 | B5 | `gateway` → cloud | Placeholder payload | Allowlist only: intent, generic Category names, placeholders, size buckets, months. Never merchants, amounts, exact dates, account details or Memory text (ADR 0011). |
 | B6 | Mac → backup storage | restic chunks | Encrypted on the Mac before upload. |
 | B7 | Repo → GitHub (public) | Code, fixtures, issues | Synthetic data only. Enforced by gitleaks and the fixture guard in CI. |
+| B8 | `ingest` ↔ SimpleFIN aggregator (Lunch Flow, via GoCardless Bank Account Data) | Access token out; Accounts, balances, Transactions in | One pinned host, HTTPS, read-only; token in Keychain; responses untrusted and parsed strictly like CSVs (ADR 0013). |
 
 ## Threats and mitigations
 
@@ -30,9 +31,10 @@ Status: draft for review. Grows with each milestone.
 | Prompt injection via merchant descriptors or CSV cells | Descriptions are data fields, truncated to 60 characters, instruction-like text stripped; the Assistant has no write tools apart from Proposals that need a click; CI injection suite | A misleading explanation; caught by the grounding check if it involves figures |
 | Prompt injection via chat | Same tool limits; router cannot reach tools outside its sub-graph | As above |
 | LLM invents figures | Grounding check: every figure must match a tool result in that turn (ADR 0007) | Wrong words around correct figures |
-| Data leaves via tracing or telemetry | LangSmith and external tracing disabled; CI egress test allows only localhost Ollama | Third-party library adding telemetry in an update; the egress test catches it in CI |
+| Data leaves via tracing or telemetry | LangSmith and external tracing disabled; CI egress test allows only localhost Ollama and the pinned SimpleFIN host from `ingest` | Third-party library adding telemetry in an update; the egress test catches it in CI |
 | Cloud provider sees personal data | Placeholders, allowlist, opt-in, payload log (ADR 0011) | Patterns inferable from generic Category names and month-level timing |
-| Runaway cloud spend | Cost meter with hard £7 cap (ADR 0012) | None beyond the cap |
+| Aggregator sees or leaks the user's bank data | One read-only SimpleFIN provider (Lunch Flow, relaying through the regulated GoCardless Bank Account Data; bank consent expires every 90 days and Lunch Flow retains data for 90 days) on a pinned host; consent age and sync failures are shown by `fa summary` with error class and counts only; token in Keychain and revocable with `fa disconnect`; provider's retention and deletion terms checked in the spike before connecting (ADR 0013) | The provider holds a copy of transactions under its own terms; a breach there is outside the app's control |
+| Runaway paid spend | One cost meter with a hard £9 monthly cap: aggregator ≤ £5, pay-as-you-go ≤ £4 (ADR 0013) | None beyond the cap |
 | Arbitrary file access through the app | No tool reads files; `ingest` reads only paths given on the CLI; the API has no file-path parameters; the app refuses to read data from inside the repo | |
 | Card art endpoint used to read other files | `/api/card-art/{key}` takes only allowlisted keys (`lloyds`, `hsbc`, `revolut`), resolves inside `card-art/` in the data directory, opens once with no symlinks followed and reads at most 2 MB from that handle (no TOCTOU), refuses FIFOs and devices, sniffs PNG/JPEG/WebP magic bytes (else 415), caps at 2 MB (413), sends `no-store` and `nosniff` (#58) | Anyone who can write to the data directory can change the picture |
 | Local network attacker | Server binds to `127.0.0.1` only | Other local processes on the same Mac can reach the port; acceptable for one user |
