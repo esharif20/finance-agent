@@ -365,7 +365,8 @@ def _pair(rows: list[_MatchRow], must: set[int]) -> list[tuple[int, int]] | None
     ambiguous. A `must` row lies where the other source is complete, so it has
     a counterpart; any other row may or may not. The component resolves only if
     some matching pairs every `must` row and every such matching has the same
-    size (a smaller one would mean a purchase silently lost)."""
+    size and pairs the same rows (a smaller one would mean a purchase silently
+    lost; a different leftover row could strand a later import's row)."""
     csv = sorted(
         (m for m in rows if not m.synced), key=lambda m: (m.posted_on, m.order)
     )
@@ -427,6 +428,20 @@ def _pair(rows: list[_MatchRow], must: set[int]) -> list[tuple[int, int]] | None
             if nxt is not None and nxt not in seen:
                 seen.add(nxt)
                 queue.append(nxt)
+    # an equal-size matching that leaves a different row unpaired is a guess
+    # too: that row may be the one a later import's row needed. It exists iff
+    # an alternating path runs from an unpaired row to a paired optional row.
+    for side, mate, other in ((adj, of_c, of_s), (back, of_s, of_c)):
+        queue = [x for x in side if x not in mate]
+        seen = set(queue)
+        for x in queue:
+            for y in side[x]:
+                nxt = other[y]  # y is paired, or the matching was not maximum
+                if nxt not in must:
+                    return None
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append(nxt)
     if len(of_c) == len(csv) == len(syn):  # perfect: date order, as before
         return [(c.id, s.id) for c, s in zip(csv, syn, strict=True)]
     return list(of_c.items())
@@ -1130,17 +1145,24 @@ class Ledger:
         """ADR 0014 amendment: per source, the days each Statement Import holds
         completely for the Account: from its first row's date (a sync asks from
         London midnight; a CSV export may start mid-day, so not its first day)
-        to the day before its last row's (that day may still gain rows)."""
+        to the day before its last row's (that day may still gain rows). A CSV
+        export whose dates are out of Bank order shows Bank order is not date
+        order, so no CSV export of the Account gives coverage."""
         t, ts, si, k = (
             schema.transaction,
             schema.transaction_source,
             schema.statement_import,
             schema.synced_key,
         )
-        days: dict[tuple[str, int], list[date]] = defaultdict(list)
+        days: dict[tuple[str, int], list[tuple[int, date]]] = defaultdict(list)
         for r in self._db.execute(
             self._db.select(
-                ts, si.c.source, ts.c.statement_import_id, t.c.posted_on, k.c.posted_ts
+                ts,
+                si.c.source,
+                ts.c.statement_import_id,
+                ts.c.bank_position,
+                t.c.posted_on,
+                k.c.posted_ts,
             )
             .join(si, self._db.on(si, si.c.id == ts.c.statement_import_id))
             .join(t, self._db.on(t, t.c.id == ts.c.transaction_id))
@@ -1150,9 +1172,19 @@ class Ledger:
             on = r.posted_on
             if r.source == "simplefin" and r.posted_ts is not None:
                 on = datetime.fromtimestamp(int(r.posted_ts), simplefin.LONDON).date()
-            days[(str(r.source), int(r.statement_import_id))].append(on)
+            days[(str(r.source), int(r.statement_import_id))].append(
+                (int(r.bank_position), on)
+            )
+        unordered = any(
+            [d for _, d in sorted(rows)] != sorted(d for _, d in rows)
+            for (source, _), rows in days.items()
+            if source == "csv"
+        )
         out: dict[str, list[tuple[date, date]]] = defaultdict(list)
-        for (source, _), ds in days.items():
+        for (source, _), rows in days.items():
+            if source == "csv" and unordered:
+                continue
+            ds = [d for _, d in rows]
             lo = min(ds) + timedelta(0 if source == "simplefin" else 1)
             hi = max(ds) - timedelta(1)
             if lo <= hi:

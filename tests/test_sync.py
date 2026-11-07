@@ -486,3 +486,57 @@ def test_another_users_sync_never_reaches_this_users_views(
     assert b.sync_gaps() == []
     assert b.possible_duplicates() == same_day_repeats(b)
     assert {t.id for t in a.transactions()}.isdisjoint(t.id for t in b.transactions())
+
+
+def test_a_back_valued_csv_row_never_widens_coverage() -> None:
+    # Verifier, #74. Bank order is not date order: the export holds rows 1-3
+    # (6 Jan, a refund back-valued to 1 Jan, 12 Jan), so it is complete only from
+    # 7 Jan, not from 2 Jan. A coffee bought 5 Jan (not in the export) posts on
+    # 8 Jan in the sync, which starts on 8 Jan and misses the 6 Jan coffee. Two
+    # real coffees: they must stay two, or be surfaced, never merged into one.
+    ev = [
+        (date(2026, 1, 5), "DEB", "CAFE NERO 0042", -350),
+        (date(2026, 1, 6), "DEB", "CAFE NERO 0042", -350),
+        (date(2026, 1, 1), "CR", "REFUND SHOP", 100),
+        (date(2026, 1, 12), "DEB", "TFL TRAVEL", -200),
+    ]
+    h = History(SORT_CODE, "00000001", _with_balances(ev, 100000))
+    with temp_ledger() as (led, d):
+        csv = d / "export.csv"
+        csv.write_text(render_export(h, 1, 4).text)
+        led.import_files([csv])
+        led.apply_sync(skewed_sync(h, [3, 0, 0, 0], 7, 10))
+        (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
+        led.link_synced_account("ACC-1", acc.id)
+        coffees = [t for t in led.transactions() if "NERO" in t.description.upper()]
+        assert len(coffees) == 2 or led.possible_duplicates()
+
+
+def test_a_guessed_pairing_never_strands_a_later_csv_row() -> None:
+    # Verifier, #74. Two real coffees: CSV 9 Jan / synced 10 Jan, and CSV 11 Jan /
+    # synced 13 Jan. The first export starts after the 9 Jan coffee, so the 11 Jan
+    # one may pair with either synced coffee: equal size, different rows left
+    # over. Pairing it with 10 Jan strands the 9 Jan coffee a later export brings
+    # (4 days from 13 Jan): three coffees, nothing surfaced. Equal size is not
+    # enough; which rows stay unpaired must be fixed too.
+    ev = [
+        (date(2026, 1, 8), "DEB", "SHOP A", -100),
+        (date(2026, 1, 9), "DEB", "CAFE NERO 0042", -350),
+        (date(2026, 1, 9), "DEB", "TFL TRAVEL", -200),
+        (date(2026, 1, 11), "DEB", "CAFE NERO 0042", -350),
+        (date(2026, 1, 14), "DEB", "SHOP B", -300),
+        (date(2026, 1, 16), "DEB", "SHOP C", -400),
+    ]
+    h = History(SORT_CODE, "00000001", _with_balances(ev, 100000))
+    with temp_ledger() as (led, d):
+        first, later = d / "first.csv", d / "later.csv"
+        first.write_text(render_export(h, 2, 5).text)
+        later.write_text(render_export(h, 0, 5).text)
+        led.import_files([first])
+        led.apply_sync(skewed_sync(h, [0, 1, 0, 2, 0, 0], 7, 15))
+        (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
+        led.link_synced_account("ACC-1", acc.id)
+        led.import_files([later])
+        coffees = {t.id for t in led.transactions() if "NERO" in t.description.upper()}
+        surfaced = {i for g in led.possible_duplicates() for i in g}
+        assert len(coffees) == 2 or coffees & surfaced

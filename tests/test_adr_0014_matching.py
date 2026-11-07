@@ -73,7 +73,7 @@ def resolve(
 ) -> list[tuple[str, str]] | None:
     """Pairs for one component, or None when ambiguous: by brute force, every
     matching that pairs each `must` row is an explanation; the component
-    resolves only if one exists and all have the same size."""
+    resolves only if one exists and all pair the same rows (so the same size)."""
     cs = sorted((r for r in group if r.source == "csv"), key=lambda r: (r.day, r.key))
     ss = sorted(
         (r for r in group if r.source == "synced"), key=lambda r: (r.day, r.key)
@@ -93,7 +93,8 @@ def resolve(
                 walk(i + 1, used | {s.key}, [*acc, (c, s)])
 
     walk(0, frozenset(), [])
-    if not found or len({len(m) for m in found}) > 1:
+    # the same rows stay unpaired in every explanation, else the leftover is a guess
+    if not found or len({frozenset(k for p in m for k in p) for m in found}) > 1:
         return None
     if len(found[0]) == len(cs) == len(ss):  # perfect: pair in date order
         return [(c.key, s.key) for c, s in zip(cs, ss, strict=True)]
