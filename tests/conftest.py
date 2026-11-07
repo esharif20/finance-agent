@@ -32,6 +32,11 @@ def _never_touch_real_data(
             pytest.fail(f"test reached the real data directory: {REAL_DATA_DIR}")
         return inside_repo(path)
 
+    # no test lists real volumes or runs diskutil; backup tests install a fake
+    from finance_agent.cli import backup
+
+    monkeypatch.setattr(backup, "VOLUMES", list)
+
     monkeypatch.setattr(storage, "_inside_repo", guarded)
 
 

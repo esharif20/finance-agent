@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Eye, EyeOff, LayoutDashboard, ListOrdered } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
+import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
 import { NavTabs } from "@/components/NavTabs";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
@@ -73,9 +74,10 @@ export function App() {
             />
           ) : (
             <>
-              <h1 className="mb-6 text-title">
-                {TABS.find((t) => t.id === tab)?.label}
-              </h1>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <h1 className="text-title">{TABS.find((t) => t.id === tab)?.label}</h1>
+                <BackupStatus />
+              </div>
               {route.name === "transactions" ? <Transactions /> : <Overview account={route.account} />}
             </>
           )}

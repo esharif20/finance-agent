@@ -51,7 +51,7 @@ Acceptance:
 
 ## M3: Real data readiness and learning categories
 
-SQLCipher with Keychain key (gate for real data, ADR 0002); restic backups and `fa restore`; HSBC and Revolut importers; FX conversion with provenance; Transfer detection; Review Queue; ML classifier if it beats the rules baseline; model registry and shadow mode; read-only bank sync through one SimpleFIN aggregator (ADR 0013, ADR 0014).
+SQLCipher with Keychain key (gate for real data, ADR 0002); light local backups to a registered external drive and `fa restore` (#95); HSBC and Revolut importers; FX conversion with provenance; Transfer detection; Review Queue; ML classifier if it beats the rules baseline; model registry and shadow mode; read-only bank sync through one SimpleFIN aggregator (ADR 0013, ADR 0014).
 
 ## M4: Assistant
 

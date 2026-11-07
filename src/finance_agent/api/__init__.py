@@ -4,7 +4,7 @@ Money crosses the wire as integer minor units plus a currency; the frontend
 formats it in one place."""
 
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
@@ -13,7 +13,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
 from finance_agent.api import card_art
@@ -31,7 +31,7 @@ from finance_agent.ledger import (
     Transaction,
     UnknownTarget,
 )
-from finance_agent.storage import open_db
+from finance_agent.storage import backup, default_db_path, open_db
 
 # shortcut: located relative to the source tree, so only a checkout serves the UI
 WEB_DIST = Path(__file__).resolve().parents[3] / "web" / "dist"
@@ -184,6 +184,8 @@ class SyncStatusOut(BaseModel):
     consent_expires_on: str | None
     consent_days_left: int | None
     consent_warning: bool
+    last_backup_at: str | None  # the last good copy on the backup drive (#95)
+    backup_warning: bool  # a drive is registered but no copy in 7 days
 
 
 class HealthOut(BaseModel):
@@ -318,10 +320,17 @@ def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
     )
 
 
-def _ledger(request: Request) -> Iterator[Ledger]:
+def _conn(request: Request) -> Iterator[Connection]:
     engine: Engine = request.app.state.engine
     with engine.begin() as conn:
-        yield Ledger(conn, current_user())
+        yield conn
+
+
+Conn = Annotated[Connection, Depends(_conn)]  # one per request, shared with Led
+
+
+def _ledger(conn: Conn) -> Ledger:
+    return Ledger(conn, current_user())
 
 
 Led = Annotated[Ledger, Depends(_ledger)]
@@ -433,6 +442,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.get("/api/sync-status")
     def sync_status(led: Led) -> SyncStatusOut:
         st = led.sync_status()
+        bk = backup.status(default_db_path().parent, datetime.now(UTC))
 
         def iso(v: object) -> str | None:
             return v.isoformat() if isinstance(v, (date, datetime)) else None
@@ -445,6 +455,8 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             consent_expires_on=iso(st.consent_expires_on),
             consent_days_left=st.consent_days_left,
             consent_warning=st.consent_warning,
+            last_backup_at=iso(bk.last_backup_at),
+            backup_warning=bk.warning,
         )
 
     @app.get(
@@ -490,10 +502,12 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         )
 
     @app.post("/api/corrections", status_code=201)
-    def correct(led: Led, body: CorrectionIn) -> CorrectionOut:
+    def correct(led: Led, conn: Conn, body: CorrectionIn) -> CorrectionOut:
         if (body.transaction_id is None) == (body.merchant_id is None):
             raise HTTPException(422, "give exactly one of transaction_id, merchant_id")
         cat = (body.category[0], body.category[1])
+        # /api/categories offers the current version even before the next import
+        categorise.seed_taxonomy(conn, current_user())
         try:
             if body.transaction_id is not None:
                 k = led.correct_transaction(body.transaction_id, cat)
