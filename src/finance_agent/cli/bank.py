@@ -12,6 +12,7 @@ from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
 from finance_agent import categorise
+from finance_agent.categorise import embedding
 from finance_agent.cli import gbp
 from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
@@ -217,6 +218,7 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
         if any(r.added for r in reports):  # same as `fa import`
             with engine.begin() as conn:
                 categorise.run(conn, user_id)
+                embedding.refresh_quietly(conn, user_id)
     except NotConnected as e:
         return _err(str(e))
     except Busy:

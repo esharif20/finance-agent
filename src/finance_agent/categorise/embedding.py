@@ -44,6 +44,9 @@ KEEP_ALIVE = "1m"
 SCALE = 32767  # int16
 MAX_DIMS = 4096
 SIMILARITY = 1000  # similarity() is cosine in thousandths
+BATCH = 64  # names per /api/embed request, so a big Ledger stays under the timeout
+MAX_REPLY = 8 * 1024 * 1024  # a bigger reply is treated as Ollama being unavailable
+SUGGESTIONS = 3
 
 type Vector = tuple[int, ...]
 
@@ -59,13 +62,17 @@ class EmbeddingUnavailable(RuntimeError):
 class Embedder(Protocol):
     model: str
 
+    def digest(self) -> str | None:
+        """The model's version, "" if it has none, None when it is off."""
+        ...
+
     def embed(self, texts: Sequence[str]) -> list[Vector]: ...
 
 
 class _Response(Protocol):
     status: int
 
-    def read(self) -> bytes: ...
+    def read(self, amt: int) -> bytes: ...
     def close(self) -> None: ...
 
 
@@ -172,11 +179,13 @@ class OllamaEmbedder:
                     {"Content-Type": "application/json"},
                 )
                 resp = conn.getresponse()
-                raw = resp.read()
+                raw = resp.read(MAX_REPLY + 1)
             except (OSError, http.client.HTTPException):
                 raise EmbeddingUnavailable(
                     "Ollama is not running on localhost"
                 ) from None
+            if len(raw) > MAX_REPLY:
+                raise EmbeddingUnavailable("reply from Ollama too large")
             if resp.status != 200:  # a redirect is refused, never followed
                 raise EmbeddingUnavailable(f"Ollama returned HTTP {resp.status}")
             try:
@@ -200,6 +209,12 @@ class OllamaEmbedder:
         return None
 
     def embed(self, texts: Sequence[str]) -> list[Vector]:
+        if len(texts) > BATCH:
+            return [
+                v
+                for i in range(0, len(texts), BATCH)
+                for v in self.embed(texts[i : i + BATCH])
+            ]
         if not texts:
             return []
         reply = self._call(
@@ -226,6 +241,9 @@ class TrigramEmbedder:
 
     model = "hashed-trigrams-v1"
     dims = 256
+
+    def digest(self) -> str:
+        return ""
 
     def embed(self, texts: Sequence[str]) -> list[Vector]:
         out: list[Vector] = []
@@ -254,19 +272,30 @@ def _unpack(blob: bytes) -> Vector:
     return tuple(a)
 
 
+def stored_model(embedder: Embedder) -> str | None:
+    """The `model` column value: the name plus the start of the model digest,
+    so a re-pulled model's vectors count as stale (#114). None when off."""
+    digest = embedder.digest()
+    if digest is None:
+        return None
+    return f"{embedder.model}@{digest[:12]}" if digest else embedder.model
+
+
 def refresh(conn: Connection, user_id: int, embedder: Embedder) -> int | None:
     """Embed every categorised Merchant that has no vector from `embedder`'s
-    model yet; returns how many, or None when the local model is off (the
-    rules carry on alone). Drops vectors whose Merchant no longer names any
-    Transaction. Call after `categorise.run`."""
+    model version yet; returns how many, or None when the local model is off
+    (the rules carry on alone). Drops vectors whose Merchant no longer names
+    any Transaction. Call after `categorise.run`."""
+    model = stored_model(embedder)
+    if model is None:
+        log.info("embeddings local model off")
+        return None
     db = Scoped(conn, user_id)
     me, cat = schema.merchant_embedding, schema.categorisation
     named = db.select(cat, cat.c.merchant_id).where(cat.c.merchant_id.is_not(None))
     db.execute(db.delete(me).where(me.c.merchant_id.not_in(named)))
     have = set(
-        db.execute(
-            db.select(me, me.c.merchant_id).where(me.c.model == embedder.model)
-        ).scalars()
+        db.execute(db.select(me, me.c.merchant_id).where(me.c.model == model)).scalars()
     )
     wanted = set(db.execute(named.distinct()).scalars()) - have
     names = {m.id: m.name for m in Ledger(conn, user_id).merchants() if m.id in wanted}
@@ -278,9 +307,19 @@ def refresh(conn: Connection, user_id: int, embedder: Embedder) -> int | None:
         return None
     db.execute(db.delete(me).where(me.c.merchant_id.in_(ids)))  # another model's
     for i, v in zip(ids, vectors, strict=True):
-        db.insert(me, merchant_id=i, model=embedder.model, dims=len(v), vector=_pack(v))
+        db.insert(me, merchant_id=i, model=model, dims=len(v), vector=_pack(v))
     log.info("embeddings merchants=%d", len(ids))
     return len(ids)
+
+
+def refresh_quietly(conn: Connection, user_id: int) -> None:
+    """`refresh` with the real local model for import and sync: it never raises
+    and never delays them past Ollama's own timeouts (#114). Off means the
+    rules carry on alone."""
+    try:
+        refresh(conn, user_id, OllamaEmbedder())
+    except Exception as e:  # noqa: BLE001
+        log.warning("embeddings refresh failed: %s", type(e).__name__)
 
 
 def vectors(conn: Connection, user_id: int, model: str) -> dict[int, Vector]:
@@ -300,3 +339,41 @@ def forget(conn: Connection, user_id: int) -> int:
     n = db.execute(db.delete(schema.merchant_embedding)).rowcount
     log.info("embeddings forgotten=%d", n)
     return n
+
+
+def suggest(
+    conn: Connection,
+    user_id: int,
+    targets: Mapping[str, int],
+    labelled: Mapping[int, set[tuple[str, str]]],
+) -> dict[str, list[tuple[str, str]]]:
+    """Top-3 Categories for each target (key -> Merchant id): the Categories of
+    the most similar Correction-labelled Merchants (`labelled`: Merchant id ->
+    its corrected Categories), from the stored vectors of the model covering
+    most Merchants. Nothing is assigned; no Ollama call is made."""
+    me = schema.merchant_embedding
+    db = Scoped(conn, user_id)
+    rows = db.execute(db.select(me, me.c.merchant_id, me.c.model, me.c.vector)).all()
+    by_model: dict[str, dict[int, Vector]] = {}
+    for r in rows:
+        by_model.setdefault(r.model, {})[r.merchant_id] = _unpack(r.vector)
+    if not by_model:
+        return {}
+    vecs = max(by_model.items(), key=lambda kv: (len(kv[1]), kv[0]))[1]
+    out: dict[str, list[tuple[str, str]]] = {}
+    for key, m in targets.items():
+        if m not in vecs:
+            continue
+        best: dict[tuple[str, str], int] = {}
+        for n, cats in labelled.items():
+            if n == m or n not in vecs or len(vecs[n]) != len(vecs[m]):
+                continue
+            s = similarity(vecs[m], vecs[n])
+            for c in cats:
+                best[c] = max(best.get(c, -SIMILARITY), s)
+        ranked = sorted(
+            ((s, c) for c, s in best.items() if s > 0), key=lambda x: (-x[0], x[1])
+        )
+        if ranked:
+            out[key] = [c for _, c in ranked[:SUGGESTIONS]]
+    return out

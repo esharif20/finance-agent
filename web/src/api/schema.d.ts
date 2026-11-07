@@ -885,6 +885,11 @@ export interface components {
             merchant_id: number | null;
             /** Skipped */
             skipped: boolean;
+            /** Suggestions */
+            suggestions: [
+                string,
+                string
+            ][];
             /** Title */
             title: string;
             /** Transaction Ids */
