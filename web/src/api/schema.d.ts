@@ -218,6 +218,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/manage-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Manage Links */
+        get: operations["manage_links_api_manage_links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memories": {
         parameters: {
             query?: never;
@@ -1105,6 +1122,15 @@ export interface components {
              */
             status: "on" | "off";
         };
+        /** ManageLinkOut */
+        ManageLinkOut: {
+            /** Domain */
+            domain: string;
+            /** Names */
+            names: string[];
+            /** Url */
+            url: string;
+        };
         /** MemoriesOut */
         MemoriesOut: {
             /** Items */
@@ -1902,6 +1928,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LocalModelOut"];
+                };
+            };
+        };
+    };
+    manage_links_api_manage_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageLinkOut"][];
                 };
             };
         };
