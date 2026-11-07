@@ -3,7 +3,9 @@
 Real bank art and logos only ever come from these local files: the repo ships
 generic faces. Only allowlisted names, image bytes and a size limit are served."""
 
+import os
 import re
+import stat
 from pathlib import Path
 
 from finance_agent.storage import default_db_path
@@ -11,6 +13,7 @@ from finance_agent.storage import default_db_path
 ART_KEYS = ("lloyds", "hsbc", "revolut")
 MAX_BYTES = 2 * 1024 * 1024
 _EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
+_OPEN_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
 
 # One place maps a Bank's name to its art. CSV imports name the Bank ("Lloyds");
 # SimpleFIN gives org.name ("HSBC UK") or, without one, org.id. org.domain is null
@@ -53,14 +56,21 @@ def read(key: str) -> tuple[bytes, str]:
         raise Refused(404)
     folder = art_dir().resolve()
     for ext in _EXTENSIONS:
-        path = folder / f"{key}{ext}"
-        if not path.is_file():
+        # One open, no symlinks, then fstat and a bounded read on that same fd,
+        # so a file swapped or grown after a check cannot get past it (TOCTOU).
+        try:
+            fd = os.open(folder / f"{key}{ext}", _OPEN_FLAGS)
+        except FileNotFoundError:
             continue
-        if path.resolve().parent != folder:  # a symlink out of the folder
+        except OSError:  # a symlink (ELOOP), a directory, no permission
+            raise Refused(404) from None
+        if not stat.S_ISREG(os.fstat(fd).st_mode):  # a directory, FIFO or device
+            os.close(fd)
             raise Refused(404)
-        if path.stat().st_size > MAX_BYTES:
+        with os.fdopen(fd, "rb") as f:
+            data = f.read(MAX_BYTES + 1)
+        if len(data) > MAX_BYTES:
             raise Refused(413)
-        data = path.read_bytes()
         media = _media_type(data[:12])
         if media is None:
             raise Refused(415)

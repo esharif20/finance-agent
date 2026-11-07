@@ -252,6 +252,10 @@ export function AccountStack({
     const el = canvas.current;
     const lost = (e: Event) => {
       e.preventDefault();
+      // shortcut: no webglcontextrestored path, so the CSS cards stay until remount.
+      const s = scene.current;
+      scene.current = null; // before dispose: its forceContextLoss fires this event again
+      s?.dispose();
       setGl(false);
     };
     el.addEventListener("webglcontextlost", lost);

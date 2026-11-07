@@ -2,6 +2,7 @@
 
 Every image here is generated at test time; the real art never enters the repo."""
 
+import os
 import struct
 import zlib
 from collections.abc import Callable, Iterator
@@ -167,3 +168,81 @@ def test_accounts_carry_their_art_key(
 
     assert account["bank"] == "Lloyds"
     assert account["art"] == "lloyds"
+
+
+# Verifier's adversarial suite (#58): encodings, link games, special files, TOCTOU.
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/card-art/%252e%252e%252fledger.db",  # double-encoded
+        "/api/card-art/..%5cledger.db",  # backslash
+        "/api/card-art/hsbc%5c..%5c..%5cledger.db",
+        "/api/card-art/%2Ftmp%2Fledger.db",  # absolute
+        "/api/card-art/hsbc%00.png",
+        "/api/card-art/h%D1%95bc",  # Cyrillic s
+        "/api/card-art/%EF%BD%88sbc",  # fullwidth h
+        "/api/card-art/hsbc%20",
+        "/api/card-art/Hsbc",
+        "/api/card-art/.hsbc",
+    ],
+)
+def test_encoded_and_lookalike_keys_are_404(
+    client: TestClient, art_dir: Path, path: str
+) -> None:
+    (art_dir / "hsbc.png").write_bytes(png())
+    (art_dir.parent / "ledger.db").write_bytes(b"SQLite format 3\x00secret")
+
+    r = client.get(path)
+
+    assert r.status_code == 404
+    assert b"secret" not in r.content
+
+
+def test_a_hardlink_to_the_ledger_is_not_served(
+    client: TestClient, art_dir: Path
+) -> None:
+    db = art_dir.parent / "ledger.db"
+    db.write_bytes(b"SQLite format 3\x00secret")
+    (art_dir / "hsbc.png").hardlink_to(db)
+
+    r = client.get("/api/card-art/hsbc")
+
+    assert r.status_code == 415
+    assert b"secret" not in r.content
+
+
+def test_a_symlink_inside_the_folder_is_refused(
+    client: TestClient, art_dir: Path
+) -> None:
+    (art_dir / "real.png").write_bytes(png())
+    (art_dir / "lloyds.png").symlink_to(art_dir / "real.png")
+
+    assert client.get("/api/card-art/lloyds").status_code == 404
+
+
+def test_a_directory_or_fifo_with_the_name_is_not_read(
+    client: TestClient, art_dir: Path
+) -> None:
+    (art_dir / "hsbc.png").mkdir()
+    os.mkfifo(art_dir / "lloyds.png")  # opening this for read would hang
+
+    assert client.get("/api/card-art/hsbc").status_code == 404
+    assert client.get("/api/card-art/lloyds").status_code == 404
+
+
+def test_the_size_cap_holds_on_the_bytes_read_not_an_earlier_stat(
+    client: TestClient, art_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A file that grows after it is checked (TOCTOU) is still refused."""
+    (art_dir / "hsbc.png").write_bytes(png() + b"\x00" * card_art.MAX_BYTES)
+    real_stat = Path.stat
+
+    def small(self: Path, **kw: bool) -> os.stat_result:
+        st = real_stat(self, **kw)
+        return os.stat_result((*st[:6], 100, *st[7:]))  # st_size as checked earlier
+
+    monkeypatch.setattr(Path, "stat", small)
+
+    assert client.get("/api/card-art/hsbc").status_code == 413

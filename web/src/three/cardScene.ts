@@ -153,6 +153,7 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       env.dispose();
       pmrem.dispose();
       renderer.dispose();
+      renderer.forceContextLoss(); // free the GPU context now, not at GC, so route switches cannot pile them up
     },
   };
 }
