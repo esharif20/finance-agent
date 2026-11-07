@@ -37,6 +37,35 @@ Status: draft for review.
 | Recommendation ranking | offline replay: acceptance of top 3 | rank by £ impact |
 | Change-point detection | detection delay and false alarms on synthetic shifts | none |
 
+## Minimum-data gates (ADR 0015)
+
+A learned component runs live only when the user's own data clears its gate. Below the gate, the baseline or rules decide, and the "How well I know you" page says which gate is not yet met. Gates are starting values: each ticket confirms or tunes its gate in its evaluation.
+
+| Component | Gate | Fallback |
+| --- | --- | --- |
+| Categoriser: embedding nearest neighbours (first M3 candidate) | ≥ 200 Corrections and ≥ 5 per Category it may assign | Corrections + rules |
+| Categoriser: calibrated classifier on embeddings + amount/day features | Beats the embedding nearest-neighbour model on macro F1 and calibration | Embedding nearest neighbours |
+| Recurring detection | ≥ 3 occurrences of the series | Not flagged |
+| Personal baselines and anomaly scores | ≥ 6 months for the Category | No anomaly Insight |
+| Forecasting (ETS) | ≥ 13 months of history | Seasonal naive at ≥ 12 months; none before |
+| Change-point detection | ≥ 9 months for the series | None |
+| Preference prediction / contextual bandit | Starts from priors on day one, and needs no gate | Rank by £ impact |
+
+Embeddings come from a pretrained local model (Ollama), used for inference only (ADR 0009). The model name and version are recorded with every evaluation result.
+
+## Learning from interaction
+
+- **Active learning in the Review Queue (M3).** The queue orders Transactions by expected information gain, using classifier uncertainty weighted by how often the Merchant appears, so each Correction teaches the most. Metric: macro F1 reached per Correction, against a random-order and a newest-first queue.
+- **Contextual bandit for Insights and their timing (M5–M6).** Thompson sampling with a Beta, or a Bayesian linear model on context: time of month, recent spend and Category.
+  - **Reward:** accepted and acted on, plus regret-review outcomes.
+  - **Never** opens, clicks or time on screen.
+  - **Exposure cap:** a fixed maximum number of Insights and alerts per week, whatever the bandit prefers.
+- **Propensity logging from the first Insight (M5).** Every shown item records the policy version and the probability it had of being shown. Candidate policies are compared by off-policy evaluation (inverse propensity scoring and self-normalised IPS) on these logs before any shadow run.
+- **Out of scope:**
+  - full reinforcement learning (ADR 0015);
+  - training deep models from scratch on real data;
+  - fine-tuning on real data (ADR 0009).
+
 ## Assistant quality
 
 Golden set of ~100 synthetic questions with expected intent, tool calls and figures; it doubles as the model benchmark.
