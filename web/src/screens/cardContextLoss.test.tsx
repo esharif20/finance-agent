@@ -37,3 +37,21 @@ it("disposes the scene and stops rendering when the WebGL context is lost", asyn
   await new Promise((r) => setTimeout(r, 50));
   expect(scene.render).not.toHaveBeenCalled();
 });
+
+it("disposes the scene, with every card's face and back, when the stack unmounts (#93)", async () => {
+  let resize: ResizeObserverCallback = () => {};
+  vi.stubGlobal("WebGLRenderingContext", class {});
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(cb: ResizeObserverCallback) { resize = cb; }
+    observe() {} disconnect() {} unobserve() {}
+  });
+  scene.dispose.mockClear();
+  const { unmount } = render(<AccountStack accounts={[account]} onSelect={() => {}} />);
+  act(() => resize([{ contentRect: { width: 360 } } as ResizeObserverEntry], {} as ResizeObserver));
+  await vi.waitFor(() => expect(screen.getByRole("group", { name: "Accounts" })).toHaveAttribute("data-gl", "true"));
+  expect(scene.setFaces).toHaveBeenLastCalledWith(expect.any(Array), expect.any(String)); // the page colour for the backs
+
+  unmount();
+
+  expect(scene.dispose).toHaveBeenCalledTimes(1);
+});

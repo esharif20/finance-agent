@@ -35,6 +35,10 @@ const RISE_MS = 160; // a chosen card rises towards you, then settles at the fro
 const BAND = 58; // px
 const FRONT_BAND = 104;
 const SETTLE_MS = 420;
+// Drag or side-scroll the stack to turn the front card over (#93); this long after the input
+// stops, the stack settles on the nearest card: the next one past half a turn.
+const SNAP_MS = 170;
+const DRAG_PX = 8; // movement before a press becomes a drag, so a tap stays a click
 
 /** Spring for #59's content transition, so the view below settles with the card. */
 export const SELECT_SPRING = { type: "spring", duration: 0.5, bounce: 0.18 } as const;
@@ -90,6 +94,10 @@ function faces(accounts: Account[]): Face[] {
   ];
 }
 
+/** The page colour behind the stack, which each card's back fades towards (#93). */
+const pageColour = () =>
+  getComputedStyle(document.documentElement).getPropertyValue("--background").trim() || "#f3f5f7";
+
 const webgl = () => typeof WebGLRenderingContext !== "undefined";
 const transform = (p: Pose) =>
   `translate3d(${p.x}px, ${p.y}px, ${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg) scale(${p.s})`;
@@ -121,6 +129,12 @@ export function AccountStack({
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const scene = useRef<CardScene | null>(null);
   const onScreen = useRef(true); // the scene skips frames while the stack is off screen
+  const [turn, setTurnState] = useState(0); // -1..1: how far the front card is turned over
+  const turnNow = useRef(0); // the same, for the snap timer
+  const setTurn = (v: number) => {
+    turnNow.current = Math.max(-1, Math.min(1, v));
+    setTurnState(turnNow.current);
+  };
 
   const frontIndex = Math.max(0, all.findIndex((f) => f.id === selected));
   const current = all[frontIndex] as Face;
@@ -132,6 +146,7 @@ export function AccountStack({
     reduce,
     hover,
     rising,
+    flip: turn,
     peek: layout.peek,
     fanPeek: layout.fanPeek,
   });
@@ -165,7 +180,9 @@ export function AccountStack({
     }));
     now.forEach((p, i) => {
       const el = buttons.current[i];
-      if (el) el.style.transform = transform(p);
+      if (!el) return;
+      el.style.transform = transform(p);
+      el.dataset.back = String(Math.abs(p.ry) > 90); // turned over: the labels would read mirrored
     });
     if (withScene && scene.current && onScreen.current && !document.hidden) {
       scene.current.update(
@@ -291,13 +308,21 @@ export function AccountStack({
     [all, art, allH, cardH],
   );
   const stackH = layout.height;
+  const [page, setPage] = useState(pageColour);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const change = () => setPage(pageColour());
+    mq.addEventListener?.("change", change);
+    return () => mq.removeEventListener?.("change", change);
+  }, []);
   useEffect(() => {
     const s = scene.current;
     if (!gl || !s) return;
     s.setSize(width, stackH, MX, MY);
-    s.setFaces(sceneFaces);
+    s.setFaces(sceneFaces, page);
     draw.current();
-  }, [gl, width, stackH, sceneFaces]);
+  }, [gl, width, stackH, sceneFaces, page]);
 
   // Pause while the stack is off screen: the scene only renders when something moves.
   useEffect(() => {
@@ -310,6 +335,69 @@ export function AccountStack({
     io.observe(el);
     return () => io.disconnect();
   }, [gl]);
+
+  // Snap: settle on the nearest card once the drag or side-scroll has stopped for SNAP_MS.
+  const snapTimer = useRef(0);
+  const snapNow = useRef(() => {});
+  snapNow.current = () => {
+    const step = Math.round(turnNow.current);
+    setTurn(0);
+    if (!step) return;
+    const i = (frontIndex + step + all.length) % all.length;
+    setRising(i);
+    onSelect(all[i]?.id);
+  };
+  const armSnap = () => {
+    clearTimeout(snapTimer.current);
+    snapTimer.current = window.setTimeout(() => snapNow.current(), SNAP_MS);
+  };
+  useEffect(() => () => clearTimeout(snapTimer.current), []);
+  const press = useRef<{ id: number; x: number; y: number; from: number; dragging: boolean } | null>(null);
+  const dragged = useRef(false); // the click that ends a drag is not a choice
+  const widthNow = useRef(width);
+  widthNow.current = width || 1;
+  // Sideways wheel (a trackpad swipe) turns the card; vertical stays the page's scroll. Not a
+  // React prop: React's wheel listener is passive, so it could not keep the page from moving.
+  useEffect(() => {
+    const el = stack.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      setTurn(turnNow.current + e.deltaX / widthNow.current);
+      armSnap();
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [accounts.length === 0]); // the stack mounts with the first account; the handler reads refs
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    dragged.current = false;
+    if (e.button !== 0 || press.current) return; // one pointer at a time
+    press.current = { id: e.pointerId, x: e.clientX, y: e.clientY, from: turnNow.current, dragging: false };
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    if (!p || p.id !== e.pointerId) return;
+    const dx = e.clientX - p.x;
+    if (!p.dragging) {
+      if (Math.abs(e.clientY - p.y) > DRAG_PX && Math.abs(e.clientY - p.y) > Math.abs(dx)) {
+        press.current = null; // a vertical move is the page scrolling
+        return;
+      }
+      if (Math.abs(dx) <= DRAG_PX) return;
+      p.dragging = true;
+      clearTimeout(snapTimer.current);
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    setTurn(p.from - dx / widthNow.current); // drag left: towards the next card
+  };
+  const onPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    if (!p || p.id !== e.pointerId) return;
+    press.current = null;
+    dragged.current = p.dragging;
+    if (p.dragging || turnNow.current !== 0) armSnap();
+  };
 
   // CSS cards show the same art as a background image.
   const cssArt = useMemo(() => {
@@ -349,6 +437,10 @@ export function AccountStack({
         aria-label="Accounts"
         className="card-stack"
         data-gl={gl}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
         style={{ height: stackH, perspective: PERSPECTIVE }}
       >
         {wantGl ? (
@@ -373,6 +465,10 @@ export function AccountStack({
               type="button"
               aria-pressed={on}
               onClick={() => {
+                if (dragged.current) {
+                  dragged.current = false;
+                  return;
+                }
                 if (!on) setRising(i);
                 onSelect(f.id);
               }}

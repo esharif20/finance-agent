@@ -493,6 +493,20 @@ html[data-private] .money {
 .account-card[data-tucked="true"] > * {
   opacity: 0; /* not visibility: the labels still name the button */
 }
+/* Turning the stack over (#93): touch keeps vertical scrolling for the page and gives the
+   sideways drag to the stack. A card turned past edge-on hides its labels; over WebGL its
+   back is the faded mirror the scene draws. */
+.card-stack {
+  touch-action: pan-y;
+}
+.account-card[data-back="true"] > * {
+  opacity: 0;
+}/* shortcut: without WebGL a turned card fades as a whole rather than to the page colour;
+   that path only runs when WebGL is missing, so it is not worth a second face in CSS. */
+.card-stack:not([data-gl="true"]) .account-card[data-back="true"] {
+  opacity: 0.35;
+}
+
 /* With WebGL the canvas draws the face, the edge and the sheen. */
 .card-stack[data-gl="true"] .account-card {
   background: none;
@@ -520,6 +534,9 @@ html[data-private] .money {
 }
 .card-stack[data-gl="true"] .account-card[data-selected="true"] {
   box-shadow: 0 0 0 2px var(--foreground);
+}
+.card-stack[data-gl="true"] .account-card[data-back="true"] {
+  box-shadow: none; /* the chosen ring is the front's; the back is the scene's alone */
 }
 @media (hover: hover) and (pointer: fine) {
   .account-card[data-hover="true"]:not([data-selected="true"]) {
@@ -663,3 +680,4 @@ html[data-private] .money {
     transition: none;
   }
 }
+
