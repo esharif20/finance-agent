@@ -1,5 +1,5 @@
-"""Classification metrics for evaluations (docs/ML_EVALUATIONS.md), in the
-standard library only.
+"""Metrics for evaluations (docs/ML_EVALUATIONS.md), in the standard library
+only: classification (#112), ranking and forecast (#146).
 
 A prediction of None is an abstention (Uncategorised, sent to the Review
 Queue): a miss for its gold Category, never a Category of its own. Macro F1
@@ -7,6 +7,7 @@ averages over the Categories in the gold labels only, so a Category with no
 gold rows is reported by `per_category` but cannot raise or lower the mean.
 """
 
+import math
 from collections import Counter
 from collections.abc import Hashable, Sequence
 
@@ -64,3 +65,51 @@ def expected_calibration_error(
         abs(sum(ok for _, ok in rows) - sum(c for c, _ in rows)) / total
         for rows in binned.values()
     )
+
+
+# --- ranking and forecast metrics (#146) ------------------------------------
+
+
+def ndcg_at_k(gains: Sequence[int], k: int) -> float:
+    """NDCG@k of gains listed in ranked order, with linear gains. 1.0 when no
+    item has a gain, since every order is then ideal."""
+    if k < 1:
+        raise ValueError("k must be at least 1")
+    if any(g < 0 for g in gains):
+        raise ValueError("gains must be non-negative")
+
+    def dcg(gs: Sequence[int]) -> float:
+        return sum(g / math.log2(i + 2) for i, g in enumerate(gs[:k]))
+
+    ideal = dcg(sorted(gains, reverse=True))
+    return dcg(gains) / ideal if ideal else 1.0
+
+
+def naive_scale(train: Sequence[int], m: int = 1) -> float:
+    """The MASE scale: mean |y[t] - y[t-m]| over the training series."""
+    diffs = [abs(a - b) for a, b in zip(train[m:], train, strict=False)]
+    if not diffs or not any(diffs):
+        raise ValueError("MASE is undefined: no non-zero lag-m differences")
+    return sum(diffs) / len(diffs)
+
+
+def mase(actual: Sequence[int], forecast: Sequence[int], scale: float) -> float:
+    """Mean absolute error of `forecast`, divided by `scale` (`naive_scale`)."""
+    _same_length(actual, forecast)
+    if not actual or scale <= 0:
+        raise ValueError("need forecasts and a positive scale")
+    errors = [abs(a - f) for a, f in zip(actual, forecast, strict=True)]
+    return sum(errors) / len(errors) / scale
+
+
+def interval_coverage(
+    actual: Sequence[int], intervals: Sequence[tuple[int, int]]
+) -> float:
+    """Share of actuals inside their (lower, upper) interval, bounds inclusive."""
+    _same_length(actual, intervals)
+    if not actual:
+        raise ValueError("no forecasts to score")
+    if any(lo > hi for lo, hi in intervals):
+        raise ValueError("interval lower bound above its upper bound")
+    inside = sum(lo <= a <= hi for a, (lo, hi) in zip(actual, intervals, strict=True))
+    return inside / len(actual)
