@@ -32,6 +32,20 @@ Read `GLOSSARY.md` and the relevant `docs/adr/` before working. Design docs: `do
 
 When running `/implement-spec`, start each implementer subagent with the model on its ticket's label, in its own worktree. For `model:opus` tickets only, a fresh Opus verifier subagent (no access to the implementer's reasoning) runs `/code-review` and adds at least one adversarial test (a property test or a malicious input); the ticket merges only when the verifier approves and CI passes. `model:sonnet` and `model:haiku` tickets merge on CI. A ticket that fails review twice moves up one model.
 
+## Parallel work
+
+Tickets that don't depend on each other run at the same time, each in its own worktree, and every one still passes the same quality gates.
+
+- **Pick parallel tickets that don't overlap.** Two tickets run together only if they have no blocking link and their expected files don't overlap. In particular, at most one of them may touch each of these:
+  - a new Alembic migration;
+  - `ledger/__init__.py`;
+  - the same screen component.
+
+  Generated files (`web/openapi.json`, `web/src/api/schema.d.ts`) are never hand-merged; regenerate them with `pnpm --dir web run gen`.
+- **At most 3 implementers or verifiers at once.** This keeps the 16 GB Mac responsive.
+- **During development, run only the tests your change touches.** Run the full CI-equivalent exactly once, before opening the PR, with `scripts/check-all.sh`. It holds a lock shared by every worktree, so only one full suite runs at a time.
+- **Merges are serial.** One merger at a time merges into the integration branch. Each branch first merges the current tip, and its PR merges only on green CI against that tip. A `model:opus` ticket still needs its verifier's approval before it merges.
+
 ## Frontend work: required skills
 
 Any task that touches the frontend (components, screens, styling, charts, motion, the demo landing page) must load these skills first:
