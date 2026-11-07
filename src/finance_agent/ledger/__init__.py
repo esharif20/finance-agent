@@ -374,7 +374,7 @@ class Ledger:
         if needle:
             named = (
                 self._db.select(c, c.c.transaction_id)
-                .join(m, m.c.id == c.c.merchant_id)
+                .join(m, self._db.on(m, m.c.id == c.c.merchant_id))
                 .where(func.lower(m.c.name).contains(needle, autoescape=True))
             )
             terms.append(
@@ -416,7 +416,7 @@ class Ledger:
         hashes: dict[int, set[str]] = {}
         for link in self._db.execute(
             self._db.select(src, src.c.transaction_id, si.c.file_hash).join(
-                si, si.c.id == src.c.statement_import_id
+                si, self._db.on(si, si.c.id == src.c.statement_import_id)
             )
         ):
             hashes.setdefault(link.transaction_id, set()).add(link.file_hash)
@@ -589,8 +589,8 @@ class Ledger:
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
             )
-            .outerjoin(sub, sub.c.id == m.c.default_category_id)
-            .outerjoin(top, top.c.id == sub.c.parent_id)
+            .outerjoin(sub, self._db.on(sub, sub.c.id == m.c.default_category_id))
+            .outerjoin(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .order_by(m.c.name)
         )
         return [
@@ -617,9 +617,9 @@ class Ledger:
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
             )
-            .outerjoin(m, m.c.id == c.c.merchant_id)
-            .outerjoin(sub, sub.c.id == c.c.category_id)
-            .outerjoin(top, top.c.id == sub.c.parent_id)
+            .outerjoin(m, self._db.on(m, m.c.id == c.c.merchant_id))
+            .outerjoin(sub, self._db.on(sub, sub.c.id == c.c.category_id))
+            .outerjoin(top, self._db.on(top, top.c.id == sub.c.parent_id))
         )
         by_txn: dict[int, tuple[str, str]] = {}
         by_merchant: dict[int, tuple[str, str]] = {}
@@ -699,8 +699,8 @@ class Ledger:
                 k.c.created_at,
                 k.c.reverted_at,
             )
-            .join(sub, sub.c.id == k.c.category_id)
-            .join(top, top.c.id == sub.c.parent_id)
+            .join(sub, self._db.on(sub, sub.c.id == k.c.category_id))
+            .join(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .order_by(k.c.id)
         )
         return [
@@ -722,7 +722,7 @@ class Ledger:
         ).scalar()
         return self._exists(  # a leaf of the current taxonomy version only
             self._db.select(sub, sub.c.id)
-            .join(top, top.c.id == sub.c.parent_id)
+            .join(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .where(
                 top.c.name == category[0],
                 sub.c.name == category[1],
@@ -841,8 +841,8 @@ class Ledger:
         latest: dict[int, tuple[datetime, str]] = {}
         for r in self._db.execute(
             self._db.select(si, tx.c.account_id, si.c.imported_at, si.c.source)
-            .join(ts, ts.c.statement_import_id == si.c.id)
-            .join(tx, tx.c.id == ts.c.transaction_id)
+            .join(ts, self._db.on(ts, ts.c.statement_import_id == si.c.id))
+            .join(tx, self._db.on(tx, tx.c.id == ts.c.transaction_id))
             .distinct()
         ):
             if r.account_id not in latest or r.imported_at > latest[r.account_id][0]:
@@ -858,7 +858,9 @@ class Ledger:
                 a.c.currency,
                 schema.bank.c.name.label("bank"),
             )
-            .join(schema.bank, schema.bank.c.id == a.c.bank_id)
+            .join(
+                schema.bank, self._db.on(schema.bank, schema.bank.c.id == a.c.bank_id)
+            )
             .order_by(a.c.id)
         ).all():
             rows = self._transactions_in_bank_order(r.id)
@@ -976,7 +978,7 @@ class Ledger:
                 a.c.id,
                 a.c.masked_number,
             )
-            .join(a, a.c.id == g.c.account_id)
+            .join(a, self._db.on(a, a.c.id == g.c.account_id))
             .order_by(a.c.id, g.c.from_date, g.c.id)
         ).all()
         return [
@@ -1101,7 +1103,7 @@ class Ledger:
                 t.c.amount_minor,
                 t.c.running_balance_minor,
             )
-            .join(t, t.c.id == src.c.transaction_id)
+            .join(t, self._db.on(t, t.c.id == src.c.transaction_id))
             .where(t.c.account_id == account_id)
             .order_by(src.c.statement_import_id, src.c.bank_position)
         ).all()
