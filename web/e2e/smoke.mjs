@@ -3,8 +3,8 @@
 //   pnpm --dir web run smoke [screens-dir]
 // Seeds a fresh temp ledger itself; FA_DB_PATH, if set, must name an existing
 // ledger under the temp directory, so the real data dir is never opened.
-// Needs `pnpm build` first and a WebKit install of the global Playwright CLI.
-// Not part of CI (no browser there); never opens a real browser window of yours:
+// Needs `pnpm build` first and a global Playwright install with WebKit (CI does both).
+// PLAYWRIGHT_MODULE overrides where playwright is loaded from. Never opens a real browser window of yours:
 // FA_NO_BROWSER is set and `fa stop` always runs.
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -13,7 +13,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 
 const require = createRequire(import.meta.url);
-const globalRoot = execFileSync("npm", ["root", "-g"]).toString().trim();
+// pnpm run leaves npm_config_* in the env, which makes `npm root -g` print a relative path
+const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.toLowerCase().startsWith("npm_")));
+const globalRoot = execFileSync("npm", ["root", "-g"], { env: cleanEnv }).toString().trim();
 const { webkit } = require(process.env.PLAYWRIGHT_MODULE ?? `${globalRoot}/playwright`);
 
 const temps = [tmpdir(), "/tmp"].filter(existsSync).map((d) => realpathSync(d));
