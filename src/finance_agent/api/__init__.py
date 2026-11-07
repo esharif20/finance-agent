@@ -31,6 +31,7 @@ from finance_agent.ledger import (
     Transaction,
     UnknownTarget,
 )
+from finance_agent.ledger.sync import NotConnected, run_sync
 from finance_agent.storage import backup, default_db_path, is_encrypted, open_db
 from finance_agent.storage.lock import Busy
 
@@ -462,15 +463,13 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     @app.post("/api/sync")
     def sync(request: Request) -> SyncOut:
         """The same sync as `fa sync`; errors say the class at most, never data."""
-        from finance_agent.cli import bank  # the CLI owns the sync; imported lazily
-
         if not is_encrypted(default_db_path()):  # the CLI's gate (ADR 0002)
             raise HTTPException(409, "Sync needs the encrypted database.")
         try:
-            reports = bank.run_sync(request.app.state.engine, current_user())
+            reports = run_sync(request.app.state.engine, current_user())
         except Busy:
             raise HTTPException(409, "A sync is already running.") from None
-        except bank.NotConnected:
+        except NotConnected:
             raise HTTPException(409, "Not connected. Run `fa connect` first.") from None
         except Exception as e:
             raise HTTPException(502, f"Sync failed ({type(e).__name__}).") from None

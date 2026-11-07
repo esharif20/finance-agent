@@ -12,9 +12,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from finance_agent import api, identity
-from finance_agent.cli import bank
 from finance_agent.ingest import simplefin
 from finance_agent.ledger import Ledger
+from finance_agent.ledger.sync import SYNC_LOCK
 from finance_agent.storage import default_db_path, keychain, open_db
 from finance_agent.storage.lock import Busy, exclusive
 from synthetic_lloyds import generate_histories
@@ -90,9 +90,9 @@ def test_sync_refuses_an_unencrypted_database(
 def test_a_running_sync_makes_the_next_one_skip(env: Env) -> None:
     c, t, _ = env
     data = default_db_path().parent
-    with exclusive(data, bank.SYNC_LOCK):
+    with exclusive(data, SYNC_LOCK):
         r = c.post("/api/sync")
-        with pytest.raises(Busy), exclusive(data, bank.SYNC_LOCK):
+        with pytest.raises(Busy), exclusive(data, SYNC_LOCK):
             pass
     assert r.status_code == 409 and "already running" in r.json()["detail"]
     assert t.calls == 0
@@ -126,6 +126,6 @@ def test_cli_sync_skips_while_another_run_holds_the_lock(
     from finance_agent.cli import main
 
     _, t, _ = env
-    with exclusive(default_db_path().parent, bank.SYNC_LOCK):
+    with exclusive(default_db_path().parent, SYNC_LOCK):
         assert main(["sync", "--notify"]) == 0
     assert "skipped" in capsys.readouterr().out and t.calls == 0
