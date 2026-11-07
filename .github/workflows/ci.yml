@@ -47,7 +47,7 @@ jobs:
 
   smoke:
     name: smoke (webkit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Playwright 1.58 has no WebKit build for ubuntu-latest (26.04)
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
