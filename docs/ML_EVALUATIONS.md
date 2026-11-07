@@ -37,6 +37,12 @@ Status: draft for review.
 | Recommendation ranking | offline replay: acceptance of top 3 | rank by £ impact |
 | Change-point detection | detection delay and false alarms on synthetic shifts | none |
 
+### Recurring detection (#104)
+
+`evals/recurring.py` scores `categorise.recurring.detect_recurring` on 400 seeded synthetic schedules (seed 104, dataset v1). Gold recurring: weekly, monthly, annual, monthly with ±3 days and ±3% jitter, skipped months and price rises. Gold not recurring: irregular dates, one-offs, monthly visits with varying amounts, and drifting amounts. The metric is binary precision and recall. The baseline is "same amount ± 5% of the first charge, same interval ± 1 day as the first gap". Results are committed to `evals/results/recurring_baseline.json`; `tests/test_eval_recurring.py` fails when the detector falls below its committed scores or below the baseline.
+
+Detector v1: precision 1.0, recall 0.65. Baseline: precision 1.0, recall 0.12. Skipped months and price rises are missed by design (precision first). Known services and descriptor patterns cover them in recognition, and the user can add any entry.
+
 ### Intelligence Engine harnesses (#146)
 
 `evals/synthetic_history.py` generates seeded 36-month histories for six fictional users, with payday cycles, seasonality (December, summer, winter energy) and planted events as ground truth: price rises, Category spikes against the seasonal normal, annual renewals and payday shortfalls. Each harness calls an interface the M5 tickets implement, with a stub until then, and reports per event type, per Category or per user, not only overall:
