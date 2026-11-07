@@ -11,6 +11,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from finance_agent import categorise
 from finance_agent.cli import LOCAL_USER
 from finance_agent.ledger import Ledger
 from finance_agent.storage import DB_ENV, open_db
@@ -59,6 +60,7 @@ def run(folder: Path, notify: Notifier = osascript) -> int:
     try:
         with engine.begin() as conn:
             r = Ledger(conn, LOCAL_USER).import_files(files)
+            categorise.run(conn, LOCAL_USER)  # same as `fa import`
     except (OSError, ValueError, LookupError):
         notify(TITLE, "Import failed")
         return 1
