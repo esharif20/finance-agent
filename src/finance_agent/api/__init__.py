@@ -21,6 +21,7 @@ from finance_agent.api import (
     card_art,
     fx,
     local_model,
+    manage_links,
     merchants,
     notes,
     review_queue,
@@ -599,6 +600,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     app.include_router(notes.router)
     app.include_router(merchants.router)
     app.include_router(fx.router)
+    app.include_router(manage_links.router)
     app.include_router(local_model.router)
 
     dist = web_dir or WEB_DIST
