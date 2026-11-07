@@ -4,14 +4,14 @@
   "schedules": 400,
   "detector": {
     "precision": 1.0,
-    "recall": 0.645833,
+    "recall": 0.8625,
     "flagged_rate_by_case": {
       "monthly": 1.0,
-      "monthly_jitter": 0.875,
+      "monthly_jitter": 0.9,
       "weekly": 1.0,
       "annual": 1.0,
-      "skipped_month": 0.0,
-      "price_rise": 0.0,
+      "skipped_month": 0.625,
+      "price_rise": 0.65,
       "irregular": 0.0,
       "one_off": 0.0,
       "monthly_varying_amounts": 0.0,

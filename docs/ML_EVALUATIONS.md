@@ -41,7 +41,9 @@ Status: draft for review.
 
 `evals/recurring.py` scores `categorise.recurring.detect_recurring` on 400 seeded synthetic schedules (seed 104, dataset v1). Gold recurring: weekly, monthly, annual, monthly with ±3 days and ±3% jitter, skipped months and price rises. Gold not recurring: irregular dates, one-offs, monthly visits with varying amounts, and drifting amounts. The metric is binary precision and recall. The baseline is "same amount ± 5% of the first charge, same interval ± 1 day as the first gap". Results are committed to `evals/results/recurring_baseline.json`; `tests/test_eval_recurring.py` fails when the detector falls below its committed scores or below the baseline.
 
-Detector v1: precision 1.0, recall 0.65. Baseline: precision 1.0, recall 0.12. Skipped months and price rises are missed by design (precision first). Known services and descriptor patterns cover them in recognition, and the user can add any entry.
+Detector v1 (whole history): precision 1.0, recall 0.65. Baseline: precision 1.0, recall 0.12.
+
+Detector v2 (#177) judges the latest run of charges. A history regular as a whole is one run, which keeps every v1 hit. Otherwise the run grows back from the latest charge while each earlier charge is one cadence window earlier and within ±5% of the run's median so far, and it is flagged at 3 or more charges. An old skipped month, price rise or one-off no longer blocks a current series, and a price step starts a new run (judging the step is #148's job). Results: precision 1.0, recall 0.86. Flagged rates: skipped months 0 to 0.63, price rises 0 to 0.65, ±3% jitter 0.875 to 0.9, drift stays at 0. The remaining misses are series whose latest run is shorter than 3 charges (a skip or rise in the last two periods). Known services and descriptor patterns cover these in recognition, and the user can add any entry. Three charges cannot tell ±3% jitter from slow drift, so the step rule compares each earlier charge with the run's median before that charge joins. Banding against the true median instead let drift through (precision 0.87).
 
 ### Intelligence Engine harnesses (#146)
 

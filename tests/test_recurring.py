@@ -75,13 +75,13 @@ OFF_CADENCE = st.one_of(
 @given(
     st.lists(st.integers(1, 900), min_size=1, max_size=10),
     OFF_CADENCE,
-    st.integers(0, 10),
+    st.integers(0, 1),
     st.integers(100, 100_000),
 )
-def test_irregular_payments_are_never_flagged(
-    gaps: list[int], odd: int, at: int, amount: int
+def test_a_latest_run_broken_by_an_irregular_gap_is_never_flagged(
+    gaps: list[int], odd: int, back: int, amount: int
 ) -> None:
-    gaps.insert(at % (len(gaps) + 1), odd)  # at least one gap fits no cadence
+    gaps.insert(len(gaps) - back, odd)  # one of the last two gaps fits no cadence
     days = [0]
     for g in gaps:
         days.append(days[-1] + g)
@@ -121,4 +121,71 @@ def test_refunds_alone_never_recur() -> None:
 
 def test_two_charges_on_one_day_break_the_cadence() -> None:
     charges = [(d, 1099) for d in monthly(4)] + [(monthly(4)[2], 1099)]
+    assert detect_recurring(charges) is None
+
+
+def test_an_old_skipped_month_does_not_block_the_current_run() -> None:
+    days = monthly(8)
+    del days[2]  # skipped long ago; the last five charges are a clean run
+    r = detect_recurring([(d, 1099) for d in days])
+    assert r == Recurrence("monthly", 5, days[2], days[-1], 1099)
+
+
+NOISE = st.lists(
+    st.tuples(st.integers(0, 1500), st.integers(-50_000, 50_000)), max_size=15
+)
+
+
+@given(
+    NOISE,
+    st.integers(3, 12),
+    st.integers(100, 100_000),
+    st.integers(1, 200),
+    st.randoms(use_true_random=False),
+)
+def test_a_noisy_prefix_followed_by_a_clean_run_is_detected_in_any_row_order(
+    noise: list[tuple[int, int]], n: int, amount: int, pause: int, rnd: random.Random
+) -> None:
+    # adversarial: any old history (off-cadence days, other prices, refunds)
+    # ending at least one day before a clean monthly run of n charges
+    start = D0 + timedelta(days=max((d for d, _ in noise), default=0) + pause)
+    run = [(d, amount) for d in monthly(n, start)]
+    charges = [(D0 + timedelta(days=d), a) for d, a in noise] + run
+    r = detect_recurring(charges)
+    assert r is not None and r.interval == "monthly"
+    assert r.charge_count >= n and r.last_on == run[-1][0]
+    assert abs(amount - r.typical_minor) * 20 <= r.typical_minor
+    rnd.shuffle(charges)
+    assert detect_recurring(charges) == r
+
+
+@given(NOISE, st.integers(1, 2), st.integers(100, 100_000), OFF_CADENCE)
+def test_a_latest_run_shorter_than_three_charges_is_not_detected(
+    noise: list[tuple[int, int]], n: int, amount: int, odd: int
+) -> None:
+    last = max((d for d, _ in noise), default=0)
+    prefix = [(D0 + timedelta(days=d), a) for d, a in noise]
+    prefix.append((D0 + timedelta(days=last + 1), amount * 3))  # a price far off
+    start = D0 + timedelta(days=last + 1 + odd)  # then an off-cadence gap
+    charges = prefix + [(d, amount) for d in monthly(n, start)]
+    assert detect_recurring(charges) is None
+
+
+@given(NOISE)
+def test_detection_is_deterministic(rows: list[tuple[int, int]]) -> None:
+    charges = [(D0 + timedelta(days=d), a) for d, a in rows]
+    assert detect_recurring(charges) == detect_recurring(list(charges))
+
+
+def test_a_price_step_starts_a_new_run() -> None:
+    days = monthly(7)
+    charges = [(d, 1099) for d in days[:3]] + [(d, 1299) for d in days[3:]]
+    assert detect_recurring(charges) == Recurrence(
+        "monthly", 4, days[3], days[-1], 1299
+    )
+
+
+def test_a_price_step_with_fewer_than_three_new_charges_is_not_detected() -> None:
+    days = monthly(6)
+    charges = [(d, 1099) for d in days[:4]] + [(d, 1299) for d in days[4:]]
     assert detect_recurring(charges) is None
