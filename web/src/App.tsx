@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Eye, EyeOff, LayoutDashboard, ListOrdered } from "lucide-react";
+import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
 import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
@@ -9,6 +9,7 @@ import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
 import { useRoute } from "@/lib/route";
 import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Overview } from "@/screens/Overview";
+import { ReviewQueue, useReviewCount } from "@/screens/ReviewQueue";
 import { Transactions } from "@/screens/Transactions";
 
 const queryClient = new QueryClient();
@@ -41,17 +42,19 @@ function HideAmounts() {
   );
 }
 
-const TABS = [
+const tabs = (review: number) => [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="size-4" aria-hidden="true" /> },
   { id: "transactions", label: "Transactions", icon: <ListOrdered className="size-4" aria-hidden="true" /> },
+  { id: "review", label: "Review", icon: <Inbox className="size-4" aria-hidden="true" />, badge: review },
 ];
 
-export function App() {
+function Shell() {
   const route = useRoute();
-  const tab = route.name === "transactions" ? "transactions" : "overview";
+  const review = useReviewCount();
+  const TABS = tabs(review);
+  const tab = route.name === "transactions" || route.name === "review" ? route.name : "overview";
   return (
-    <QueryClientProvider client={queryClient}>
-      <PrivacyProvider>
+    <>
       <Ambient />
       <div className="mx-auto w-full max-w-[1120px] px-4 pt-3 pb-28 sm:px-9 sm:pb-16">
         <header className="glass sticky top-3 z-20 mb-6 flex items-center gap-3 rounded-full py-2 pr-2 pl-3">
@@ -78,9 +81,20 @@ export function App() {
             <>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <h1 className="text-title">{TABS.find((t) => t.id === tab)?.label}</h1>
+                {route.name === "overview" && review > 0 && (
+                  <a href="#review" className="text-sm font-semibold underline-offset-4 hover:underline">
+                    {review} to review
+                  </a>
+                )}
                 <BackupStatus />
               </div>
-              {route.name === "transactions" ? <Transactions /> : <Overview account={route.account} />}
+              {route.name === "transactions" ? (
+                <Transactions />
+              ) : route.name === "review" ? (
+                <ReviewQueue />
+              ) : (
+                <Overview account={route.account} />
+              )}
             </>
           )}
         </main>
@@ -91,6 +105,15 @@ export function App() {
           item="inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold"
         />
       </div>
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <PrivacyProvider>
+        <Shell />
       </PrivacyProvider>
     </QueryClientProvider>
   );
