@@ -141,13 +141,17 @@ def _main(argv: Sequence[str] | None) -> int:
     if args.command == "watch":
         from finance_agent.cli import watch
 
-        if args.watch_command == "install":
-            print(f"Installed {watch.install(args.folder)}")
-        elif args.watch_command == "remove":
-            watch.remove()
-            print("Removed")
-        else:
-            return watch.run(args.folder)
+        try:
+            if args.watch_command == "install":
+                print(f"Installed {watch.install(args.folder)}")
+            elif args.watch_command == "remove":
+                watch.remove()
+                print("Removed")
+            else:
+                return watch.run(args.folder)
+        except (OSError, ValueError) as e:
+            print(f"fa: {e}", file=sys.stderr)
+            return 1
         return 0
 
     try:
