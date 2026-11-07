@@ -14,7 +14,8 @@ def test_install_writes_a_daily_plist_and_remove_unloads_it(tmp_path: Path) -> N
     schedule.install(agents, calls.append)
     plist = plistlib.loads((agents / f"{schedule.LABEL}.plist").read_bytes())
     assert plist["ProgramArguments"][-2:] == ["sync", "--notify"]
-    assert plist["StartCalendarInterval"] == {"Hour": 7, "Minute": 30}
+    assert plist["StartInterval"] == 6 * 60 * 60 and plist["RunAtLoad"] is True
+    assert "StartCalendarInterval" not in plist
     assert calls[-1][0] == "load"
     schedule.remove(agents, calls.append)
     assert not (agents / f"{schedule.LABEL}.plist").exists()

@@ -74,6 +74,19 @@ export const postCorrection = (body: {
 export const revertCorrection = (id: number) => send(`/api/corrections/${id}`, { method: "DELETE" });
 export const fetchMonths = () => get<string[]>("/api/months");
 export const fetchSyncStatus = () => get<SyncStatus>("/api/sync-status");
+
+export type SyncResult = components["schemas"]["SyncOut"];
+
+/** Run a sync now. A refusal throws the API's own reason, which never holds amounts or URLs. */
+export async function postSync(): Promise<SyncResult> {
+  const res = await fetch("/api/sync", { method: "POST" });
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => null);
+    const detail = (body as { detail?: unknown } | null)?.detail;
+    throw new Error(typeof detail === "string" ? detail : "Couldn't sync. Try again.");
+  }
+  return (await res.json()) as SyncResult;
+}
 export type MonthTotals = components["schemas"]["MonthTotalsOut"];
 export const fetchMonthSeries = (accountId?: number) =>
   get<MonthTotals[]>(
