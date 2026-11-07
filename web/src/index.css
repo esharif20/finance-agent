@@ -573,3 +573,47 @@ html[data-private] .money {
 }
 :root { --cat-0: #0b66c3; --cat-1: #0e7a82; --cat-2: #b45309; --cat-3: #c03a5e; --cat-4: #2f7a45; --cat-5: #8a6a00; --cat-6: #a03c96; --cat-7: #0a6fa8; --cat-8: #7a5636; --cat-9: #5f6b0f; --cat-other: #6b7075; --chip-ink-mix: black 42%; --chip-tint: 14%; }
 @media (prefers-color-scheme: dark) { :root:not(.light) { --cat-0: #7da2f7; --cat-1: #3fc1c4; --cat-2: #f0a04b; --cat-3: #f27b9b; --cat-4: #5ccf86; --cat-5: #dcb83c; --cat-6: #d886d0; --cat-7: #4fb4ec; --cat-8: #cfa57c; --cat-9: #b5c94a; --cat-other: #a9aeb4; --chip-ink-mix: white 35%; --chip-tint: 20%; } }
+
+/* motion polish (#71): icon cross-swap and count tick; the marker lives in NavTabs. */
+.icon-swap {
+  grid-area: 1 / 1;
+  display: grid;
+  transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1), opacity 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.icon-swap[data-icon="in"] {
+  opacity: 1;
+  transform: none;
+}
+.icon-swap[data-icon="out"] {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+.icon-swap:last-child[data-icon="out"] {
+  transform: rotate(-90deg) scale(0.5);
+}
+.count-tick {
+  animation: count-tick 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes count-tick {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon-swap,
+  .icon-swap[data-icon="out"],
+  .icon-swap:last-child[data-icon="out"] {
+    transform: none;
+    transition: opacity 150ms linear;
+  }
+  .count-tick {
+    transform: none;
+    animation: count-fade 150ms linear;
+  }
+  @keyframes count-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
