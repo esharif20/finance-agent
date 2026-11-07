@@ -245,6 +245,8 @@ class SubscriptionEntry:
     interval: str | None
     created_at: datetime  # when the Merchant first entered the registry
     changed_at: datetime
+    # when `status` began: a regroup moves changed_at but not this (#190)
+    status_since: datetime | None = None
 
 
 class InvalidEntry(ValueError):
@@ -330,6 +332,7 @@ class SyncReport:
     provider_errors: int
     gaps: list[SyncGap]
     accounts: list[AffectedAccount]
+    skipped_accounts: int = 0  # unsupported currency (#186); no fields kept
 
 
 @dataclass(frozen=True)
@@ -903,6 +906,7 @@ class Ledger:
                 provider_errors=parsed.errors,
                 gaps=[],
                 accounts=[],
+                skipped_accounts=parsed.skipped,
             )
         import_id = self._db.insert(
             si,
@@ -1004,6 +1008,7 @@ class Ledger:
             provider_errors=parsed.errors,
             gaps=gaps,
             accounts=[AffectedAccount(i, m) for i, m in sorted(touched.items())],
+            skipped_accounts=parsed.skipped,
         )
 
     def link_synced_account(self, provider_account_id: str, account_id: int) -> None:
@@ -2199,6 +2204,7 @@ class Ledger:
             .order_by(e.c.id)
         )
         first: dict[int, datetime] = {}
+        since: dict[int, datetime] = {}
         latest: dict[int, Any] = {}
         for r in rows:
             first.setdefault(r.merchant_id, r.created_at)
@@ -2206,6 +2212,8 @@ class Ledger:
             # a detection that lost a race with a user write never wins
             if r.source == "detection" and prior is not None and prior.source == "user":
                 continue
+            if prior is None or prior.status != r.status:
+                since[r.merchant_id] = r.created_at
             latest[r.merchant_id] = r
         return sorted(
             (
@@ -2222,6 +2230,7 @@ class Ledger:
                     r.interval,
                     first[r.merchant_id],
                     r.created_at,
+                    since[r.merchant_id],
                 )
                 for r in latest.values()
             ),
