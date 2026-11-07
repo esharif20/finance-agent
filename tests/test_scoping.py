@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine, delete, insert, select, text, update
+from sqlalchemy import Engine, delete, func, insert, select, text, update
 
 from finance_agent import categorise
 from finance_agent.ledger import Ledger
@@ -51,6 +51,25 @@ def test_a_scoped_subquery_does_not_scope_the_outer_table(db: Scoped) -> None:
     inner = db.select(t, t.c.id)
     with pytest.raises(UnscopedQuery):
         db.execute(select(t.c.id).where(t.c.id.in_(inner)))
+
+
+def test_an_unscoped_subquery_anywhere_is_refused(db: Scoped) -> None:
+    """A scoped outer statement must not smuggle another user's rows in
+    through a scalar subquery in its columns or its UPDATE values, or through
+    a table an UPDATE/DELETE names only in its WHERE."""
+    a = schema.account
+    leak = select(func.count()).select_from(a).scalar_subquery()
+    name = select(a.c.name).limit(1).scalar_subquery()
+    for stmt in (
+        db.select(t, t.c.id, leak),
+        db.update(t).values(description=name),
+        db.select(t, t.c.id).where(t.c.id.in_(select(src.c.transaction_id))),
+        db.update(t).where(t.c.account_id == a.c.id).values(description="x"),
+        db.delete(t).where(t.c.account_id == a.c.id),
+    ):
+        with pytest.raises(UnscopedQuery):
+            db.execute(stmt)
+    db.execute(db.select(t, t.c.id, db.select(a, func.count()).scalar_subquery()))
 
 
 def test_scoped_statements_run(db: Scoped) -> None:
