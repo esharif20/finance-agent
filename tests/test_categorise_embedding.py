@@ -164,6 +164,51 @@ def test_down_or_malformed_ollama_is_unavailable_and_quotes_nothing(
     assert CAFE not in str(err.value) and "SYNTH" not in str(err.value)
 
 
+HOSTILE: list[bytes] = [
+    b"[" * 100_000 + b"]" * 100_000,  # nested past the parser's recursion limit
+    b'{"embeddings": [[1e999999999, 1], [1, 1]]}',  # finite, overflows scaling
+    b'{"embeddings": [[Infinity, 1], [1, 1]]}',
+    b'{"embeddings": [[' + b"9" * 5000 + b", 1], [1, 1]]}",  # past int digit limit
+    b'{"embeddings": [[1, 1], [1, 1], [1, 1]]}',  # more vectors than inputs
+    b'{"embeddings": [[[1], [1]], [[1], [1]]]}',
+    b'{"embeddings": null}',
+]
+
+
+@pytest.mark.parametrize("body", HOSTILE)
+def test_a_hostile_reply_is_unavailable_never_a_crash(body: bytes) -> None:
+    """Verifier #189: anything on :11434 may answer; the rules must carry on."""
+    e, _ = ollama([(200, body)])
+    with pytest.raises(EmbeddingUnavailable):
+        e.embed([CAFE, GYM])
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://0.0.0.0:11434",
+        "http://[::ffff:127.0.0.1]:11434",
+        "http://127.0.0.2:11434",
+        "http://localhost:11434@evil.example:11434",
+        "http://127.0.0.1.nip.io:11434",
+        "http://[::]:11434",
+    ],
+)
+def test_host_tricks_are_refused(url: str) -> None:
+    with pytest.raises(OllamaHostRefused):
+        OllamaEmbedder(base_url=url)
+
+
+def test_ollama_host_and_proxy_env_vars_are_ignored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for var in ("OLLAMA_HOST", "HTTP_PROXY", "http_proxy", "ALL_PROXY"):
+        monkeypatch.setenv(var, "http://evil.example:8080")
+    conn = OllamaEmbedder().open_connection()
+    assert (conn.host, conn.port) == ("localhost", 11434)
+    assert getattr(conn, "_tunnel_host", None) is None  # no CONNECT proxy
+
+
 def test_digest_is_the_pulled_models_version_and_none_when_off() -> None:
     tags = {
         "models": [
@@ -328,6 +373,56 @@ def test_deleting_the_last_transaction_naming_a_merchant_deletes_its_vector(
     }
     _delete_transactions(conn, f"description = '{CAFE}'")
     assert embedding.vectors(conn, 1, TrigramEmbedder.model).keys() == {ids[GYM]}
+
+
+def test_deleting_many_transactions_does_not_rescan_categorisation_per_row(
+    conn: Connection,
+) -> None:
+    """Verifier #189: the trigger fires per deleted row, so each firing must be
+    cheap (an index probe per vector), or an Account deletion of 10k
+    Transactions takes about a minute. Counts SQLite VM steps, not seconds."""
+    embedding.refresh(conn, 1, TrigramEmbedder())
+    ids = _ids(conn)
+    acct = conn.execute(text('SELECT account_id FROM "transaction" LIMIT 1')).scalar()
+    n = 3000
+    conn.execute(
+        text(
+            "WITH RECURSIVE i(k) AS (SELECT 1 UNION ALL SELECT k + 1 FROM i"
+            ' WHERE k < :n) INSERT INTO "transaction" (user_id, account_id,'
+            " posted_on, bank_type, description, amount_minor, currency, status)"
+            " SELECT 1, :a, '2026-01-02', 'CARD', :d, -100000 - k, 'GBP', 'completed'"
+            " FROM i"
+        ),
+        {"n": n, "a": acct, "d": CAFE},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO categorisation (user_id, transaction_id, kind,"
+            " merchant_id, source, taxonomy_version) SELECT 1, id, 'Spending',"
+            " :m, 'default', 2 FROM \"transaction\" WHERE amount_minor <= -100001"
+        ),
+        {"m": ids[CAFE], "n": n},
+    )
+    half = f"amount_minor <= -{100000 + n // 2 + 1}"
+    sql = f'DELETE FROM categorisation WHERE transaction_id IN (SELECT id FROM "transaction" WHERE {half})'  # noqa: E501, S608
+    conn.execute(text(sql))
+    raw: Any = conn.connection.driver_connection
+    steps = [0]
+
+    def tick() -> int:
+        steps[0] += 1
+        return 0
+
+    raw.set_progress_handler(tick, 1000)
+    try:
+        conn.execute(text(f'DELETE FROM "transaction" WHERE {half}'))  # noqa: S608
+    finally:
+        raw.set_progress_handler(None, 0)
+    assert steps[0] * 1000 < 5_000_000, steps[0]
+    assert embedding.vectors(conn, 1, TrigramEmbedder.model).keys() == {
+        ids[CAFE],
+        ids[GYM],
+    }
 
 
 def test_deleting_an_import_or_account_deletes_its_vectors_only(

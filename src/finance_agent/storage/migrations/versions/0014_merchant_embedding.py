@@ -1,5 +1,6 @@
 """Merchant embeddings (#113): a new merchant_embedding table, deleted with its
-Merchant (ON DELETE CASCADE) or with the last Transaction naming it (trigger)
+Merchant (ON DELETE CASCADE) or with the last Transaction naming it (trigger),
+and an index on categorisation.merchant_id for that trigger
 
 Revision ID: 0014
 Revises: 0013
@@ -18,15 +19,17 @@ depends_on = None
 # Account deletion, a sync match): a deletion path must delete a Transaction's
 # categorisation first (foreign key), so a Merchant with no categorisation left
 # names no Transaction, and its vector goes. It errs towards deleting: vectors
-# are derived and rebuilt by `embedding.refresh`.
+# are derived and rebuilt by `embedding.refresh`. It fires once per deleted
+# row, so it probes ix_categorisation_merchant once per stored vector rather
+# than scanning categorisation (verifier #189: 10k deletes took ~50 s).
 TRIGGER = """
 CREATE TRIGGER merchant_embedding_source_gone AFTER DELETE ON "transaction"
 BEGIN
     DELETE FROM merchant_embedding
     WHERE user_id = OLD.user_id
-      AND merchant_id NOT IN (
-          SELECT merchant_id FROM categorisation
-          WHERE user_id = OLD.user_id AND merchant_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM categorisation
+          WHERE categorisation.merchant_id = merchant_embedding.merchant_id
       );
 END
 """
@@ -46,6 +49,7 @@ def upgrade() -> None:
         sa.Column("dims", sa.Integer, nullable=False),
         sa.Column("vector", sa.LargeBinary, nullable=False),
     )
+    op.create_index("ix_categorisation_merchant", "categorisation", ["merchant_id"])
     # shortcut: SQLite trigger syntax; a Postgres move (ADR 0003) needs a
     # trigger function instead.
     if op.get_bind().dialect.name == "sqlite":
@@ -56,3 +60,4 @@ def downgrade() -> None:
     if op.get_bind().dialect.name == "sqlite":
         op.execute("DROP TRIGGER IF EXISTS merchant_embedding_source_gone")
     op.drop_table("merchant_embedding")
+    op.drop_index("ix_categorisation_merchant", "categorisation")

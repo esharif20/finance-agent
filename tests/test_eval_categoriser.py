@@ -196,3 +196,31 @@ def test_support_counts_every_test_row() -> None:
     test = [r for r in categoriser.load() if r.split == "test"]
     assert sum(committed["support"].values()) == len(test)
     assert Counter(committed["support"]).most_common(1)[0][1] >= 5
+
+
+def test_a_real_category_collapse_fails_the_gate_while_macro_f1_rises() -> None:
+    """Verifier #189: from the real predictions, one Category stops being
+    predicted while every other row is fixed, so macro F1 goes up; the gate
+    must still refuse it."""
+    rows = categoriser.load()
+    gold = [categoriser.resolve(r.category) for r in rows if r.split == "test"]
+    preds = categoriser.baseline(rows)
+    victim = Counter(gold).most_common(1)[0][0]
+    worse: list[categoriser.Prediction] = [
+        (None, 0.0) if g == victim else (g, 1.0) for g in gold
+    ]
+    before = categoriser.metrics_for(gold, preds)
+    after = categoriser.metrics_for(gold, worse)
+    assert after["macro_f1"] > before["macro_f1"]  # the headline hides it
+
+    def results(m: dict[str, float]) -> gate.Results:
+        return {
+            "dataset_sha256": "x",
+            "dataset_version": 2,
+            "models": {"rules": {"metrics": m}},
+        }
+
+    problems = gate.lowered(
+        results(after), results(before), categoriser.lower_is_better
+    )
+    assert any(f"{victim[0]} / {victim[1]}.recall" in p for p in problems), problems

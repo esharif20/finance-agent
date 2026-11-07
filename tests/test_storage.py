@@ -409,6 +409,8 @@ def test_migration_0014_adds_embeddings_and_keeps_rows_that_reference_them(
             assert ("merchant_embedding" in inspect(conn).get_table_names()) == (
                 target == "0014"
             )
+            indexes = {i["name"] for i in inspect(conn).get_indexes("categorisation")}
+            assert ("ix_categorisation_merchant" in indexes) == (target == "0014")
             triggers = conn.execute(text(trig)).scalars().all()
             assert triggers == (
                 ["merchant_embedding_source_gone"] if target == "0014" else []

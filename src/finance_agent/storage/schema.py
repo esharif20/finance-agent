@@ -193,6 +193,7 @@ categorisation = Table(
     Column("category_id", Integer, ForeignKey("category.id")),
     Column("source", String(64), nullable=False),
     Column("taxonomy_version", Integer, nullable=False),
+    Index("ix_categorisation_merchant", "merchant_id"),  # the 0014 trigger probes it
 )
 
 # ADR 0014 identity: (Account, provider transaction ID), raw synced fields as

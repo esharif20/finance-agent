@@ -181,7 +181,7 @@ class OllamaEmbedder:
                 raise EmbeddingUnavailable(f"Ollama returned HTTP {resp.status}")
             try:
                 return json.loads(raw, parse_float=Decimal)
-            except ValueError:
+            except (ValueError, RecursionError):  # RecursionError: nested too deep
                 raise EmbeddingUnavailable("malformed reply from Ollama") from None
         finally:
             conn.close()
@@ -214,7 +214,10 @@ class OllamaEmbedder:
             or len({len(v) for v in vectors}) != 1
         ):
             raise EmbeddingUnavailable("malformed embeddings from Ollama")
-        return [quantise(v) for v in vectors]
+        try:
+            return [quantise(v) for v in vectors]
+        except ArithmeticError:  # a finite but huge exponent overflows Decimal
+            raise EmbeddingUnavailable("malformed embeddings from Ollama") from None
 
 
 class TrigramEmbedder:
