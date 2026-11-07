@@ -137,6 +137,26 @@ def test_pending_rows_never_open_a_gap_but_a_real_gap_still_does(
         )
 
 
+def test_a_repeated_pending_id_cannot_cancel_a_real_gap() -> None:
+    # Adversarial: the feed lists one pending row twice under one ID and drops
+    # a posted row of the same amount. Subtracting the pending row twice would
+    # net the missing row's Gap to zero; one ID is one row (ADR 0014).
+    with temp_ledger() as (led, _):
+        led.apply_sync(response(H, 0, 10))
+        doc = json.loads(response(H, 10, 20, pending=1))
+        rows = doc["accounts"][0]["transactions"]
+        lost = next(i for i in range(10, 19) if H.txns[i].amount_minor < 0)
+        amount = Decimal(H.txns[lost].amount_minor).scaleb(-2)
+        rows[:] = [r for r in rows if r["id"] != f"{lost:05d}"]
+        pend = next(r for r in rows if r.get("pending"))
+        pend["amount"] = str(amount)
+        rows.append(dict(pend))
+        acc = doc["accounts"][0]
+        acc["balance"] = str(Decimal(acc["balance"]) + Decimal(1) + amount)
+        r = led.apply_sync(json.dumps(doc).encode())
+        assert [g.amount for g in r.gaps] == [amount]
+
+
 def test_csv_history_before_the_anchor_never_opens_a_gap(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:

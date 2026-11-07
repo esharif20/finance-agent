@@ -164,16 +164,17 @@ def _account(a: dict[str, Any]) -> SyncedAccount:
     org_name = _str(org, "name", required=False) or _str(org, "id", required=False)
     txns = _list(a.get("transactions", []), "transactions")
     posted: dict[str, SyncedRow] = {}
+    # one ID is one row for pending rows too, so a repeat cannot cancel a Gap
+    pending: dict[str, SyncedRow] = {}
     conflict = False
-    pending_minor = 0
     for t in txns:
         is_pending, row = _row(_obj(t, "transaction"))
-        if is_pending:
-            pending_minor += row.amount_minor
-        elif row.provider_id not in posted:
-            posted[row.provider_id] = row
-        elif posted[row.provider_id] != row:
+        seen = pending if is_pending else posted
+        if row.provider_id not in seen:
+            seen[row.provider_id] = row
+        elif seen[row.provider_id] != row:
             conflict = True
+    pending_minor = sum(r.amount_minor for r in pending.values())
     return SyncedAccount(
         provider_id=pid,
         org=org_name,
