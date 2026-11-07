@@ -59,7 +59,7 @@ The normalised party a Transaction is with (raw "TESCO STORES 3021" → Tesco). 
 _Avoid_: Payee, vendor, shop, counterparty
 
 **Review Queue**:
-The Transactions whose Category could not be assigned with enough confidence and are waiting for the user to decide.
+Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence, a Possible Duplicate, or "is this a subscription?".
 _Avoid_: Inbox, uncategorised
 
 ## Intelligence
