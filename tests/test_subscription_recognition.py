@@ -193,3 +193,23 @@ def test_recognition_never_overwrites_a_user_decision(
         assert by_name(recognise(engine, export, later))[e.merchant] == decided
     finally:
         engine.dispose()
+
+
+SEPARATORS = st.sampled_from(list("&-_*./+'|\x00"))
+
+
+@given(st.sampled_from(sorted(KNOWN_SERVICES)), SEPARATORS, st.data())
+def test_adversarial_punctuation_inside_a_name_never_matches(
+    name: str, sep: str, data: st.DataObject
+) -> None:
+    # "B & T" or "E-E" is another business's initials, not BT or EE
+    letters = name.replace(" ", "")
+    at = data.draw(st.integers(1, len(letters) - 1))
+    assert known_service(letters[:at] + sep + letters[at:]) is None
+
+
+def test_spacing_and_web_suffixes_still_match() -> None:
+    for n in ("DISNEYPLUS", "disney  plus", "NOWTV", "BT.COM", "Netflix.co.uk"):
+        assert known_service(n) is not None, n
+    for n in ("B & T", "B T", "S*K*Y", "T.V. LICENCE", "NETFLIX\x00"):
+        assert known_service(n) is None, n

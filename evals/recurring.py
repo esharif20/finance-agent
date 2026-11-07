@@ -17,7 +17,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from finance_agent.engine.recurring import detect_recurring
+from finance_agent.categorise.recurring import detect_recurring
 
 SEED = 104
 DATASET_VERSION = 1

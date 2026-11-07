@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from hypothesis import given
 from hypothesis import strategies as st
 
-from finance_agent.engine.recurring import Recurrence, detect_recurring
+from finance_agent.categorise.recurring import Recurrence, detect_recurring
 
 D0 = date(2026, 1, 15)
 

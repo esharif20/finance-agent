@@ -1,6 +1,6 @@
 """Subscription recognition (#104), after the registry (#103): known services
 from their first charge, descriptor patterns asked about straight away, then
-recurring detection (`engine.recurring`). Every write goes through
+recurring detection (`categorise.recurring`). Every write goes through
 `Ledger.record_detection`, which never overrides a user decision and writes
 nothing when the evidence is unchanged, so re-running is idempotent.
 """
@@ -8,7 +8,7 @@ nothing when the evidence is unchanged, so re-running is idempotent.
 import logging
 import re
 
-from finance_agent.engine.recurring import detect_recurring
+from finance_agent.categorise.recurring import detect_recurring
 from finance_agent.ledger import REGISTRY_KINDS, Ledger, Transaction
 
 log = logging.getLogger(__name__)  # counts only
@@ -69,12 +69,12 @@ KNOWN_SERVICES: dict[str, tuple[str, str]] = {
 
 
 def _key(name: str) -> str:
-    return re.sub(r"[^A-Z0-9]", "", name.upper())
+    # only spacing and a web suffix are ignored: other punctuation stays, so
+    # "B & T" or "E-E" (another business's initials) never reads as BT or EE
+    return re.sub(r"\.CO(M|\.UK)$", "", " ".join(name.upper().split()))
 
 
-_BY_KEY = {
-    _key(n) + suffix: n for n in KNOWN_SERVICES for suffix in ("", "COM", "COUK")
-}
+_BY_KEY = {k: n for n in KNOWN_SERVICES for k in (_key(n), _key(n).replace(" ", ""))}
 
 
 def known_service(merchant: str) -> tuple[str, str, str] | None:

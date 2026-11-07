@@ -1,5 +1,7 @@
 """Recurring detection (#104; reused by M5's detectors, #148). Pure: no
-database, no logging, integers only.
+database, no logging, integers only. It lives in `categorise`, which
+recognition needs, because `engine` depends on `categorise` and not the
+other way round (docs/ARCHITECTURE.md).
 
 `detect_recurring` finds one regular series in a Merchant's charges. A series
 needs at least `MIN_CHARGES` charges (the ADR 0015 gate), every gap between
