@@ -1,6 +1,7 @@
 # Public repo: never commit real financial data or secrets.
 *.csv
 !tests/fixtures/synthetic/**/*.csv
+!evals/datasets/**/*.csv
 *.db
 *.sqlite
 *.sqlite3
