@@ -13,7 +13,6 @@ from sqlalchemy import Connection
 from finance_agent import categorise
 from finance_agent.identity import current_user
 from finance_agent.ledger import (
-    CURRENCY,
     SPLIT_PARTS,
     InvalidSplit,
     KindHasNoCategory,
@@ -85,7 +84,7 @@ def _split(led: Ledger, s: Split) -> SplitOut:
         transaction_id=s.transaction_id,
         parts=_parts(s.parts),
         amount_minor=s.amount_minor,
-        currency=CURRENCY,
+        currency=s.currency,
         needs_recheck=s.needs_recheck,
         ledger_version=led.ledger_version(),
     )

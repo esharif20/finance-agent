@@ -14,6 +14,7 @@ import { useCardSprings } from "./useCardSprings";
 export { SELECT_SPRING } from "./useCardSprings";
 
 type Account = components["schemas"]["AccountOut"];
+type Balances = components["schemas"]["BalancesOut"];
 
 // Generic hues for banks without a known colour, all outside the violet band 235-290.
 const HUES = [172, 38, 345, 140, 15, 95];
@@ -51,16 +52,18 @@ type Face = {
   masked?: string;
   balance: { minor: number; currency: string } | null;
   matches: boolean | null; // null: the bank gives no balance, so nothing to match
+  rateNeeded?: string[]; // currencies whose balance has no rate, so the total is unknown
   hue: number | null;
   art: string | null;
 };
 
-function faces(accounts: Account[]): Face[] {
+function faces(accounts: Account[], balances?: Balances): Face[] {
   const currency = accounts[0]?.currency ?? "GBP";
-  // GBP only for now, like the summary: an All accounts total needs one currency
+  // one currency sums as is; mixed ones take the API's GBP total (#156), never a guess
   const same = accounts.every((a) => a.currency === currency);
   // a bank with no balance (HSBC) leaves the total unknown, not smaller
   const known = accounts.every((a) => a.bank_balance !== null);
+  const needed = (balances?.accounts ?? []).filter((x) => x.gbp === null).map((x) => x.currency);
   const status = (a: Account[]) =>
     a.some((x) => x.gaps.length > 0) ? false : a.every((x) => x.bank_balance !== null) || null;
   const all: Face = {
@@ -70,8 +73,11 @@ function faces(accounts: Account[]): Face[] {
     balance:
       same && known
         ? { minor: accounts.reduce((n, a) => n + (a.bank_balance?.minor ?? 0), 0), currency }
-        : null,
+        : same
+          ? null
+          : (balances?.total ?? null),
     matches: status(accounts),
+    rateNeeded: same || !known ? [] : [...new Set(needed)],
     hue: null,
     art: null,
   };
@@ -100,15 +106,17 @@ const transform = (p: Pose) =>
 
 export function AccountStack({
   accounts,
+  balances,
   selected,
   onSelect,
 }: {
   accounts: Account[];
+  balances?: Balances; // GBP balances from /api/fx/balances, for a mixed-currency total
   selected?: number;
   onSelect: (id: number | undefined) => void;
 }) {
   const reduce = useReducedMotion() ?? false;
-  const all = useMemo(() => faces(accounts), [accounts]);
+  const all = useMemo(() => faces(accounts, balances), [accounts, balances]);
   const [hover, setHover] = useState<Hover | null>(null);
   const [rising, setRising] = useState<number | null>(null);
   const [width, setWidth] = useState(0);
@@ -409,7 +417,9 @@ export function AccountStack({
                 <Money value={f.balance} odometer={f.key} className="account-balance text-row font-semibold" />
               ) : null}
               <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
-                {f.matches === null ? (
+                {f.rateNeeded?.length ? (
+                  `Total unknown: rate needed for ${f.rateNeeded.join(", ")}`
+                ) : f.matches === null ? (
                   f.id === undefined ? "Total unknown: a bank gives no balance" : "No balance from bank"
                 ) : f.matches ? (
                   <>

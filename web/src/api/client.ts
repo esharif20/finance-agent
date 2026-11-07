@@ -31,6 +31,12 @@ export const fetchAccounts = () => get<Account[]>("/api/accounts");
 export const fetchSpending = (month: string, accountId?: number) =>
   get<Spending>(`/api/spending${query(month, accountId)}`);
 
+export type FxMonth = components["schemas"]["FxMonthOut"];
+export type FxBalances = components["schemas"]["BalancesOut"];
+export const fetchFxMonth = (month: string, accountId?: number) =>
+  get<FxMonth>(`/api/fx/month${query(month, accountId)}`);
+export const fetchFxBalances = () => get<FxBalances>("/api/fx/balances");
+
 export type TxnFilters = {
   account_id?: string;
   kind?: string;

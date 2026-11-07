@@ -117,7 +117,7 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 | `statement_import` | id, user_id, account_id, source (csv, open_banking), file_hash, encrypted_blob, imported_at |
 | `transaction` | id, user_id, account_id, posted_on, description, amount_minor, currency, running_balance_minor, status (pending, completed, reverted), dedupe_key |
 | `transaction_source` | transaction_id, statement_import_id, row_number (one Transaction can appear in many imports) |
-| `fx_conversion` | transaction_id, rate, gbp_minor, basis (bank-derived, estimated, unconverted), rate_source, rate_date |
+| `fx_rate` | id, user_id, currency, rate (Decimal string, GBP per unit), rate_on, created_at: rates the user entered (#156). Conversions are derived on read, each with its rate's source and date; `transaction.gbp_minor` holds a Bank's own GBP amount when its export gives one |
 | `merchant` | id, user_id, name, default_category_id |
 | `category` | id, parent_id, name, taxonomy_version, archived_at |
 | `correction` | id, user_id, transaction_id, field, new_value, origin (ui, chat), created_at, superseded_by |

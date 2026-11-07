@@ -1,11 +1,13 @@
 import { TriangleAlert } from "lucide-react";
 import type { components } from "@/api/schema";
+import { FxProvenance, RateNeeded } from "@/components/FxNote";
 import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Slice } from "@/lib/categories";
 import { PoundStrip } from "./PoundStrip";
 
 type Summary = components["schemas"]["SummaryOut"];
+type FxMonth = components["schemas"]["FxMonthOut"];
 
 export function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number) as [number, number];
@@ -20,8 +22,10 @@ export function MonthCard({
   summary,
   slices,
   children,
+  fx,
 }: {
   summary: Summary;
+  fx?: FxMonth; // which rates the foreign figures used, and what needs one (#156)
   slices?: Slice[];
   children?: React.ReactNode; // a line under the figures, e.g. Transfers between Accounts
 }) {
@@ -34,7 +38,10 @@ export function MonthCard({
       </CardHeader>
 
       <div role="group" aria-label="Net">
-        <p className="text-label text-muted-foreground">Net</p>
+        <p className="flex items-center gap-1 text-label text-muted-foreground">
+          Net
+          <FxProvenance fx={fx} />
+        </p>
         <Money
           value={net}
           sign
@@ -74,6 +81,7 @@ export function MonthCard({
           </span>
         </p>
       )}
+      <RateNeeded fx={fx} />
     </Card>
   );
 }
