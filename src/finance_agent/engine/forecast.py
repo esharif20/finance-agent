@@ -32,6 +32,7 @@ import pandas as pd
 from scipy.stats import t as student_t
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
+from finance_agent.categorise import normalise
 from finance_agent.categorise.recurring import CADENCES, Recurrence, detect_recurring
 from finance_agent.ledger import Ledger
 
@@ -44,6 +45,9 @@ MIN_MONTHS = 2 * SEASON
 SEASONAL_NAIVE_MONTHS = 12
 PARAMS = 2 + 1 + SEASON - 1  # alpha, gamma, the level and 11 free seasonal states
 MAX_LOG = 700.0  # exp(700) is about 1e304, still a finite float
+# income is scheduled from its recent credits only, so a pay rise or a bonus
+# long ago does not stop the salary being recognised
+RECENT_CREDITS = 6
 
 Method = Literal["ets", "seasonal_naive", "insufficient"]
 
@@ -65,26 +69,33 @@ class CategoryForecast:
 
 @dataclass(frozen=True)
 class RecurringPayment:
-    merchant: str
+    """A scheduled payment out, or (in `CashFlow.income`) a scheduled credit
+    in; pence are positive either way."""
+
+    merchant: str  # for income, the payer's normalised description
     interval: str  # weekly, monthly or annual
     months: tuple[int, ...]  # pence due in each forecast month
+    dates: tuple[date, ...] = ()  # the projected dates within the forecast
 
 
 @dataclass(frozen=True)
 class CashFlowMonth:
     month: str  # YYYY-MM
     recurring: int  # pence, from schedules
-    total: Band  # recurring plus every forecast Category
+    total: Band  # recurring plus every forecast Category: money out only
+    income: int = 0  # pence in, from recurring credits' schedules
 
 
 @dataclass(frozen=True)
 class CashFlow:
-    """Money out over the coming months. Categories marked insufficient are
-    left out of the totals; the UI says why (ADR 0015)."""
+    """Money out over the coming months, and recurring money in. Categories
+    marked insufficient are left out of the totals; the UI says why (ADR
+    0015). One-off and irregular income is never projected."""
 
     months: tuple[CashFlowMonth, ...]
     recurring: tuple[RecurringPayment, ...]
     categories: dict[tuple[str, str], CategoryForecast]
+    income: tuple[RecurringPayment, ...] = ()
 
 
 def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
@@ -101,8 +112,12 @@ def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
     shares: list[tuple[int | None, date, tuple[str, str] | None, int]] = []
     names: dict[int, str] = {}
     by_merchant: dict[int, list[tuple[date, int]]] = {}
+    by_payer: dict[str, list[tuple[date, int]]] = {}
     for t in led.transactions():
         c = t.categorisation
+        if c is not None and c.kind == "Income" and t.posted_on < start:
+            payer = normalise(t.description)
+            by_payer.setdefault(payer, []).append((t.posted_on, int(t.amount * 100)))
         if c is None or c.kind != "Spending" or t.posted_on >= start:
             continue
         pence = int(-t.amount * 100)
@@ -125,9 +140,13 @@ def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
         scheduled.add(merchant_id)
         if rec is None or status == "user_cancelled":
             continue
-        due = _project(rec, months)
-        if any(due):
-            recurring.append(RecurringPayment(names[merchant_id], rec.interval, due))
+        if payment := _payment(names[merchant_id], rec, months):
+            recurring.append(payment)
+    income: list[RecurringPayment] = []
+    for payer, credits in sorted(by_payer.items()):
+        rec = detect_recurring(sorted(credits)[-RECENT_CREDITS:])
+        if payer and rec is not None and (credit := _payment(payer, rec, months)):
+            income.append(credit)
     monthly: dict[tuple[str, str], dict[date, int]] = {}
     for merchant_id, on, cat, pence in shares:
         if cat is not None and merchant_id not in scheduled:
@@ -152,8 +171,9 @@ def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
             fixed + sum(b.lower for b in bands),
             fixed + sum(b.upper for b in bands),
         )
-        out.append(CashFlowMonth(f"{month:%Y-%m}", fixed, total))
-    return CashFlow(tuple(out), tuple(recurring), categories)
+        paid = sum(r.months[i] for r in income)
+        out.append(CashFlowMonth(f"{month:%Y-%m}", fixed, total, paid))
+    return CashFlow(tuple(out), tuple(recurring), categories, tuple(income))
 
 
 def _add_months(d: date, k: int) -> date:
@@ -162,19 +182,24 @@ def _add_months(d: date, k: int) -> date:
     return date(d.year + y, m + 1, day)
 
 
-def _project(rec: Recurrence, months: Sequence[date]) -> tuple[int, ...]:
-    """Pence due in each month of `months` (consecutive month starts, the last
-    one exclusive) from a series' schedule; nothing once it has lapsed."""
+def _payment(
+    name: str, rec: Recurrence, months: Sequence[date]
+) -> RecurringPayment | None:
+    """A series projected over `months` (consecutive month starts, the last
+    one exclusive) from its schedule; None once it has lapsed or when nothing
+    falls due."""
     start, end = months[0], months[-1]
     if (start - rec.last_on).days > CADENCES[rec.interval][1]:
-        return (0,) * (len(months) - 1)  # missed a whole cycle: it has stopped
+        return None  # missed a whole cycle: it has stopped
     due: list[date] = []
     k = 1
     while (d := _next(rec, k)) < end:
         if d >= start:
-            due.append(d.replace(day=1))
+            due.append(d)
         k += 1
-    return tuple(due.count(m) * rec.typical_minor for m in months[:-1])
+    starts = [d.replace(day=1) for d in due]
+    pence = tuple(starts.count(m) * rec.typical_minor for m in months[:-1])
+    return RecurringPayment(name, rec.interval, pence, tuple(due)) if due else None
 
 
 def _next(rec: Recurrence, k: int) -> date:
@@ -200,9 +225,12 @@ def forecast_category(history: Sequence[int], horizon: int) -> CategoryForecast:
 
 def _seasonal_naive(y: Sequence[int], horizon: int) -> tuple[Band, ...]:
     """The same month a year before; the interval is the nearest-rank LEVEL
-    quantile of past same-lag errors (lag 1 when there is no year to compare)."""
-    lag = SEASON if len(y) > SEASON else 1
-    errors = sorted(abs(a - b) for a, b in zip(y[lag:], y, strict=False))
+    quantile of past same-month and month-to-month errors pooled: below 24
+    months the same-month errors alone are too few (one at 13 months), and
+    their bands covered about 68% for an 80% level (verifier #179)."""
+    errors = sorted(
+        abs(a - b) for lag in (1, SEASON) for a, b in zip(y[lag:], y, strict=False)
+    )
     q = errors[math.ceil(LEVEL * len(errors)) - 1]
     n = len(y)
     points = [y[n - SEASON + (h - 1) % SEASON] for h in range(1, horizon + 1)]

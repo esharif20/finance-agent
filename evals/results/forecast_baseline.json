@@ -79,31 +79,31 @@
       "model_version": "1",
       "metrics": {
         "Food & Drink / Coffee.mase": 0.926635,
-        "Food & Drink / Coffee.coverage_gap": 0.085354,
+        "Food & Drink / Coffee.coverage_gap": 0.00303,
         "Food & Drink / Eating out.mase": 0.64783,
-        "Food & Drink / Eating out.coverage_gap": 0.090404,
+        "Food & Drink / Eating out.coverage_gap": 0.008081,
         "Food & Drink / Groceries.mase": 1.090483,
-        "Food & Drink / Groceries.coverage_gap": 0.027273,
+        "Food & Drink / Groceries.coverage_gap": 0.012121,
         "Food & Drink / Takeaway.mase": 0.818332,
-        "Food & Drink / Takeaway.coverage_gap": 0.062626,
+        "Food & Drink / Takeaway.coverage_gap": 0.032323,
         "Shopping / Online.mase": 0.745886,
-        "Shopping / Online.coverage_gap": 0.062626,
+        "Shopping / Online.coverage_gap": 0.028283,
         "Transport / Public transport.mase": 0.592277,
-        "Transport / Public transport.coverage_gap": 0.05,
+        "Transport / Public transport.coverage_gap": 0.033333,
         "Travel / Holidays.mase": 0.314064,
-        "Travel / Holidays.coverage_gap": 0.032323,
+        "Travel / Holidays.coverage_gap": 0.076263,
         "overall.mase": 0.733644,
-        "overall.coverage_gap": 0.058658
+        "overall.coverage_gap": 0.014935
       },
       "coverage": {
-        "Food & Drink / Coffee": 0.714646,
-        "Food & Drink / Eating out": 0.709596,
-        "Food & Drink / Groceries": 0.772727,
-        "Food & Drink / Takeaway": 0.737374,
-        "Shopping / Online": 0.737374,
-        "Transport / Public transport": 0.75,
-        "Travel / Holidays": 0.767677,
-        "overall": 0.741342
+        "Food & Drink / Coffee": 0.80303,
+        "Food & Drink / Eating out": 0.808081,
+        "Food & Drink / Groceries": 0.787879,
+        "Food & Drink / Takeaway": 0.767677,
+        "Shopping / Online": 0.828283,
+        "Transport / Public transport": 0.833333,
+        "Travel / Holidays": 0.876263,
+        "overall": 0.814935
       }
     }
   }

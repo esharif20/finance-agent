@@ -97,6 +97,7 @@ source_modules = [
     "finance_agent.ingest",
     "finance_agent.ledger",
     "finance_agent.categorise",
+    "finance_agent.memory",
 ]
 forbidden_modules = ["finance_agent.engine"]
 

@@ -106,3 +106,26 @@ def test_a_float_model_reproduces_within_its_declared_tolerance(
     assert gate.run("t", lambda: renamed, path, _lower, [], tolerance=0.005) == 1
     recount = {**_results(0.8), "dataset_version": 1.004}  # so are integers
     assert gate.run("t", lambda: recount, path, _lower, [], tolerance=0.005) == 1
+
+
+def test_the_float_tolerance_never_lets_write_lower_a_score(tmp_path: Path) -> None:
+    # verifier #179: the tolerance is for reproducing a run, not for the
+    # refuse-to-lower rule; a MASE worse by 0.004 is still refused
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(_results(0.8, err=0.5)))
+    worse = _results(0.8, err=0.504)
+    argv = ["--write", "--tolerance=1", "--reproduce-tolerance", "1"]  # no CLI knob
+    assert gate.run("t", lambda: worse, path, _lower, argv, tolerance=0.005) == 1
+    assert json.loads(path.read_text()) == _results(0.8, err=0.5)  # untouched
+    worse_recall = _results(0.796)
+    assert gate.run("t", lambda: worse_recall, path, _lower, argv, 0.005) == 1
+
+
+def test_only_the_forecast_harness_declares_a_tolerance() -> None:
+    evals = Path(__file__).resolve().parents[1] / "evals"
+    tolerant = sorted(
+        p.name
+        for p in evals.glob("*.py")
+        if "gate.run(" in (src := p.read_text()) and "TOLERANCE" in src
+    )
+    assert tolerant == ["forecast.py"]

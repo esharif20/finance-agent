@@ -140,3 +140,44 @@ def test_cash_flow_projects_recurring_payments_and_forecasts_the_rest(
 
 def _id(ids: dict[str, int], fragment: str) -> int:
     return next(i for name, i in ids.items() if fragment in name.upper())
+
+
+def test_cash_flow_projects_recurring_income_with_its_paydays(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    # verifier #179: the what-if (#134 item 6, #151) needs money in as well as
+    # money out, and the next payday's date
+    rows: list[tuple[date, str, str]] = []
+    for i in range(26):  # Jan 2024 to Feb 2026
+        pay = "2100.00" if i < 20 else "2400.00"  # a pay rise in Sep 2025
+        rows.append((_month(i, 25), "SYNTH ACME LTD SALARY", pay))
+        if i < 15:  # a side job that stopped: lapsed, never projected
+            rows.append((_month(i, 3), "SYNTH SIDEGIG PAYOUT", "150.00"))
+        rows.append((_month(i, 9), "SYNTH GROCER", f"-{180 + i % 5}.00"))
+    rows.append((date(2025, 12, 24), "SYNTH AUNT GIFT", "50.00"))  # one-off
+    text = "".join(f"{d:%d/%m/%Y},{desc},{amt}\n" for d, desc, amt in rows)
+    with engine.begin() as conn:
+        Ledger(conn, 1).import_files([write_export(text)])
+        categorise.run(conn, 1)
+        before = Ledger(conn, 1).transactions()
+        flow = cash_flow(Ledger(conn, 1), date(2026, 3, 14), 3)
+        assert Ledger(conn, 1).transactions() == before  # read-only
+
+    salary = [r for r in flow.income if "ACME" in r.merchant.upper()]
+    assert [(r.interval, r.months) for r in salary] == [("monthly", (240_000,) * 3)]
+    assert salary[0].dates == (date(2026, 3, 25), date(2026, 4, 25), date(2026, 5, 25))
+    assert [r.merchant for r in flow.income] == [salary[0].merchant]  # no others
+    assert [m.income for m in flow.months] == [240_000] * 3
+    assert all(type(m.income) is int and m.income > 0 for m in flow.months)
+    assert not [r for r in flow.recurring if "ACME" in r.merchant.upper()]
+    # money out is unchanged by income: the total is still spend only
+    assert all(m.total.point > 0 for m in flow.months)
+
+
+def test_a_short_seasonal_naive_band_is_not_one_lucky_error() -> None:
+    # verifier #179: at 13 months there is one same-month error; when that one
+    # matched exactly, the band must still reflect the month-to-month swings
+    year = [1_000, 9_000] * 6
+    f = forecast_category([*year, year[0]], 3)
+    assert f.method == "seasonal_naive"
+    assert all(b.lower < b.point < b.upper for b in f.months)
