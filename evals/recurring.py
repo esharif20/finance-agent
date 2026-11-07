@@ -128,7 +128,7 @@ def generate(seed: int = SEED) -> list[Case]:
 
     @case("fixed_price_irregular", False)
     def _() -> Charges:  # a café visit at one price: some runs look weekly
-        n, a, d = rnd.randint(4, 20), amt(), start
+        n, a, d = rnd.randint(6, 20), amt(), start
         out: Charges = []
         for _ in range(n):
             d += timedelta(rnd.randint(3, 12))

@@ -1,7 +1,7 @@
 {
-  "dataset_version": 1,
+  "dataset_version": 2,
   "seed": 104,
-  "schedules": 400,
+  "schedules": 440,
   "detector": {
     "precision": 1.0,
     "recall": 0.8625,
@@ -15,7 +15,8 @@
       "irregular": 0.0,
       "one_off": 0.0,
       "monthly_varying_amounts": 0.0,
-      "drift": 0.0
+      "drift": 0.0,
+      "fixed_price_irregular": 0.0
     }
   },
   "baseline": {
@@ -31,7 +32,8 @@
       "irregular": 0.0,
       "one_off": 0.0,
       "monthly_varying_amounts": 0.0,
-      "drift": 0.0
+      "drift": 0.0,
+      "fixed_price_irregular": 0.0
     }
   }
 }

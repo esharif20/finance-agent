@@ -151,6 +151,8 @@ def test_a_noisy_prefix_followed_by_a_clean_run_is_detected_in_any_row_order(
     # charges at the run's own price off its cadence are evidence, not noise
     noise = [(d, a) for d, a in noise if abs(a - amount) * 10 > amount]
     start = D0 + timedelta(days=max((d for d, _ in noise), default=0) + pause)
+    if start.day > 28:  # monthly() clamps to the 28th, which would be earlier
+        start += timedelta(days=4)
     run = [(d, amount) for d in monthly(n, start)]
     charges = [(D0 + timedelta(days=d), a) for d, a in noise] + run
     r = detect_recurring(charges)
@@ -196,7 +198,8 @@ def test_a_price_step_with_fewer_than_three_new_charges_is_not_detected() -> Non
 def test_one_price_bought_more_often_than_the_cadence_is_not_a_series() -> None:
     # adversarial (verifier #183): café visits at one price whose last three
     # happen to be a week apart; a series is never charged sooner than its cadence
-    days, d = [], D0
+    days: list[date] = []
+    d = D0
     for g in (3, 4, 2, 3, 7, 7):
         d += timedelta(days=g)
         days.append(d)
@@ -256,5 +259,7 @@ def test_a_flagged_run_is_contiguous_on_cadence_and_within_the_band(
     run = sorted((d, a) for d, a in charges if a > 0 and r.first_on <= d <= r.last_on)
     lo, hi = CADENCES[r.interval]
     assert len(run) == r.charge_count >= 3
-    assert all(lo <= (y[0] - x[0]).days <= hi for x, y in zip(run, run[1:]))
+    assert all(
+        lo <= (y[0] - x[0]).days <= hi for x, y in zip(run, run[1:], strict=False)
+    )
     assert all(abs(a - r.typical_minor) * 20 <= r.typical_minor for _, a in run)
