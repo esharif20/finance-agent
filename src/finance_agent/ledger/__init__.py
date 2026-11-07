@@ -216,7 +216,9 @@ def _decimal(minor: int) -> Decimal:
     return Decimal(minor).scaleb(-2)
 
 
-_UNCATEGORISED = "Uncategorised"  # the categorise module's name; it imports us
+UNCATEGORISED = "Uncategorised"  # the catch-all Category; categorise seeds it
+# shortcut: one currency until FX conversion lands; then sum gbp_minor
+CURRENCY = "GBP"
 
 
 def _only(account_id: int | None) -> list[ColumnElement[bool]]:
@@ -384,7 +386,7 @@ class Ledger:
                 self._db.select(t, t.c.id, t.c.amount_minor).where(
                     t.c.posted_on >= start,
                     t.c.posted_on < end,
-                    t.c.currency == "GBP",  # shortcut: as in summarise_month
+                    t.c.currency == CURRENCY,
                     *_only(account_id),
                 )
             )
@@ -486,11 +488,11 @@ class Ledger:
                 fees -= t.amount
             elif c.kind == "Refund":
                 refunds += t.amount
-                if c.category and c.category[0] == _UNCATEGORISED:
+                if c.category and c.category[0] == UNCATEGORISED:
                     unmatched -= t.amount
         cats: list[Spend] = []
         for sp in spends:
-            if sp.name == _UNCATEGORISED:
+            if sp.name == UNCATEGORISED:
                 sp = replace(sp, amount=sp.amount - unmatched)
                 if sp.amount == 0:
                     continue
@@ -693,15 +695,14 @@ class Ledger:
         ).where(
             t.c.posted_on >= start,
             t.c.posted_on < end,
-            # shortcut: GBP only until FX conversion lands; then sum gbp_minor
-            t.c.currency == "GBP",
+            t.c.currency == CURRENCY,
             *_only(account_id),
         )
         row = self._db.execute(stmt).one()
         ins, outs, moved_in, moved_out = (int(v) for v in row)
         return MonthSummary(
             month,
-            "GBP",
+            CURRENCY,
             _decimal(ins),
             _decimal(outs),
             _decimal(ins - outs),

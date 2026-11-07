@@ -18,6 +18,7 @@ from finance_agent import categorise
 from finance_agent.api import card_art
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
+    CURRENCY,
     AccountBalance,
     Breakdown,
     CategoryDetail,
@@ -229,7 +230,7 @@ def _transaction(t: Transaction) -> TransactionOut:
         id=t.id,
         posted_on=t.posted_on.isoformat(),
         description=t.description,
-        amount=_money(t.amount, "GBP"),  # shortcut: GBP only, as in summarise_month
+        amount=_money(t.amount, CURRENCY),
         account_id=t.account_id,
         kind=c.kind if c else None,
         merchant_id=c.merchant_id if c else None,
@@ -265,7 +266,7 @@ def _matches(
 
 
 def _spending(month: str, b: Breakdown, money_out: Decimal) -> SpendingOut:
-    c = "GBP"
+    c = CURRENCY
     return SpendingOut(
         month=month,
         currency=c,
@@ -291,14 +292,14 @@ def _txn(t: Transaction) -> CategoryTxnOut:
         id=t.id,
         posted_on=t.posted_on.isoformat(),
         description=t.description,
-        amount=_money(t.amount, "GBP"),
+        amount=_money(t.amount, CURRENCY),
         merchant=c.merchant if c else None,
         subcategory=c.category[1] if c and c.category else None,
     )
 
 
 def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
-    c = "GBP"
+    c = CURRENCY
 
     def spends(xs: tuple[Spend, ...]) -> list[CategorySpendOut]:
         return [CategorySpendOut(name=x.name, amount=_money(x.amount, c)) for x in xs]
