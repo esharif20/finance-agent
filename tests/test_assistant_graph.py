@@ -23,6 +23,7 @@ from finance_agent.assistant import (
     OllamaError,
     Reply,
     ToolCall,
+    context,
     graph,
 )
 from finance_agent.assistant.graph import (
@@ -574,3 +575,17 @@ def test_obfuscated_injection_in_memory_text_is_cut_before_the_model(
     seen = " ".join(x.content for x in sent(m)).lower()
     for word in ("rules", "999", "obey", "propose_correction"):
         assert word not in seen
+
+
+def test_a_result_the_budget_withheld_cannot_ground_a_reply(
+    engine: Engine, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The model never saw a result the budget replaced, so its figures are
+    not this turn's evidence: a reply stating them is not grounded."""
+    total = spending(client)["total"]["minor"]
+    monkeypatch.setattr(context, "TOOL_RESULTS_TOKENS", 1)
+    said = f"You spent {pounds(total)}."
+    m = fake("ask", calls(("spending_summary", {"month": MONTH})), said, said)
+    a = turn(engine, m, "spend in January?")
+    assert (a.path, a.evidence) == ("deterministic", ())
+    assert pounds(total) not in a.reply

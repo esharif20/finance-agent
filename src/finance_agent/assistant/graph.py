@@ -184,11 +184,12 @@ class Assistant:
                 Message(role="assistant", content=r.content, tool_calls=tuple(calls))
             )
             for call in calls:
-                content = self._run(route, call, s, d)
+                seen = len(d.values)
+                content = budget.take(self._run(route, call, s, d))
+                if content == context.TOO_LARGE:  # unseen, so not evidence
+                    del d.values[seen:]
                 d.messages.append(
-                    Message(
-                        role="tool", tool_name=call.name, content=budget.take(content)
-                    )
+                    Message(role="tool", tool_name=call.name, content=content)
                 )
         d.failed = True  # still asking for tools: no reply to check
         return d
