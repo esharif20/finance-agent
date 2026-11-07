@@ -1,18 +1,45 @@
-// Smoke test: run `fa`, open the Overview in WebKit, assert the totals match the API.
-//   FA_DB_PATH=<synthetic db> pnpm --dir web run smoke [screens-dir]
+// Smoke test: run `fa` on a temp ledger of synthetic data, open the Overview in
+// WebKit and assert the totals match the API.
+//   pnpm --dir web run smoke [screens-dir]
+// Seeds a fresh temp ledger itself; FA_DB_PATH, if set, must name an existing
+// ledger under the temp directory, so the real data dir is never opened.
 // Needs `pnpm build` first and a WebKit install of the global Playwright CLI.
 // Not part of CI (no browser there); never opens a real browser window of yours:
 // FA_NO_BROWSER is set and `fa stop` always runs.
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, sep } from "node:path";
 
 const require = createRequire(import.meta.url);
 const globalRoot = execFileSync("npm", ["root", "-g"]).toString().trim();
 const { webkit } = require(process.env.PLAYWRIGHT_MODULE ?? `${globalRoot}/playwright`);
 
+const temps = [tmpdir(), "/tmp"].filter(existsSync).map((d) => realpathSync(d));
+const underTemp = (file) => existsSync(file) && temps.some((t) => realpathSync(dirname(file)).startsWith(t + sep));
+let seeded; // the temp dir this run made, removed at the end
+let db = process.env.FA_DB_PATH;
+if (!db) {
+  seeded = mkdtempSync(join(tmpdir(), "fa-smoke-"));
+  db = join(seeded, "ledger.db");
+  const files = execFileSync("uv", ["run", "python", "scripts/synthetic_exports.py", seeded], { cwd: ".." })
+    .toString()
+    .trim()
+    .split("\n");
+  execFileSync("uv", ["run", "fa", "import", ...files], {
+    env: { ...process.env, FA_DB_PATH: db },
+    cwd: "..",
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+}
+if (!underTemp(db)) {
+  console.error("smoke: FA_DB_PATH must name an existing ledger under the temp directory; unset it to seed one");
+  process.exit(2);
+}
+
 const port = process.env.FA_PORT ?? "8791";
-const env = { ...process.env, FA_PORT: port, FA_NO_BROWSER: "1" };
+const env = { ...process.env, FA_DB_PATH: db, FA_PORT: port, FA_NO_BROWSER: "1" };
 const fa = (...args) => execFileSync("uv", ["run", "fa", ...args], { env, cwd: "..", stdio: "inherit" });
 const base = `http://127.0.0.1:${port}`;
 const shots = process.argv[2];
@@ -112,6 +139,7 @@ try {
   await browser.close();
 } finally {
   fa("stop");
+  if (seeded) rmSync(seeded, { recursive: true, force: true });
 }
 if (failed) process.exit(1);
 console.log("smoke: Overview totals match the API");

@@ -45,6 +45,10 @@ class UnsafeDatabasePath(ValueError):
     pass
 
 
+class MissingDatabase(ValueError):
+    """No ledger at the path, and the caller may not create one."""
+
+
 class UnscopedQuery(RuntimeError):
     """A statement reached Scoped.execute without its user filter: a bug."""
 
@@ -57,14 +61,18 @@ def _inside_repo(path: Path) -> bool:
     return any((p / ".git").exists() for p in path.resolve().parents)
 
 
-def open_db(path: Path | None = None) -> Engine:
+def open_db(path: Path | None = None, create: bool = True) -> Engine:
     """The connection factory: validate the path, create it, migrate to head.
+    With create=False a missing ledger is refused, so serving the app never
+    makes one (only `fa import` does).
 
     Swap point for SQLCipher in M3 (ADR 0002).
     """
     path = path or default_db_path()
     if _inside_repo(path):
         raise UnsafeDatabasePath("refusing to open a database inside a repository")
+    if not create and not path.is_file():
+        raise MissingDatabase(f"no ledger at {path}; run `fa import <files>` first")
     path.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{path}")
     event.listen(engine, "connect", _sqlite_pragmas)

@@ -36,6 +36,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     summ.add_argument("month", metavar="YYYY-MM")
     args = parser.parse_args(argv)
 
+    if args.command is None:  # serving never creates the ledger; `fa import` does
+        try:
+            open_db(create=False).dispose()
+        except (OSError, ValueError) as e:
+            print(f"fa: {e}", file=sys.stderr)
+            return 1
     if args.command in (None, "stop"):
         ln = launcher.default()
         try:

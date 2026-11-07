@@ -496,4 +496,6 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
 
 
 def serve(port: int = DEFAULT_PORT) -> None:
-    uvicorn.run(create_app(open_db()), host=HOST, port=port, log_level="warning")
+    uvicorn.run(
+        create_app(open_db(create=False)), host=HOST, port=port, log_level="warning"
+    )

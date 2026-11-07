@@ -10,7 +10,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from finance_agent import api, categorise, identity
+from finance_agent import api, categorise, identity, storage
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import generate_histories, render_export
 
@@ -40,12 +40,33 @@ def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None
         calls.append(kwargs)
 
     monkeypatch.setattr(uvicorn, "run", fake_run)
-    monkeypatch.setattr(api, "open_db", lambda: None)  # binding needs no database
+
+    def no_db(**_: object) -> None:  # binding needs no database
+        return None
+
+    monkeypatch.setattr(api, "open_db", no_db)
 
     api.serve(port=9999)
 
     assert calls[0]["host"] == "127.0.0.1"
     assert identity.HOST == "127.0.0.1"
+
+
+def test_serving_never_creates_the_ledger(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    db = tmp_path / "nowhere" / "ledger.db"
+    monkeypatch.setenv("FA_DB_PATH", str(db))
+
+    def served(*_: object, **__: object) -> None:
+        pytest.fail("served")
+
+    monkeypatch.setattr(uvicorn, "run", served)
+
+    with pytest.raises(storage.MissingDatabase):
+        api.serve(port=9999)
+
+    assert not db.parent.exists()
 
 
 def test_current_user_is_the_single_local_user() -> None:
