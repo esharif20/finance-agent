@@ -200,6 +200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync
+         * @description The same sync as `fa sync`; errors say the class at most, never data.
+         */
+        post: operations["sync_api_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sync-status": {
         parameters: {
             query?: never;
@@ -408,6 +428,15 @@ export interface components {
             net: components["schemas"]["Money"];
             transfers_in: components["schemas"]["Money"];
             transfers_out: components["schemas"]["Money"];
+        };
+        /** SyncOut */
+        SyncOut: {
+            /** Added */
+            added: number;
+            /** Already Known */
+            already_known: number;
+            /** Matched */
+            matched: number;
         };
         /**
          * SyncStatusOut
@@ -812,6 +841,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_api_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncOut"];
                 };
             };
         };

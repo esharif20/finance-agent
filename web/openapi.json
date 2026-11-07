@@ -560,6 +560,29 @@
         "title": "SummaryOut",
         "type": "object"
       },
+      "SyncOut": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "already_known": {
+            "title": "Already Known",
+            "type": "integer"
+          },
+          "matched": {
+            "title": "Matched",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "matched",
+          "already_known"
+        ],
+        "title": "SyncOut",
+        "type": "object"
+      },
       "SyncStatusOut": {
         "description": "Freshness and consent only: a failure is an error class and a count.",
         "properties": {
@@ -1303,6 +1326,25 @@
           }
         },
         "summary": "Summary"
+      }
+    },
+    "/api/sync": {
+      "post": {
+        "description": "The same sync as `fa sync`; errors say the class at most, never data.",
+        "operationId": "sync_api_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync"
       }
     },
     "/api/sync-status": {

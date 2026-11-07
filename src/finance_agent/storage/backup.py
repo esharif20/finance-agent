@@ -24,6 +24,7 @@ from alembic.script import ScriptDirectory
 from sqlcipher3 import dbapi2 as _dbapi  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
 from finance_agent.storage import keychain, open_db
+from finance_agent.storage.lock import Busy, exclusive
 
 sqlcipher: Any = _dbapi
 
@@ -372,16 +373,11 @@ def lock(data_dir: Path) -> Generator[None]:
     """One backup at a time: a sync-triggered run and an on-mount run can start
     together, and each would delete the other's temp file as a crash leftover.
     The OS drops the lock when a run dies, so a crash never blocks the next."""
-    data_dir.mkdir(parents=True, exist_ok=True)
-    fd = os.open(data_dir / LOCK, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise BackupError("another backup is running; this one skipped") from None
-        yield
-    finally:
-        os.close(fd)
+        with exclusive(data_dir, LOCK):
+            yield
+    except Busy:
+        raise BackupError("another backup is running; this one skipped") from None
 
 
 def take(db_path: Path, folder: Path, now: datetime) -> str:

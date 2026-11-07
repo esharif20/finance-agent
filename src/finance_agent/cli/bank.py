@@ -6,6 +6,7 @@ ingest client, and never printed, logged or put in an error message."""
 import getpass
 import logging
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from keyring.errors import KeyringError
@@ -16,6 +17,7 @@ from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
 from finance_agent.ledger import Ledger, SyncReport
 from finance_agent.storage import default_db_path, is_encrypted, keychain, open_db
+from finance_agent.storage.lock import Busy, exclusive
 
 log = logging.getLogger(__name__)
 LEGACY_HINT = (
@@ -201,16 +203,31 @@ def _alert(engine: Engine, user_id: int, notify: Notifier) -> None:
             notify(TITLE, body)
 
 
-def sync(user_id: int, notify: Notifier | None = None) -> int:
-    """Fetch and apply. `notify` is set by the scheduled job only."""
-    engine = _encrypted_db()
-    try:
+SYNC_LOCK = (
+    ".sync.lock"  # in the data dir: one sync at a time (scheduled, CLI or button)
+)
+
+
+class NotConnected(ValueError):
+    pass
+
+
+def run_sync(
+    engine: Engine,
+    user_id: int,
+    notify: Notifier | None = None,
+    show: Callable[[SyncReport], None] | None = None,
+) -> list[SyncReport]:
+    """Fetch and apply under the sync lock; raises `Busy` if another run holds it
+    and `NotConnected` without an access URL. A failure is recorded by class name
+    only, then re-raised. `notify` is set by the scheduled job only."""
+    with exclusive(default_db_path().parent, SYNC_LOCK):
         access = keychain.get_text(SERVICE)
         if access is None:
-            return _err("not connected; run `fa connect` first")
+            raise NotConnected("not connected; run `fa connect` first")
         try:
-            _fetch_and_apply(engine, user_id, access)
-        except Exception as e:  # recorded by class name only, then re-raised
+            reports = _fetch_and_apply(engine, user_id, access, show)
+        except Exception as e:
             with engine.begin() as conn:
                 Ledger(conn, user_id).record_sync_failure(
                     type(e).__name__, datetime.now(UTC)
@@ -223,16 +240,37 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
             Ledger(conn, user_id).record_sync_success(datetime.now(UTC))
         if notify:
             _alert(engine, user_id, notify)
-        return 0
+        return reports
+
+
+def sync(user_id: int, notify: Notifier | None = None) -> int:
+    engine = _encrypted_db()
+    try:
+        run_sync(engine, user_id, notify, _print)
+    except NotConnected as e:
+        return _err(str(e))
+    except Busy:
+        print("fa: another sync is running; this one skipped")
     finally:
         engine.dispose()
+    return 0
 
 
-def _fetch_and_apply(engine: Engine, user_id: int, access: str) -> None:
+def _fetch_and_apply(
+    engine: Engine,
+    user_id: int,
+    access: str,
+    show: Callable[[SyncReport], None] | None,
+) -> list[SyncReport]:
     today = datetime.now(simplefin.LONDON).date()
     with engine.begin() as conn:
         since = Ledger(conn, user_id).sync_since(today)
+    reports: list[SyncReport] = []
     for start, end in simplefin.windows(since, today):
         raw = simplefin.fetch(access, start, end, simplefin.transport)
         with engine.begin() as conn:  # each response commits on its own
-            _print(Ledger(conn, user_id).apply_sync(raw))
+            r = Ledger(conn, user_id).apply_sync(raw)
+        reports.append(r)
+        if show:
+            show(r)
+    return reports
