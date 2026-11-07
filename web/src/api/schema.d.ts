@@ -414,6 +414,8 @@ export interface components {
          * @description Freshness and consent only: a failure is an error class and a count.
          */
         SyncStatusOut: {
+            /** Backup Warning */
+            backup_warning: boolean;
             /** Consent Days Left */
             consent_days_left: number | null;
             /** Consent Expires On */
@@ -424,6 +426,8 @@ export interface components {
             failure_class: string | null;
             /** Failures In A Row */
             failures_in_a_row: number;
+            /** Last Backup At */
+            last_backup_at: string | null;
             /** Last Failure At */
             last_failure_at: string | null;
             /** Last Sync At */

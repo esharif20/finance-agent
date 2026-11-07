@@ -7,7 +7,7 @@ Status: draft for review. Grows with each milestone.
 1. Transactions and balances (the Ledger).
 2. Statement Imports, which contain full sort codes and account numbers.
 3. Memories and feedback: what the user values, regrets and plans.
-4. Credentials: SQLCipher key, restic password, cloud API keys, later Open Banking tokens.
+4. Credentials: SQLCipher key, the account-reference HMAC key, the backup recovery key (both keys together), the SimpleFIN access token, cloud API keys.
 
 ## Trust boundaries
 
@@ -18,7 +18,7 @@ Status: draft for review. Grows with each milestone.
 | B3 | Core → `assistant` | Tool results | Read-only, allowlisted tools; aggregates, at most 20 rows, evidence IDs; descriptions marked as data and truncated. |
 | B4 | `assistant` → model | Prompt | Local Ollama on localhost only, unless the user opts in per conversation. |
 | B5 | `gateway` → cloud | Placeholder payload | Allowlist only: intent, generic Category names, placeholders, size buckets, months. Never merchants, amounts, exact dates, account details or Memory text (ADR 0011). |
-| B6 | Mac → backup storage | restic chunks | Encrypted on the Mac before upload. |
+| B6 | Mac → registered external drive | Backup copies (zip of the SQLCipher database, card art, backup config) | Still SQLCipher-encrypted. Drive matched by Volume UUID only; the internal disk is refused; nothing is written elsewhere. `fa backup` deletes only files in its own manifest (#95). |
 | B7 | Repo → GitHub (public) | Code, fixtures, issues | Synthetic data only. Enforced by gitleaks and the fixture guard in CI. |
 | B8 | `ingest` ↔ SimpleFIN aggregator (Lunch Flow, via GoCardless Bank Account Data) | Access token out; Accounts, balances, Transactions in | One pinned host, HTTPS, read-only; token in Keychain; responses untrusted and parsed strictly like CSVs (ADR 0013). |
 
@@ -34,6 +34,10 @@ Status: draft for review. Grows with each milestone.
 | Data leaves via tracing or telemetry | LangSmith and external tracing disabled; CI egress test allows only localhost Ollama and the pinned SimpleFIN host from `ingest` | Third-party library adding telemetry in an update; the egress test catches it in CI |
 | Cloud provider sees personal data | Placeholders, allowlist, opt-in, payload log (ADR 0011) | Patterns inferable from generic Category names and month-level timing |
 | Aggregator sees or leaks the user's bank data | One read-only SimpleFIN provider (Lunch Flow, relaying through the regulated GoCardless Bank Account Data; bank consent expires every 90 days and Lunch Flow retains data for 90 days) on a pinned host; consent age and sync failures are shown by `fa summary` with error class and counts only; token in Keychain and revocable with `fa disconnect`; provider's retention and deletion terms checked in the spike before connecting (ADR 0013) | The provider holds a copy of transactions under its own terms; a breach there is outside the app's control |
+| Backup drive lost or stolen | Copies hold only the SQLCipher-encrypted database; the key stays in the Keychain (#95) | Card art and the backup config (a volume UUID) are not encrypted; the recovery key, if leaked from the password manager, opens every copy |
+| Recovery key leaks | Treated as a credential: shown once on screen by `fa backup setup`, never written to disk, logs or argv; `fa restore --recovery-key` reads it from stdin and stores it in the Keychain only after the copy opens with it | Anyone holding both the key and a copy can read the Ledger |
+| Something on the Mac deletes or alters the always-mounted backups | Dedicated folder; `fa backup` deletes only manifest-listed names and refuses a tampered manifest; missing copies are warned about, not repaired; the app warns when no copy is newer than 7 days | Malware or a mistake on the Mac can still delete the folder |
+| Theft, fire or a power surge takes the Mac and the drive together | An occasional offline copy to a second drive kept elsewhere (documented, no code) | Without that copy, a local disaster loses everything since the last offline copy |
 | Runaway paid spend | One cost meter with a hard £9 monthly cap: aggregator ≤ £5, pay-as-you-go ≤ £4 (ADR 0013) | None beyond the cap |
 | Arbitrary file access through the app | No tool reads files; `ingest` reads only paths given on the CLI; the API has no file-path parameters; the app refuses to read data from inside the repo | |
 | Card art endpoint used to read other files | `/api/card-art/{key}` takes only allowlisted keys (`lloyds`, `hsbc`, `revolut`), resolves inside `card-art/` in the data directory, opens once with no symlinks followed and reads at most 2 MB from that handle (no TOCTOU), refuses FIFOs and devices, sniffs PNG/JPEG/WebP magic bytes (else 415), caps at 2 MB (413), sends `no-store` and `nosniff` (#58) | Anyone who can write to the data directory can change the picture |
