@@ -640,19 +640,23 @@ html[data-private] .money {
 
 /* balance odometer: columns of 0-9 roll from 0 and rest on the real digit (--d) */
 .odometer .odo-col {
+  /* one whole-pixel step drives window, line and offset: a fractional em step snapped each
+     digit's line differently from its translate, so digits drifted and clipped (#100) */
+  --odo-h: round(up, 1.15em, 1px);
   display: inline-block;
-  height: 1.15em;
+  height: var(--odo-h);
   overflow: hidden;
-  line-height: 1.15em;
+  line-height: var(--odo-h);
   vertical-align: bottom;
   font-variant-numeric: tabular-nums;
 }
 .odometer .odo-reel {
   display: block;
-  transform: translateY(calc(var(--d) * -1.15em));
+  transform: translateY(calc(var(--d) * var(--odo-h) * -1));
 }
 .odometer .odo-reel > span {
   display: block;
+  height: var(--odo-h);
 }
 .odometer[data-play] .odo-reel {
   animation: odo-roll 360ms cubic-bezier(0.23, 1, 0.32, 1) calc(min(var(--i), 8) * 10ms) both;
@@ -662,7 +666,7 @@ html[data-private] .money {
     transform: translateY(0);
   }
   to {
-    transform: translateY(calc(var(--d) * -1.15em));
+    transform: translateY(calc(var(--d) * var(--odo-h) * -1));
   }
 }
 
