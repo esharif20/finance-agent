@@ -45,6 +45,7 @@ class ImportReport:
     # such as one row that is either of two twins (ADR 0006); longest, then
     # earliest, is used
     ambiguous: int = 0
+    files_imported: int = 0  # files stored or already known; not rejected
 
 
 log = logging.getLogger(__name__)  # counts, IDs and timings only
@@ -263,7 +264,7 @@ class Ledger:
         self._db = Scoped(conn, user_id)
 
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
-        added = known = ambiguous = 0
+        added = known = ambiguous = files = 0
         stored = False
         rejected: list[Rejection] = []
         accounts: dict[int, str] = {}
@@ -272,6 +273,13 @@ class Ledger:
             data = path.read_bytes()
             try:
                 parsed = ingest.parse(data)
+            except ingest.UnknownFormat:
+                # the whole batch stops (the caller's transaction rolls back), so a
+                # file of another Bank is never half of an import
+                raise ingest.UnknownFormat(
+                    f"{path.name}: no Importer recognises this file's header; "
+                    "nothing in this batch was imported"
+                ) from None
             except ingest.UnreadableFile as e:
                 rejected.append(Rejection(path.name, e.line, e.reason))
                 log.info("import file=%d rejected=1", n)
@@ -288,6 +296,7 @@ class Ledger:
                 self._db.select(si, si.c.id).where(si.c.file_hash == digest)
             ).first():
                 known += len(parsed.rows)
+                files += 1
                 log.info("import file=%d already_known=%d", n, len(parsed.rows))
                 continue
             stored = True
@@ -335,6 +344,7 @@ class Ledger:
                     bank_position=position,
                 )
             added += file_added
+            files += 1
             log.info(
                 "import file=%d statement_import_id=%d added=%d ms=%d",
                 n,
@@ -353,6 +363,7 @@ class Ledger:
             rejected,
             [AffectedAccount(i, m) for i, m in sorted(accounts.items())],
             ambiguous,
+            files,
         )
 
     def transactions(self) -> list[Transaction]:

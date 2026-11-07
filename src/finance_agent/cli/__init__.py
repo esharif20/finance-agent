@@ -23,7 +23,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="fa")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("stop", help="stop the local server")
-    imp = sub.add_parser("import", help="import Bank CSV exports")
+    imp = sub.add_parser(
+        "import",
+        help="import Bank CSV exports",
+        description="Import Bank CSV exports. A file with any bad row is refused "
+        "whole; a file no Importer recognises stops the whole batch.",
+        epilog="exit status: 0 all imported (or already known); 1 nothing "
+        "imported; 2 some files imported, others refused",
+    )
     imp.add_argument("files", nargs="+", type=Path)
     summ = sub.add_parser("summary", help="money in, out and net for a month")
     summ.add_argument("month", metavar="YYYY-MM")
@@ -67,7 +74,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for rej in r.rejected:
                     print(f"  rejected {rej.file} line {rej.line}: {rej.reason}")
                 if r.rejected:
-                    return 1
+                    return 2 if r.files_imported else 1
             else:
                 try:
                     s = ledger.summarise_month(args.month)
