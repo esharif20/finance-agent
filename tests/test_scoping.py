@@ -29,7 +29,7 @@ def db(engine: Engine) -> Iterator[Scoped]:
         update(t).values(description="x"),
         delete(t),
         insert(t).values(user_id=1),
-        text("SELECT * FROM \"transaction\""),
+        text('SELECT * FROM "transaction"'),
     ],
     ids=["bare", "other-user", "not-equal", "update", "delete", "insert", "text"],
 )
@@ -41,9 +41,7 @@ def test_an_unscoped_statement_is_refused(db: Scoped, stmt: object) -> None:
 def test_a_join_must_scope_the_joined_table_too(db: Scoped) -> None:
     with pytest.raises(UnscopedQuery):
         db.execute(db.select(src).join(si, si.c.id == src.c.statement_import_id))
-    db.execute(
-        db.select(src).join(si, db.on(si, si.c.id == src.c.statement_import_id))
-    )
+    db.execute(db.select(src).join(si, db.on(si, si.c.id == src.c.statement_import_id)))
     db.execute(
         db.select(src).outerjoin(si, db.on(si, si.c.id == src.c.statement_import_id))
     )
