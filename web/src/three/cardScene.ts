@@ -6,13 +6,13 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { BACK_SCRIM, FRONT_SCRIM } from "@/lib/cardArt";
 import type { Pose } from "@/lib/cardPoses";
-import { CARD_SPEC, type CardParts, createCardParts, createPaymentCardModel } from "./cardModel";
+import { type CardParts, createCardParts, createPaymentCardModel } from "./cardModel";
 
 /** `h`: the card's height in px (All accounts is a compact card); `scrim`: see setScrim. */
 export type SceneFace = { art: HTMLCanvasElement | null; hue: number | null; h: number };
 
 /** The generic face: the bank's colour, a few diagonal bands and a contactless mark. */
-function genericFace(hue: number | null, w: number, h: number): HTMLCanvasElement {
+function genericFace(hue: number | null, w: number, h: number, contactless = true): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
@@ -34,7 +34,7 @@ function genericFace(hue: number | null, w: number, h: number): HTMLCanvasElemen
   g.fillStyle = "rgb(255 255 255 / 0.07)";
   for (let i = 0; i < 3; i++) g.fillRect(i * w * 0.11, -h, w * 0.05 + i * w * 0.012, h * 3);
   g.restore();
-  if (hue !== null) {
+  if (hue !== null && contactless) {
     g.strokeStyle = "rgb(255 255 255 / 0.7)";
     g.lineWidth = w * 0.006;
     g.lineCap = "round";
@@ -53,28 +53,20 @@ function genericFace(hue: number | null, w: number, h: number): HTMLCanvasElemen
 // a second front.
 const BACK_FADE = 0.42;
 
-/** The back (#93): the face's image, with its chip printed in, washed towards the page
-    colour. It is drawn from the same source as the face, so privacy mode's generic face gives
-    a generic back. Mirroring comes from the mesh, which shows these UVs from behind. */
-function fadedBack(src: HTMLCanvasElement, page: string, withChip: boolean): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = src.width;
-  c.height = src.height;
+/** The back (#93, #129): the generic face's colour with a magnetic stripe and a signature
+    panel, washed towards the page colour. Card art is front-only, so the back never draws it:
+    a turned card shows neither the bank's art nor anything printed on it. */
+export function cardBack(face: SceneFace, page: string, w: number, h: number): HTMLCanvasElement {
+  const c = genericFace(face.hue, w, h, false);
   const g = c.getContext("2d");
   if (!g) return c;
-  g.drawImage(src, 0, 0);
-  if (withChip) {
-    // CARD_SPEC.chip is in card widths from the centre, y up; the canvas is y down.
-    const { w, h, r, x, y } = CARD_SPEC.chip;
-    const W = c.width;
-    g.fillStyle = CARD_SPEC.materials.chip.color;
-    g.beginPath();
-    g.roundRect(W * (0.5 + x - w / 2), c.height / 2 - W * (y + h / 2), W * w, W * h, W * r);
-    g.fill();
-  }
+  g.fillStyle = "rgb(12 14 16 / 0.92)";
+  g.fillRect(0, h * 0.11, w, h * 0.19);
+  g.fillStyle = "rgb(236 238 240 / 0.85)";
+  g.fillRect(w * 0.07, h * 0.42, w * 0.56, h * 0.12);
   g.globalAlpha = BACK_FADE;
   g.fillStyle = page;
-  g.fillRect(0, 0, c.width, c.height);
+  g.fillRect(0, 0, w, h);
   return c;
 }
 
@@ -117,7 +109,8 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       const h = Math.round(f.h);
       const p = sizes.get(h) ?? createCardParts(box.w, h);
       sizes.set(h, p);
-      const src = f.art ?? genericFace(f.hue, 1024, Math.round(1024 / (p.w / p.h)));
+      const size = [1024, Math.round(1024 / (p.w / p.h))] as const;
+      const src = f.art ?? genericFace(f.hue, ...size);
       const texture = (c: HTMLCanvasElement) => {
         const t = new THREE.CanvasTexture(c);
         t.colorSpace = THREE.SRGBColorSpace;
@@ -126,7 +119,7 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       };
       const tex = texture(src);
       const withChip = f.art === null && f.hue !== null;
-      const back = texture(fadedBack(src, page, withChip));
+      const back = texture(cardBack(f, page, ...size));
       const card = createPaymentCardModel(p, tex, withChip, back);
       scene.add(card.group);
       return card;
@@ -192,7 +185,9 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       env.dispose();
       pmrem.dispose();
       renderer.dispose();
-      renderer.forceContextLoss(); // free the GPU context now, not at GC, so route switches cannot pile them up
+      // Free the GPU context now, not at GC, so route switches cannot pile them up; a context the
+      // browser already took is left alone, so it can still be restored (#129).
+      if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
     },
   };
 }
