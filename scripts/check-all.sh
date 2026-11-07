@@ -19,6 +19,7 @@ uv run ruff check .
 uv run pyright
 uv run lint-imports
 uv run pytest -q
+uv run python evals/categoriser.py
 pnpm --dir web install --frozen-lockfile
 pnpm --dir web run gen
 git diff --exit-code -- web/openapi.json web/src/api/schema.d.ts

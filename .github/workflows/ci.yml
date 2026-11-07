@@ -29,6 +29,8 @@ jobs:
       - run: uv run pyright
       - run: uv run lint-imports
       - run: uv run pytest
+      - name: categoriser eval (blocks on regression)
+        run: uv run python evals/categoriser.py
       - uses: pnpm/action-setup@v4
         with:
           version: 10

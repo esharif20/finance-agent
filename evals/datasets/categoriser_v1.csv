@@ -1,0 +1,310 @@
+# synthetic
+# categoriser dataset v1, seed 112, labels in taxonomy v1
+id,split,case,descriptor,amount_minor,top,sub
+1,correction,clean,MARLOW GROCERS,-15919,Food & Drink,Groceries
+2,correction,noise,marlow grocers,-23069,Food & Drink,Groceries
+3,correction,clean,THE COPPER KETTLE,-15386,Food & Drink,Eating out
+4,correction,noise,THE COPPER KETTLE 25NOV,-5477,Food & Drink,Eating out
+5,correction,clean,BEAN THERE COFFEE,-12028,Food & Drink,Coffee
+6,correction,noise,ZTL*BEAN THERE COFFEE,-15052,Food & Drink,Coffee
+7,correction,clean,WOKWAY KITCHEN,-1039,Food & Drink,Takeaway
+8,correction,noise,WOKWAY KITCHEN 20JAN,-24028,Food & Drink,Takeaway
+9,correction,clean,NORTHLINE RAIL,-15093,Transport,Public transport
+10,correction,noise,NORTHLINE  RAIL,-8758,Transport,Public transport
+11,correction,clean,HARGREAVE CLOTHING,-11669,Shopping,Clothing
+12,correction,noise,SQ *HARGREAVE CLOTHING,-24189,Shopping,Clothing
+13,correction,clean,VOLTSPARK ELECTRONICS,-19902,Shopping,Electronics
+14,correction,noise,VOLTSPARK ELECTRONICS CD 8410,-17203,Shopping,Electronics
+15,correction,clean,HOMEWELL HARDWARE,-11445,Shopping,Household
+16,correction,noise,HOMEWELL HARDWARE 20JUN,-8480,Shopping,Household
+17,correction,clean,BRIGHTWATER ENERGY,-843,Bills & Utilities,Energy
+18,correction,noise,BRIGHTWATER ENERGY LONDON GB,-22317,Bills & Utilities,Energy
+19,correction,clean,CLEARSPRING WATER,-7456,Bills & Utilities,Water
+20,correction,noise,clearspring water,-13193,Bills & Utilities,Water
+21,correction,clean,KESTREL MOBILE,-21354,Bills & Utilities,Phone & internet
+22,correction,noise,KESTREL MOBILE LONDON GB,-2222,Bills & Utilities,Phone & internet
+23,correction,clean,STREAMLY,-8190,Subscriptions,Streaming
+24,correction,noise,streamly,-21852,Subscriptions,Streaming
+25,correction,clean,PIXELFORGE SOFTWARE,-18578,Subscriptions,Software
+26,correction,noise,PIXELFORGE  SOFTWARE,-304,Subscriptions,Software
+27,correction,clean,ORCHARD BOOK CLUB,-8608,Subscriptions,Memberships
+28,correction,noise,ORCHARD BOOK CLUB 27NOV,-5747,Subscriptions,Memberships
+29,correction,clean,FIXRIGHT PLUMBING,-9629,Housing,Maintenance
+30,correction,noise,FIXRIGHT PLUMBING 05NOV,-21907,Housing,Maintenance
+31,correction,clean,GREENLEAF DENTAL,-20605,Health,Medical
+32,correction,noise,GREENLEAF DENTAL LEEDS,-20591,Health,Medical
+33,correction,clean,ROYAL STAGE TICKETS,-8841,Entertainment,Events
+34,correction,noise,ZTL*ROYAL STAGE TICKETS,-22923,Entertainment,Events
+35,correction,clean,LEVEL UP GAMES,-19454,Entertainment,Games
+36,correction,noise,LEVEL UP GAMES CD 8119,-12974,Entertainment,Games
+37,correction,clean,CRAFTERS CORNER,-7770,Entertainment,Hobbies
+38,correction,noise,CRAFTERS CORNER CD 2131,-10465,Entertainment,Hobbies
+39,correction,clean,SKYWING AIR,-24654,Travel,Flights
+40,correction,noise,SKYWING AIR LONDON GB,-18031,Travel,Flights
+41,correction,clean,HARBOUR VIEW HOTEL,-10485,Travel,Hotels
+42,correction,noise,HARBOUR VIEW HOTEL GBR,-3456,Travel,Hotels
+43,correction,clean,SUNTRAIL HOLIDAYS,-16111,Travel,Holidays
+44,correction,noise,SUNTRAIL HOLIDAYS CD 5312,-2381,Travel,Holidays
+45,correction,clean,SNIP AND STYLE,-302,Personal care,Hair & beauty
+46,correction,noise,SNIP AND STYLE 5449,-12318,Personal care,Hair & beauty
+47,correction,clean,PUREGLOW TOILETRIES,-9233,Personal care,Toiletries
+48,correction,noise,PUREGLOW TOILETRIES 16JUN,-16700,Personal care,Toiletries
+49,test,clean,TESCO STORES,-6863,Food & Drink,Groceries
+50,test,noise,tesco stores,-2888,Food & Drink,Groceries
+51,test,noise,TESCO STORES LEEDS,-24712,Food & Drink,Groceries
+52,test,noise,TESCO STORES 14JAN,-4661,Food & Drink,Groceries
+53,test,noise,TESCO STORES,-13410,Food & Drink,Groceries
+54,test,clean,PRET A MANGER,-19689,Food & Drink,Coffee
+55,test,noise,SUMUP *PRET A MANGER,-10806,Food & Drink,Coffee
+56,test,noise,PRET A MANGER 12JAN,-1858,Food & Drink,Coffee
+57,test,noise,PRET A MANGER 18JUN,-14609,Food & Drink,Coffee
+58,test,noise,PRET A MANGER 8850,-9152,Food & Drink,Coffee
+59,test,clean,DELIVEROO.CO.UK,-10266,Food & Drink,Takeaway
+60,test,noise,DELIVEROO.CO.UK 9256,-14636,Food & Drink,Takeaway
+61,test,noise,DELIVEROO.CO.UK,-9341,Food & Drink,Takeaway
+62,test,noise,DELIVEROO.CO.UK,-1415,Food & Drink,Takeaway
+63,test,noise,deliveroo.co.uk,-5845,Food & Drink,Takeaway
+64,test,clean,AMAZON.CO.UK,-22823,Shopping,Online
+65,test,noise,amazon.co.uk,-14612,Shopping,Online
+66,test,noise,AMAZON.CO.UK,-20023,Shopping,Online
+67,test,noise,AMAZON.CO.UK 24JUN,-14555,Shopping,Online
+68,test,noise,AMAZON.CO.UK CD 7513,-7649,Shopping,Online
+69,test,clean,PAYPAL *SPOTIFY,-17734,Subscriptions,Streaming
+70,test,noise,PAYPAL  *SPOTIFY,-5116,Subscriptions,Streaming
+71,test,noise,paypal *spotify,-9684,Subscriptions,Streaming
+72,test,noise,paypal *spotify,-22984,Subscriptions,Streaming
+73,test,noise,SQ *PAYPAL *SPOTIFY,-20756,Subscriptions,Streaming
+74,test,clean,TFL.GOV.UK/CP,-5560,Transport,Public transport
+75,test,noise,TFL.GOV.UK/CP,-8080,Transport,Public transport
+76,test,noise,TFL.GOV.UK/CP,-11870,Transport,Public transport
+77,test,noise,TFL.GOV.UK/CP GBR,-7061,Transport,Public transport
+78,test,noise,TFL.GOV.UK/CP 10NOV,-1866,Transport,Public transport
+79,test,clean,NCP PARKING,-21314,Transport,Parking
+80,test,noise,ncp parking,-167,Transport,Parking
+81,test,noise,NCP PARKING LEEDS,-2153,Transport,Parking
+82,test,noise,ZTL*NCP PARKING,-10899,Transport,Parking
+83,test,noise,NCP PARKING CD 4394,-12441,Transport,Parking
+84,test,clean,ALDERS PHARMACY,-23573,Health,Pharmacy
+85,test,noise,ALDERS PHARMACY 20JUN,-22412,Health,Pharmacy
+86,test,noise,ALDERS PHARMACY 03JUN,-6307,Health,Pharmacy
+87,test,noise,ALDERS  PHARMACY,-21649,Health,Pharmacy
+88,test,noise,ALDERS PHARMACY CD 2400,-10155,Health,Pharmacy
+89,test,clean,UBER TRIP,-1879,Transport,Taxi
+90,test,noise,SUMUP *UBER TRIP,-21778,Transport,Taxi
+91,test,noise,UBER TRIP LONDON GB,-6483,Transport,Taxi
+92,test,noise,UBER TRIP BRISTOL,-1857,Transport,Taxi
+93,test,noise,UBER TRIP 05NOV,-16667,Transport,Taxi
+94,test,clean,RIVERSIDE PETROL,-10708,Transport,Fuel
+95,test,noise,RIVERSIDE PETROL BRISTOL,-15410,Transport,Fuel
+96,test,noise,SUMUP *RIVERSIDE PETROL,-3782,Transport,Fuel
+97,test,noise,RIVERSIDE PETROL LEEDS,-6456,Transport,Fuel
+98,test,noise,RIVERSIDE PETRO,-18195,Transport,Fuel
+99,test,clean,MAPLE LETTINGS RENT,-2455,Housing,Rent
+100,test,noise,MAPLE LETTINGS RENT 08JAN,-2536,Housing,Rent
+101,test,noise,MAPLE LETTINGS RENT CD 4180,-14149,Housing,Rent
+102,test,noise,MAPLE LETTINGS RENT CD 3915,-2619,Housing,Rent
+103,test,noise,ZTL*MAPLE LETTINGS RENT,-23823,Housing,Rent
+104,test,clean,HALDEN COUNCIL TAX,-9836,Bills & Utilities,Council tax
+105,test,noise,HALDEN  COUNCIL  TAX,-6141,Bills & Utilities,Council tax
+106,test,noise,HALDEN COUNCIL TAX 8269,-20340,Bills & Utilities,Council tax
+107,test,noise,HALDEN COUNCIL TAX 07JUN,-18197,Bills & Utilities,Council tax
+108,test,noise,HALDEN COUNCIL TAX LONDON GB,-10139,Bills & Utilities,Council tax
+109,test,clean,IRONWORKS GYM,-19446,Health,Fitness
+110,test,noise,ironworks gym,-23378,Health,Fitness
+111,test,noise,IRONWORKS GYM,-12957,Health,Fitness
+112,test,noise,IRONWORKS GYM 8289,-2432,Health,Fitness
+113,test,noise,IRONWORKS GYM,-2497,Health,Fitness
+114,test,clean,MARLOW GROCERS,-21833,Food & Drink,Groceries
+115,test,noise,MARLOW GROCERS 9157,-24193,Food & Drink,Groceries
+116,test,noise,SQ *MARLOW GROCERS,-5955,Food & Drink,Groceries
+117,test,noise,MARLOW GROCERS,-10667,Food & Drink,Groceries
+118,test,noise,MARLOW GROCERS,-15568,Food & Drink,Groceries
+119,test,clean,THE COPPER KETTLE,-4483,Food & Drink,Eating out
+120,test,noise,THE COPPER KETTLE 6891,-7084,Food & Drink,Eating out
+121,test,noise,THE COPPER KETTLE GBR,-20092,Food & Drink,Eating out
+122,test,noise,SUMUP *THE COPPER KETTLE,-2862,Food & Drink,Eating out
+123,test,noise,THE COPPER KETT,-4614,Food & Drink,Eating out
+124,test,clean,BEAN THERE COFFEE,-10733,Food & Drink,Coffee
+125,test,noise,SUMUP *BEAN THERE COFFEE,-20839,Food & Drink,Coffee
+126,test,noise,bean there coffee,-17992,Food & Drink,Coffee
+127,test,noise,BEAN  THERE  COFFEE,-10257,Food & Drink,Coffee
+128,test,noise,BEAN THERE COFF,-8053,Food & Drink,Coffee
+129,test,clean,WOKWAY KITCHEN,-7885,Food & Drink,Takeaway
+130,test,noise,WOKWAY KITCHEN CD 7778,-22529,Food & Drink,Takeaway
+131,test,noise,WOKWAY KITCHEN CD 1764,-14550,Food & Drink,Takeaway
+132,test,noise,WOKWAY KITCHEN GBR,-590,Food & Drink,Takeaway
+133,test,noise,wokway kitchen,-20383,Food & Drink,Takeaway
+134,test,clean,NORTHLINE RAIL,-6583,Transport,Public transport
+135,test,noise,NORTHLINE RAIL 16JUN,-11256,Transport,Public transport
+136,test,noise,NORTHLINE RAIL 0531,-12590,Transport,Public transport
+137,test,noise,NORTHLINE RAIL 1252,-20581,Transport,Public transport
+138,test,noise,NORTHLINE RAIL,-11941,Transport,Public transport
+139,test,clean,HARGREAVE CLOTHING,-12325,Shopping,Clothing
+140,test,noise,HARGREAVE CLOTHING 18NOV,-15658,Shopping,Clothing
+141,test,noise,HARGREAVE  CLOTHING,-10687,Shopping,Clothing
+142,test,noise,HARGREAVE CLOTHING CD 6611,-21456,Shopping,Clothing
+143,test,noise,HARGREAVE CLOTH,-22123,Shopping,Clothing
+144,test,clean,VOLTSPARK ELECTRONICS,-13598,Shopping,Electronics
+145,test,noise,VOLTSPARK ELECTRONICS 2614,-857,Shopping,Electronics
+146,test,noise,VOLTSPARK ELECTRONICS 8391,-16669,Shopping,Electronics
+147,test,noise,VOLTSPARK ELECTRONICS CD 3100,-10794,Shopping,Electronics
+148,test,noise,VOLTSPARK  ELECTRONICS,-2907,Shopping,Electronics
+149,test,clean,HOMEWELL HARDWARE,-15953,Shopping,Household
+150,test,noise,homewell hardware,-10285,Shopping,Household
+151,test,noise,HOMEWELL HARDWARE LONDON GB,-18547,Shopping,Household
+152,test,noise,homewell hardware,-10942,Shopping,Household
+153,test,noise,homewell hardware,-23901,Shopping,Household
+154,test,clean,BRIGHTWATER ENERGY,-15642,Bills & Utilities,Energy
+155,test,noise,BRIGHTWATER ENERGY GBR,-13276,Bills & Utilities,Energy
+156,test,noise,BRIGHTWATER ENERGY 03NOV,-7239,Bills & Utilities,Energy
+157,test,noise,ZTL*BRIGHTWATER ENERGY,-16146,Bills & Utilities,Energy
+158,test,noise,SQ *BRIGHTWATER ENERGY,-23455,Bills & Utilities,Energy
+159,test,clean,CLEARSPRING WATER,-22864,Bills & Utilities,Water
+160,test,noise,CLEARSPRING WATER 3087,-13602,Bills & Utilities,Water
+161,test,noise,CLEARSPRING WAT,-3772,Bills & Utilities,Water
+162,test,noise,CLEARSPRING WATER 3612,-6191,Bills & Utilities,Water
+163,test,noise,CLEARSPRING WAT,-10810,Bills & Utilities,Water
+164,test,clean,KESTREL MOBILE,-10889,Bills & Utilities,Phone & internet
+165,test,noise,ZTL*KESTREL MOBILE,-10393,Bills & Utilities,Phone & internet
+166,test,noise,KESTREL MOBILE,-14579,Bills & Utilities,Phone & internet
+167,test,noise,KESTREL MOBILE CD 3609,-13047,Bills & Utilities,Phone & internet
+168,test,noise,kestrel mobile,-17279,Bills & Utilities,Phone & internet
+169,test,clean,STREAMLY,-15286,Subscriptions,Streaming
+170,test,noise,STREAMLY,-22103,Subscriptions,Streaming
+171,test,noise,streamly,-1561,Subscriptions,Streaming
+172,test,noise,STREAMLY 06JAN,-5937,Subscriptions,Streaming
+173,test,noise,STREAMLY GBR,-23892,Subscriptions,Streaming
+174,test,clean,PIXELFORGE SOFTWARE,-11393,Subscriptions,Software
+175,test,noise,PIXELFORGE SOFTWARE 8179,-1479,Subscriptions,Software
+176,test,noise,PIXELFORGE  SOFTWARE,-22283,Subscriptions,Software
+177,test,noise,PIXELFORGE SOFTWARE BRISTOL,-21027,Subscriptions,Software
+178,test,noise,PIXELFORGE SOFTWARE LONDON GB,-14823,Subscriptions,Software
+179,test,clean,ORCHARD BOOK CLUB,-11372,Subscriptions,Memberships
+180,test,noise,ORCHARD BOOK CLUB 6668,-2470,Subscriptions,Memberships
+181,test,noise,ORCHARD BOOK CLUB CD 6428,-1464,Subscriptions,Memberships
+182,test,noise,ZTL*ORCHARD BOOK CLUB,-14138,Subscriptions,Memberships
+183,test,noise,orchard book club,-12917,Subscriptions,Memberships
+184,test,clean,FIXRIGHT PLUMBING,-18672,Housing,Maintenance
+185,test,noise,SUMUP *FIXRIGHT PLUMBING,-13508,Housing,Maintenance
+186,test,noise,FIXRIGHT PLUMBI,-11481,Housing,Maintenance
+187,test,noise,FIXRIGHT PLUMBING 9447,-6077,Housing,Maintenance
+188,test,noise,fixright plumbing,-14336,Housing,Maintenance
+189,test,clean,GREENLEAF DENTAL,-18861,Health,Medical
+190,test,noise,GREENLEAF DENTAL CD 8686,-16750,Health,Medical
+191,test,noise,GREENLEAF DENTAL 24NOV,-5484,Health,Medical
+192,test,noise,ZTL*GREENLEAF DENTAL,-8260,Health,Medical
+193,test,noise,GREENLEAF DENTAL 5149,-14881,Health,Medical
+194,test,clean,ROYAL STAGE TICKETS,-16155,Entertainment,Events
+195,test,noise,ROYAL STAGE TICKETS BRISTOL,-8981,Entertainment,Events
+196,test,noise,ROYAL STAGE TICKETS 4097,-7991,Entertainment,Events
+197,test,noise,royal stage tickets,-4863,Entertainment,Events
+198,test,noise,ROYAL STAGE TICKETS LEEDS,-11476,Entertainment,Events
+199,test,clean,LEVEL UP GAMES,-12685,Entertainment,Games
+200,test,noise,LEVEL UP GAMES GBR,-24210,Entertainment,Games
+201,test,noise,LEVEL UP GAMES 18NOV,-24735,Entertainment,Games
+202,test,noise,LEVEL UP GAMES,-7677,Entertainment,Games
+203,test,noise,LEVEL UP GAMES CD 8546,-7621,Entertainment,Games
+204,test,clean,CRAFTERS CORNER,-16555,Entertainment,Hobbies
+205,test,noise,CRAFTERS CORNER 3840,-21355,Entertainment,Hobbies
+206,test,noise,CRAFTERS CORNER,-12352,Entertainment,Hobbies
+207,test,noise,CRAFTERS  CORNER,-12684,Entertainment,Hobbies
+208,test,noise,CRAFTERS CORNER 10NOV,-15435,Entertainment,Hobbies
+209,test,clean,SKYWING AIR,-6982,Travel,Flights
+210,test,noise,skywing air,-2691,Travel,Flights
+211,test,noise,SQ *SKYWING AIR,-9209,Travel,Flights
+212,test,noise,skywing air,-20630,Travel,Flights
+213,test,noise,SKYWING AIR,-12772,Travel,Flights
+214,test,clean,HARBOUR VIEW HOTEL,-23914,Travel,Hotels
+215,test,noise,HARBOUR VIEW HOTEL BRISTOL,-22935,Travel,Hotels
+216,test,noise,HARBOUR VIEW HOTEL 8260,-13217,Travel,Hotels
+217,test,noise,ZTL*HARBOUR VIEW HOTEL,-1149,Travel,Hotels
+218,test,noise,HARBOUR VIEW HO,-15027,Travel,Hotels
+219,test,clean,SUNTRAIL HOLIDAYS,-6484,Travel,Holidays
+220,test,noise,ZTL*SUNTRAIL HOLIDAYS,-16488,Travel,Holidays
+221,test,noise,SUNTRAIL HOLIDAYS 27JUN,-12142,Travel,Holidays
+222,test,noise,SUNTRAIL HOLIDAYS GBR,-7920,Travel,Holidays
+223,test,noise,SUNTRAIL HOLIDAYS CD 3393,-23758,Travel,Holidays
+224,test,clean,SNIP AND STYLE,-1160,Personal care,Hair & beauty
+225,test,noise,SNIP AND STYLE 8731,-17443,Personal care,Hair & beauty
+226,test,noise,SNIP AND STYLE 3844,-1859,Personal care,Hair & beauty
+227,test,noise,SNIP AND STYLE 18JAN,-24082,Personal care,Hair & beauty
+228,test,noise,SQ *SNIP AND STYLE,-20212,Personal care,Hair & beauty
+229,test,clean,PUREGLOW TOILETRIES,-3162,Personal care,Toiletries
+230,test,noise,PUREGLOW TOILETRIES 05NOV,-12537,Personal care,Toiletries
+231,test,noise,pureglow toiletries,-17491,Personal care,Toiletries
+232,test,noise,SQ *PUREGLOW TOILETRIES,-3975,Personal care,Toiletries
+233,test,noise,PUREGLOW TOILET,-10352,Personal care,Toiletries
+234,test,unseen,FENWICK FARM SHOP,-19342,Food & Drink,Groceries
+235,test,unseen,FENWICK FARM SHOP LEEDS,-24260,Food & Drink,Groceries
+236,test,unseen,FENWICK FARM SHOP 11JUN,-15184,Food & Drink,Groceries
+237,test,unseen,BLUE DOOR BISTRO,-18058,Food & Drink,Eating out
+238,test,unseen,BLUE DOOR BISTRO 12JAN,-6531,Food & Drink,Eating out
+239,test,unseen,SQ *BLUE DOOR BISTRO,-22201,Food & Drink,Eating out
+240,test,unseen,MOONBEAM ROASTERS,-20584,Food & Drink,Coffee
+241,test,unseen,MOONBEAM ROASTE,-2331,Food & Drink,Coffee
+242,test,unseen,MOONBEAM ROASTE,-8734,Food & Drink,Coffee
+243,test,unseen,ZIPLINE BUS CO,-2127,Transport,Public transport
+244,test,unseen,zipline bus co,-17420,Transport,Public transport
+245,test,unseen,ZIPLINE BUS CO GBR,-24364,Transport,Public transport
+246,test,unseen,ATLAS OUTFITTERS,-21558,Shopping,Clothing
+247,test,unseen,ATLAS OUTFITTERS CD 3447,-12049,Shopping,Clothing
+248,test,unseen,ATLAS OUTFITTERS 9002,-22982,Shopping,Clothing
+249,test,unseen,HEARTHSTONE ENERGY,-16320,Bills & Utilities,Energy
+250,test,unseen,HEARTHSTONE ENE,-10355,Bills & Utilities,Energy
+251,test,unseen,HEARTHSTONE ENERGY 04NOV,-20370,Bills & Utilities,Energy
+252,test,unseen,NIMBUS BROADBAND,-19638,Bills & Utilities,Phone & internet
+253,test,unseen,nimbus broadband,-6612,Bills & Utilities,Phone & internet
+254,test,unseen,NIMBUS BROADBAND 8638,-12577,Bills & Utilities,Phone & internet
+255,test,unseen,CLOUDNOTE APP,-2219,Subscriptions,Software
+256,test,unseen,CLOUDNOTE APP 3132,-17863,Subscriptions,Software
+257,test,unseen,CLOUDNOTE  APP,-7865,Subscriptions,Software
+258,test,unseen,HILLTOP CINEMA,-11423,Entertainment,Events
+259,test,unseen,HILLTOP CINEMA,-24662,Entertainment,Events
+260,test,unseen,HILLTOP CINEMA 5050,-4665,Entertainment,Events
+261,test,unseen,CANVAS ART SUPPLIES,-6713,Entertainment,Hobbies
+262,test,unseen,CANVAS  ART  SUPPLIES,-20590,Entertainment,Hobbies
+263,test,unseen,CANVAS ART SUPPLIES 8672,-18169,Entertainment,Hobbies
+264,test,unseen,PINEWOOD LODGE,-12275,Travel,Hotels
+265,test,unseen,PINEWOOD LODGE,-9473,Travel,Hotels
+266,test,unseen,PINEWOOD LODGE LONDON GB,-8795,Travel,Hotels
+267,test,unseen,WILLOW SPA,-5948,Personal care,Hair & beauty
+268,test,unseen,willow spa,-22223,Personal care,Hair & beauty
+269,test,unseen,WILLOW SPA CD 4964,-2868,Personal care,Hair & beauty
+270,test,unseen,QUAYSIDE PARKING,-1067,Transport,Parking
+271,test,unseen,QUAYSIDE PARKING LEEDS,-16922,Transport,Parking
+272,test,unseen,QUAYSIDE PARKING LONDON GB,-2963,Transport,Parking
+273,test,unseen,MEADOW PHARMACY,-17246,Health,Pharmacy
+274,test,unseen,MEADOW PHARMACY CD 3044,-12689,Health,Pharmacy
+275,test,unseen,MEADOW PHARMACY LEEDS,-21289,Health,Pharmacy
+276,test,unseen,SWIFT CABS,-17308,Transport,Taxi
+277,test,unseen,SWIFT CABS,-19959,Transport,Taxi
+278,test,unseen,SWIFT CABS,-12288,Transport,Taxi
+279,test,unseen,OAKFIELD FITNESS,-3207,Health,Fitness
+280,test,unseen,OAKFIELD FITNESS 3078,-21224,Health,Fitness
+281,test,unseen,OAKFIELD FITNESS GBR,-13261,Health,Fitness
+282,test,lookalike,TESCOMBE GARDEN CENTRE,-18487,Shopping,Household
+283,test,lookalike,PRETTY NAILS STUDIO,-13949,Personal care,Hair & beauty
+284,test,lookalike,AMAZONIA GRILL,-6827,Food & Drink,Eating out
+285,test,lookalike,UBER EATS,-10859,Food & Drink,Takeaway
+286,test,lookalike,FUEL JUICE BAR,-4162,Food & Drink,Eating out
+287,test,lookalike,GYMSHARK,-14249,Shopping,Clothing
+288,test,lookalike,RENTOKIL PEST CONTROL,-741,Housing,Maintenance
+289,test,lookalike,THE PARKING LOT DINER,-370,Food & Drink,Eating out
+290,test,lookalike,PHARMACY BAR AND GRILL,-3897,Food & Drink,Eating out
+291,test,lookalike,SPOTLIGHT THEATRE,-14050,Entertainment,Events
+292,test,lookalike,MARLOWE ARMS,-10564,Food & Drink,Eating out
+293,test,lookalike,KESTREL KITCHEN,-14428,Food & Drink,Takeaway
+294,test,lookalike,STREAMLINE BIKES,-9142,Entertainment,Hobbies
+295,test,lookalike,SKYWING AIR CARGO,-5943,Shopping,Online
+296,test,refund,AMAZON.CO.UK REFUND,10115,Shopping,Online
+297,test,refund,TESCO STORES 2231 REFUND,7883,Food & Drink,Groceries
+298,test,refund,DELIVEROO.CO.UK REFUND,20433,Food & Drink,Takeaway
+299,test,refund,HARGREAVE CLOTHING REFUND,4022,Shopping,Clothing
+300,test,refund,REFUND SKYWING AIR,16908,Travel,Flights
+301,test,refund,HARBOUR VIEW HOTEL REFUND,20996,Travel,Hotels
+302,test,refund,VOLTSPARK ELECTRONICS REFUND 0042,15154,Shopping,Electronics
+303,test,refund,LEVEL UP GAMES REFUND,21318,Entertainment,Games
+304,test,refund,ATLAS OUTFITTERS REFUND,20014,Shopping,Clothing
+305,test,refund,HILLTOP CINEMA REFUND,20879,Entertainment,Events
+306,test,refund,HARGREAVE CLOTHING,1032,Shopping,Clothing
+307,test,refund,SUNTRAIL HOLIDAYS,2263,Travel,Holidays
