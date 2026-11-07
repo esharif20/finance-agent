@@ -5,9 +5,11 @@ header-less CSV of `date (DD/MM/YYYY), description, amount` (signed, negative is
 money out), newest first. It has no balance and no account number. UNVERIFIED
 against a real export: confirm the first-row shape only, and change it here.
 
-Because there is no balance, `balance_minor` is 0 for every row (ADR 0006 says a
-Bank without one needs its own decision; the sequence alignment still separates
-twins). All HSBC rows share one Account.
+Because there is no balance, `balance_minor` is None (stored NULL, as for synced
+rows), so HSBC Accounts are never reconciled and never open a Gap; identity is
+date, description and amount, placed by sequence alignment (ADR 0006). With no
+account number either, every HSBC file lands in one Account, named so (ADR 0014,
+known limits). HSBC's filenames and rows carry no masked number to use instead.
 """
 
 import csv
@@ -23,6 +25,7 @@ CURRENCY = "GBP"
 _DATE = re.compile(r"\d{2}/\d{2}/\d{4}", re.ASCII)
 _AMOUNT = re.compile(r"-?\d+(\.\d{1,2})?", re.ASCII)
 ACCOUNT_REF = hashlib.sha256(b"hsbc:default").hexdigest()
+ACCOUNT_NAME = "All HSBC accounts (the export has no account number)"
 
 
 class Hsbc:
@@ -82,8 +85,9 @@ class Hsbc:
                     bank_type="",
                     description=desc,
                     amount_minor=int(Decimal(amount) * 100),
-                    balance_minor=0,
+                    balance_minor=None,
                     currency=CURRENCY,
+                    account_name=ACCOUNT_NAME,
                 )
             )
         rows.reverse()  # Bank order, oldest first

@@ -39,13 +39,14 @@ def test_revolut_fee_is_folded_into_the_row_and_keeps_the_balance_chain() -> Non
     p = parse(revolut_export(3, 30).encode())
     assert p.rejected == []
     for a, b in zip(p.rows, p.rows[1:], strict=False):
+        assert b.balance_minor is not None
         assert b.balance_minor - b.amount_minor == a.balance_minor
 
 
 def test_revolut_non_gbp_is_rejected_with_a_reason() -> None:
     p = parse(revolut_export(1, 2, currency="EUR").encode())
     assert [r.reason for r in p.rejected] == [
-        "non-GBP row (foreign currency is not supported yet)"
+        "non-GBP row: foreign currency support is coming (#156)"
     ] * 2
 
 

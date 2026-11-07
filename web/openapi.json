@@ -48,7 +48,14 @@
             "type": "string"
           },
           "bank_balance": {
-            "$ref": "#/components/schemas/Money"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "currency": {
             "title": "Currency",
@@ -81,7 +88,14 @@
             "title": "Last Import"
           },
           "ledger_balance": {
-            "$ref": "#/components/schemas/Money"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "masked_number": {
             "title": "Masked Number",

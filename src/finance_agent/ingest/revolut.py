@@ -5,8 +5,9 @@ Started Date, Completed Date, Description, Amount, Fee, Currency, State,
 Balance; dates `YYYY-MM-DD HH:MM:SS`, oldest first. UNVERIFIED against a real
 export: confirm the header row only, and change it here.
 
-GBP only (FX is #156): other currencies are rejected. Only COMPLETED rows are
-imported; PENDING and REVERTED rows are dropped, never stored as settled. The
+GBP only (FX is #156): a row in another currency refuses the whole file, as any
+rejected row does for every Bank. Only COMPLETED rows are imported; PENDING and
+REVERTED rows are never stored as settled, and the import report counts them. The
 Fee column is separate from Amount, so a row's amount is Amount - Fee, which
 keeps the Balance chain intact. One Account per Product.
 """
@@ -55,7 +56,7 @@ def _parse_row(cells: list[str], line: int) -> ParsedRow | None:
     if state != "COMPLETED":
         raise _Malformed("unknown state")
     if cur != "GBP":
-        raise _Malformed("non-GBP row (foreign currency is not supported yet)")
+        raise _Malformed("non-GBP row: foreign currency support is coming (#156)")
     try:
         posted_on = datetime.strptime(completed or started, DATE_FORMAT).date()
     except ValueError:
@@ -95,6 +96,7 @@ class Revolut:
         skip, lines = body(text)
         rows: list[ParsedRow] = []
         rejected: list[RejectedRow] = []
+        skipped = 0
         reader = csv.reader(lines[1:])
         line = skip + 2
         while True:
@@ -113,6 +115,8 @@ class Revolut:
             except _Malformed as e:
                 rejected.append(RejectedRow(start, str(e)))
                 continue
-            if row:
+            if row is None:  # PENDING or REVERTED
+                skipped += 1
+            else:
                 rows.append(row)
-        return ParsedFile(self.bank, rows, rejected)
+        return ParsedFile(self.bank, rows, rejected, skipped)

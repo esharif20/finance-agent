@@ -50,7 +50,7 @@ type Face = {
   title: string;
   masked?: string;
   balance: { minor: number; currency: string } | null;
-  matches: boolean;
+  matches: boolean | null; // null: the bank gives no balance, so nothing to match
   hue: number | null;
   art: string | null;
 };
@@ -59,14 +59,19 @@ function faces(accounts: Account[]): Face[] {
   const currency = accounts[0]?.currency ?? "GBP";
   // GBP only for now, like the summary: an All accounts total needs one currency
   const same = accounts.every((a) => a.currency === currency);
+  // a bank with no balance (HSBC) leaves the total unknown, not smaller
+  const known = accounts.every((a) => a.bank_balance !== null);
+  const status = (a: Account[]) =>
+    a.some((x) => x.gaps.length > 0) ? false : a.every((x) => x.bank_balance !== null) || null;
   const all: Face = {
     key: "all",
     id: undefined,
     title: "All accounts",
-    balance: same
-      ? { minor: accounts.reduce((n, a) => n + a.bank_balance.minor, 0), currency }
-      : null,
-    matches: accounts.every((a) => a.gaps.length === 0),
+    balance:
+      same && known
+        ? { minor: accounts.reduce((n, a) => n + (a.bank_balance?.minor ?? 0), 0), currency }
+        : null,
+    matches: status(accounts),
     hue: null,
     art: null,
   };
@@ -78,7 +83,7 @@ function faces(accounts: Account[]): Face[] {
       title: a.bank,
       masked: a.masked_number,
       balance: a.bank_balance,
-      matches: a.gaps.length === 0,
+      matches: status([a]),
       hue: accountHue(a, i),
       art: a.art,
     })),
@@ -404,7 +409,9 @@ export function AccountStack({
                 <Money value={f.balance} odometer={f.key} className="account-balance text-row font-semibold" />
               ) : null}
               <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
-                {f.matches ? (
+                {f.matches === null ? (
+                  "No balance from bank"
+                ) : f.matches ? (
                   <>
                     <Check className="size-3.5" aria-hidden="true" />
                     Matches ledger

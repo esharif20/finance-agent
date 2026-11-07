@@ -57,6 +57,16 @@ describe("AccountStack", () => {
     expect(group.querySelector("img, svg:not([aria-hidden])")).toBeNull();
   });
 
+  it("shows no figure and no match for a bank that gives no balance (HSBC)", () => {
+    const hsbc = account({ id: 3, bank: "HSBC", masked_number: "HSBC", bank_balance: null, ledger_balance: null });
+    render(<AccountStack accounts={[account(), hsbc]} onSelect={() => {}} />);
+    const cards = within(screen.getByRole("group", { name: "Accounts" })).getAllByRole("button");
+    expect(cards[0]).not.toHaveTextContent("£"); // a total missing HSBC would be wrong
+    expect(cards[0]).not.toHaveTextContent("Matches ledger");
+    expect(cards[2]).toHaveTextContent("No balance from bank");
+    expect(cards[2]).not.toHaveTextContent("£");
+  });
+
   it("announces the selected card and reports a choice", async () => {
     const onSelect = vi.fn();
     const { rerender } = render(

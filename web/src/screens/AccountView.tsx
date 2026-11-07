@@ -17,6 +17,8 @@ const when = (iso: string) =>
 const SOURCE: Record<string, string> = { csv: "a CSV statement" };
 
 /** One Account's details: balance, whether the Ledger agrees, and its last import. */
+const NO_BALANCE = "Balance not provided by this bank";
+
 export function AccountDetails({ account: a }: { account: Account }) {
   const matches = a.gaps.length === 0;
   return (
@@ -33,13 +35,21 @@ export function AccountDetails({ account: a }: { account: Account }) {
         <div role="group" aria-label="Bank balance">
           <dt className="text-label text-muted-foreground">Bank balance</dt>
           <dd className="mt-0.5">
-            <Money value={a.bank_balance} className="figure text-figure" />
+            {a.bank_balance ? (
+              <Money value={a.bank_balance} className="figure text-figure" />
+            ) : (
+              <span className="text-sm text-muted-foreground">{NO_BALANCE}</span>
+            )}
           </dd>
         </div>
         <div role="group" aria-label="Ledger balance">
           <dt className="text-label text-muted-foreground">Ledger balance</dt>
           <dd className="mt-0.5">
-            <Money value={a.ledger_balance} className="figure text-figure" />
+            {a.ledger_balance ? (
+              <Money value={a.ledger_balance} className="figure text-figure" />
+            ) : (
+              <span className="text-sm text-muted-foreground">{NO_BALANCE}</span>
+            )}
           </dd>
         </div>
       </dl>
@@ -47,13 +57,15 @@ export function AccountDetails({ account: a }: { account: Account }) {
         role="status"
         className={`flex items-start gap-2 rounded-[10px] p-3 text-sm ${matches ? "bg-raised" : "bg-warning text-warning-foreground"}`}
       >
-        {matches ? (
+        {a.bank_balance === null ? null : matches ? (
           <Check className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         ) : (
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         )}
         <span>
-          {matches
+          {a.bank_balance === null
+            ? `${NO_BALANCE}, so this Account can't be reconciled. Its transactions are still counted.`
+            : matches
             ? "Matches ledger. Every pound your bank shows is accounted for."
             : `${a.gaps.length === 1 ? "One Reconciliation Gap" : `${a.gaps.length} Reconciliation Gaps`} between the bank and the ledger. The dates are under the cards.`}
         </span>

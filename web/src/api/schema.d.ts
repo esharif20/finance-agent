@@ -423,7 +423,7 @@ export interface components {
             art: string | null;
             /** Bank */
             bank: string;
-            bank_balance: components["schemas"]["Money"];
+            bank_balance: components["schemas"]["Money"] | null;
             /** Currency */
             currency: string;
             /** Gaps */
@@ -434,7 +434,7 @@ export interface components {
             kind: string;
             /** Last Import */
             last_import: string | null;
-            ledger_balance: components["schemas"]["Money"];
+            ledger_balance: components["schemas"]["Money"] | null;
             /** Masked Number */
             masked_number: string;
             /** Name */
