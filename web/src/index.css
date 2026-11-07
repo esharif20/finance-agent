@@ -495,7 +495,7 @@ html[data-private] .money {
 }
 /* Turning the stack over (#93): touch keeps vertical scrolling for the page and gives the
    sideways drag to the stack. A card turned past edge-on hides its labels; over WebGL its
-   back is the faded mirror the scene draws. */
+   back is the generic reverse the scene draws (#129). */
 .card-stack {
   touch-action: pan-y;
 }
@@ -503,10 +503,12 @@ html[data-private] .money {
 .card-stack[data-gl="true"] .account-card[data-turned="true"] > * {
   opacity: 0; /* over WebGL the labels are flat and would part from the turning 3D card */
 }
-/* shortcut: without WebGL a turned card fades as a whole rather than to the page colour;
-   that path only runs when WebGL is missing, so it is not worth a second face in CSS. */
+/* shortcut: without WebGL (missing, or its context lost) a turned card fades as a whole rather
+   than to the page colour, not worth a second face in CSS. Its art is front-only, so the
+   generic colour replaces it: !important beats the inline art (#129). */
 .card-stack:not([data-gl="true"]) .account-card[data-back="true"] {
   opacity: 0.35;
+  background-image: linear-gradient(145deg, oklch(0.47 0.12 var(--h)), oklch(0.31 0.085 calc(var(--h) + 18))) !important;
 }
 
 /* With WebGL the canvas draws the face, the edge and the sheen. */

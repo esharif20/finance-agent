@@ -1,21 +1,17 @@
 import { Check } from "lucide-react";
-import { animate, type MotionValue, motionValue, useReducedMotion } from "motion/react";
-import {
-  type CSSProperties,
-  type PointerEvent,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useReducedMotion } from "motion/react";
+import { type CSSProperties, type PointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
-import { usePrivacy } from "@/lib/privacy";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ASPECT, BACK_SCRIM, FACE_HUE, FRONT_SCRIM, loadArt, RADIUS } from "@/lib/cardArt";
+import { ASPECT, BACK_SCRIM, FACE_HUE, FRONT_SCRIM, RADIUS } from "@/lib/cardArt";
 import { type Hover, type Pose, stackLayout, stackPoses } from "@/lib/cardPoses";
-import type { CardScene, SceneFace } from "@/three/cardScene";
+import type { SceneFace } from "@/three/cardScene";
+import { useCardArt } from "./useCardArt";
+import { useCardScene } from "./useCardScene";
+import { useCardSprings } from "./useCardSprings";
+
+export { SELECT_SPRING } from "./useCardSprings";
 
 type Account = components["schemas"]["AccountOut"];
 
@@ -41,10 +37,6 @@ const SNAP_MS = 170;
 const TURNED_DEG = 12; // a hover tilts a card up to 10deg; beyond this it is being turned
 const DRAG_PX = 8; // movement before a press becomes a drag, so a tap stays a click
 
-/** Spring for #59's content transition, so the view below settles with the card. */
-export const SELECT_SPRING = { type: "spring", duration: 0.5, bounce: 0.18 } as const;
-const HOVER_SPRING = { type: "spring", stiffness: 320, damping: 26, mass: 0.7 } as const;
-
 const day = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
     day: "numeric",
@@ -62,8 +54,6 @@ type Face = {
   hue: number | null;
   art: string | null;
 };
-
-const NO_ART: Record<string, HTMLCanvasElement> = {};
 
 function faces(accounts: Account[]): Face[] {
   const currency = accounts[0]?.currency ?? "GBP";
@@ -103,9 +93,6 @@ const webgl = () => typeof WebGLRenderingContext !== "undefined";
 const transform = (p: Pose) =>
   `translate3d(${p.x}px, ${p.y}px, ${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg) scale(${p.s})`;
 
-type Springs = Record<Exclude<keyof Pose, "layer">, MotionValue<number>>;
-const KEYS = ["x", "y", "z", "rx", "ry", "rz", "s"] as const;
-
 export function AccountStack({
   accounts,
   selected,
@@ -120,16 +107,10 @@ export function AccountStack({
   const [hover, setHover] = useState<Hover | null>(null);
   const [rising, setRising] = useState<number | null>(null);
   const [width, setWidth] = useState(0);
-  const [loaded, setArt] = useState<Record<string, HTMLCanvasElement>>({});
-  // A card image can carry a name or number: privacy mode shows generic faces only.
-  const { hidden } = usePrivacy();
-  const art = hidden ? NO_ART : loaded;
-  const [gl, setGl] = useState(false);
+  const art = useCardArt(all);
   const stack = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const scene = useRef<CardScene | null>(null);
-  const onScreen = useRef(true); // the scene skips frames while the stack is off screen
   const [turn, setTurnState] = useState(0); // -1..1: how far the front card is turned over
   const turnNow = useRef(0); // the same, for the snap timer
   const setTurn = (v: number) => {
@@ -164,76 +145,32 @@ export function AccountStack({
   };
   const bands = all.map(band);
 
-  // One set of springs per card; the DOM and the WebGL scene both read them.
-  const springs = useMemo<Springs[]>(
-    () =>
-      all.map(() => Object.fromEntries(KEYS.map((k) => [k, motionValue(k === "s" ? 1 : 0)])) as Springs),
-    [all],
-  );
-  const light = useMemo(() => ({ x: motionValue(0), y: motionValue(0), on: motionValue(0) }), []);
-
-  // Draw: write each card's transform and render the scene, at most once a frame.
-  const draw = useRef((_scene = true) => {});
-  draw.current = (withScene = true) => {
-    const now = springs.map((s, i) => ({
-      ...(Object.fromEntries(KEYS.map((k) => [k, s[k].get()])) as Omit<Pose, "layer">),
-      layer: poses[i]?.layer ?? 0,
-    }));
-    now.forEach((p, i) => {
-      const el = buttons.current[i];
-      if (!el) return;
-      el.style.transform = transform(p);
-      el.dataset.back = String(Math.abs(p.ry) > 90); // turned over: the labels would read mirrored
-      // Past a hover's tilt the card is turning: over WebGL its flat labels would part from it.
-      el.dataset.turned = String(Math.abs(p.ry) > TURNED_DEG);
-    });
-    if (withScene && scene.current && onScreen.current && !document.hidden) {
-      scene.current.update(
-        now,
-        { x: light.x.get(), y: light.y.get(), on: light.on.get() },
-        bands.map((top, i) => (top === null ? null : { top, front: isFront(i) })),
-      );
-      scene.current.render();
-    }
-  };
-  useEffect(() => {
-    let queued = 0;
-    const schedule = () => {
-      if (!queued) queued = requestAnimationFrame(() => ((queued = 0), draw.current()));
-    };
-    const offs = [...springs.flatMap((s) => KEYS.map((k) => s[k].on("change", schedule))), light.x.on("change", schedule), light.y.on("change", schedule), light.on.on("change", schedule)];
-    document.addEventListener("visibilitychange", schedule);
-    return () => {
-      for (const off of offs) off();
-      document.removeEventListener("visibilitychange", schedule);
-      cancelAnimationFrame(queued);
-    };
-  }, [springs, light]);
-
-  // Move every spring towards this render's poses (instantly under reduced motion).
-  const placed = useRef<Springs[] | null>(null);
-  useLayoutEffect(() => {
-    const first = placed.current !== springs; // new cards start where they belong
-    placed.current = springs;
-    poses.forEach((p, i) => {
-      const s = springs[i];
-      if (!s) return;
-      const chosen = i === frontIndex || i === rising;
-      for (const k of KEYS) {
-        if (first || reduce) s[k].jump(p[k]);
-        else animate(s[k], p[k], chosen && k !== "rx" && k !== "ry" ? SELECT_SPRING : HOVER_SPRING);
+  // One set of springs per card; the DOM and the WebGL scene both read them. `draw` runs after
+  // render (a frame, or the layout effect), so `gpu` below is set by then.
+  const redraw = useCardSprings(
+    all,
+    poses,
+    { frontIndex, rising, reduce, hover, width, heightAt: (i) => heightOf(all[i] as Face) },
+    (now, light, withScene) => {
+      now.forEach((p, i) => {
+        const el = buttons.current[i];
+        if (!el) return;
+        el.style.transform = transform(p);
+        el.dataset.back = String(Math.abs(p.ry) > 90); // turned over: the labels would read mirrored
+        // Past a hover's tilt the card is turning: over WebGL its flat labels would part from it.
+        el.dataset.turned = String(Math.abs(p.ry) > TURNED_DEG);
+      });
+      const s = gpu.scene.current;
+      if (withScene && s && gpu.onScreen.current && !document.hidden) {
+        s.update(
+          now,
+          light,
+          bands.map((top, i) => (top === null ? null : { top, front: isFront(i) })),
+        );
+        s.render();
       }
-    });
-    const lit = hover && !reduce ? hover : null;
-    const target = lit ? poses[lit.index] : undefined;
-    animate(light.on, lit ? 1 : 0, { duration: 0.2 });
-    const litFace = lit ? all[lit.index] : undefined;
-    if (lit && target && litFace) {
-      animate(light.x, lit.px * width + target.x, HOVER_SPRING);
-      animate(light.y, lit.py * heightOf(litFace) + target.y, HOVER_SPRING);
-    }
-    draw.current(false); // DOM only: undo React's write of the target transform; the frame renders the scene
-  });
+    },
+  );
 
   // While the cards reshuffle, the ones going back hide their text: over the WebGL faces
   // a DOM card is see-through, so its label would float across the card in front.
@@ -261,49 +198,8 @@ export function AccountStack({
     return () => ro.disconnect();
   }, []);
 
-  // The user's own art, from the local folder through the API; null keeps the generic face.
-  useEffect(() => {
-    let live = true;
-    for (const key of new Set(all.flatMap((f) => (f.art ? [f.art] : []))))
-      void loadArt(key).then((c) => {
-        if (live && c) setArt((a) => ({ ...a, [key]: c }));
-      });
-    return () => {
-      live = false;
-    };
-  }, [all]);
-
   // WebGL: one lazy-loaded canvas for the whole stack, never under reduced motion.
   const wantGl = !reduce && webgl() && width > 0;
-  useEffect(() => {
-    if (!wantGl || !canvas.current) return;
-    let live = true;
-    const el = canvas.current;
-    const lost = (e: Event) => {
-      e.preventDefault();
-      // shortcut: no webglcontextrestored path, so the CSS cards stay until remount.
-      const s = scene.current;
-      scene.current = null; // before dispose: its forceContextLoss fires this event again
-      s?.dispose();
-      setGl(false);
-    };
-    el.addEventListener("webglcontextlost", lost);
-    import("@/three/cardScene")
-      .then(({ createCardScene }) => {
-        if (!live) return;
-        scene.current = createCardScene(el, PERSPECTIVE);
-        setGl(true);
-      })
-      .catch(() => setGl(false));
-    return () => {
-      live = false;
-      el.removeEventListener("webglcontextlost", lost);
-      scene.current?.dispose();
-      scene.current = null;
-      setGl(false);
-    };
-  }, [wantGl]);
-
   const allH = layout.allH;
   const sceneFaces = useMemo<SceneFace[]>(
     () =>
@@ -319,25 +215,14 @@ export function AccountStack({
     mq.addEventListener?.("change", change);
     return () => mq.removeEventListener?.("change", change);
   }, []);
-  useEffect(() => {
-    const s = scene.current;
-    if (!gl || !s) return;
-    s.setSize(width, stackH, MX, MY);
-    s.setFaces(sceneFaces, page);
-    draw.current();
-  }, [gl, width, stackH, sceneFaces, page]);
-
-  // Pause while the stack is off screen: the scene only renders when something moves.
-  useEffect(() => {
-    const el = stack.current;
-    if (!gl || !el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => {
-      onScreen.current = e?.isIntersecting ?? true;
-      if (onScreen.current) draw.current();
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [gl]);
+  const gpu = useCardScene(
+    canvas,
+    stack,
+    wantGl,
+    { perspective: PERSPECTIVE, width, height: stackH, mx: MX, my: MY, faces: sceneFaces, page },
+    redraw,
+  );
+  const gl = gpu.gl;
 
   // Snap: settle on the nearest card once the drag or side-scroll has stopped for SNAP_MS.
   const snapTimer = useRef(0);
