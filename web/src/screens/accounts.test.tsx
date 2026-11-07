@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { components } from "@/api/schema";
 import { PrivacyProvider } from "@/lib/privacy";
 import { AccountStack } from "./AccountStack";
+import { useRoute } from "@/lib/route";
 import { Overview } from "./Overview";
+
+function Routed() {
+  const r = useRoute();
+  return <Overview account={r.name === "overview" ? r.account : undefined} />;
+}
 
 type Account = components["schemas"]["AccountOut"];
 const m = (minor: number) => ({ minor, currency: "GBP" });
@@ -21,6 +27,8 @@ const account = (over: Partial<Account> = {}): Account => ({
   ledger_balance: m(117979),
   gaps: [],
   art: null,
+  last_import: null,
+  source: "csv",
   ...over,
 });
 const saver = account({
@@ -171,6 +179,9 @@ describe("Overview account filter", () => {
       money_out: m(100),
       net: m(net),
       gaps: [],
+      transfers_in: m(0),
+      transfers_out: m(0),
+      accounts: [],
     });
     const spending = {
       month: "2026-02",
@@ -180,6 +191,7 @@ describe("Overview account filter", () => {
       refunds: m(0),
       fees: m(0),
       money_out: m(100),
+      merchants: [],
       categories: [{ name: "Housing", amount: m(100) }],
     };
     vi.stubGlobal(
@@ -191,12 +203,13 @@ describe("Overview account filter", () => {
         if (url.startsWith("/api/spending")) return Response.json(spending);
         if (url.startsWith("/api/months")) return Response.json(["2026-02"]);
         if (url.startsWith("/api/month-series")) return Response.json([]);
+        if (url.startsWith("/api/transactions")) return Response.json({ items: [], total: 0 });
         return Response.json([account(), saver]);
       }),
     );
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <Overview />
+        <Routed />
       </QueryClientProvider>,
     );
     expect(await screen.findByLabelText("Net")).toHaveTextContent("+£90.00");

@@ -484,5 +484,44 @@ html[data-private] .money {
 .account-card:active {
   filter: brightness(0.97);
 }
+
+/* Per-account view (#59). The combined view's share bars wear each Account's card hue, with a
+   2px card-coloured gap between segments; the table under them is the legend and the figures.
+   Top merchants are one series, so one hue: --data. */
+.share-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--raised);
+}
+.share-bar > span,
+.share-key {
+  background: oklch(0.6 0.13 var(--h));
+}
+.share-bar > span {
+  flex-basis: 0;
+  min-width: 4px;
+}
+.share-key {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.merchant-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--raised);
+}
+.merchant-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 3px;
+  background: var(--data);
+}
 :root { --cat-0: #0b66c3; --cat-1: #0e7a82; --cat-2: #b45309; --cat-3: #c03a5e; --cat-4: #2f7a45; --cat-5: #8a6a00; --cat-6: #a03c96; --cat-7: #0a6fa8; --cat-8: #7a5636; --cat-9: #5f6b0f; --cat-other: #6b7075; --chip-ink-mix: black 42%; --chip-tint: 14%; }
 @media (prefers-color-scheme: dark) { :root:not(.light) { --cat-0: #7da2f7; --cat-1: #3fc1c4; --cat-2: #f0a04b; --cat-3: #f27b9b; --cat-4: #5ccf86; --cat-5: #dcb83c; --cat-6: #d886d0; --cat-7: #4fb4ec; --cat-8: #cfa57c; --cat-9: #b5c94a; --cat-other: #a9aeb4; --chip-ink-mix: white 35%; --chip-tint: 20%; } }

@@ -65,5 +65,5 @@ export const fetchMonthSeries = (accountId?: number) =>
   );
 
 export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
-export const fetchCategory = (name: string, month: string) =>
-  get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}?month=${month}`);
+export const fetchCategory = (name: string, month: string, accountId?: number) =>
+  get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}${query(month, accountId)}`);

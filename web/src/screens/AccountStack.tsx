@@ -20,6 +20,9 @@ type Account = components["schemas"]["AccountOut"];
 
 // Generic hues for banks without a known colour, all outside the violet band 235-290.
 const HUES = [172, 38, 345, 140, 15, 95];
+/** The hue an Account wears on its card, so the per-account breakdown matches the stack. */
+export const accountHue = (a: Account, i: number): number =>
+  (a.art ? FACE_HUE[a.art] : undefined) ?? HUES[i % HUES.length] ?? 200;
 const PERSPECTIVE = 1400; // px; the WebGL camera sits at the same distance
 // The canvas overflows the stack so lifted cards and tilts aren't clipped; sideways only as
 // far as the phone gutter, so it never makes the page scroll.
@@ -78,7 +81,7 @@ function faces(accounts: Account[]): Face[] {
       masked: a.masked_number,
       balance: a.bank_balance,
       matches: a.gaps.length === 0,
-      hue: (a.art ? FACE_HUE[a.art] : undefined) ?? HUES[i % HUES.length] ?? 200,
+      hue: accountHue(a, i),
       art: a.art,
     })),
   ];

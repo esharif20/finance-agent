@@ -16,7 +16,15 @@ export function monthLabel(month: string): string {
   });
 }
 
-export function MonthCard({ summary, slices }: { summary: Summary; slices?: Slice[] }) {
+export function MonthCard({
+  summary,
+  slices,
+  children,
+}: {
+  summary: Summary;
+  slices?: Slice[];
+  children?: React.ReactNode; // a line under the figures, e.g. Transfers between Accounts
+}) {
   const { money_in, money_out, net, gaps } = summary;
   const overspent = net.minor < 0;
   return (
@@ -51,6 +59,8 @@ export function MonthCard({ summary, slices }: { summary: Summary; slices?: Slic
       </dl>
 
       <PoundStrip inMinor={money_in.minor} outMinor={money_out.minor} slices={slices} />
+
+      {children}
 
       {gaps.length > 0 && (
         <p

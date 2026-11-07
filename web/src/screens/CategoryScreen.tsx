@@ -6,7 +6,7 @@ import { Money } from "@/components/Money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { categoryColour } from "@/lib/categories";
-import { categoryHref } from "@/lib/route";
+import { accountHref, categoryHref } from "@/lib/route";
 import { MonthSwitcher } from "./MonthSwitcher";
 import { monthLabel } from "./MonthCard";
 
@@ -105,16 +105,18 @@ function Transactions({ data }: { data: CategoryDetail }) {
 export function CategoryScreen({
   category,
   month: chosen,
+  account,
 }: {
   category: string;
   month?: string;
+  account?: number;
 }) {
   const reduce = useReducedMotion();
   const months = useQuery({ queryKey: ["months"], queryFn: fetchMonths });
   const month = chosen ?? months.data?.[0];
   const detail = useQuery({
-    queryKey: ["category", category, month],
-    queryFn: () => fetchCategory(category, month as string),
+    queryKey: ["category", category, month, account],
+    queryFn: () => fetchCategory(category, month as string, account),
     enabled: !!month,
     placeholderData: keepPreviousData,
     retry: (n, e) => !(e instanceof NoData) && n < 2,
@@ -122,12 +124,12 @@ export function CategoryScreen({
   // a Category without its own hue (Uncategorised) falls back to the grey
   const colour = categoryColour(category).replace(")", ", var(--cat-other))");
   const go = (m: string) => {
-    window.location.hash = categoryHref(category, m);
+    window.location.hash = categoryHref(category, m, account);
   };
 
   const back = (
     <a
-      href="#overview"
+      href={accountHref(account)}
       className="inline-flex min-h-11 items-center gap-2 rounded-full bg-raised px-4 text-sm font-semibold transition-colors hover:bg-active"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />

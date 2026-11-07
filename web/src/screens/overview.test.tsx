@@ -21,9 +21,24 @@ const summary: Summary = {
   money_out: m(247560),
   net: m(93690),
   gaps: [],
+  transfers_in: m(0),
+  transfers_out: m(0),
+  accounts: [],
 };
 
 const cat = (name: string, minor: number) => ({ name, amount: m(minor) });
+const txn = (posted_on: string) => ({
+  id: 1,
+  posted_on,
+  description: "SYNTH RENT",
+  amount: m(-90000),
+  account_id: 1,
+  kind: "Spending",
+  merchant_id: null,
+  merchant: null,
+  category: ["Housing", "Rent"],
+  source: "rule:rent",
+});
 const spending: Spending = {
   month: "2026-02",
   currency: "GBP",
@@ -32,6 +47,7 @@ const spending: Spending = {
   refunds: m(0),
   fees: m(0),
   money_out: m(200000),
+  merchants: [],
   categories: [
     cat("Housing", 90000),
     cat("Food & Drink", 40000),
@@ -54,6 +70,8 @@ const account = (over: Partial<Account> = {}): Account => ({
   ledger_balance: m(117979),
   gaps: [],
   art: null,
+  last_import: null,
+  source: "csv",
   ...over,
 });
 
@@ -136,6 +154,7 @@ describe("SpendingDonut", () => {
       fees: m(2298),
       unmatched_refunds: m(-1099),
       money_out: m(94105),
+      merchants: [],
       categories: [cat("Housing", 90000), cat("Uncategorised", 2807)],
     };
     // the parts the screen prints must add up to Money out
@@ -201,6 +220,7 @@ describe("Overview", () => {
         if (url.startsWith("/api/spending")) return Response.json(jan ? january.spending : spending);
         if (url.startsWith("/api/month-series")) return Response.json(series);
         if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+        if (url.startsWith("/api/transactions")) return Response.json({ items: [], total: 0 });
         return Response.json([account()]);
       }),
     );
@@ -263,11 +283,12 @@ describe("Overview", () => {
   it("marks the newest month as so far when the Ledger stops before its end", async () => {
     const fetcher = vi.fn(async (url: string) => {
       if (url.startsWith("/api/transactions"))
-        return Response.json({ items: [{ id: 1, posted_on: "2026-02-14" }], total: 1 });
+        return Response.json({ items: [txn("2026-02-14")], total: 1 });
       if (url.startsWith("/api/summary")) return Response.json(summary);
       if (url.startsWith("/api/spending")) return Response.json(spending);
       if (url.startsWith("/api/month-series")) return Response.json(series);
       if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+      if (url.startsWith("/api/transactions")) return Response.json({ items: [], total: 0 });
       return Response.json([account()]);
     });
     vi.stubGlobal("fetch", fetcher);
@@ -283,11 +304,12 @@ describe("Overview", () => {
       "fetch",
       vi.fn(async (url: string) => {
         if (url.startsWith("/api/transactions"))
-          return Response.json({ items: [{ id: 1, posted_on: "2026-02-28" }], total: 1 });
+          return Response.json({ items: [txn("2026-02-28")], total: 1 });
         if (url.startsWith("/api/summary")) return Response.json(summary);
         if (url.startsWith("/api/spending")) return Response.json(spending);
         if (url.startsWith("/api/month-series")) return Response.json(series);
         if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+        if (url.startsWith("/api/transactions")) return Response.json({ items: [], total: 0 });
         return Response.json([account()]);
       }),
     );

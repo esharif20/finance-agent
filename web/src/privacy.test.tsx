@@ -11,6 +11,9 @@ const summary = {
   money_out: m(247560),
   net: m(93690),
   gaps: [],
+  transfers_in: m(0),
+  transfers_out: m(0),
+  accounts: [],
 };
 const spending = {
   month: "2026-02",
@@ -21,6 +24,7 @@ const spending = {
   refunds: m(0),
   fees: m(0),
   money_out: m(247560),
+  merchants: [],
 };
 const accounts = [
   {
@@ -33,6 +37,8 @@ const accounts = [
     ledger_balance: m(117979),
     gaps: [],
     art: null,
+    last_import: null,
+    source: "csv",
   },
 ];
 
@@ -48,7 +54,9 @@ beforeEach(() => {
             ? spending
             : url.startsWith("/api/months")
               ? ["2026-02"]
-              : accounts,
+              : url.startsWith("/api/transactions")
+                ? { items: [], total: 0 }
+                : accounts,
       ),
     ),
   );

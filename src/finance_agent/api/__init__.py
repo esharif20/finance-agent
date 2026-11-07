@@ -45,13 +45,24 @@ class GapOut(BaseModel):
     amount: Money
 
 
+class AccountMonthOut(BaseModel):
+    account_id: int
+    money_in: Money
+    money_out: Money
+    transfers_in: Money
+    transfers_out: Money
+
+
 class SummaryOut(BaseModel):
     month: str
     currency: str
-    money_in: Money
+    money_in: Money  # Transfers between the user's own Accounts left out
     money_out: Money
     net: Money
     gaps: list[GapOut]
+    transfers_in: Money
+    transfers_out: Money
+    accounts: list[AccountMonthOut]  # combined view only: each Account's part
 
 
 class AccountOut(BaseModel):
@@ -65,6 +76,8 @@ class AccountOut(BaseModel):
     ledger_balance: Money
     gaps: list[GapOut]
     art: str | None  # key for /api/card-art/{art}; None means the generic face
+    last_import: str | None  # ISO time of the newest statement with its rows
+    source: str  # how that statement came in: "csv"
 
 
 class TransactionOut(BaseModel):
@@ -116,6 +129,7 @@ class SpendingOut(BaseModel):
     refunds: Money  # all Refunds received
     fees: Money
     money_out: Money  # == total + refunds + fees
+    merchants: list[CategorySpendOut]  # top 5 across Categories
 
 
 class MonthTotalsOut(BaseModel):
@@ -166,7 +180,9 @@ def _gap(g: Gap, currency: str) -> GapOut:
     )
 
 
-def _summary(s: MonthSummary) -> SummaryOut:
+def _summary(
+    s: MonthSummary, parts: dict[int, MonthSummary] | None = None
+) -> SummaryOut:
     c = s.currency
     return SummaryOut(
         month=s.month,
@@ -175,6 +191,18 @@ def _summary(s: MonthSummary) -> SummaryOut:
         money_out=_money(s.money_out, c),
         net=_money(s.net, c),
         gaps=[_gap(g, c) for g in s.gaps],
+        transfers_in=_money(s.transfers_in, c),
+        transfers_out=_money(s.transfers_out, c),
+        accounts=[
+            AccountMonthOut(
+                account_id=i,
+                money_in=_money(p.money_in, c),
+                money_out=_money(p.money_out, c),
+                transfers_in=_money(p.transfers_in, c),
+                transfers_out=_money(p.transfers_out, c),
+            )
+            for i, p in (parts or {}).items()
+        ],
     )
 
 
@@ -190,6 +218,8 @@ def _account(a: AccountBalance) -> AccountOut:
         ledger_balance=_money(a.ledger_balance, a.currency),
         gaps=[_gap(g, a.currency) for g in a.gaps],
         art=card_art.art_key(a.bank),
+        last_import=a.last_import.isoformat() if a.last_import else None,
+        source=a.source,
     )
 
 
@@ -248,6 +278,10 @@ def _spending(month: str, b: Breakdown, money_out: Decimal) -> SpendingOut:
         refunds=_money(b.refunds, c),
         fees=_money(b.fees, c),
         money_out=_money(money_out, c),
+        merchants=[
+            CategorySpendOut(name=s.name, amount=_money(s.amount, c))
+            for s in b.merchants
+        ],
     )
 
 
@@ -316,7 +350,13 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         if month is None:
             raise HTTPException(404, "No transactions yet. Run `fa import` first.")
         try:
-            return _summary(led.summarise_month(month, account_id))
+            whole = led.summarise_month(month, account_id)
+            parts = (
+                {a.id: led.summarise_month(month, a.id) for a in led.accounts()}
+                if account_id is None
+                else None
+            )
+            return _summary(whole, parts)
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
 
@@ -344,12 +384,14 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         led: Led,
         name: str,
         month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+        account_id: AccountId = None,
     ) -> CategoryDetailOut:
+        _known(led, account_id)
         month = month or led.latest_month()
         if month is None:
             raise HTTPException(404, "No transactions yet. Run `fa import` first.")
         try:
-            detail = led.category_detail(name, month)
+            detail = led.category_detail(name, month, account_id=account_id)
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
         if detail is None:
