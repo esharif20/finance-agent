@@ -29,6 +29,15 @@ class ParsedFile:
     rejected: list[RejectedRow]
 
 
+def body(text: str) -> tuple[int, list[str]]:
+    """Skip leading `#` comment lines; return (lines skipped, remaining lines)."""
+    lines = text.splitlines()
+    skip = 0
+    while skip < len(lines) and lines[skip].startswith("#"):
+        skip += 1
+    return skip, lines[skip:]
+
+
 class Importer(Protocol):
     bank: str
 

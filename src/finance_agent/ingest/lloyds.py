@@ -11,7 +11,7 @@ import re
 from datetime import date, datetime
 from decimal import Decimal
 
-from finance_agent.ingest.types import ParsedFile, ParsedRow, RejectedRow
+from finance_agent.ingest.types import ParsedFile, ParsedRow, RejectedRow, body
 
 HEADER = (
     "Transaction Date",
@@ -82,20 +82,11 @@ def _parse_row(cells: list[str], line: int) -> ParsedRow:
     )
 
 
-def _body(text: str) -> tuple[int, list[str]]:
-    """Skip leading `#` comment lines; return (lines skipped, remaining lines)."""
-    lines = text.splitlines()
-    skip = 0
-    while skip < len(lines) and lines[skip].startswith("#"):
-        skip += 1
-    return skip, lines[skip:]
-
-
 class Lloyds:
     bank = "Lloyds"
 
     def detects(self, text: str) -> bool:
-        _, lines = _body(text)
+        _, lines = body(text)
         if not lines:
             return False
         try:
@@ -105,7 +96,7 @@ class Lloyds:
         return tuple(c.strip() for c in header) == HEADER
 
     def parse(self, text: str) -> ParsedFile:
-        skip, lines = _body(text)
+        skip, lines = body(text)
         rows: list[ParsedRow] = []
         rejected: list[RejectedRow] = []
         reader = csv.reader(lines[1:])

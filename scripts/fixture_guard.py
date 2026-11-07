@@ -9,10 +9,12 @@ like a bank export's header), so renaming a file does not hide it.
 Run locally with `uv run python scripts/fixture_guard.py`.
 """
 
+import csv
 import posixpath
 import re
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 
 SYNTHETIC_DIRS = ("tests/fixtures/synthetic/", "evals/datasets/")
@@ -21,18 +23,52 @@ SQLITE_MAGIC = b"SQLite format 3\x00"
 DATA_SUFFIXES = {".csv", ".tsv", ".db", ".sqlite", ".sqlite3"}
 SNIFF_BYTES = 64 * 1024
 _DATE = re.compile(r"date", re.I)
+_DATE_CELL = re.compile(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}([ T]\d{2}:\d{2}(:\d{2})?)?")
+_MONEY_CELL = re.compile(r"[-+£$€]?\d[\d,]*\.\d{2}")
 _CELL = re.compile(r"\w[\w &/().%£$€-]{0,39}")  # a column name, not prose or code
 _MONEY = re.compile(r"amount|debit|credit|balance|paid (in|out)|money (in|out)", re.I)
 
 
+def _gunzip_head(head: bytes) -> bytes:
+    """Open gzip layers (a few, each bounded) so a compressed export is sniffed
+    by what it holds, not by its name."""
+    for _ in range(4):
+        if not head.startswith(b"\x1f\x8b"):
+            break
+        try:
+            head = zlib.decompressobj(31).decompress(head, SNIFF_BYTES)
+        except zlib.error:
+            break
+    return head
+
+
+def _looks_like_headerless_row(line: str) -> bool:
+    """A transaction row with no header, like HSBC UK's: a date cell and a
+    decimal money cell among at least three cells."""
+    if not line:
+        return False
+    try:
+        cells = [c.strip() for c in next(csv.reader([line]))]
+    except csv.Error:
+        return False
+    return (
+        len(cells) >= 3
+        and any(_DATE_CELL.fullmatch(c) for c in cells)
+        and any(_MONEY_CELL.fullmatch(c) for c in cells)
+    )
+
+
 def _looks_like_export(head: bytes) -> bool:
     """The first line that is not blank or a `#` comment is a delimited header
-    of at least three column names, one naming a date and one an amount."""
+    of at least three column names, one naming a date and one an amount, or a
+    header-less transaction row."""
     utf16 = head.startswith((b"\xff\xfe", b"\xfe\xff"))
     text = head.decode("utf-16" if utf16 else "utf-8-sig", errors="replace")
     line = next(
         (x for x in text.splitlines() if x.strip() and not x.startswith("#")), ""
     )
+    if _looks_like_headerless_row(line):
+        return True
     for sep in ",\t;|":
         cells = [c.strip().strip("\"'").strip() for c in line.split(sep)]
         if (
@@ -49,7 +85,7 @@ def _is_data_file(path: Path) -> bool:
     if any(s.lower() in DATA_SUFFIXES for s in path.suffixes):
         return True
     with path.open("rb") as f:
-        head = f.read(SNIFF_BYTES)
+        head = _gunzip_head(f.read(SNIFF_BYTES))
     return head.startswith(SQLITE_MAGIC) or _looks_like_export(head)
 
 
