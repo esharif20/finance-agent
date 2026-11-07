@@ -478,8 +478,10 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             raise HTTPException(409, "A sync is already running.") from None
         except NotConnected:
             raise HTTPException(409, "Not connected. Run `fa connect` first.") from None
-        except Exception as e:
-            raise HTTPException(502, f"Sync failed ({type(e).__name__}).") from None
+        except Exception:  # the failure class is kept in sync status for `fa status`
+            raise HTTPException(
+                502, "Couldn't reach your bank. Try again in a little while."
+            ) from None
         return SyncOut(
             added=sum(r.added for r in reports),
             matched=sum(r.matched for r in reports),

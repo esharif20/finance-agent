@@ -65,10 +65,10 @@ describe("SyncNow", () => {
   it("shows a calm error with the API's reason", async () => {
     setup(
       RECENT,
-      () => new Response(JSON.stringify({ detail: "Sync failed (SimpleFINError)." }), { status: 502 }),
+      () => new Response(JSON.stringify({ detail: "Couldn't reach your bank. Try again in a little while." }), { status: 502 }),
     );
     await userEvent.click(await screen.findByRole("button", { name: /sync now/i }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Sync failed (SimpleFINError).");
+    expect(await screen.findByRole("status")).toHaveTextContent("Couldn't reach your bank. Try again in a little while.");
   });
 
   it("syncs once on open when the last sync is over an hour old", async () => {

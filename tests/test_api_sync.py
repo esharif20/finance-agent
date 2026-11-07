@@ -116,7 +116,7 @@ def test_errors_leak_no_secret_and_no_amount(
     assert r.status_code == 502
     shown = r.text + caplog.text
     assert ACCESS not in shown and "1,234" not in shown
-    assert r.json()["detail"] == "Sync failed (SimpleFINError)."
+    assert r.json()["detail"] == "Couldn't reach your bank. Try again in a little while."
     assert c.get("/api/sync-status").json()["failure_class"] == "SimpleFINError"
 
 
