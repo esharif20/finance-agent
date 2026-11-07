@@ -171,3 +171,64 @@ def test_account_details_inside_a_description_stay_out_of_report_and_logs(
     seen = out.out + out.err + "\n".join(r.getMessage() for r in caplog.records)
     for leak in ("99-88-77", "13572468", "24681357", "11-22-33"):
         assert leak not in seen
+
+
+def _stored(db: Path) -> int:
+    engine = open_db(db)
+    with engine.begin() as conn:
+        n = len(conn.execute(select(schema.transaction.c.id)).all())
+    engine.dispose()
+    return n
+
+
+def test_exit_codes_ok_nothing_and_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db = tmp_path / "db" / "ledger.db"
+    monkeypatch.setenv("FA_DB_PATH", str(db))
+    good = tmp_path / "good.csv"
+    good.write_text(HEAD + row("A") + row("B"))
+    bad = tmp_path / "bad.csv"
+    bad.write_text(HEAD + row("C") + BROKEN)
+
+    assert main(["import", str(bad)]) == 1  # nothing imported
+    assert main(["import", str(good), str(bad)]) == 2  # partial
+    assert "rejected bad.csv line 4" in capsys.readouterr().out
+    assert _stored(db) == 2
+    assert main(["import", str(good)]) == 0  # already known is fine
+
+
+def test_an_unknown_format_names_the_file_and_imports_nothing_of_the_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db = tmp_path / "db" / "ledger.db"
+    monkeypatch.setenv("FA_DB_PATH", str(db))
+    good = tmp_path / "good.csv"
+    good.write_text(HEAD + row("A"))
+    odd = tmp_path / "odd-bank.csv"
+    odd.write_text("# synthetic\nDate,Amount,SECRETDESC\n01/03/2026,5.00,x\n")
+
+    assert main(["import", str(good), str(odd)]) == 1
+    err = capsys.readouterr().err
+    assert "odd-bank.csv" in err and "SECRETDESC" not in err
+    assert _stored(db) == 0
+
+
+def test_an_oversized_csv_field_refuses_only_its_file(
+    ledger_for: LedgerFor, write_export: WriteExport
+) -> None:
+    good = write_export(HEAD + row("A"))
+    huge = write_export(HEAD + row("B") + row('"' + "X" * 200_000 + '"'))
+    r = ledger_for(1).import_files([good, huge])
+    assert r.added == 1 and r.files_imported == 1
+    assert [(x.file, x.reason) for x in r.rejected] == [(huge.name, "malformed CSV")]
+
+
+def test_import_help_documents_the_exit_codes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit):
+        main(["import", "--help"])
+    out = " ".join(capsys.readouterr().out.split())
+    assert "0 all imported" in out and "1 nothing imported" in out
+    assert "2 some files imported" in out

@@ -78,3 +78,12 @@ def test_tests_can_never_open_the_real_data_directory(
 
 def test_tests_default_to_a_temporary_database() -> None:
     assert not storage.default_db_path().is_relative_to(storage.DEFAULT_DB.parent)
+
+
+def test_open_without_create_refuses_a_missing_ledger(tmp_path: Path) -> None:
+    db = tmp_path / "nowhere" / "ledger.db"
+    with pytest.raises(storage.MissingDatabase):
+        open_db(db, create=False)
+    assert not db.parent.exists()
+    open_db(db).dispose()
+    open_db(db, create=False).dispose()  # an existing one opens

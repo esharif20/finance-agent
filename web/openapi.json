@@ -121,7 +121,7 @@
           },
           "merchants": {
             "items": {
-              "$ref": "#/components/schemas/CategorySpendOut"
+              "$ref": "#/components/schemas/MerchantSpendOut"
             },
             "title": "Merchants",
             "type": "array"
@@ -234,6 +234,17 @@
             ],
             "title": "Merchant"
           },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
           "posted_on": {
             "title": "Posted On",
             "type": "string"
@@ -255,6 +266,7 @@
           "posted_on",
           "description",
           "amount",
+          "merchant_id",
           "merchant",
           "subcategory"
         ],
@@ -365,6 +377,35 @@
           "app"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "MerchantSpendOut": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "merchant_id",
+          "name",
+          "amount"
+        ],
+        "title": "MerchantSpendOut",
         "type": "object"
       },
       "Money": {
@@ -897,6 +938,46 @@
           }
         },
         "summary": "Correct"
+      }
+    },
+    "/api/corrections/{correction_id}": {
+      "delete": {
+        "description": "Undo a Correction (it stays in the history, marked reverted).",
+        "operationId": "revert_api_corrections__correction_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correction_id",
+            "required": true,
+            "schema": {
+              "title": "Correction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert"
       }
     },
     "/api/health": {

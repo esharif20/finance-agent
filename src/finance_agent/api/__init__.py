@@ -18,10 +18,12 @@ from finance_agent import categorise
 from finance_agent.api import card_art
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
+    CURRENCY,
     AccountBalance,
     Breakdown,
     CategoryDetail,
     Gap,
+    KindHasNoCategory,
     Ledger,
     MonthSummary,
     Spend,
@@ -120,6 +122,12 @@ class CategorySpendOut(BaseModel):
     amount: Money
 
 
+class MerchantSpendOut(BaseModel):
+    merchant_id: int | None  # None for "Unknown": no Merchant
+    name: str
+    amount: Money
+
+
 class SpendingOut(BaseModel):
     month: str
     currency: str
@@ -149,6 +157,7 @@ class CategoryTxnOut(BaseModel):
     posted_on: str
     description: str
     amount: Money  # signed as the Bank has it: spending negative
+    merchant_id: int | None
     merchant: str | None
     subcategory: str | None
 
@@ -159,7 +168,7 @@ class CategoryDetailOut(BaseModel):
     currency: str
     total: Money  # spending after refunds, as on the donut
     subcategories: list[CategorySpendOut]
-    merchants: list[CategorySpendOut]  # top 5 across Subcategories
+    merchants: list[MerchantSpendOut]  # top 5 across Subcategories
     trend: list[TrendPointOut]  # trailing 6 months, oldest first
     transactions: list[CategoryTxnOut]  # newest first
 
@@ -229,7 +238,7 @@ def _transaction(t: Transaction) -> TransactionOut:
         id=t.id,
         posted_on=t.posted_on.isoformat(),
         description=t.description,
-        amount=_money(t.amount, "GBP"),  # shortcut: GBP only, as in summarise_month
+        amount=_money(t.amount, CURRENCY),
         account_id=t.account_id,
         kind=c.kind if c else None,
         merchant_id=c.merchant_id if c else None,
@@ -239,33 +248,8 @@ def _transaction(t: Transaction) -> TransactionOut:
     )
 
 
-def _matches(
-    t: Transaction,
-    account_id: int | None,
-    kind: str | None,
-    category: str | None,
-    month: str | None,
-    needle: str,
-) -> bool:
-    c = t.categorisation
-    return (
-        (account_id is None or t.account_id == account_id)
-        and (month is None or t.posted_on.strftime("%Y-%m") == month)
-        and (kind is None or (c is not None and c.kind == kind))
-        and (
-            category is None
-            or (c is not None and c.category is not None and c.category[0] == category)
-        )
-        and (
-            not needle
-            or needle in t.description.lower()
-            or needle in ((c.merchant if c else None) or "").lower()
-        )
-    )
-
-
 def _spending(month: str, b: Breakdown, money_out: Decimal) -> SpendingOut:
-    c = "GBP"
+    c = CURRENCY
     return SpendingOut(
         month=month,
         currency=c,
@@ -291,14 +275,15 @@ def _txn(t: Transaction) -> CategoryTxnOut:
         id=t.id,
         posted_on=t.posted_on.isoformat(),
         description=t.description,
-        amount=_money(t.amount, "GBP"),
+        amount=_money(t.amount, CURRENCY),
+        merchant_id=c.merchant_id if c else None,
         merchant=c.merchant if c else None,
         subcategory=c.category[1] if c and c.category else None,
     )
 
 
 def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
-    c = "GBP"
+    c = CURRENCY
 
     def spends(xs: tuple[Spend, ...]) -> list[CategorySpendOut]:
         return [CategorySpendOut(name=x.name, amount=_money(x.amount, c)) for x in xs]
@@ -309,7 +294,12 @@ def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
         currency=c,
         total=_money(d.total, c),
         subcategories=spends(d.subcategories),
-        merchants=spends(d.merchants),
+        merchants=[
+            MerchantSpendOut(
+                merchant_id=x.merchant_id, name=x.name, amount=_money(x.amount, c)
+            )
+            for x in d.merchants
+        ],
         trend=[TrendPointOut(month=m, amount=_money(a, c)) for m, a in d.trend],
         transactions=[_txn(t) for t in d.transactions],
     )
@@ -462,16 +452,11 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> TransactionsOut:
-        needle = q.strip().lower() if q else ""
-        # shortcut: filters in Python over every row; fine for one person's Ledger
-        rows = [
-            t
-            for t in reversed(led.transactions())
-            if _matches(t, account_id, kind, category, month, needle)
-        ]
+        page = led.search_transactions(
+            account_id, kind, category, month, q, limit, offset
+        )
         return TransactionsOut(
-            items=[_transaction(t) for t in rows[offset : offset + limit]],
-            total=len(rows),
+            items=[_transaction(t) for t in page.items], total=page.total
         )
 
     @app.post("/api/corrections", status_code=201)
@@ -490,7 +475,18 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             raise HTTPException(
                 404, "no such Transaction, Merchant or Category"
             ) from None
+        except KindHasNoCategory as e:
+            raise HTTPException(422, f"{e}: only Spending and Refunds do") from None
         return CorrectionOut(id=k.id, ledger_version=led.ledger_version())
+
+    @app.delete("/api/corrections/{correction_id}")
+    def revert(led: Led, correction_id: int) -> CorrectionOut:
+        """Undo a Correction (it stays in the history, marked reverted)."""
+        try:
+            led.revert_correction(correction_id)
+        except UnknownTarget:
+            raise HTTPException(404, "no such active Correction") from None
+        return CorrectionOut(id=correction_id, ledger_version=led.ledger_version())
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
@@ -500,4 +496,6 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
 
 
 def serve(port: int = DEFAULT_PORT) -> None:
-    uvicorn.run(create_app(open_db()), host=HOST, port=port, log_level="warning")
+    uvicorn.run(
+        create_app(open_db(create=False)), host=HOST, port=port, log_level="warning"
+    )

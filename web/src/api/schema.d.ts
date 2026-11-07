@@ -92,6 +92,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/corrections/{correction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revert
+         * @description Undo a Correction (it stays in the history, marked reverted).
+         */
+        delete: operations["revert_api_corrections__correction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -240,7 +260,7 @@ export interface components {
             /** Currency */
             currency: string;
             /** Merchants */
-            merchants: components["schemas"]["CategorySpendOut"][];
+            merchants: components["schemas"]["MerchantSpendOut"][];
             /** Month */
             month: string;
             /** Name */
@@ -275,6 +295,8 @@ export interface components {
             id: number;
             /** Merchant */
             merchant: string | null;
+            /** Merchant Id */
+            merchant_id: number | null;
             /** Posted On */
             posted_on: string;
             /** Subcategory */
@@ -313,6 +335,14 @@ export interface components {
         HealthOut: {
             /** App */
             app: string;
+        };
+        /** MerchantSpendOut */
+        MerchantSpendOut: {
+            amount: components["schemas"]["Money"];
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Name */
+            name: string;
         };
         /** Money */
         Money: {
@@ -560,6 +590,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_api_corrections__correction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

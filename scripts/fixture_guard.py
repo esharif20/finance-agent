@@ -1,28 +1,55 @@
 """Fixture guard: refuse data files that could hold real financial data.
 
-Data files (CSV/TSV/SQLite, by any extension in the name or by SQLite magic bytes)
-may only live under tests/fixtures/synthetic/, and every file there must start
-with the line `# synthetic`.
+Data files may only live under tests/fixtures/synthetic/ or evals/datasets/
+(docs/DATA_POLICY.md), and every file there must start with the line
+`# synthetic`. A data file is found by name (a CSV/TSV/SQLite extension
+anywhere in it) or by content (SQLite magic bytes, or a first line that reads
+like a bank export's header), so renaming a file does not hide it.
 
 Run locally with `uv run python scripts/fixture_guard.py`.
 """
 
 import posixpath
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-SYNTHETIC_DIR = "tests/fixtures/synthetic/"
+SYNTHETIC_DIRS = ("tests/fixtures/synthetic/", "evals/datasets/")
 HEADER = b"# synthetic"
 SQLITE_MAGIC = b"SQLite format 3\x00"
 DATA_SUFFIXES = {".csv", ".tsv", ".db", ".sqlite", ".sqlite3"}
+SNIFF_BYTES = 64 * 1024
+_DATE = re.compile(r"date", re.I)
+_CELL = re.compile(r"\w[\w &/().%£$€-]{0,39}")  # a column name, not prose or code
+_MONEY = re.compile(r"amount|debit|credit|balance|paid (in|out)|money (in|out)", re.I)
+
+
+def _looks_like_export(head: bytes) -> bool:
+    """The first line that is not blank or a `#` comment is a delimited header
+    of at least three column names, one naming a date and one an amount."""
+    text = head.decode("utf-8-sig", errors="replace")
+    line = next(
+        (x for x in text.splitlines() if x.strip() and not x.startswith("#")), ""
+    )
+    for sep in ",\t;|":
+        cells = [c.strip().strip("\"'").strip() for c in line.split(sep)]
+        if (
+            len(cells) >= 3
+            and all(_CELL.fullmatch(c) for c in cells)
+            and any(_DATE.search(c) for c in cells)
+            and any(_MONEY.search(c) for c in cells)
+        ):
+            return True
+    return False
 
 
 def _is_data_file(path: Path) -> bool:
     if any(s.lower() in DATA_SUFFIXES for s in path.suffixes):
         return True
     with path.open("rb") as f:
-        return f.read(len(SQLITE_MAGIC)) == SQLITE_MAGIC
+        head = f.read(SNIFF_BYTES)
+    return head.startswith(SQLITE_MAGIC) or _looks_like_export(head)
 
 
 def find_violations(root: Path, paths: list[str]) -> list[str]:
@@ -31,7 +58,7 @@ def find_violations(root: Path, paths: list[str]) -> list[str]:
         path = root / rel
         if not path.is_file():  # deleted in the working tree
             continue
-        if posixpath.normpath(rel).startswith(SYNTHETIC_DIR):
+        if posixpath.normpath(rel).startswith(SYNTHETIC_DIRS):
             with path.open("rb") as f:
                 first_line = f.readline().rstrip(b"\r\n")
             if first_line != HEADER:
@@ -39,7 +66,7 @@ def find_violations(root: Path, paths: list[str]) -> list[str]:
                     f"{rel}: synthetic fixture must start with '# synthetic'"
                 )
         elif _is_data_file(path):
-            violations.append(f"{rel}: data file outside {SYNTHETIC_DIR}")
+            violations.append(f"{rel}: data file outside {' or '.join(SYNTHETIC_DIRS)}")
     return violations
 
 

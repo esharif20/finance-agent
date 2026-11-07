@@ -8,6 +8,7 @@ import {
   fetchCategories,
   fetchTransactions,
   postCorrection,
+  revertCorrection,
 } from "@/api/client";
 import { CategoryChip, type Category } from "@/components/CategoryChip";
 import { Money } from "@/components/Money";
@@ -66,10 +67,23 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
     queryFn: () => fetchTransactions(applied, limit),
     placeholderData: (prev) => prev,
   });
+  // the last change, until it is undone or replaced
+  const [undo, setUndo] = useState<{ id: number; label: string } | null>(null);
   const correct = useMutation({
     mutationFn: postCorrection,
+    onMutate: () => setUndo(null),
     // totals on Overview and the drill-down come from the same Ledger: refetch everything
-    onSuccess: () => client.invalidateQueries(),
+    onSuccess: (k, body) => {
+      setUndo({ id: k.id, label: body.category[1] });
+      return client.invalidateQueries();
+    },
+  });
+  const revert = useMutation({
+    mutationFn: revertCorrection,
+    onSuccess: () => {
+      setUndo(null);
+      return client.invalidateQueries();
+    },
   });
 
   const set = (key: keyof TxnFilters) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -157,9 +171,23 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
         <Skeleton className="h-[480px] rounded-card" />
       ) : (
         <Card className="p-2 sm:p-3" aria-busy={page.isFetching}>
-          <p role="status" className="px-3 py-2 text-sm text-muted-foreground">
-            {page.data.total === 0 ? "No transactions match." : `${page.data.total} transactions`}
-            {correct.isError && " · Couldn't save that change. Try again."}
+          <p role="status" className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm text-muted-foreground">
+            <span>{page.data.total === 0 ? "No transactions match." : `${page.data.total} transactions`}</span>
+            {correct.isError && <span className="text-foreground">{correct.error.message}</span>}
+            {revert.isError && <span className="text-foreground">{revert.error.message}</span>}
+            {undo && (
+              <span className="inline-flex items-center gap-2 text-foreground">
+                Moved to {undo.label}.
+                <button
+                  type="button"
+                  onClick={() => revert.mutate(undo.id)}
+                  disabled={revert.isPending}
+                  className="min-h-8 rounded-full bg-active px-3 font-semibold transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-60"
+                >
+                  Undo
+                </button>
+              </span>
+            )}
           </p>
           <ul aria-label="Transactions">
             {page.data.items.map((t) => (

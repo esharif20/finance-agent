@@ -81,3 +81,23 @@ def test_unknown_category_and_bad_month(client: TestClient, seeded: str) -> None
     assert got.status_code == 404
     got = client.get("/api/categories/Housing", params={"month": "2026-13"})
     assert got.status_code == 422
+
+
+def test_merchants_are_keyed_by_id(
+    client: TestClient, engine: Engine, seeded: str
+) -> None:
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        ids = {m.name: m.id for m in led.merchants()}
+        top = next(s for s in led.spending_by_category(seeded) if s.children)
+        detail = led.category_detail(top.name, seeded)
+    assert detail is not None
+    for m in detail.merchants:
+        assert m.merchant_id == ids.get(m.name)  # "Unknown" has no id
+
+    body = client.get(f"/api/categories/{top.name}", params={"month": seeded}).json()
+    assert [(m["merchant_id"], m["name"]) for m in body["merchants"]] == [
+        (m.merchant_id, m.name) for m in detail.merchants
+    ]
+    for t in body["transactions"]:
+        assert t["merchant_id"] == (ids[t["merchant"]] if t["merchant"] else None)

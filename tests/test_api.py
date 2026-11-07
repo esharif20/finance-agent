@@ -10,7 +10,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from finance_agent import api, categorise, identity
+from finance_agent import api, categorise, identity, storage
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import generate_histories, render_export
 
@@ -40,12 +40,33 @@ def test_server_binds_to_localhost_only(monkeypatch: pytest.MonkeyPatch) -> None
         calls.append(kwargs)
 
     monkeypatch.setattr(uvicorn, "run", fake_run)
-    monkeypatch.setattr(api, "open_db", lambda: None)  # binding needs no database
+
+    def no_db(**_: object) -> None:  # binding needs no database
+        return None
+
+    monkeypatch.setattr(api, "open_db", no_db)
 
     api.serve(port=9999)
 
     assert calls[0]["host"] == "127.0.0.1"
     assert identity.HOST == "127.0.0.1"
+
+
+def test_serving_never_creates_the_ledger(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    db = tmp_path / "nowhere" / "ledger.db"
+    monkeypatch.setenv("FA_DB_PATH", str(db))
+
+    def served(*_: object, **__: object) -> None:
+        pytest.fail("served")
+
+    monkeypatch.setattr(uvicorn, "run", served)
+
+    with pytest.raises(storage.MissingDatabase):
+        api.serve(port=9999)
+
+    assert not db.parent.exists()
 
 
 def test_current_user_is_the_single_local_user() -> None:
@@ -229,6 +250,63 @@ def test_bad_corrections_are_refused(
     client: TestClient, categorised: str, body: dict[str, object], status: int
 ) -> None:
     assert client.post("/api/corrections", json=body).status_code == status
+
+
+def test_a_correction_on_a_categoryless_kind_is_a_422(
+    client: TestClient, categorised: str
+) -> None:
+    income = next(t for t in _all(client) if t["kind"] == "Income")
+    res = client.post(
+        "/api/corrections",
+        json={"transaction_id": income["id"], "category": ["Housing", "Rent"]},
+    )
+    assert res.status_code == 422
+    assert "Income" in res.json()["detail"]
+
+
+def test_deleting_a_correction_reverts_it(client: TestClient, categorised: str) -> None:
+    spend = next(t for t in _all(client) if t["kind"] == "Spending")
+    new = (
+        ["Housing", "Rent"]
+        if spend["category"] != ["Housing", "Rent"]
+        else ["Travel", "Hotels"]
+    )
+    made = client.post(
+        "/api/corrections", json={"transaction_id": spend["id"], "category": new}
+    ).json()
+
+    res = client.delete(f"/api/corrections/{made['id']}")
+
+    assert res.status_code == 200
+    assert res.json()["ledger_version"] == made["ledger_version"] + 1
+    row = next(t for t in _all(client) if t["id"] == spend["id"])
+    assert row["category"] == spend["category"] and row["source"] == spend["source"]
+    assert client.delete(f"/api/corrections/{made['id']}").status_code == 404
+
+
+def test_deleting_an_unknown_or_another_users_correction_is_a_404(
+    client: TestClient,
+    engine: Engine,
+    categorised: str,
+    write_export: Callable[[str], Path],
+) -> None:
+    h, _ = generate_histories(seed=3, days=30)
+    with engine.begin() as conn:
+        theirs = Ledger(conn, 2)
+        theirs.import_files([write_export(render_export(h, 0, 60).text)])
+        categorise.run(conn, 2)
+        spend = next(
+            t
+            for t in theirs.transactions()
+            if t.categorisation and t.categorisation.kind == "Spending"
+        )
+        k = theirs.correct_transaction(spend.id, ("Housing", "Rent"))
+
+    assert client.delete("/api/corrections/999999").status_code == 404
+    assert client.delete("/api/corrections/abc").status_code == 422
+    assert client.delete(f"/api/corrections/{k.id}").status_code == 404
+    with engine.begin() as conn:
+        assert Ledger(conn, 2).corrections()[0].reverted_at is None
 
 
 def test_categories_list_the_taxonomy(client: TestClient) -> None:

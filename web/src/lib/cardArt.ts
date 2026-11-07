@@ -4,6 +4,10 @@
 
 export const ASPECT = 85.6 / 53.98; // ISO/IEC 7810 ID-1
 export const RADIUS = 0.037; // corner radius / width
+// Label band darkness over art, for CSS and WebGL alike: the front one is opaque (it crops the
+// art's printed name and scheme mark under the balance); a card behind keeps some art.
+export const FRONT_SCRIM = 1;
+export const BACK_SCRIM = 0.72;
 
 // Generic face hue per art key; none in the violet band 235-290 (DIRECTIONS.md).
 export const FACE_HUE: Record<string, number> = { lloyds: 158, hsbc: 18, revolut: 345 };

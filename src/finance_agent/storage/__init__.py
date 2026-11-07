@@ -10,14 +10,19 @@ from typing import Any
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import (
+    BindParameter,
+    ColumnElement,
     Connection,
     CursorResult,
     Delete,
     Engine,
     Executable,
+    FromClause,
+    Join,
     Select,
     Table,
     Update,
+    and_,
     create_engine,
     delete,
     event,
@@ -25,6 +30,9 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.sql import operators
+from sqlalchemy.sql.elements import BinaryExpression, ClauseElement, ColumnClause
+from sqlalchemy.sql.selectable import SelectBase
 
 from finance_agent.storage import schema
 
@@ -37,6 +45,14 @@ class UnsafeDatabasePath(ValueError):
     pass
 
 
+class MissingDatabase(ValueError):
+    """No ledger at the path, and the caller may not create one."""
+
+
+class UnscopedQuery(RuntimeError):
+    """A statement reached Scoped.execute without its user filter: a bug."""
+
+
 def default_db_path() -> Path:
     return Path(os.environ.get(DB_ENV) or DEFAULT_DB)
 
@@ -45,14 +61,18 @@ def _inside_repo(path: Path) -> bool:
     return any((p / ".git").exists() for p in path.resolve().parents)
 
 
-def open_db(path: Path | None = None) -> Engine:
+def open_db(path: Path | None = None, create: bool = True) -> Engine:
     """The connection factory: validate the path, create it, migrate to head.
+    With create=False a missing ledger is refused, so serving the app never
+    makes one (only `fa import` does).
 
     Swap point for SQLCipher in M3 (ADR 0002).
     """
     path = path or default_db_path()
     if _inside_repo(path):
         raise UnsafeDatabasePath("refusing to open a database inside a repository")
+    if not create and not path.is_file():
+        raise MissingDatabase(f"no ledger at {path}; run `fa import <files>` first")
     path.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{path}")
     event.listen(engine, "connect", _sqlite_pragmas)
@@ -112,5 +132,56 @@ class Scoped:
             .values(ledger_version=u.c.ledger_version + 1)
         )
 
+    def on(self, table: FromClause, *cond: ColumnElement[bool]) -> ColumnElement[bool]:
+        """A join condition that also keeps the joined table to this user; the
+        foreign keys are single-column, so they alone would not."""
+        return and_(*cond, table.c.user_id == self.user_id)
+
     def execute(self, stmt: Executable) -> CursorResult[Any]:
+        """Run a SELECT, UPDATE or DELETE in which every table read is filtered
+        to this user (WHERE, or ON for a joined table); refuse anything else."""
+        if not self._scoped(stmt):
+            raise UnscopedQuery("statement is not scoped to the user")
         return self.conn.execute(stmt)
+
+    def _scoped(self, stmt: Executable) -> bool:
+        if isinstance(stmt, Select):
+            roots: list[FromClause] = list(stmt.get_final_froms())
+        elif isinstance(stmt, Update | Delete):
+            roots = [stmt.table]
+        else:
+            return False
+        tables: list[FromClause] = []
+        conds: list[ClauseElement | None] = [stmt.whereclause]
+        while roots:
+            f = roots.pop()
+            if isinstance(f, Join):
+                roots += [f.left, f.right]
+                conds.append(f.onclause)
+            else:
+                tables.append(f)
+        filtered = {
+            id(c.table) for e in conds if e is not None for c in self._filters(e)
+        }
+        return bool(tables) and all(id(f) in filtered for f in tables)
+
+    def _filters(self, e: ClauseElement) -> list[ColumnClause[Any]]:
+        """Columns compared `user_id == this user` in `e`, not inside subqueries
+        (a scoped subquery says nothing about the outer table)."""
+        found: list[ColumnClause[Any]] = []
+        todo = [e]
+        while todo:
+            x = todo.pop()
+            if isinstance(x, SelectBase):
+                continue
+            if (
+                isinstance(x, BinaryExpression)
+                and x.operator is operators.eq
+                and isinstance(x.left, ColumnClause)
+                and x.left.name == "user_id"
+                and isinstance(x.right, BindParameter)
+                and x.right.value == self.user_id
+            ):
+                found.append(x.left)
+            todo += x.get_children()
+        return found

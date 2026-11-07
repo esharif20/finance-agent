@@ -417,6 +417,16 @@ html[data-private] .money {
   padding-top: calc(var(--band, 0px) + 24px);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
 }
+/* A card peeking from behind: the masked number moves right, beside the balance, clear of the
+   chip banks print on the left. */
+.account-card[data-art="true"]:not([data-front="true"]) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: ". title balance" "status status status";
+  column-gap: 14px;
+}
+.account-card[data-art="true"]:not([data-front="true"]) [data-slot="title"] {
+  align-self: center;
+}
 .account-card[data-art="true"][data-front="true"] {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: 1fr auto auto;

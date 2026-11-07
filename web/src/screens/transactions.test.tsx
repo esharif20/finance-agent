@@ -144,8 +144,13 @@ describe("Transactions", () => {
         urls.push(url);
         if (url.startsWith("/api/transactions"))
           return Response.json({
-            items: [txn({ id: 1 }), txn({ id: 2, kind: "Income", merchant: null, category: null, amount: m(5000) })],
-            total: 2,
+            items: [
+              txn({ id: 1 }),
+              txn({ id: 2, kind: "Income", merchant: null, category: null, amount: m(5000) }),
+              txn({ id: 3, kind: "Transfer", merchant: null, category: null }),
+              txn({ id: 4, kind: "Fee", merchant: null, category: null }),
+            ],
+            total: 4,
           });
         return Response.json(url.startsWith("/api/categories") ? groups : []);
       }),
@@ -162,5 +167,79 @@ describe("Transactions", () => {
     await userEvent.type(screen.getByRole("searchbox"), "tesco");
 
     await waitFor(() => expect(urls.some((u) => u.includes("kind=Income") && u.includes("q=tesco"))).toBe(true));
+  });
+
+  const mountList = (answer: (url: string, init?: RequestInit) => Response | undefined) => {
+    let category = ["Food & Drink", "Groceries"];
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        const custom = answer(url, init);
+        if (custom) return custom;
+        if (init?.method === "POST") {
+          category = ["Transport", "Taxi"];
+          return Response.json({ id: 41, ledger_version: 3 }, { status: 201 });
+        }
+        if (init?.method === "DELETE") {
+          category = ["Food & Drink", "Groceries"];
+          return Response.json({ id: 41, ledger_version: 4 });
+        }
+        if (url.startsWith("/api/transactions")) return Response.json({ items: [txn({ category })], total: 1 });
+        if (url.startsWith("/api/categories")) return Response.json(groups);
+        return Response.json([]);
+      }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <Transactions />
+      </QueryClientProvider>,
+    );
+    return calls;
+  };
+
+  const pickTaxi = async () => {
+    const row = await screen.findByRole("listitem", { name: /TESCO STORES 3021/ });
+    await userEvent.click(within(row).getByRole("button", { name: /Category:/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Taxi" }));
+  };
+
+  it("offers Undo after a change, which reverts that Correction", async () => {
+    const calls = mountList(() => undefined);
+    await pickTaxi();
+    expect(await screen.findByRole("status")).toHaveTextContent("Moved to Taxi");
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(calls).toContain("DELETE /api/corrections/41"));
+    expect(await screen.findByRole("button", { name: /Category: Food & Drink, Groceries/ })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument());
+  });
+
+  it("shows why the Ledger refused a change", async () => {
+    mountList((_url, init) =>
+      init?.method === "POST"
+        ? Response.json({ detail: "Income takes no Category: only Spending and Refunds do" }, { status: 422 })
+        : undefined,
+    );
+    await pickTaxi();
+    expect(await screen.findByRole("status")).toHaveTextContent("Income takes no Category");
+    expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+});
+
+describe("CategoryChip placement", () => {
+  it("opens towards the left when the right edge has no room", async () => {
+    const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 32, width: right - left, height: 32, x: left, y: 0, toJSON: () => ({}) });
+    const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.dataset.slot === "card" ? rect(0, 400) : rect(300, 380);
+    });
+    render(
+      <div data-slot="card">
+        <CategoryChip value={["Food & Drink", "Groceries"]} groups={groups} merchant={null} onChange={() => {}} />
+      </div>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Category:/ }));
+    expect(await screen.findByRole("dialog")).toHaveAttribute("data-align", "end");
+    spy.mockRestore();
   });
 });
