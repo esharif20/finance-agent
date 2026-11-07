@@ -379,6 +379,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/subscriptions/costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscription Costs */
+        get: operations["subscription_costs_api_subscriptions_costs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/subscriptions/{merchant_id}": {
         parameters: {
             query?: never;
@@ -398,6 +415,26 @@ export interface paths {
         head?: never;
         /** Regroup */
         patch: operations["regroup_api_subscriptions__merchant_id__patch"];
+        trace?: never;
+    };
+    "/api/subscriptions/{merchant_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel
+         * @description The user cancelled it: kept on the list, out of the totals.
+         */
+        post: operations["cancel_api_subscriptions__merchant_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/subscriptions/{merchant_id}/confirm": {
@@ -663,6 +700,39 @@ export interface components {
             /** Ledger Version */
             ledger_version: number;
         };
+        /** CostOut */
+        CostOut: {
+            /** Cost Note */
+            cost_note: string | null;
+            /** Counted */
+            counted: boolean;
+            /** Group */
+            group: string;
+            /** Interval */
+            interval: string | null;
+            /** Kind */
+            kind: string;
+            /** Last Charge On */
+            last_charge_on: string | null;
+            /** Merchant */
+            merchant: string;
+            /** Merchant Id */
+            merchant_id: number;
+            monthly: components["schemas"]["Pence"] | null;
+            /** Status */
+            status: string;
+        };
+        /** CostsOut */
+        CostsOut: {
+            /** Groups */
+            groups: components["schemas"]["GroupTotal"][];
+            /** Items */
+            items: components["schemas"]["CostOut"][];
+            /** Rate Needed */
+            rate_needed: number;
+            /** Totals */
+            totals: components["schemas"]["KindTotal"][];
+        };
         /** EvidenceOut */
         EvidenceOut: {
             /** Charge Count */
@@ -689,6 +759,14 @@ export interface components {
              * @enum {string}
              */
             kind: "subscription" | "bill";
+        };
+        /** GroupTotal */
+        GroupTotal: {
+            /** Group */
+            group: string;
+            /** Kind */
+            kind: string;
+            monthly: components["schemas"]["Pence"];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -720,6 +798,12 @@ export interface components {
             version: string;
             /** Weight */
             weight: number;
+        };
+        /** KindTotal */
+        KindTotal: {
+            /** Kind */
+            kind: string;
+            monthly: components["schemas"]["Pence"];
         };
         /** MerchantOut */
         MerchantOut: {
@@ -806,6 +890,16 @@ export interface components {
             amount_minor: number;
             /** Category */
             category: string[];
+        };
+        /** Pence */
+        Pence: {
+            /**
+             * Currency
+             * @default GBP
+             */
+            currency: string;
+            /** Minor */
+            minor: number;
         };
         /** PreviewOut */
         PreviewOut: {
@@ -1765,6 +1859,26 @@ export interface operations {
             };
         };
     };
+    subscription_costs_api_subscriptions_costs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostsOut"];
+                };
+            };
+        };
+    };
     remove_api_subscriptions__merchant_id__delete: {
         parameters: {
             query?: never;
@@ -1810,6 +1924,37 @@ export interface operations {
                 "application/json": components["schemas"]["GroupIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_subscriptions__merchant_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                merchant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

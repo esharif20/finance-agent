@@ -224,6 +224,7 @@ DETECTED_REASONS = ("known_service", "pattern")  # user_confirmed, user_added: u
 DETECTED_STATUSES = ("suggested", "active")  # suggested: ask "Is this a subscription?"
 INTERVALS = ("weekly", "monthly", "annual")
 NOT_SUBSCRIPTION = "not_subscription"  # a negative entry
+USER_CANCELLED = "user_cancelled"  # the user cancelled it; a further charge is a flag
 
 
 @dataclass(frozen=True)
@@ -287,6 +288,7 @@ class Transaction:
     transfer_with: int | None = None  # the other leg of an own-account Transfer
     categorisation: Categorisation | None = None  # None until `categorise.run`
     account_id: int = 0
+    currency: str = "GBP"  # the Transaction's own currency, before any FX
 
 
 @dataclass(frozen=True)
@@ -797,6 +799,7 @@ class Ledger:
                 t.c.running_balance_minor,
                 t.c.bank_type,
                 t.c.account_id,
+                t.c.currency,
             )
             .where(*where)
             .order_by(t.c.posted_on, t.c.id)
@@ -824,6 +827,7 @@ class Ledger:
                 other_leg.get(r.id),
                 cats.get(r.id),
                 r.account_id,
+                r.currency,
             )
             for r in rows
         ]
@@ -2226,6 +2230,23 @@ class Ledger:
             "active",
             "user_confirmed",
             date.today(),
+            x.charge_count,
+            x.interval,
+        )
+
+    def cancel_subscription(self, merchant_id: int) -> int:
+        """The user says they cancelled it: its kind, group and evidence stay,
+        and it leaves the totals. Confirming it lists it as active again.
+        Returns the registry row written."""
+        x = self._listed(merchant_id)
+        return self._registry(
+            merchant_id,
+            "user",
+            x.kind,
+            x.group,
+            USER_CANCELLED,
+            x.reason,
+            x.evidence_on,
             x.charge_count,
             x.interval,
         )

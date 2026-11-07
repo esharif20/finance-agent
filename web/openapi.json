@@ -514,6 +514,128 @@
         "title": "CorrectionOut",
         "type": "object"
       },
+      "CostOut": {
+        "properties": {
+          "cost_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Note"
+          },
+          "counted": {
+            "title": "Counted",
+            "type": "boolean"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_charge_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Charge On"
+          },
+          "merchant": {
+            "title": "Merchant",
+            "type": "string"
+          },
+          "merchant_id": {
+            "title": "Merchant Id",
+            "type": "integer"
+          },
+          "monthly": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "merchant_id",
+          "merchant",
+          "kind",
+          "group",
+          "status",
+          "interval",
+          "last_charge_on",
+          "monthly",
+          "cost_note",
+          "counted"
+        ],
+        "title": "CostOut",
+        "type": "object"
+      },
+      "CostsOut": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GroupTotal"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CostOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "rate_needed": {
+            "title": "Rate Needed",
+            "type": "integer"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/KindTotal"
+            },
+            "title": "Totals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "totals",
+          "groups",
+          "rate_needed"
+        ],
+        "title": "CostsOut",
+        "type": "object"
+      },
       "EvidenceOut": {
         "properties": {
           "charge_count": {
@@ -593,6 +715,28 @@
           "group"
         ],
         "title": "GroupIn",
+        "type": "object"
+      },
+      "GroupTotal": {
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "monthly": {
+            "$ref": "#/components/schemas/Pence"
+          }
+        },
+        "required": [
+          "kind",
+          "monthly",
+          "group"
+        ],
+        "title": "GroupTotal",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -685,6 +829,23 @@
           "skipped"
         ],
         "title": "ItemOut",
+        "type": "object"
+      },
+      "KindTotal": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "monthly": {
+            "$ref": "#/components/schemas/Pence"
+          }
+        },
+        "required": [
+          "kind",
+          "monthly"
+        ],
+        "title": "KindTotal",
         "type": "object"
       },
       "MerchantOut": {
@@ -959,6 +1120,24 @@
           "category"
         ],
         "title": "PartOut",
+        "type": "object"
+      },
+      "Pence": {
+        "properties": {
+          "currency": {
+            "default": "GBP",
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor"
+        ],
+        "title": "Pence",
         "type": "object"
       },
       "PreviewOut": {
@@ -2670,6 +2849,24 @@
         "summary": "Add"
       }
     },
+    "/api/subscriptions/costs": {
+      "get": {
+        "operationId": "subscription_costs_api_subscriptions_costs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Subscription Costs"
+      }
+    },
     "/api/subscriptions/{merchant_id}": {
       "delete": {
         "description": "Take an entry off the list: remembered as \"not a subscription\".",
@@ -2759,6 +2956,48 @@
           }
         },
         "summary": "Regroup"
+      }
+    },
+    "/api/subscriptions/{merchant_id}/cancel": {
+      "post": {
+        "description": "The user cancelled it: kept on the list, out of the totals.",
+        "operationId": "cancel_api_subscriptions__merchant_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchant_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Merchant Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel"
       }
     },
     "/api/subscriptions/{merchant_id}/confirm": {
