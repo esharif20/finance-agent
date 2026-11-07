@@ -166,6 +166,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notes/{transaction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_api_notes__transaction_id__get"];
+        /**
+         * Save
+         * @description Set the note; the previous version is kept, superseded.
+         */
+        put: operations["save_api_notes__transaction_id__put"];
+        post?: never;
+        /**
+         * Purge
+         * @description Delete every version of the note. Backups keep it until they age out.
+         */
+        delete: operations["purge_api_notes__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review-queue": {
         parameters: {
             query?: never;
@@ -665,6 +690,29 @@ export interface components {
             /** Month */
             month: string;
         };
+        /** NoteIn */
+        NoteIn: {
+            /** Text */
+            text: string;
+        };
+        /** NoteOut */
+        NoteOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** History */
+            history: components["schemas"]["VersionOut"][];
+            /** Ledger Version */
+            ledger_version: number;
+            /** Part */
+            part: number | null;
+            /** Text */
+            text: string;
+            /** Transaction Id */
+            transaction_id: number;
+        };
         /** PartIn */
         PartIn: {
             /** Amount Minor */
@@ -683,6 +731,13 @@ export interface components {
         PreviewOut: {
             /** Parts */
             parts: components["schemas"]["PartOut"][];
+        };
+        /** PurgeOut */
+        PurgeOut: {
+            /** Ledger Version */
+            ledger_version: number;
+            /** Purged */
+            purged: number;
         };
         /** QueueOut */
         QueueOut: {
@@ -861,6 +916,18 @@ export interface components {
         VersionIn: {
             /** Version */
             version: string;
+        };
+        /** VersionOut */
+        VersionOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Superseded At */
+            superseded_at: string | null;
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -1129,6 +1196,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": string[];
+                };
+            };
+        };
+    };
+    read_api_notes__transaction_id__get: {
+        parameters: {
+            query?: {
+                part?: number | null;
+            };
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_api_notes__transaction_id__put: {
+        parameters: {
+            query?: {
+                part?: number | null;
+            };
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_api_notes__transaction_id__delete: {
+        parameters: {
+            query?: {
+                part?: number | null;
+            };
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
