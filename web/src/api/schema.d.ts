@@ -201,6 +201,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountMonthOut */
+        AccountMonthOut: {
+            /** Account Id */
+            account_id: number;
+            money_in: components["schemas"]["Money"];
+            money_out: components["schemas"]["Money"];
+            transfers_in: components["schemas"]["Money"];
+            transfers_out: components["schemas"]["Money"];
+        };
         /** AccountOut */
         AccountOut: {
             /** Art */
@@ -216,11 +225,15 @@ export interface components {
             id: number;
             /** Kind */
             kind: string;
+            /** Last Import */
+            last_import: string | null;
             ledger_balance: components["schemas"]["Money"];
             /** Masked Number */
             masked_number: string;
             /** Name */
             name: string;
+            /** Source */
+            source: string;
         };
         /** CategoryDetailOut */
         CategoryDetailOut: {
@@ -324,6 +337,8 @@ export interface components {
             /** Currency */
             currency: string;
             fees: components["schemas"]["Money"];
+            /** Merchants */
+            merchants: components["schemas"]["CategorySpendOut"][];
             money_out: components["schemas"]["Money"];
             /** Month */
             month: string;
@@ -333,6 +348,8 @@ export interface components {
         };
         /** SummaryOut */
         SummaryOut: {
+            /** Accounts */
+            accounts: components["schemas"]["AccountMonthOut"][];
             /** Currency */
             currency: string;
             /** Gaps */
@@ -342,6 +359,8 @@ export interface components {
             /** Month */
             month: string;
             net: components["schemas"]["Money"];
+            transfers_in: components["schemas"]["Money"];
+            transfers_out: components["schemas"]["Money"];
         };
         /** TransactionOut */
         TransactionOut: {
@@ -496,6 +515,7 @@ export interface operations {
         parameters: {
             query?: {
                 month?: string | null;
+                account_id?: number | null;
             };
             header?: never;
             path: {

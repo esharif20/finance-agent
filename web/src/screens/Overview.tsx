@@ -1,19 +1,25 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import { NoData, fetchAccounts, fetchMonths, fetchSpending, fetchSummary } from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AccountStack } from "./AccountStack";
 import { groupSpending } from "@/lib/categories";
+import { accountHref } from "@/lib/route";
+import { AccountStack, SELECT_SPRING } from "./AccountStack";
+import { AccountDetails, AccountShares, TopMerchants, TransfersLine } from "./AccountView";
 import { MonthBars } from "./MonthBars";
-import { MonthCard } from "./MonthCard";
+import { MonthCard, monthLabel } from "./MonthCard";
 import { MonthSwitcher } from "./MonthSwitcher";
 import { SpendingDonut } from "./SpendingDonut";
+import { Transactions } from "./Transactions";
 
-export function Overview() {
+/** The Overview: the card stack chooses the Account in view (`account`, from the URL hash;
+ * undefined is All accounts) and everything else follows it. */
+export function Overview({ account }: { account?: number }) {
+  const reduce = useReducedMotion();
   // undefined = the newest month; the switcher sets it
   const [chosen, setChosen] = useState<string>();
-  const [account, setAccount] = useState<number>(); // undefined = All accounts
   const summary = useQuery({
     queryKey: ["summary", chosen, account],
     queryFn: () => fetchSummary(chosen, account),
@@ -28,8 +34,17 @@ export function Overview() {
   });
   const months = useQuery({ queryKey: ["months"], queryFn: fetchMonths });
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: fetchAccounts });
+  // a hash naming an Account that isn't there (any more) shows All accounts
+  const known = accounts.data?.some((a) => a.id === account) ? account : undefined;
+  const select = (id: number | undefined) => {
+    window.location.hash = accountHref(id); // a history entry: Back returns to the last card
+  };
+  const stale = accounts.data !== undefined && account !== undefined && known === undefined;
+  useEffect(() => {
+    if (stale) window.location.replace(accountHref());
+  }, [stale]);
 
-  if (summary.error instanceof NoData) {
+  if (summary.error instanceof NoData && account === undefined) {
     return (
       <Card>
         <h2 className="text-heading">No transactions yet</h2>
@@ -39,7 +54,7 @@ export function Overview() {
       </Card>
     );
   }
-  if (summary.error || accounts.error || spending.error || months.error) {
+  if (!stale && (summary.error || accounts.error || spending.error || months.error)) {
     return (
       <Card role="alert">
         <h2 className="text-heading">Can't reach the local server</h2>
@@ -61,7 +76,7 @@ export function Overview() {
       </Card>
     );
   }
-  if (!summary.data || !accounts.data || !spending.data || !months.data) {
+  if (stale || !summary.data || !accounts.data || !spending.data || !months.data) {
     return (
       <div className="grid gap-6 lg:grid-cols-[7fr_5fr]" aria-busy="true">
         <Skeleton className="h-[440px] rounded-card" />
@@ -70,17 +85,53 @@ export function Overview() {
     );
   }
   const { slices } = groupSpending(spending.data.categories);
+  const one = accounts.data.find((a) => a.id === account);
+  // The view under the stack settles with the card: same spring, a short rise, no travel
+  // under reduced motion. Keyed by Account so a switch replays it.
+  const view = account ?? "all";
+  const settle = {
+    initial: { opacity: 0, y: reduce ? 0 : 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: reduce ? { duration: 0.15 } : SELECT_SPRING,
+  };
   return (
     <div className="flex flex-col gap-6">
       <MonthSwitcher months={months.data} month={summary.data.month} onChange={setChosen} />
       <MonthBars month={summary.data.month} account={account} onChange={setChosen} />
       <div className="grid items-start gap-6 lg:grid-cols-[7fr_5fr]">
-        <div className="flex flex-col gap-6">
-          <MonthCard summary={summary.data} slices={slices} />
-          <SpendingDonut spending={spending.data} />
+        {/* first in the DOM: on a phone the view sits under the card stack */}
+        <div className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1">
+          <AccountStack accounts={accounts.data} selected={account} onSelect={select} />
+          {/* relative: paints above the stack's WebGL canvas, which overflows below the cards */}
+          <motion.div key={view} {...settle} className="relative">
+            {one ? (
+              <AccountDetails account={one} />
+            ) : (
+              <AccountShares summary={summary.data} accounts={accounts.data} />
+            )}
+          </motion.div>
         </div>
-        <AccountStack accounts={accounts.data} selected={account} onSelect={setAccount} />
+        <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
+          <MonthCard summary={summary.data} slices={slices}>
+            <TransfersLine summary={summary.data} combined={account === undefined} />
+          </MonthCard>
+          <SpendingDonut spending={spending.data} account={account} />
+          <motion.div key={view} {...settle}>
+            <TopMerchants spending={spending.data} />
+          </motion.div>
+        </div>
       </div>
+      <motion.section key={view} {...settle} aria-labelledby="txns-title" className="flex flex-col gap-4">
+        <h2 id="txns-title" className="text-heading">
+          {one ? `${one.bank} ${one.masked_number}` : "All accounts"}: transactions in{" "}
+          {monthLabel(summary.data.month)}
+        </h2>
+        <Transactions
+          key={`${account ?? "all"}-${summary.data.month}`}
+          scope={{ account_id: account === undefined ? undefined : String(account), month: summary.data.month }}
+          page={20}
+        />
+      </motion.section>
     </div>
   );
 }

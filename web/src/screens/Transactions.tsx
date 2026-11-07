@@ -49,13 +49,15 @@ function useDebounced<T>(value: T, ms = 250): T {
   return v;
 }
 
-export function Transactions() {
+/** The Transactions list; `scope` pins filters (the Overview's Account and month) and
+ * hides their pickers. */
+export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFilters; page?: number }) {
   const client = useQueryClient();
   const [filters, setFilters] = useState<TxnFilters>({});
   const [search, setSearch] = useState("");
-  const [limit, setLimit] = useState(PAGE);
+  const [limit, setLimit] = useState(size);
   const q = useDebounced(search.trim());
-  const applied = { ...filters, q };
+  const applied = { ...filters, ...scope, q };
 
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: fetchAccounts });
   const categories = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
@@ -71,7 +73,7 @@ export function Transactions() {
   });
 
   const set = (key: keyof TxnFilters) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setLimit(PAGE);
+    setLimit(size);
     setFilters((f) => ({ ...f, [key]: e.target.value }));
   };
   const accountName = (id: number) => accounts.data?.find((a) => a.id === id);
@@ -102,14 +104,14 @@ export function Transactions() {
             type="search"
             value={search}
             onChange={(e) => {
-              setLimit(PAGE);
+              setLimit(size);
               setSearch(e.target.value);
             }}
             placeholder="Search description or merchant"
             className={`${field} w-full pl-10`}
           />
         </label>
-        <Pick label="Account">
+        {scope.account_id === undefined && scope.month === undefined && <Pick label="Account">
           <select value={filters.account_id ?? ""} onChange={set("account_id")} className={`${field} w-full appearance-none pr-10`}>
             <option value="">All accounts</option>
             {accounts.data?.map((a) => (
@@ -118,7 +120,7 @@ export function Transactions() {
               </option>
             ))}
           </select>
-        </Pick>
+        </Pick>}
         <Pick label="Kind">
           <select value={filters.kind ?? ""} onChange={set("kind")} className={`${field} w-full appearance-none pr-10`}>
             <option value="">All kinds</option>
@@ -135,7 +137,7 @@ export function Transactions() {
             ))}
           </select>
         </Pick>
-        <label className={`${field} flex items-center gap-2`}>
+        {scope.month === undefined && <label className={`${field} flex items-center gap-2`}>
           <span className="text-muted-foreground">Month</span>
           <input
             type="month"
@@ -143,7 +145,7 @@ export function Transactions() {
             onChange={set("month")}
             className="min-w-0 flex-1 bg-transparent"
           />
-        </label>
+        </label>}
       </form>
 
       {page.error ? (
@@ -201,7 +203,7 @@ export function Transactions() {
           {page.data.items.length < page.data.total && (
             <button
               type="button"
-              onClick={() => setLimit((l) => l + PAGE)}
+              onClick={() => setLimit((l) => l + size)}
               className="mx-3 my-3 min-h-11 rounded-full bg-active px-5 text-sm font-semibold"
             >
               Show more

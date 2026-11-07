@@ -81,13 +81,18 @@ export function App() {
         </header>
         <main>
           {route.name === "category" ? (
-            <CategoryScreen key={route.category} category={route.category} month={route.month} />
+            <CategoryScreen
+              key={route.category}
+              category={route.category}
+              month={route.month}
+              account={route.account}
+            />
           ) : (
             <>
               <h1 className="mb-6 text-title">
                 {TABS.find((t) => t.id === tab)?.label}
               </h1>
-              {route.name === "transactions" ? <Transactions /> : <Overview />}
+              {route.name === "transactions" ? <Transactions /> : <Overview account={route.account} />}
             </>
           )}
         </main>

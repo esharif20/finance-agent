@@ -13,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import ColumnElement, Connection, Select, case, func, union
+from sqlalchemy import ColumnElement, Connection, Select, and_, case, func, union
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
@@ -173,6 +173,8 @@ class AccountBalance:
     ledger_balance: Decimal  # opening balance plus every Transaction we hold
     gaps: list[Gap]  # bank_balance - ledger_balance == sum of these amounts
     bank: str = ""  # the Bank's name, e.g. "Lloyds"
+    last_import: datetime | None = None  # newest statement holding its rows
+    source: str = ""  # how that statement came in: "csv"
 
 
 @dataclass(frozen=True)
@@ -185,6 +187,7 @@ class Breakdown:
     spending_after_refunds: Decimal  # == sum(categories) + unmatched_refunds
     refunds: Decimal  # all Refunds received in the month
     fees: Decimal
+    merchants: tuple[Spend, ...] = ()  # top Merchants across Categories
 
 
 @dataclass(frozen=True)
@@ -195,6 +198,9 @@ class MonthSummary:
     money_out: Decimal  # positive
     net: Decimal
     gaps: list[Gap]  # Gaps touching the month: the figures may be incomplete
+    # Transfers between the user's own Accounts, left out of money in and out
+    transfers_in: Decimal = Decimal(0)
+    transfers_out: Decimal = Decimal(0)  # positive
 
 
 @dataclass(frozen=True)
@@ -405,14 +411,20 @@ class Ledger:
         return list(level(tree))
 
     def category_detail(
-        self, name: str, month: str, trend: int = 6, top_merchants: int = 5
+        self,
+        name: str,
+        month: str,
+        trend: int = 6,
+        top_merchants: int = 5,
+        account_id: int | None = None,
     ) -> CategoryDetail | None:
         """None when the month has nothing in Category `name`."""
         start, end = _month_bounds(month)
 
         def total_in(m: str) -> Spend | None:
             return next(
-                (s for s in self.spending_by_category(m) if s.name == name), None
+                (s for s in self.spending_by_category(m, account_id) if s.name == name),
+                None,
             )
 
         here = total_in(month)
@@ -435,6 +447,7 @@ class Ledger:
             t
             for t in reversed(self.transactions())
             if start <= t.posted_on < end
+            and account_id in (None, t.account_id)
             and (c := t.categorisation)
             and c.kind in ("Spending", "Refund")
             and c.category
@@ -483,7 +496,18 @@ class Ledger:
                     continue
             cats.append(sp)
         total = sum((sp.amount for sp in spends), Decimal(0))
-        return Breakdown(tuple(cats), unmatched, total, refunds, fees)
+        shops: dict[str, Decimal] = {}
+        for m in (m for sp in spends for sub in sp.children for m in sub.children):
+            shops[m.name] = shops.get(m.name, Decimal(0)) + m.amount
+        top = sorted(shops.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+        return Breakdown(
+            tuple(cats),
+            unmatched,
+            total,
+            refunds,
+            fees,
+            tuple(Spend(n, a) for n, a in top),
+        )
 
     def merchants(self) -> list[Merchant]:
         """Every Merchant of this user with its default Category, by name."""
@@ -655,20 +679,26 @@ class Ledger:
         start, end = _month_bounds(month)
         t = schema.transaction
         amt = t.c.amount_minor
+        moved = t.c.id.in_(self._transfer_ids())  # neither spending nor income
+
+        def total(*when: ColumnElement[bool], sign: int = 1) -> Any:
+            return func.coalesce(func.sum(case((and_(*when), amt * sign), else_=0)), 0)
+
         stmt = self._db.select(
             t,
-            func.coalesce(func.sum(case((amt > 0, amt), else_=0)), 0),
-            func.coalesce(func.sum(case((amt < 0, -amt), else_=0)), 0),
+            total(amt > 0, ~moved),
+            total(amt < 0, ~moved, sign=-1),
+            total(amt > 0, moved),
+            total(amt < 0, moved, sign=-1),
         ).where(
             t.c.posted_on >= start,
             t.c.posted_on < end,
             # shortcut: GBP only until FX conversion lands; then sum gbp_minor
             t.c.currency == "GBP",
-            t.c.id.not_in(self._transfer_ids()),  # neither spending nor income
             *_only(account_id),
         )
         row = self._db.execute(stmt).one()
-        ins, outs = (int(v) for v in row)
+        ins, outs, moved_in, moved_out = (int(v) for v in row)
         return MonthSummary(
             month,
             "GBP",
@@ -682,6 +712,8 @@ class Ledger:
                 and g.to_date >= start
                 and account_id in (None, g.account.id)
             ],
+            _decimal(moved_in),
+            _decimal(moved_out),
         )
 
     def _align(
@@ -729,6 +761,20 @@ class Ledger:
         """Accounts with Bank and Ledger balances; an empty Account is skipped."""
         a = schema.account
         gaps = self.gaps()
+        si, ts, tx = (
+            schema.statement_import,
+            schema.transaction_source,
+            schema.transaction,
+        )
+        latest: dict[int, tuple[datetime, str]] = {}
+        for r in self._db.execute(
+            self._db.select(si, tx.c.account_id, si.c.imported_at, si.c.source)
+            .join(ts, ts.c.statement_import_id == si.c.id)
+            .join(tx, tx.c.id == ts.c.transaction_id)
+            .distinct()
+        ):
+            if r.account_id not in latest or r.imported_at > latest[r.account_id][0]:
+                latest[r.account_id] = (r.imported_at, r.source)
         out: list[AccountBalance] = []
         for r in self._db.execute(
             self._db.select(
@@ -758,6 +804,7 @@ class Ledger:
                     _decimal(opening + sum(x.amount_minor for x in rows)),
                     [g for g in gaps if g.account.id == r.id],
                     r.bank,
+                    *latest.get(r.id, (None, "")),
                 )
             )
         return out

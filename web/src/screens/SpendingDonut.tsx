@@ -26,7 +26,7 @@ function arcs(minors: number[]) {
   });
 }
 
-export function SpendingDonut({ spending }: { spending: Spending }) {
+export function SpendingDonut({ spending, account }: { spending: Spending; account?: number }) {
   const reduce = useReducedMotion();
   const { slices, rows } = groupSpending(spending.categories);
   const placed = arcs(slices.map((s) => s.minor));
@@ -69,7 +69,7 @@ export function SpendingDonut({ spending }: { spending: Spending }) {
                     // pointer shortcut; keyboard and screen readers use the legend links
                     style={s.key === "other" ? undefined : { cursor: "pointer" }}
                     onClick={() => {
-                      if (s.key !== "other") window.location.hash = categoryHref(s.name, spending.month);
+                      if (s.key !== "other") window.location.hash = categoryHref(s.name, spending.month, account);
                     }}
                     initial={reduce ? false : { strokeDasharray: `0 ${C}`, strokeDashoffset: -a.start }}
                     animate={{ strokeDasharray: dash, strokeDashoffset: -a.start }}
@@ -104,7 +104,7 @@ export function SpendingDonut({ spending }: { spending: Spending }) {
                         style={{ background: r.colour }}
                       />
                       <a
-                        href={categoryHref(r.name, spending.month)}
+                        href={categoryHref(r.name, spending.month, account)}
                         className="truncate rounded-md underline-offset-4 hover:underline"
                       >
                         {r.name}

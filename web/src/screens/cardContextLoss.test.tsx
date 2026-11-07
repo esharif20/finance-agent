@@ -11,7 +11,7 @@ type Account = components["schemas"]["AccountOut"];
 const m = (minor: number) => ({ minor, currency: "GBP" });
 const account: Account = {
   id: 1, bank: "Lloyds", name: "Current", kind: "current", masked_number: "••••0001",
-  currency: "GBP", bank_balance: m(100), ledger_balance: m(100), gaps: [], art: null,
+  currency: "GBP", bank_balance: m(100), ledger_balance: m(100), gaps: [], art: null, last_import: null, source: "csv",
 } as Account;
 
 afterEach(() => vi.unstubAllGlobals());

@@ -78,6 +78,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"Money in   {gbp(s.money_in)}")
                 print(f"Money out  {gbp(s.money_out)}")
                 print(f"Net        {gbp(s.net)}")
+                if s.transfers_in or s.transfers_out:
+                    print(f"Transfers  {gbp(s.transfers_out)} between your accounts")
                 for g in s.gaps:
                     print(
                         f"Warning: Reconciliation Gap on {g.account.masked_number} "

@@ -1,6 +1,35 @@
 {
   "components": {
     "schemas": {
+      "AccountMonthOut": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "money_in": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "money_out": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "transfers_in": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "transfers_out": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "account_id",
+          "money_in",
+          "money_out",
+          "transfers_in",
+          "transfers_out"
+        ],
+        "title": "AccountMonthOut",
+        "type": "object"
+      },
       "AccountOut": {
         "properties": {
           "art": {
@@ -40,6 +69,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "last_import": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Import"
+          },
           "ledger_balance": {
             "$ref": "#/components/schemas/Money"
           },
@@ -49,6 +89,10 @@
           },
           "name": {
             "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
             "type": "string"
           }
         },
@@ -62,7 +106,9 @@
           "bank_balance",
           "ledger_balance",
           "gaps",
-          "art"
+          "art",
+          "last_import",
+          "source"
         ],
         "title": "AccountOut",
         "type": "object"
@@ -381,6 +427,13 @@
           "fees": {
             "$ref": "#/components/schemas/Money"
           },
+          "merchants": {
+            "items": {
+              "$ref": "#/components/schemas/CategorySpendOut"
+            },
+            "title": "Merchants",
+            "type": "array"
+          },
           "money_out": {
             "$ref": "#/components/schemas/Money"
           },
@@ -406,13 +459,21 @@
           "unmatched_refunds",
           "refunds",
           "fees",
-          "money_out"
+          "money_out",
+          "merchants"
         ],
         "title": "SpendingOut",
         "type": "object"
       },
       "SummaryOut": {
         "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountMonthOut"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
           "currency": {
             "title": "Currency",
             "type": "string"
@@ -436,6 +497,12 @@
           },
           "net": {
             "$ref": "#/components/schemas/Money"
+          },
+          "transfers_in": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "transfers_out": {
+            "$ref": "#/components/schemas/Money"
           }
         },
         "required": [
@@ -444,7 +511,10 @@
           "money_in",
           "money_out",
           "net",
-          "gaps"
+          "gaps",
+          "transfers_in",
+          "transfers_out",
+          "accounts"
         ],
         "title": "SummaryOut",
         "type": "object"
@@ -747,6 +817,22 @@
                 }
               ],
               "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
             }
           }
         ],
