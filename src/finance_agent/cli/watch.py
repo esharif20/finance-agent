@@ -10,12 +10,12 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from finance_agent.cli import LOCAL_USER
 from finance_agent.ledger import Ledger
 from finance_agent.storage import DB_ENV, open_db
 
 LABEL = "com.finance-agent.watch"
 AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
-LOCAL_USER = 1
 TITLE = "Finance Agent"
 
 Notifier = Callable[[str, str], None]

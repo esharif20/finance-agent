@@ -112,9 +112,7 @@ def test_first_sync_anchors_and_a_missing_row_opens_a_gap(
 
 
 @settings(max_examples=25, deadline=None)
-@given(
-    st.integers(0, 3), st.integers(0, 3), st.integers(-500, 500), st.booleans()
-)
+@given(st.integers(0, 3), st.integers(0, 3), st.integers(-500, 500), st.booleans())
 def test_pending_rows_never_open_a_gap_but_a_real_gap_still_does(
     first_pending: int, later_pending: int, offset: int, lose_row: bool
 ) -> None:
@@ -196,27 +194,8 @@ def test_syncing_twice_changes_nothing(case: tuple[History, int, int, int]) -> N
         assert len(before[0]) == n and before[1] == []
 
 
-@settings(max_examples=25, deadline=None)
-@given(histories_and_split(), st.booleans())
-def test_csv_and_sync_never_double_count_unambiguous_rows(
-    case: tuple[History, int, int, int], csv_first: bool
-) -> None:
-    h, a, b, n = case  # CSV holds rows [0, a), the sync [b, n): overlap [b, a)
-    with temp_ledger() as (led, d):
-        csv = d / "export.csv"
-        csv.write_text(render_export(h, 0, a).text)
-        if csv_first:
-            led.import_files([csv])
-        led.apply_sync(response(h, b, n))
-        if not csv_first:
-            led.import_files([csv])
-        (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
-        led.link_synced_account("ACC-1", acc.id)  # merges the synced Account in
-        assert len(led.accounts()) == 1
-        assume(led.ambiguous_matches() == [])
-        assert len(led.transactions()) == n
-        total = sum(t.amount for t in led.transactions())
-        assert total == Decimal(sum(t.amount_minor for t in h.txns)).scaleb(-2)
+# CSV plus sync never double-counting is tested through the CLI:
+# test_cli_sync.py::test_csv_and_sync_through_the_cli_never_double_count
 
 
 @settings(max_examples=25, deadline=None)

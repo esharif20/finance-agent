@@ -118,7 +118,8 @@ def open_db(path: Path | None = None, create: bool = True) -> Engine:
         dbapi_conn.execute(f"PRAGMA key = \"x'{key}'\"")
         dbapi_conn.execute("PRAGMA foreign_keys = ON")
 
-    engine = create_engine(f"sqlite:///{path}", module=sqlcipher)
+    # hide_parameters: an error message never quotes amounts or descriptions
+    engine = create_engine(f"sqlite:///{path}", module=sqlcipher, hide_parameters=True)
     event.listen(engine, "connect", keyed_connect, insert=True)
     cfg = Config()
     cfg.set_main_option("script_location", str(_MIGRATIONS))

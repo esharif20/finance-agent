@@ -41,7 +41,21 @@ def _print_status(st: SyncStatus) -> None:
             print(f"{warn} consent expires {st.consent_expires_on} (in {left} days)")
 
 
+UNEXPECTED = (
+    "fa: unexpected {}; details are withheld because they may quote your data. "
+    "Run the command again; if it keeps failing, report this error name."
+)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except Exception as e:  # last resort: str(e) or a traceback may quote data
+        print(UNEXPECTED.format(type(e).__name__), file=sys.stderr)
+        return 1
+
+
+def _main(argv: Sequence[str] | None) -> int:
     parser = argparse.ArgumentParser(prog="fa")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("stop", help="stop the local server")
@@ -69,6 +83,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="record that the bank consent was renewed",
     )
+    con.add_argument(
+        "--link",
+        action="store_true",
+        help="link synced Accounts to CSV Accounts imported since connecting",
+    )
     sub.add_parser("disconnect", help="remove the SimpleFIN access URL")
     sy = sub.add_parser("sync", help="fetch new Transactions from SimpleFIN")
     mode = sy.add_mutually_exclusive_group()
@@ -85,7 +104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.command == "disconnect":
                 return bank.disconnect()
             if args.command == "connect":
-                return bank.connect(LOCAL_USER, args.renewed)
+                return bank.connect(LOCAL_USER, args.renewed, args.link)
             if args.install or args.uninstall:
                 from finance_agent.cli import schedule
 
@@ -154,6 +173,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if r.accounts:
                     masked = ", ".join(a.masked_number for a in r.accounts)
                     print(f"Accounts affected: {masked}")
+                    if ledger.unlinked_synced_accounts():  # ADR 0014: say so
+                        print(
+                            "Synced Accounts are not linked to CSV Accounts yet, so "
+                            "both are kept; if one is this Bank's, run "
+                            "`fa connect --link`"
+                        )
                 for rej in r.rejected:
                     print(f"  rejected {rej.file} line {rej.line}: {rej.reason}")
                 if r.rejected:
