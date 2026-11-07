@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0010"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0011"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -184,4 +184,32 @@ def test_migration_0010_keeps_category_corrections_and_drops_only_splits(
         insp = inspect(conn)
         assert "split_part" not in insp.get_table_names()
         assert "kind" not in {c["name"] for c in insp.get_columns("correction")}
+    eng.dispose()
+
+
+def test_migration_0011_adds_and_drops_only_the_note_table(tmp_path: Path) -> None:
+    """0010 -> 0011 adds `note` with its length check; 0011 -> 0010 drops it (#124)."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0010")
+        tables = set(inspect(conn).get_table_names())
+        command.upgrade(cfg, "0011")
+        assert set(inspect(conn).get_table_names()) == tables | {"note"}
+        with pytest.raises(Exception, match="CHECK"):  # over 140 characters
+            conn.execute(
+                text(
+                    "INSERT INTO note (user_id, transaction_id, text, created_at)"
+                    " VALUES (1, 1, :t, '2026-01-01')"
+                ),
+                {"t": "x" * 141},
+            )
+        command.downgrade(cfg, "0010")
+        assert set(inspect(conn).get_table_names()) == tables
     eng.dispose()

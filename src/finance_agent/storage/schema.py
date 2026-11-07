@@ -304,6 +304,25 @@ split_part = Table(
     CheckConstraint(text("ordinal BETWEEN 0 AND 9"), name="ck_split_part_ordinal"),
 )
 
+# Purpose notes (#124), versioned: editing supersedes the live row and adds a
+# new one; deleting purges every row of that target. The target is one
+# Transaction (`part` NULL) or part `part` of its Split, by position. Notes are
+# never logged and never leave the Mac by default (AI_DESIGN, DATA_POLICY).
+note = Table(
+    "note",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("transaction_id", Integer, ForeignKey("transaction.id"), nullable=False),
+    Column("part", Integer),
+    Column("text", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("superseded_at", DateTime(timezone=True)),
+    CheckConstraint(text("length(text) BETWEEN 1 AND 140"), name="ck_note_length"),
+    CheckConstraint(text("part BETWEEN 0 AND 9"), name="ck_note_part"),
+    Index("ix_note_target", "user_id", "transaction_id"),
+)
+
 # Subscription registry (#103), append-only like `correction`: the latest row per
 # Merchant is its entry, the rest is the history. `source` is "user" or
 # "detection"; once a Merchant has a user row, detection never writes for it.

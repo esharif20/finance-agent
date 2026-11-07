@@ -15,6 +15,7 @@ Status: draft for review.
 | --- | --- | --- |
 | Statement Imports (encrypted originals) | Until deleted by the user | Deleting one removes its Transactions unless they also appear in another import |
 | Transactions and Corrections | Until deleted | Cascades to derived tables |
+| Purpose notes (on a Transaction or a Split part, at most 140 characters) | Until deleted; an edit keeps every earlier version | Deleting a note purges every version of it, and the freed pages are zeroed (SQLCipher's `secure_delete`). Backups made before the delete still hold it until they age out of the backup retention below: about a month (7 daily copies, then 4 weekly ones). Notes are never logged and never sent through the privacy gateway unless the user opts in for one question |
 | Derived data (categorisations, Insights, forecasts, caches) | Recomputed on demand | Rebuilt from the Ledger, so never the only copy of anything |
 | Memories | Until changed or deleted; preferences re-asked after 6 months; constraints do not expire | Hard delete, including from caches and summaries |
 | Conversation | Current session only | Discarded at session end |

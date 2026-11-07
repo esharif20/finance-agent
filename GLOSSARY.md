@@ -52,6 +52,10 @@ _Avoid_: Edit, override, fix
 A Correction that divides one Transaction into 2–10 parts, each with its own amount and Category, adding up to the Transaction exactly. The Transaction itself is unchanged; a Split whose Transaction amount later changes needs re-checking and is never rescaled.
 _Avoid_: Allocation, itemisation, sub-transaction
 
+**Note**:
+A purpose note of at most 140 characters on one Transaction or one part of its Split, saying what the payment was for. Edits keep the earlier versions; deleting a Note purges every version. It never sets a Category, is searchable, local only and never logged.
+_Avoid_: Memo, comment, description (the Bank's text)
+
 ## Categorisation
 
 **Category**:
