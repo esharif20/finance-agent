@@ -499,9 +499,11 @@ html[data-private] .money {
 .card-stack {
   touch-action: pan-y;
 }
-.account-card[data-back="true"] > * {
-  opacity: 0;
-}/* shortcut: without WebGL a turned card fades as a whole rather than to the page colour;
+.account-card[data-back="true"] > *,
+.card-stack[data-gl="true"] .account-card[data-turned="true"] > * {
+  opacity: 0; /* over WebGL the labels are flat and would part from the turning 3D card */
+}
+/* shortcut: without WebGL a turned card fades as a whole rather than to the page colour;
    that path only runs when WebGL is missing, so it is not worth a second face in CSS. */
 .card-stack:not([data-gl="true"]) .account-card[data-back="true"] {
   opacity: 0.35;
@@ -535,8 +537,9 @@ html[data-private] .money {
 .card-stack[data-gl="true"] .account-card[data-selected="true"] {
   box-shadow: 0 0 0 2px var(--foreground);
 }
-.card-stack[data-gl="true"] .account-card[data-back="true"] {
-  box-shadow: none; /* the chosen ring is the front's; the back is the scene's alone */
+.card-stack[data-gl="true"] .account-card[data-turned="true"] {
+  /* the ring is flat like the labels; !important: it beats the hover ring's longer selector */
+  box-shadow: none !important;
 }
 @media (hover: hover) and (pointer: fine) {
   .account-card[data-hover="true"]:not([data-selected="true"]) {

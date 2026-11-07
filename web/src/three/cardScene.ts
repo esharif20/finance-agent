@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { BACK_SCRIM, FRONT_SCRIM } from "@/lib/cardArt";
 import type { Pose } from "@/lib/cardPoses";
-import { type CardParts, createCardParts, createPaymentCardModel } from "./cardModel";
+import { CARD_SPEC, type CardParts, createCardParts, createPaymentCardModel } from "./cardModel";
 
 /** `h`: the card's height in px (All accounts is a compact card); `scrim`: see setScrim. */
 export type SceneFace = { art: HTMLCanvasElement | null; hue: number | null; h: number };
@@ -51,17 +51,27 @@ function genericFace(hue: number | null, w: number, h: number): HTMLCanvasElemen
 
 // How far a card's back fades towards the page: enough that it reads as the reverse, not
 // a second front.
-const BACK_FADE = 0.72;
+const BACK_FADE = 0.42;
 
-/** The back (#93): the face's image washed towards the page colour. It is drawn from the
-    same source as the face, so privacy mode's generic face gives a generic back. */
-function fadedBack(src: HTMLCanvasElement, page: string): HTMLCanvasElement {
+/** The back (#93): the face's image, with its chip printed in, washed towards the page
+    colour. It is drawn from the same source as the face, so privacy mode's generic face gives
+    a generic back. Mirroring comes from the mesh, which shows these UVs from behind. */
+function fadedBack(src: HTMLCanvasElement, page: string, withChip: boolean): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = src.width;
   c.height = src.height;
   const g = c.getContext("2d");
   if (!g) return c;
   g.drawImage(src, 0, 0);
+  if (withChip) {
+    // CARD_SPEC.chip is in card widths from the centre, y up; the canvas is y down.
+    const { w, h, r, x, y } = CARD_SPEC.chip;
+    const W = c.width;
+    g.fillStyle = CARD_SPEC.materials.chip.color;
+    g.beginPath();
+    g.roundRect(W * (0.5 + x - w / 2), c.height / 2 - W * (y + h / 2), W * w, W * h, W * r);
+    g.fill();
+  }
   g.globalAlpha = BACK_FADE;
   g.fillStyle = page;
   g.fillRect(0, 0, c.width, c.height);
@@ -115,8 +125,9 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
         return t;
       };
       const tex = texture(src);
-      const back = texture(fadedBack(src, page));
-      const card = createPaymentCardModel(p, tex, f.art === null && f.hue !== null, back);
+      const withChip = f.art === null && f.hue !== null;
+      const back = texture(fadedBack(src, page, withChip));
+      const card = createPaymentCardModel(p, tex, withChip, back);
       scene.add(card.group);
       return card;
     });

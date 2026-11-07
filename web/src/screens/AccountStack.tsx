@@ -38,6 +38,7 @@ const SETTLE_MS = 420;
 // Drag or side-scroll the stack to turn the front card over (#93); this long after the input
 // stops, the stack settles on the nearest card: the next one past half a turn.
 const SNAP_MS = 170;
+const TURNED_DEG = 12; // a hover tilts a card up to 10deg; beyond this it is being turned
 const DRAG_PX = 8; // movement before a press becomes a drag, so a tap stays a click
 
 /** Spring for #59's content transition, so the view below settles with the card. */
@@ -183,6 +184,8 @@ export function AccountStack({
       if (!el) return;
       el.style.transform = transform(p);
       el.dataset.back = String(Math.abs(p.ry) > 90); // turned over: the labels would read mirrored
+      // Past a hover's tilt the card is turning: over WebGL its flat labels would part from it.
+      el.dataset.turned = String(Math.abs(p.ry) > TURNED_DEG);
     });
     if (withScene && scene.current && onScreen.current && !document.hidden) {
       scene.current.update(

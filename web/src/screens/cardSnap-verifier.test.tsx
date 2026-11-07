@@ -27,8 +27,24 @@ it("a keyboard choice after a drag still selects, even when the drag's click wen
   expect(onSelect).toHaveBeenCalledWith(2);
 });
 
+it("over WebGL, a card's labels hide while it is turned, so they never float off the 3D card", async () => {
+  vi.stubGlobal("WebGLRenderingContext", class {});
+  const size = sized();
+  render(<AccountStack accounts={accounts} selected={1} onSelect={() => {}} />);
+  size();
+  const group = screen.getByRole("group", { name: "Accounts" });
+  await vi.waitFor(() => expect(group).toHaveAttribute("data-gl", "true"));
+  const front = screen.getByRole("button", { name: /Bank 1/ });
+  expect(front).toHaveAttribute("data-turned", "false");
+  drag(front, -0.25 * WIDTH, fireEvent, false); // a quarter of the way: well short of edge-on
+  await vi.waitFor(() => expect(front).toHaveAttribute("data-turned", "true"));
+  fireEvent.pointerUp(front, { pointerId: 1, clientX: 110, clientY: 50 });
+  await vi.waitFor(() => expect(front).toHaveAttribute("data-turned", "false"), { timeout: 3000 });
+});
+
 it("rapid mount and unmount frees every scene it made", async () => {
   vi.stubGlobal("WebGLRenderingContext", class {});
+  made.length = 0;
   for (let i = 0; i < 5; i++) {
     const size = sized();
     const { unmount } = render(<AccountStack accounts={accounts} onSelect={() => {}} />);
