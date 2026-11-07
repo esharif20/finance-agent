@@ -66,9 +66,16 @@ class GroundingResult(BaseModel):
     evidence_ids: tuple[str, ...]
 
 
-# A claim read from the reply: one figure, a day and month without a year, or
+# A claim read from the reply: one figure; a day and month without a year; a
+# month in words (year None: any year); the dates a bare weekday can mean; or
 # None for something that can never be grounded (a spelled-out amount, stray digits).
-type _Claim = Figure | tuple[Literal["day_month"], int, int] | None
+type _Claim = (
+    Figure
+    | tuple[Literal["day_month"], int, int]
+    | tuple[Literal["month"], int, int | None]
+    | tuple[Literal["days"], date, date]
+    | None
+)
 
 _MONTHS = (
     "january february march april may june july august september october "
@@ -103,6 +110,8 @@ _INVISIBLE = set("­᠎​‌‍⁠﻿*_`~\\") | {
     chr(c) for c in (*range(0x202A, 0x202F), *range(0x2066, 0x206A))
 }
 _MINUS = set("−‐‑‒﹣")
+_NOT_A_DIGIT = "\x01"
+_PREPOSITION = r"(?:in|during|for|since|until|by|of|over|through|from|last|this|next)"
 
 
 def _normalise(reply: str) -> tuple[str, list[int]]:
@@ -118,6 +127,10 @@ def _normalise(reply: str) -> tuple[str, list[int]]:
             text = str(unicodedata.decimal(ch))  # any script's digits, e.g. full-width
         else:
             text = unicodedata.normalize("NFKC", ch)
+            # "½", "¹", "①" are numeric but not digits of the figure, and NFKC
+            # would splice them into it ("£4½" -> "£41⁄2"), so they never ground
+            if unicodedata.numeric(ch, None) is not None or any(map(str.isdigit, text)):
+                text = _NOT_A_DIGIT
         out.append(text)
         index.extend([i] * len(text))
     return "".join(out), index
@@ -170,6 +183,18 @@ def _relative_day(m: re.Match[str], today: date) -> _Claim:
     return today + timedelta(days=(target - today.weekday()) % 7 or 7)
 
 
+def _relative_month(m: re.Match[str], today: date) -> _Claim:
+    step = {"last": -1, "this": 0, "next": 1}[m["dir"].lower()]
+    n = today.year * 12 + today.month - 1 + step
+    return ("month", n % 12 + 1, n // 12)
+
+
+def _weekday(m: re.Match[str], today: date) -> _Claim:
+    """ "On Tuesday": the Tuesday in the past six days or the next six."""
+    gap = (_WEEKDAYS.index(m["day"].lower()) - today.weekday()) % 7
+    return ("days", today - timedelta(days=(7 - gap) % 7), today + timedelta(days=gap))
+
+
 def _day_month(m: re.Match[str]) -> _Claim:
     month, day = _month_number(m["mon"]), int(m["day"])
     if m["year"]:
@@ -193,6 +218,7 @@ _RULES: tuple[_Rule, ...] = (
         rf"(?P<day>{'|'.join(_WEEKDAYS)}))\b",
         _relative_day,
     ),
+    _rule(r"\b(?P<dir>last|this|next)\s+month\b", _relative_month),
     _rule(
         r"(?<![\w./-])(?P<d>\d{1,2})/(?P<m>\d{1,2})/(?P<y>\d{4})(?![\w/])",
         lambda m, _: _make_date(int(m["y"]), int(m["m"]), int(m["d"])),
@@ -213,6 +239,18 @@ _RULES: tuple[_Rule, ...] = (
     _rule(
         rf"\b{_MONTH_RE}\s+(?P<year>\d{{4}})\b",
         lambda m, _: Month(year=int(m["year"]), month=_month_number(m["mon"])),
+    ),
+    # a month in words. Capitalised only, so "march" the verb is not one, and
+    # "May" only after a preposition, so "May I" is not one.
+    _rule(
+        r"(?-i:\b(?P<mon>January|February|March|April|June|July|August|September"
+        rf"|October|November|December)\b)|\b{_PREPOSITION}\s+(?-i:(?P<may>May))\b",
+        lambda m, _: ("month", _month_number(m["mon"] or m["may"]), None),
+    ),
+    # a weekday in words; one beside a date belongs to that date, which is checked
+    _rule(
+        rf"(?<!\x00\s)(?<!\x00,\s)\b(?P<day>{'|'.join(_WEEKDAYS)})\b(?!,?\s+\x00)",
+        _weekday,
     ),
     # £12.35, -£40, £1.2k, £3 million, GBP 40, $12, €12
     _rule(
@@ -249,16 +287,26 @@ _RULES: tuple[_Rule, ...] = (
         rf"|[£$€]\s?(?:{_WORD_NUMBERS})\b",
         lambda m, _: None,
     ),
-    _rule(r"\d+", lambda m, _: None),  # any digit left over
+    _rule(rf"\d+|{_NOT_A_DIGIT}+", lambda m, _: None),  # any digit left over
 )
 
 
-def _matches(claim: _Claim, value: Figure) -> bool:
-    if claim is None:
-        return False
-    if isinstance(claim, tuple):
-        return isinstance(value, date) and (value.day, value.month) == claim[1:]
-    return type(value) is type(claim) and value == claim
+def _referent(claim: _Claim, value: Figure) -> object:
+    """What `claim` refers to if `value` grounds it, else None."""
+    match claim:
+        case None:
+            return None
+        case ("day_month", day, month):
+            fits = isinstance(value, date) and (value.day, value.month) == (day, month)
+            return value if fits else None
+        case ("month", month, year):
+            if not isinstance(value, Month | date) or value.month != month:
+                return None
+            return (value.year, month) if year in (None, value.year) else None
+        case ("days", *days):
+            return value if isinstance(value, date) and value in days else None
+        case _:
+            return value if type(value) is type(claim) and value == claim else None
 
 
 def check_grounding(
@@ -277,10 +325,12 @@ def check_grounding(
                 claim = read(m, today)
             except (InvalidOperation, ValueError, OverflowError):
                 claim = None
-            used = {v.evidence_id for v in values if _matches(claim, v.value)}
+            hits = [(v.evidence_id, _referent(claim, v.value)) for v in values]
+            hits = [(e, r) for e, r in hits if r is not None]
             start, end = index[m.start()], index[m.end() - 1] + 1
-            if used:
-                evidence |= used
+            # one referent: "3 March" with no year grounds only if one tool date fits
+            if len({r for _, r in hits}) == 1:
+                evidence |= {e for e, _ in hits}
             else:
                 offending.append(Span(start=start, end=end, text=reply[start:end]))
         # consumed text cannot be read again; \x00 keeps the indices aligned

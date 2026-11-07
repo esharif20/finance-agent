@@ -258,7 +258,16 @@ def _reply(
     starts: list[int] = []
     length = len("Summary: ")
     for value in values:
-        text = draw(st.sampled_from(_forms(value, partial)))
+        # "3 March" grounds only when one tool date has that day and month
+        twins = [
+            w
+            for w in values
+            if isinstance(w, date)
+            and isinstance(value, date)
+            and w != value
+            and (w.day, w.month) == (value.day, value.month)
+        ]
+        text = draw(st.sampled_from(_forms(value, partial and not twins)))
         if draw(st.booleans()):
             text = f"**{text}**"
         sep = draw(_SEPARATORS)
@@ -348,3 +357,84 @@ def test_fallback_figures_pass_the_grounding_check(values: list[Figure]):
     tool = [_v(f"ev{i}", v) for i, v in enumerate(values)]
     cells = [row.split(" | ")[1] for row in render_fallback(tool).splitlines()[4:]]
     assert check_grounding(" and ".join(cells), tool, today=TODAY).grounded
+
+
+# --- verifier (#168): periods in words, ambiguity, display tricks ------------
+
+
+@pytest.mark.parametrize(
+    ("reply", "value"),
+    [
+        ("In March you spent £40.", Month(year=2026, month=3)),
+        ("In March you spent £40.", date(2026, 3, 3)),  # a day in that month
+        ("Last month you spent £40.", Month(year=2026, month=2)),
+        ("This month you spent £40.", Month(year=2026, month=3)),
+        ("On Tuesday you spent £40.", date(2026, 3, 10)),
+        ("You may want to know you spent £40.", Money(minor=4000)),  # "may" the verb
+        ("Prices march up: £40.", Money(minor=4000)),  # "march" the verb
+    ],
+)
+def test_period_in_words_grounds(reply: str, value: Figure):
+    result = _check(reply, _v("ev", value), _v("ev-m", Money(minor=4000)))
+    assert result.grounded, result.offending
+
+
+@pytest.mark.parametrize(
+    ("reply", "value", "offending"),
+    [
+        ("In April you spent £40.", Month(year=2026, month=3), "April"),
+        ("During May you spent £40.", Month(year=2026, month=3), "During May"),
+        ("Last month you spent £40.", Month(year=2026, month=3), "Last month"),
+        ("This month you spent £40.", Month(year=2026, month=2), "This month"),
+        ("On Tuesday you spent £40.", date(2026, 3, 3), "Tuesday"),  # 9 days ago
+        ("On Monday you spent £40.", date(2026, 3, 10), "Monday"),
+    ],
+)
+def test_wrong_period_in_words_is_rejected(reply: str, value: Figure, offending: str):
+    result = _check(reply, _v("ev", value), _v("ev-m", Money(minor=4000)))
+    assert [s.text for s in result.offending] == [offending]
+
+
+def test_day_and_month_without_year_must_name_one_tool_date():
+    two_years = (_v("a", date(2025, 3, 3)), _v("b", date(2026, 3, 3)))
+    assert not _check("On 3 March.", *two_years).grounded
+    assert not _check("In March.", _v("a", Month(year=2025, month=3)),
+                      _v("b", Month(year=2026, month=3))).grounded  # fmt: skip
+    # the same date from two tools is still one date
+    assert _check("On 3 March.", _v("a", date(2026, 3, 3)),
+                  _v("b", date(2026, 3, 3))).grounded  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "£4½",  # NFKC would read "41⁄2" as £41
+        "£4¹",  # a superscript is not a digit of the figure
+        "£4₁",
+        "£4①",
+        "£4O",  # the letter O
+        "£4l",  # the letter l
+    ],
+)
+def test_lookalike_digits_never_ground_a_different_figure(text: str):
+    result = _check(f"You spent {text}.", _v("ev", Money(minor=4100)))
+    assert not result.grounded, text
+
+
+@pytest.mark.parametrize("text", ["£٤١", "£۴۱", "£４１", "£4١"])
+def test_figure_in_other_digits_is_read_as_its_value(text: str):
+    # Arabic-Indic, Extended Arabic-Indic, full-width and mixed digits for 41
+    assert _check(f"You spent {text}.", _v("ev", Money(minor=4100))).grounded
+    assert not _check(f"You spent {text}.", _v("ev", Money(minor=4000))).grounded
+
+
+def test_markdown_table_cells_are_checked():
+    tool = (_v("a", Money(minor=4000)), _v("b", Percent(value=Decimal("12"))))
+    assert _check("| Groceries | £40 | 12% |", *tool).grounded
+    result = _check("| Groceries | £41 | 12% |", *tool)
+    assert [s.text for s in result.offending] == ["£41"]
+
+
+def test_digits_in_a_merchant_name_fail_closed():
+    # a stray number is a count no tool gave, so the reply is not shown
+    assert not _check("You paid £40 at Shop 24.", _v("a", Money(minor=4000))).grounded
