@@ -5,13 +5,15 @@ a user decision, which detection never overwrites."""
 from collections.abc import Callable, Iterator
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from pydantic import BaseModel, Field
 
 from finance_agent.identity import current_user
 from finance_agent.ledger import InvalidEntry, Ledger, SubscriptionEntry, UnknownTarget
 
 Kind = Literal["subscription", "bill"]
+SQLITE_MAX = 2**63 - 1  # a larger id would be a 500 from the driver, not a 422
+MerchantId = Annotated[int, Path(ge=1, le=SQLITE_MAX)]
 
 
 class EvidenceOut(BaseModel):
@@ -39,7 +41,7 @@ class GroupIn(BaseModel):
 
 
 class AddIn(GroupIn):
-    merchant_id: int
+    merchant_id: int = Field(ge=1, le=SQLITE_MAX)
 
 
 class ConfirmIn(BaseModel):  # optional: confirm into another group
@@ -100,7 +102,7 @@ def add(led: Led, body: AddIn) -> SubscriptionOut:
 
 
 @router.patch("/{merchant_id}")
-def regroup(led: Led, merchant_id: int, body: GroupIn) -> SubscriptionOut:
+def regroup(led: Led, merchant_id: MerchantId, body: GroupIn) -> SubscriptionOut:
     return _apply(
         led,
         merchant_id,
@@ -109,7 +111,7 @@ def regroup(led: Led, merchant_id: int, body: GroupIn) -> SubscriptionOut:
 
 
 @router.post("/{merchant_id}/confirm")
-def confirm(led: Led, merchant_id: int, body: ConfirmIn) -> SubscriptionOut:
+def confirm(led: Led, merchant_id: MerchantId, body: ConfirmIn) -> SubscriptionOut:
     return _apply(
         led,
         merchant_id,
@@ -118,12 +120,12 @@ def confirm(led: Led, merchant_id: int, body: ConfirmIn) -> SubscriptionOut:
 
 
 @router.post("/{merchant_id}/dismiss")
-def dismiss(led: Led, merchant_id: int) -> SubscriptionOut:
+def dismiss(led: Led, merchant_id: MerchantId) -> SubscriptionOut:
     """No to a suggestion: remembered as "not a subscription"."""
     return _apply(led, merchant_id, lambda: led.not_a_subscription(merchant_id))
 
 
 @router.delete("/{merchant_id}")
-def remove(led: Led, merchant_id: int) -> SubscriptionOut:
+def remove(led: Led, merchant_id: MerchantId) -> SubscriptionOut:
     """Take an entry off the list: remembered as "not a subscription"."""
     return _apply(led, merchant_id, lambda: led.not_a_subscription(merchant_id))

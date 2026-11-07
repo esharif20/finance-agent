@@ -1607,6 +1607,10 @@ class Ledger:
         latest: dict[int, Any] = {}
         for r in rows:
             first.setdefault(r.merchant_id, r.created_at)
+            prior = latest.get(r.merchant_id)
+            # a detection that lost a race with a user write never wins
+            if r.source == "detection" and prior is not None and prior.source == "user":
+                continue
             latest[r.merchant_id] = r
         return sorted(
             (

@@ -213,3 +213,25 @@ def test_another_user_can_neither_see_nor_touch_my_entries(
             attempt()
     assert mine.subscriptions() == before
     assert theirs.subscriptions() == []
+
+
+def test_a_detection_row_after_a_user_decision_never_wins(
+    ledger_for: LedgerFor,
+) -> None:
+    """Adversarial: a detection that lost a race with a user write (it checked
+    before the user row landed) and shares its created_at must not become the
+    entry. The read side holds the rule, not only record_detection."""
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH RACE")
+    led.not_a_subscription(m)
+    decided = led.subscription(m)
+    assert decided is not None
+    led._registry(  # pyright: ignore[reportPrivateUsage]
+        m, "detection", "subscription", "Streaming", "active", "pattern",
+        date(2026, 1, 1),
+    )  # fmt: skip
+    led._db.conn.execute(  # pyright: ignore[reportPrivateUsage]
+        schema.subscription_entry.update().values(created_at=decided.changed_at)
+    )
+
+    assert led.subscription(m) == decided

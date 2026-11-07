@@ -100,3 +100,34 @@ def test_another_users_entries_are_unreachable(
     with engine.begin() as conn:
         (e,) = Ledger(conn, 2).subscriptions()
     assert (e.group, e.status, e.reason) == ("Streaming", "active", "user_added")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"kind": "subscription", "group": "Subscriptions"},  # a parent, not a leaf
+        {"kind": "subscription", "group": "Streaming' OR '1'='1"},
+        {"kind": "subscription", "group": ""},
+        {"kind": "subscription", "group": "streaming"},
+        {"kind": "Bills", "group": "Energy"},
+    ],
+)
+def test_malicious_groups_and_kinds_are_refused(
+    engine: Engine, client: TestClient, body: dict[str, str]
+) -> None:
+    m = merchant(engine, "SYNTH STREAM")
+    r = client.post("/api/subscriptions", json={"merchant_id": m, **body})
+    assert r.status_code == 422
+    assert client.get("/api/subscriptions").json() == []
+
+
+@pytest.mark.parametrize("bad", [0, 2**63, -(2**63) - 1, 2**80])
+def test_an_out_of_range_merchant_id_is_refused(client: TestClient, bad: int) -> None:
+    """Adversarial: an id SQLite cannot hold is refused, never a 500."""
+    body = {"kind": "subscription", "group": "Streaming"}
+    add = client.post("/api/subscriptions", json={"merchant_id": bad, **body})
+    assert add.status_code == 422
+    assert client.patch(f"/api/subscriptions/{bad}", json=body).status_code == 422
+    assert client.post(f"/api/subscriptions/{bad}/confirm", json={}).status_code == 422
+    assert client.post(f"/api/subscriptions/{bad}/dismiss").status_code == 422
+    assert client.delete(f"/api/subscriptions/{bad}").status_code == 422
