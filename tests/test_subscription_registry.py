@@ -297,7 +297,14 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
 
             for (k, g), *rest in after:
                 wrote = led.record_detection(m, k, g, *rest)
-                assert wrote == (not live)
+                if live:
+                    assert not wrote
+                else:  # it writes, unless it repeats the latest entry exactly
+                    x = led.subscription(m)
+                    assert x is not None
+                    now = (x.kind, x.group, x.reason, x.status, x.evidence_on)
+                    assert now + (x.charge_count, x.interval) == (k, g, *rest)
+                    assert x.source == "detection"
             if live:
                 e = led.subscription(m)
                 assert e is not None and e.source == "user"
