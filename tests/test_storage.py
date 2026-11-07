@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0015"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0016"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -501,3 +501,26 @@ def test_migration_0015_adds_proposals_and_keeps_rows_that_reference_them(
     with eng.begin() as conn, pytest.raises(Exception, match="FOREIGN KEY"):
         conn.execute(text("DELETE FROM proposal WHERE id = 1"))
     eng.dispose()
+
+
+def test_migration_0016_adds_checkpoints_and_keeps_rows_that_reference_them(
+    tmp_path: Path,
+) -> None:
+    """0016 (#139) adds the two checkpoint tables, nothing rebuilt; a Memory
+    pointing at its Proposal survives the round trip."""
+    rows = (
+        "INSERT OR IGNORE INTO proposal (id, user_id, kind, payload, status,"
+        " created_at) VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-03')",
+        "INSERT OR IGNORE INTO memory (id, user_id, proposal_id, type, text, tags,"
+        " turn_id, quote, said_on, created_at) VALUES (1, 1, 1, 'goal', 's', '[]',"
+        " 't', 'q', '2026-01-03', '2026-01-03')",
+        "INSERT INTO assistant_checkpoint (user_id, thread_id, checkpoint_ns,"
+        " checkpoint_id, checkpoint_type, checkpoint, metadata_type, metadata,"
+        " created_at) VALUES (1, 't', '', 'c', 'msgpack', x'00', 'msgpack', x'00',"
+        " '2026-01-03')",
+        "INSERT INTO assistant_checkpoint_write (user_id, thread_id, checkpoint_ns,"
+        " checkpoint_id, task_id, idx, channel, value_type, value, task_path)"
+        " VALUES (1, 't', '', 'c', 'k', 0, 'reply', 'msgpack', x'00', '')",
+    )
+    added = {"assistant_checkpoint", "assistant_checkpoint_write"}
+    round_trip(tmp_path, "0015", "0016", added, rows).dispose()
