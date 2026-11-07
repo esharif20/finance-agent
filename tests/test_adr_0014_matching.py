@@ -37,10 +37,11 @@ def candidates(a: Row, b: Row) -> bool:
     )
 
 
-def match(rows: list[Row]) -> tuple[list[tuple[str, str]], list[frozenset[str]]]:
-    """Return (csv key, synced key) pairs and the ambiguous components."""
-    csv = [r for r in rows if r.source == "csv"]
-    synced = [r for r in rows if r.source == "synced"]
+Complete = dict[str, list[tuple[date, date]]]  # source -> runs of complete days
+
+
+def components(rows: list[Row]) -> list[list[Row]]:
+    """Connected components (size > 1) of the CSV-to-synced candidate graph."""
     parent = {r.key: r.key for r in rows}
 
     def find(k: str) -> str:
@@ -48,30 +49,69 @@ def match(rows: list[Row]) -> tuple[list[tuple[str, str]], list[frozenset[str]]]
             k = parent[k]
         return k
 
-    for c in csv:
-        for s in synced:
-            if candidates(c, s):
+    for c in rows:
+        for s in rows:
+            if c.source == "csv" and s.source == "synced" and candidates(c, s):
                 parent[find(c.key)] = find(s.key)
-    components: dict[str, list[Row]] = {}
+    out: dict[str, list[Row]] = {}
     for r in rows:
-        components.setdefault(find(r.key), []).append(r)
+        out.setdefault(find(r.key), []).append(r)
+    return [g for g in out.values() if len(g) > 1]
+
+
+def must(r: Row, complete: Complete | None) -> bool:
+    """The other source is complete on every day r's counterpart could have."""
+    if complete is None:
+        return True  # both sources complete everywhere
+    other = complete["synced" if r.source == "csv" else "csv"]
+    days = {r.day + timedelta(k) for k in range(-WINDOW, WINDOW + 1)}
+    return all(any(a <= d <= b for a, b in other) for d in days)
+
+
+def resolve(
+    group: list[Row], complete: Complete | None
+) -> list[tuple[str, str]] | None:
+    """Pairs for one component, or None when ambiguous: by brute force, every
+    matching that pairs each `must` row is an explanation; the component
+    resolves only if one exists and all have the same size."""
+    cs = sorted((r for r in group if r.source == "csv"), key=lambda r: (r.day, r.key))
+    ss = sorted(
+        (r for r in group if r.source == "synced"), key=lambda r: (r.day, r.key)
+    )
+    found: list[list[tuple[Row, Row]]] = []
+
+    def walk(i: int, used: frozenset[str], acc: list[tuple[Row, Row]]) -> None:
+        if i == len(cs):
+            if all(s.key in used or not must(s, complete) for s in ss):
+                found.append(acc)
+            return
+        c = cs[i]
+        if not must(c, complete):
+            walk(i + 1, used, acc)
+        for s in ss:
+            if s.key not in used and abs((c.day - s.day).days) <= WINDOW:
+                walk(i + 1, used | {s.key}, [*acc, (c, s)])
+
+    walk(0, frozenset(), [])
+    if not found or len({len(m) for m in found}) > 1:
+        return None
+    if len(found[0]) == len(cs) == len(ss):  # perfect: pair in date order
+        return [(c.key, s.key) for c, s in zip(cs, ss, strict=True)]
+    return [(c.key, s.key) for c, s in found[0]]
+
+
+def match(
+    rows: list[Row], complete: Complete | None = None
+) -> tuple[list[tuple[str, str]], list[frozenset[str]]]:
+    """Return (csv key, synced key) pairs and the ambiguous components."""
     pairs: list[tuple[str, str]] = []
     ambiguous: list[frozenset[str]] = []
-    for group in components.values():
-        if len(group) == 1:
-            continue
-        cs = sorted(
-            (r for r in group if r.source == "csv"), key=lambda r: (r.day, r.key)
-        )
-        ss = sorted(
-            (r for r in group if r.source == "synced"), key=lambda r: (r.day, r.key)
-        )
-        zipped = list(zip(cs, ss, strict=False))
-        within = all(abs((c.day - s.day).days) <= WINDOW for c, s in zipped)
-        if len(cs) == len(ss) and within:
-            pairs += [(c.key, s.key) for c, s in zipped]
-        else:
+    for group in components(rows):
+        got = resolve(group, complete)
+        if got is None:
             ambiguous.append(frozenset(r.key for r in group))
+        else:
+            pairs += got
     return pairs, ambiguous
 
 
@@ -184,6 +224,75 @@ def test_empty_normalised_description_never_matches() -> None:
         Row("synced", "s1", -450, "GBP", "--", BASE),
     ]
     assert match(rs) == ([], [])
+
+
+def test_a_chain_across_the_coverage_boundary_is_ambiguous_not_merged() -> None:
+    # #74: coffees on 1, 3 and 5 Jan; the CSV holds 1-3 Jan, the sync 3-5 Jan.
+    # Sorted pairing gives (1, 3) and (3, 5): two purchases instead of three.
+    # The 1 Jan row's counterpart could predate the sync, so it is ambiguous.
+    day = [BASE + timedelta(d) for d in range(6)]
+    rs = [
+        Row("csv", "c000", -350, "GBP", "CAFE NERO", day[0]),
+        Row("csv", "c001", -350, "GBP", "CAFE NERO", day[2]),
+        Row("synced", "s1", -350, "GBP", "Cafe Nero", day[2]),
+        Row("synced", "s2", -350, "GBP", "Cafe Nero", day[4]),
+    ]
+    complete = {"csv": [(day[1], day[1])], "synced": [(day[2], day[3])]}
+    assert match(rs) == ([("c000", "s1"), ("c001", "s2")], [])  # the old rule
+    assert match(rs, complete) == ([], [frozenset({"c000", "c001", "s1", "s2"})])
+
+
+def test_a_row_the_other_source_must_hold_is_paired_near_the_boundary() -> None:
+    # The sync is complete around the CSV row, so the CSV row must have its
+    # counterpart: the only candidate. The synced row may not, which is fine.
+    rs = [
+        Row("csv", "c000", -350, "GBP", "CAFE NERO", BASE + timedelta(5)),
+        Row("synced", "s1", -350, "GBP", "Cafe Nero", BASE + timedelta(6)),
+    ]
+    complete = {
+        "csv": [(BASE, BASE + timedelta(5))],
+        "synced": [(BASE, BASE + timedelta(20))],
+    }
+    assert match(rs, complete) == ([("c000", "s1")], [])
+
+
+@st.composite
+def coverage(draw: st.DrawFn) -> Complete:
+    def runs() -> list[tuple[date, date]]:
+        out: list[tuple[date, date]] = []
+        for _ in range(draw(st.integers(0, 2))):
+            a, b = sorted(draw(st.integers(-4, 14)) for _ in range(2))
+            out.append((BASE + timedelta(a), BASE + timedelta(b)))
+        return out
+
+    return {"csv": runs(), "synced": runs()}
+
+
+@given(rows(), coverage())
+def test_src_resolves_exactly_the_components_the_reference_does(
+    rs: list[Row], complete: Complete
+) -> None:
+    from finance_agent.ledger import (
+        _MatchRow,  # pyright: ignore[reportPrivateUsage]
+        _pair,  # pyright: ignore[reportPrivateUsage]
+        _within,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    for group in components(rs):
+        ids = {r.key: i for i, r in enumerate(group)}
+        src = [_MatchRow(ids[r.key], r.source == "synced", r.day, r.key) for r in group]
+        need = {
+            ids[r.key]
+            for r in group
+            if _within(complete["synced" if r.source == "csv" else "csv"], r.day)
+        }
+        assert need == {ids[r.key] for r in group if must(r, complete)}
+        ref, got = resolve(group, complete), _pair(src, need)
+        assert (ref is None) == (got is None)
+        if ref is not None and got is not None:
+            assert len(ref) == len(got)
+            if len(ref) == len(group) / 2:  # perfect: the same date-order pairs
+                assert sorted(got) == sorted((ids[c], ids[s]) for c, s in ref)
 
 
 def gap(b1: int, bk: int, ledger: list[tuple[int, int]], t1: int, tk: int) -> int:

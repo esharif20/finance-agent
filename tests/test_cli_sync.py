@@ -13,7 +13,7 @@ from typing import Any
 
 import keyring
 import pytest
-from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from finance_agent.cli import main
@@ -24,6 +24,9 @@ from synthetic_lloyds import generate_histories, render_export
 from synthetic_simplefin import response
 
 H = generate_histories(3, 30)[0]
+# A sync window well inside the CSV's history (6-10 Jan), so every row matches:
+# rows near both sources' edges would be ambiguous (ADR 0014 amendment)
+INSIDE = response(H, 12, 22)
 SERVICE = keychain.SIMPLEFIN_ACCESS_SERVICE
 
 
@@ -86,8 +89,9 @@ def test_connect_stores_the_access_url_in_the_keychain_only(
 def test_connect_links_a_synced_account_to_its_csv_account(
     env: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    env["t"].body = INSIDE
     csv = tmp_path / "export.csv"
-    csv.write_text(render_export(H, 0, 10).text)
+    csv.write_text(render_export(H, 0, len(H.txns)).text)
     assert main(["import", str(csv)]) == 0
     env["answers"].append("••••0001")
     assert main(["connect"]) == 0
@@ -337,8 +341,9 @@ def test_connect_says_the_token_is_spent_when_the_keychain_refuses(
 def test_a_bad_link_answer_rolls_back_the_whole_connect(
     env: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    env["t"].body = INSIDE
     csv = tmp_path / "export.csv"
-    csv.write_text(render_export(H, 0, 10).text)
+    csv.write_text(render_export(H, 0, len(H.txns)).text)
     assert main(["import", str(csv)]) == 0
     env["answers"].append("not-a-masked-number")
     assert main(["connect"]) == 1
@@ -358,10 +363,11 @@ def test_a_bad_link_answer_rolls_back_the_whole_connect(
 def test_a_csv_imported_after_connecting_is_linked_with_connect_link(
     env: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    env["t"].body = INSIDE
     assert main(["connect"]) == 0
     assert main(["sync"]) == 0
     csv = tmp_path / "export.csv"
-    csv.write_text(render_export(H, 0, 10).text)
+    csv.write_text(render_export(H, 0, len(H.txns)).text)
     capsys.readouterr()
     assert main(["import", str(csv)]) == 0
     # ADR 0014: not linked yet, so two Accounts, and the user is told
@@ -372,7 +378,7 @@ def test_a_csv_imported_after_connecting_is_linked_with_connect_link(
     engine = open_db()
     with engine.begin() as conn:
         led = Ledger(conn, 1)
-        assert (len(led.accounts()), len(led.transactions())) == (1, 10)
+        assert (len(led.accounts()), len(led.transactions())) == (1, len(H.txns))
     engine.dispose()
     assert main(["connect", "--link"]) == 0  # nothing left to link: no prompt
     assert env["answers"] == []
@@ -404,11 +410,6 @@ def test_csv_and_sync_through_the_cli_never_double_count(
     n = len(h.txns)
     a = data.draw(st.integers(1, n))  # CSV holds rows [0, a), the sync [b, n)
     b = data.draw(st.integers(0, a - 1))
-    # Known limit, pinned by test_sync.py::test_identical_purchases_across_the_
-    # coverage_boundary_are_never_merged (xfail): ADR 0014 can pair a CSV-only
-    # row with a sync-only identical purchase and lose one. Exclude only that.
-    csv_only = {(t.amount_minor, t.description) for t in h.txns[:b]}
-    assume(not csv_only & {(t.amount_minor, t.description) for t in h.txns[a:]})
     d = tmp_path_factory.mktemp("cli")
     csv = d / "export.csv"
     csv.write_text(render_export(h, 0, a).text)

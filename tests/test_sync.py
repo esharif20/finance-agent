@@ -2,19 +2,18 @@
 
 import json
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from finance_agent.ledger import Ledger
 from synthetic_lloyds import History, generate_histories, render_export
 from synthetic_lloyds.generator import SORT_CODE, _with_balances  # pyright: ignore[reportPrivateUsage]
-from synthetic_simplefin import response
+from synthetic_simplefin import LONDON, provider_id, response, sync_row
 from test_dedupe import temp_ledger
 
 LedgerFor = Callable[[int], Ledger]
@@ -160,15 +159,12 @@ def test_a_repeated_pending_id_cannot_cancel_a_real_gap() -> None:
         assert [g.amount for g in r.gaps] == [amount]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="ADR 0014 sorted pairing chains across the coverage boundary; needs an "
-    "ADR decision (coverage-aware matching)",
-)
 def test_identical_purchases_across_the_coverage_boundary_are_never_merged() -> None:
     # Three real coffees on 1, 3 and 5 Jan. The CSV holds the first two, the sync
     # the last two. Sorted pairing gives (1, 3) and (3, 5), both within 3 days, so
-    # three purchases become two, with no Possible Duplicate and no Gap.
+    # three purchases become two, with no Possible Duplicate and no Gap. The
+    # amended rule (#74) keeps all four rows and surfaces them: the 1 Jan row's
+    # counterpart could predate the sync, so the count is not determined.
     ev = [(date(2026, 1, d), "DEB", "CAFE NERO 0042", -350) for d in (1, 3, 5)]
     h = History(SORT_CODE, "00000001", _with_balances(ev, 100000))
     with temp_ledger() as (led, d):
@@ -178,8 +174,8 @@ def test_identical_purchases_across_the_coverage_boundary_are_never_merged() -> 
         led.apply_sync(response(h, 1, 3))
         (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
         led.link_synced_account("ACC-1", acc.id)
-        lost_one = len(led.transactions()) < 3
-        assert not lost_one or led.possible_duplicates()
+        assert len(led.transactions()) == 4
+        assert [len(g) for g in led.possible_duplicates()] == [4]
 
 
 def test_csv_history_before_the_anchor_never_opens_a_gap(
@@ -199,14 +195,14 @@ def test_ambiguous_rows_stay_separate_and_are_possible_duplicates(
     ledger_for: LedgerFor, write_export: WriteExport
 ) -> None:
     led = ledger_for(1)
-    led.import_files([write_export(render_export(H, 0, 10).text)])
+    led.import_files([write_export(render_export(H, 0, 40).text)])
     (csv_account,) = led.accounts()
     led.link_synced_account("ACC-1", csv_account.id)
-    doc = json.loads(response(H, 0, 10))
+    doc = json.loads(response(H, 15, 25))  # well inside the CSV's history
     row = doc["accounts"][0]["transactions"][0]
     doc["accounts"][0]["transactions"].append(row | {"id": "again"})
     led.apply_sync(json.dumps(doc).encode())
-    assert len(led.transactions()) == 12  # 9 pairs merged; 1 CSV + 2 synced kept
+    assert len(led.transactions()) == 42  # 9 pairs merged; 1 CSV + 2 synced kept
     (group,) = led.ambiguous_matches()
     assert len(group) == 3
     assert group in led.possible_duplicates()
@@ -305,6 +301,116 @@ def test_a_pending_row_posting_under_a_new_id_counts_once(
     assert (r.added, r.gaps) == (1, [])
     assert len(led.transactions()) == 10
     assert set(led.possible_duplicates()) == set(same_day_repeats(led))
+
+
+Step = tuple[str, int, int]  # ("csv", first, end) rows, or ("sync", from, to) days
+
+
+@st.composite
+def purchases_and_coverage(draw: st.DrawFn) -> tuple[History, list[int], list[Step]]:
+    """#74: real purchases with a CSV date and a synced date up to 3 days apart,
+    two texts and amounts so twins abound. A CSV export holds a window of the
+    CSV history; a sync holds every purchase posted in its date range. Any
+    number of each, in any order."""
+    n = draw(st.integers(1, 10))
+    days = sorted(draw(st.lists(st.integers(3, 17), min_size=n, max_size=n)))
+    ev = [
+        (
+            date(2026, 1, 1) + timedelta(d),
+            "DEB",
+            draw(st.sampled_from(["CAFE NERO 0042", "TFL TRAVEL"])),
+            draw(st.sampled_from([-350, -350, -900])),
+        )
+        for d in days
+    ]
+    skew = draw(st.lists(st.integers(-3, 3), min_size=n, max_size=n))
+    steps: list[Step] = []
+    for _ in range(draw(st.integers(1, 2))):
+        a = draw(st.integers(0, n - 1))
+        steps.append(("csv", a, draw(st.integers(a + 1, n))))
+    for _ in range(draw(st.integers(1, 2))):
+        lo, hi = sorted(draw(st.integers(0, 21)) for _ in range(2))
+        steps.append(("sync", lo, hi))
+    h = History(SORT_CODE, "00000001", _with_balances(ev, 100000))
+    return h, skew, draw(st.permutations(steps))
+
+
+def skewed_sync(h: History, skew: list[int], lo: int, hi: int, nonce: int = 0) -> bytes:
+    start = date(2026, 1, 1)
+    rows: list[dict[str, Any]] = []
+    for i, t in enumerate(h.txns):
+        on = t.date + timedelta(skew[i])
+        if lo <= (on - start).days <= hi:
+            ts = int(datetime.combine(on, time(12), LONDON).timestamp()) + i
+            rows.append(sync_row(t, provider_id(i), ts))
+    end = datetime.combine(start + timedelta(hi), time(23), LONDON)
+    acc = {
+        "org": {"name": "Synthetic Bank"},
+        "id": "ACC-1",
+        "name": "Synthetic Current",
+        "currency": "GBP",
+        "balance": "0.00",
+        "balance-date": int(end.timestamp()) + nonce,  # nonce: new bytes, same rows
+        "transactions": rows,
+    }
+    return json.dumps({"errors": [], "accounts": [acc]}).encode()
+
+
+@settings(max_examples=60, deadline=None)
+@given(purchases_and_coverage(), st.booleans())
+def test_no_purchase_is_lost_and_every_extra_row_is_surfaced(
+    case: tuple[History, list[int], list[Step]], link_first: bool
+) -> None:
+    h, skew, steps = case
+    present: set[int] = set()
+    with temp_ledger() as (led, d):
+        linked = False
+
+        def link() -> None:
+            (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
+            led.link_synced_account("ACC-1", acc.id)
+
+        def apply(step: Step, again: bool = False) -> None:
+            kind, a, b = step
+            if kind == "csv":
+                # again: a sub-window, so new bytes for rows already held
+                end = b - 1 if again and b - a > 1 else b
+                path = d / f"export-{a}-{end}-{again}.csv"
+                path.write_text(render_export(h, a, end).text)
+                led.import_files([path])
+            else:
+                led.apply_sync(skewed_sync(h, skew, a, b, nonce=int(again)))
+
+        for step in steps:
+            apply(step)
+            kind, a, b = step
+            if kind == "csv":
+                present |= set(range(a, b))
+                if link_first and not linked:
+                    link()
+                    linked = True
+            else:
+                start = date(2026, 1, 1)
+                present |= {
+                    i
+                    for i, t in enumerate(h.txns)
+                    if a <= (t.date + timedelta(skew[i]) - start).days <= b
+                }
+        if not linked:
+            link()
+        txns, surfaced = snapshot(led), sorted(led.possible_duplicates(), key=sorted)
+        extra = len(txns) - len(present)
+        # no purchase is lost; an extra row only ever sits in a surfaced group
+        assert 0 <= extra <= sum(len(g) for g in surfaced) // 2
+        if not surfaced:
+            assert extra == 0
+            assert sum(t[2] for t in txns) == Decimal(
+                sum(h.txns[i].amount_minor for i in present)
+            ).scaleb(-2)
+        for step in steps:  # re-importing and re-syncing change nothing
+            apply(step, again=True)
+        assert snapshot(led) == txns
+        assert sorted(led.possible_duplicates(), key=sorted) == surfaced
 
 
 def test_sync_since_follows_the_stalest_account(ledger_for: LedgerFor) -> None:
