@@ -54,7 +54,7 @@ Dataset v2 (verifier #183) adds 40 fixed-price café histories (6 to 20 visits a
 | Harness | Interface | Metric | Baselines |
 | --- | --- | --- | --- |
 | `evals/baselines.py` | `engine.baselines` (#147) | WAPE of the seasonal baseline against the true seasonal normal (overall, per Category, first year and after), and of the payday baseline on each cycle's first-week spend | trailing three-month mean |
-| `evals/detectors.py` | `Detector` (#147 spikes, #148 the rest) | precision and recall per event type | trivial rules |
+| `evals/detectors.py` | `engine.detectors` (#147 spikes, #148 price rises and renewals, #151 shortfall) | precision and recall per event type; each hit's evidence and impact | trivial rules |
 | `evals/ranking.py` | `Ranker` (#150) | NDCG@3 and @5 against the planted-relevance oracle | rank by £ impact |
 | `evals/forecast.py` | `Forecaster` (#149) | MASE and 80% interval coverage gap, rolling origin from 13 months | naive, seasonal naive |
 
@@ -68,6 +68,17 @@ Dataset v2 (verifier #183) adds 40 fixed-price café histories (6 to 20 visits a
 | Payday, first week of a cycle | 0.472 | 0.629 |
 
 It loses on one Category, Coffee (0.079 against 0.057). That Category has no seasonality, so one earlier same month is noisier than three recent ones. Category spikes over 1.5× the seasonal baseline score precision 0.35 and recall 1.00, against the trivial rule's 0.07 and 0.78. All 34 false positives fall in a Category's first year, before the baseline can know the season.
+
+**Detectors (#148).** `engine.detectors` turns rows into typed Insight candidates. Each one carries an impact in integer pence computed by code, a confidence in percent (fixed per rule until #150 calibrates it) and the Transaction ids behind it. The spike rule moved here from the harness. A price increase is a charge more than 5% above the `categorise.recurring` series it follows, one cadence after that series' last charge. Since #177 a price step starts a new run, so the step is judged between runs, and its impact is the rise over a year. An upcoming renewal is raised 28 days before a charge's anniversary, unless the Merchant charges again first. It comes either from an annual series (any Category, which needs 3 charges by the ADR 0015 gate) or, below that gate, from a rule: a Subscriptions charge with nothing from the Merchant in the 300 days before it. Its impact is the fee last paid. A Merchant the user cancelled or marked not a subscription (`stopped`, verifier #188) gets neither a price increase nor a renewal; its rows still count towards spikes. Recurring payments and spikes return `Insufficient` below their gates, and so do price increases when no Merchant has 3 charges yet. The harness now also scores each true positive on what it says. `evidence_valid` checks that the evidence is non-empty and lies within the planted event's rows. `impact_consistent` checks a price rise or fee to within 5%, and a spike's excess so far to be positive and at most 1.5× the planted excess. Committed run (candidate v2 against the trivial rules):
+
+| Type | Precision | Recall | Evidence, impact |
+| --- | --- | --- | --- |
+| Price rise | 1.00 (0.01) | 1.00 (1.00) | 1.00, 1.00 |
+| Category spike | 0.35 (0.07) | 1.00 (0.78) | 1.00, 1.00 |
+| Upcoming renewal | 1.00 (0.40) | 1.00 (1.00) | 1.00, 1.00 |
+| Payday shortfall | not run (0.04) | 0 (1.00) | #151 |
+
+The Subscriptions rule is what lets a renewal be predicted from one or two charges. It depends on categorisation: an annual fee filed elsewhere is not flagged until it forms a series. Spike precision is unchanged from #147, and the threshold was not tuned on this set, which has only 18 spikes.
 
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
 

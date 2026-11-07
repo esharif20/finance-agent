@@ -4,10 +4,9 @@ module can reach the network by accident. An AST scan of every source file."""
 import ast
 from pathlib import Path
 
-import finance_agent
-
 NETWORK = {"urllib", "http", "socket", "ssl", "requests", "httpx", "aiohttp", "urllib3"}
-SRC = Path(finance_agent.__file__).parent
+# this checkout's source, not whichever `finance_agent` sys.path finds first
+SRC = Path(__file__).resolve().parents[1] / "src" / "finance_agent"
 ALLOWED = {
     "ingest/simplefin.py": "the one aggregator client (ADR 0013)",
     "cli/launcher.py": "probes our own server's /api/health on 127.0.0.1 only",
@@ -86,3 +85,9 @@ def test_the_scan_catches_every_import_form() -> None:
     ):
         assert network_imports(src), src
     assert network_imports("from . import socket") == set()  # a sibling module
+
+
+def test_the_scan_covers_this_checkouts_source_not_the_installed_package() -> None:
+    # another worktree's package on sys.path must not stand in for this one's
+    assert SRC == Path(__file__).resolve().parents[1] / "src" / "finance_agent"
+    assert (SRC / "ingest" / "simplefin.py").is_file()
