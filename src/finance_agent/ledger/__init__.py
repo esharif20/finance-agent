@@ -29,6 +29,8 @@ from sqlalchemy import (
 
 from finance_agent import ingest
 from finance_agent.ingest import simplefin
+from finance_agent.ledger.taxonomy import UNCATEGORISED as UNCATEGORISED
+from finance_agent.ledger.taxonomy import current
 from finance_agent.storage import Scoped, keyed_ref, schema
 
 TRANSFER_TYPES = ("TFR",)  # Lloyds Type that favours a pair; not required
@@ -290,7 +292,6 @@ def _decimal(minor: int) -> Decimal:
     return Decimal(minor).scaleb(-2)
 
 
-UNCATEGORISED = "Uncategorised"  # the catch-all Category; categorise seeds it
 # shortcut: one currency until FX conversion lands; then sum gbp_minor
 CURRENCY = "GBP"
 
@@ -1404,13 +1405,18 @@ class Ledger:
                 m.c.name,
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
+                sub.c.taxonomy_version.label("version"),
             )
             .outerjoin(sub, self._db.on(sub, sub.c.id == m.c.default_category_id))
             .outerjoin(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .order_by(m.c.name)
         )
         return [
-            Merchant(r.id, r.name, (r.top, r.sub) if r.sub is not None else None)
+            Merchant(
+                r.id,
+                r.name,
+                current(r.version, (r.top, r.sub)) if r.sub is not None else None,
+            )
             for r in rows
         ]
 
@@ -1432,6 +1438,7 @@ class Ledger:
                 c.c.taxonomy_version,
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
+                sub.c.taxonomy_version.label("version"),
             )
             .outerjoin(m, self._db.on(m, m.c.id == c.c.merchant_id))
             .outerjoin(sub, self._db.on(sub, sub.c.id == c.c.category_id))
@@ -1446,7 +1453,7 @@ class Ledger:
                 by_merchant[k.merchant_id] = k.category
         out: dict[int, Categorisation] = {}
         for r in rows:
-            category = (r.top, r.sub) if r.sub is not None else None
+            category = current(r.version, (r.top, r.sub)) if r.sub is not None else None
             source = r.source
             # Corrections beat every rule (ADR 0005); Kinds without a Category
             # (Income, Transfer, Fee) ignore them
@@ -1512,6 +1519,7 @@ class Ledger:
                 k.c.merchant_id,
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
+                sub.c.taxonomy_version.label("version"),
                 k.c.created_at,
                 k.c.reverted_at,
             )
@@ -1524,7 +1532,7 @@ class Ledger:
                 r.id,
                 r.transaction_id,
                 r.merchant_id,
-                (r.top, r.sub),
+                current(r.version, (r.top, r.sub)),  # made on any version
                 r.created_at,
                 r.reverted_at,
             )
