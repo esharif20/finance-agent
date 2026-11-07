@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PEEK, stackPoses } from "./cardPoses";
+import { PEEK, stackLayout, stackPoses } from "./cardPoses";
 
 // Four cards: All accounts (0) then three accounts.
 describe("stackPoses", () => {
@@ -37,9 +37,10 @@ describe("stackPoses", () => {
     expect(p[2]?.rx).toBeGreaterThan(0); // the top edge, under the pointer, dips away
     expect(p[2]?.ry).toBeGreaterThan(0); // and so does the right edge
     expect(p[2]?.layer).toBe(rest[2]?.layer); // never jumps over its neighbour
-    // its neighbours ease back
-    expect(p[1]?.y).toBeGreaterThan(rest[1]?.y as number);
+    // the card in front moves down to show more of it; the one behind eases back
     expect(p[3]?.y).toBeGreaterThan(rest[3]?.y as number);
+    expect(p[1]?.s).toBeLessThan(rest[1]?.s as number);
+    expect(p[1]?.y).toBe(rest[1]?.y);
     expect(p[1]?.rx).toBe(0);
   });
 
@@ -63,5 +64,31 @@ describe("stackPoses", () => {
     const rising = stackPoses(4, 2, { fan: false, reduce: false, rising: 2 });
     expect(rising[2]?.z).toBeGreaterThan(settle[2]?.z as number);
     expect(rising[2]?.s).toBeGreaterThan(1);
+  });
+
+  it("spaces the cards by the peek of the mode: wider when the accounts fan out", () => {
+    const fan = stackPoses(4, 0, { fan: true, reduce: false, peek: 100, fanPeek: 160 });
+    expect([fan[1]?.y, fan[2]?.y, fan[3]?.y, fan[0]?.y]).toEqual([0, 160, 320, 480]);
+    const chosen = stackPoses(4, 2, { fan: false, reduce: false, peek: 100, fanPeek: 160 });
+    expect(chosen[2]?.y).toBe(300);
+  });
+});
+
+describe("stackLayout", () => {
+  it("keeps All accounts compact and the stack one height in both modes", () => {
+    const l = stackLayout(4, 328);
+    expect(l.allH).toBe(164);
+    // fanned: three account cards at half a card each, All in front covering the last one's lower half
+    expect(l.fanPeek).toBe(164);
+    expect(l.height).toBe(3 * 164 + 164);
+    // chosen: the same height, the three cards behind share what the front card leaves
+    expect(l.peek).toBeCloseTo((l.height - 328) / 3);
+    expect(l.peek).toBeLessThan(l.allH); // All accounts never shows below the next card
+  });
+
+  it("never peeks less than PEEK, so a card behind stays clickable", () => {
+    const l = stackLayout(2, 328);
+    expect(l.peek).toBeGreaterThanOrEqual(PEEK);
+    expect(l.height).toBe(328 + l.peek);
   });
 });

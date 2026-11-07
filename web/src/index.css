@@ -407,16 +407,26 @@ html[data-private] .money {
     linear-gradient(160deg, rgb(255 255 255 / 0.13), transparent 45%),
     linear-gradient(145deg, oklch(0.38 0.02 205), oklch(0.26 0.02 205));
 }
-/* Over a bank's own art the name is already on the card: keep it for screen readers, and
-   set the figures on dark pills at the right so they read over any artwork. */
+/* Over a bank's own art the name is already on the card: keep it for screen readers. The
+   masked number and balance sit in one darkened band (--band, from AccountStack): the bottom
+   of what shows of a card behind, or the bottom of the front card's face; never over the
+   art's top edge, where banks print their marks. */
 .account-card[data-art="true"] {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: ". title balance" "status status status";
+  grid-template-rows: auto;
   align-content: start;
+  padding-top: calc(var(--band, 0px) + 24px);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
 }
 .account-card[data-art="true"][data-front="true"] {
-  grid-template-areas: ". . title" "balance balance status";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto auto;
+  grid-template-areas: ". ." "balance title" "balance status";
   align-content: stretch;
+  row-gap: 2px;
+  padding-top: 14px;
+}
+.account-card[data-art="true"][data-front="true"] [data-slot="title"] {
+  justify-self: end;
 }
 .account-card[data-art="true"] [data-slot="title"] > span:first-child {
   position: absolute;
@@ -426,22 +436,14 @@ html[data-private] .money {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.account-card[data-art="true"] [data-slot="title"],
-.account-card[data-art="true"] .account-balance,
-.account-card[data-art="true"] [data-slot="status"] {
-  align-self: start;
-  justify-self: end;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgb(12 14 16 / 0.66);
-}
-.account-card[data-art="true"][data-front="true"] .account-balance,
-.account-card[data-art="true"][data-front="true"] [data-slot="status"] {
-  align-self: end;
+.account-card[data-art="true"] [data-slot="title"] > span + span {
+  opacity: 0.92;
 }
 .account-card[data-art="true"][data-front="true"] .account-balance {
-  justify-self: start;
-  padding: 2px 14px;
+  align-self: end;
+}
+.account-card[data-tucked="true"] > * {
+  opacity: 0; /* not visibility: the labels still name the button */
 }
 /* With WebGL the canvas draws the face, the edge and the sheen. */
 .card-stack[data-gl="true"] .account-card {

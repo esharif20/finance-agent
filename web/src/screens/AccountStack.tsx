@@ -13,7 +13,7 @@ import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ASPECT, FACE_HUE, loadArt, RADIUS } from "@/lib/cardArt";
-import { type Hover, PEEK, type Pose, stackPoses } from "@/lib/cardPoses";
+import { type Hover, type Pose, stackLayout, stackPoses } from "@/lib/cardPoses";
 import type { CardScene, SceneFace } from "@/three/cardScene";
 
 type Account = components["schemas"]["AccountOut"];
@@ -26,6 +26,10 @@ const PERSPECTIVE = 1400; // px; the WebGL camera sits at the same distance
 const MX = 16;
 const MY = 48;
 const RISE_MS = 160; // a chosen card rises towards you, then settles at the front
+// Over a bank's own art the labels sit in one darkened band: the bottom of what shows of a
+// card behind, or the bottom of the front card's face. Never over the art's top edge.
+const BAND = 58; // px
+const FRONT_BAND = 104;
 const SETTLE_MS = 420;
 
 /** Spring for #59's content transition, so the view below settles with the card. */
@@ -111,13 +115,29 @@ export function AccountStack({
 
   const frontIndex = Math.max(0, all.findIndex((f) => f.id === selected));
   const current = all[frontIndex] as Face;
+  const fan = selected === undefined;
+  const cardH = width ? width / ASPECT : 200;
+  const layout = stackLayout(all.length, cardH);
   const poses = stackPoses(all.length, frontIndex, {
-    fan: selected === undefined,
+    fan,
     reduce,
     hover,
     rising,
+    peek: layout.peek,
+    fanPeek: layout.fanPeek,
   });
-  const cardH = width ? width / ASPECT : 200;
+  const heightOf = (f: Face) => (f.id === undefined ? layout.allH : cardH);
+  const shows = fan ? layout.fanPeek : layout.peek; // how much of a card behind is in view
+  const isFront = (i: number) => poses[i]?.layer === all.length - 1;
+  // Tucked behind a chosen account, an art card shows too little for a label band: it shows
+  // only its art (the labels stay for screen readers).
+  const tucked = (f: Face, i: number) => !fan && !isFront(i) && Boolean(f.art && art[f.art]);
+  // Where each card's label band starts (px from its top edge); null: no band (generic face).
+  const band = (f: Face, i: number) => {
+    if (!f.art || !art[f.art] || tucked(f, i)) return null;
+    return isFront(i) ? heightOf(f) - FRONT_BAND : shows - BAND;
+  };
+  const bands = all.map(band);
 
   // One set of springs per card; the DOM and the WebGL scene both read them.
   const springs = useMemo<Springs[]>(
@@ -139,7 +159,11 @@ export function AccountStack({
       if (el) el.style.transform = transform(p);
     });
     if (withScene && scene.current && onScreen.current && !document.hidden) {
-      scene.current.update(now, { x: light.x.get(), y: light.y.get(), on: light.on.get() });
+      scene.current.update(
+        now,
+        { x: light.x.get(), y: light.y.get(), on: light.on.get() },
+        bands.map((top, i) => (top === null ? null : { top, front: isFront(i) })),
+      );
       scene.current.render();
     }
   };
@@ -174,9 +198,10 @@ export function AccountStack({
     const lit = hover && !reduce ? hover : null;
     const target = lit ? poses[lit.index] : undefined;
     animate(light.on, lit ? 1 : 0, { duration: 0.2 });
-    if (lit && target) {
+    const litFace = lit ? all[lit.index] : undefined;
+    if (lit && target && litFace) {
       animate(light.x, lit.px * width + target.x, HOVER_SPRING);
-      animate(light.y, lit.py * cardH + target.y, HOVER_SPRING);
+      animate(light.y, lit.py * heightOf(litFace) + target.y, HOVER_SPRING);
     }
     draw.current(false); // DOM only: undo React's write of the target transform; the frame renders the scene
   });
@@ -246,11 +271,13 @@ export function AccountStack({
     };
   }, [wantGl]);
 
+  const allH = layout.allH;
   const sceneFaces = useMemo<SceneFace[]>(
-    () => all.map((f) => ({ art: (f.art && art[f.art]) || null, hue: f.hue })),
-    [all, art],
+    () =>
+      all.map((f) => ({ art: (f.art && art[f.art]) || null, hue: f.hue, h: f.id === undefined ? allH : cardH })),
+    [all, art, allH, cardH],
   );
-  const stackH = cardH + (all.length - 1) * PEEK;
+  const stackH = layout.height;
   useEffect(() => {
     const s = scene.current;
     if (!gl || !s) return;
@@ -323,6 +350,7 @@ export function AccountStack({
           const pose = poses[i] as Pose;
           const on = f === current;
           const image = f.art ? cssArt[f.art] : undefined;
+          const b = bands[i];
           return (
             <button
               key={f.key}
@@ -348,14 +376,23 @@ export function AccountStack({
               data-art={Boolean(f.art && art[f.art])}
               data-hover={hover?.index === i}
               data-settling={settling && !on}
+              data-tucked={tucked(f, i)}
               style={
                 {
                   zIndex: pose.layer + 1,
-                  height: cardH,
+                  height: heightOf(f),
                   borderRadius: width ? width * RADIUS : undefined,
                   transform: transform(pose),
                   ...(f.hue === null ? {} : { "--h": f.hue }),
-                  ...(image ? { backgroundImage: image } : {}),
+                  ...(b === null || b === undefined ? {} : { "--band": `${b}px` }),
+                  ...(image
+                    ? {
+                        backgroundImage:
+                          b === null || b === undefined
+                            ? image
+                            : `linear-gradient(to bottom, transparent ${b}px, rgb(6 8 10 / ${isFront(i) ? 0.88 : 0.72}) ${b + (isFront(i) ? 44 : 28)}px), ${image}`,
+                      }
+                    : {}),
                 } as CSSProperties
               }
             >

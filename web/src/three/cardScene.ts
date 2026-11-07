@@ -7,7 +7,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { Pose } from "@/lib/cardPoses";
 import { type CardParts, createCardParts, createPaymentCardModel } from "./cardModel";
 
-export type SceneFace = { art: HTMLCanvasElement | null; hue: number | null };
+/** `h`: the card's height in px (All accounts is a compact card); `scrim`: see setScrim. */
+export type SceneFace = { art: HTMLCanvasElement | null; hue: number | null; h: number };
 
 /** The generic face: the bank's colour, a few diagonal bands and a contactless mark. */
 function genericFace(hue: number | null, w: number, h: number): HTMLCanvasElement {
@@ -63,11 +64,13 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
   key.position.set(-0.6, 1.2, 2);
   const glint = new THREE.PointLight(0xffffff, 0, 0, 2); // follows the pointer: the sheen
   scene.add(key, glint, new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.25));
-  const camera = new THREE.PerspectiveCamera(30, 1, 1, perspective * 4);
+  // A tight depth range: the cards live within a few hundred px of z = 0, and near = 1 left
+  // too little depth precision between the face and the body behind it.
+  const camera = new THREE.PerspectiveCamera(30, 1, perspective * 0.5, perspective * 1.5);
   camera.position.set(0, 0, perspective);
 
-  let parts: CardParts | null = null;
-  let cards: { group: THREE.Group; dispose(): void }[] = [];
+  let parts: CardParts[] = [];
+  let cards: ReturnType<typeof createPaymentCardModel>[] = [];
   let faces: SceneFace[] = [];
   let box = { w: 0, h: 0 };
   const order: number[] = [];
@@ -77,10 +80,12 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       scene.remove(c.group);
       c.dispose();
     }
-    parts?.dispose();
-    parts = createCardParts(box.w);
-    const p = parts;
+    for (const p of parts) p.dispose();
+    const sizes = new Map<number, CardParts>();
     cards = faces.map((f) => {
+      const h = Math.round(f.h);
+      const p = sizes.get(h) ?? createCardParts(box.w, h);
+      sizes.set(h, p);
       const src = f.art ?? genericFace(f.hue, 1024, Math.round(1024 / (p.w / p.h)));
       const tex = new THREE.CanvasTexture(src);
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -89,6 +94,7 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       scene.add(card.group);
       return card;
     });
+    parts = [...sizes.values()];
   }
 
   return {
@@ -109,13 +115,18 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       if (box.w) build();
     },
     /** Same numbers as the DOM transforms, converted from CSS (y down) to three (y up). */
-    update(poses: Pose[], light: { x: number; y: number; on: number }) {
-      if (!parts) return;
+    update(
+      poses: Pose[],
+      light: { x: number; y: number; on: number },
+      scrims: ({ top: number; front: boolean } | null)[],
+    ) {
       const { w, h } = box;
       cards.forEach((c, i) => {
         const p = poses[i];
         if (!p) return;
-        c.group.position.set(parts!.w / 2 + p.x - w / 2, -(parts!.h / 2 + p.y - h / 2), p.z);
+        const sc = scrims[i];
+        c.setScrim(sc ? sc.top : null, sc?.front ? 44 : 28, sc?.front ? 1 : 0.8);
+        c.group.position.set(w / 2 + p.x - w / 2, -(c.h / 2 + p.y - h / 2), p.z);
         c.group.rotation.set((-p.rx * Math.PI) / 180, (p.ry * Math.PI) / 180, (-p.rz * Math.PI) / 180);
         c.group.scale.setScalar(p.s);
         order[i] = p.layer;
@@ -138,7 +149,7 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
     },
     dispose() {
       for (const c of cards) c.dispose();
-      parts?.dispose();
+      for (const p of parts) p.dispose();
       env.dispose();
       pmrem.dispose();
       renderer.dispose();
