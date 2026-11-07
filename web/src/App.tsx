@@ -4,6 +4,7 @@ import { Ambient } from "@/components/Ambient";
 import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
 import { NavTabs } from "@/components/NavTabs";
+import { SyncNow } from "@/components/SyncNow";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
 import { useRoute } from "@/lib/route";
 import { CategoryScreen } from "@/screens/CategoryScreen";
@@ -31,7 +32,7 @@ function HideAmounts() {
       type="button"
       aria-pressed={hidden}
       onClick={toggle}
-      className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-full glass px-4 text-sm font-semibold transition-colors [@media(hover:hover)]:hover:bg-active"
+      className="inline-flex min-h-11 items-center gap-2 rounded-full glass px-4 text-sm font-semibold transition-colors [@media(hover:hover)]:hover:bg-active"
     >
       <IconSwap on={hidden} a={<Eye className="size-4" />} b={<EyeOff className="size-4" />} />
       Hide amounts
@@ -62,6 +63,7 @@ export function App() {
             className="ml-4 hidden gap-1 sm:flex"
             item="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold"
           />
+          <SyncNow />
           <HideAmounts />
         </header>
         <main>
