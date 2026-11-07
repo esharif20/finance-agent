@@ -694,6 +694,74 @@
         "title": "MonthTotalsOut",
         "type": "object"
       },
+      "PartIn": {
+        "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "maximum": 9.223372036854776e+18,
+                "minimum": -9.223372036854776e+18,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
+          "category": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Category",
+            "type": "array"
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "title": "PartIn",
+        "type": "object"
+      },
+      "PartOut": {
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "category": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Category",
+            "type": "array"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "category"
+        ],
+        "title": "PartOut",
+        "type": "object"
+      },
+      "PreviewOut": {
+        "properties": {
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/PartOut"
+            },
+            "title": "Parts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "parts"
+        ],
+        "title": "PreviewOut",
+        "type": "object"
+      },
       "QueueOut": {
         "properties": {
           "items": {
@@ -718,6 +786,24 @@
           "ledger_version"
         ],
         "title": "QueueOut",
+        "type": "object"
+      },
+      "RevertOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "ledger_version"
+        ],
+        "title": "RevertOut",
         "type": "object"
       },
       "SpendingOut": {
@@ -772,6 +858,70 @@
           "merchants"
         ],
         "title": "SpendingOut",
+        "type": "object"
+      },
+      "SplitIn": {
+        "properties": {
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/PartIn"
+            },
+            "maxItems": 10,
+            "minItems": 2,
+            "title": "Parts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "parts"
+        ],
+        "title": "SplitIn",
+        "type": "object"
+      },
+      "SplitOut": {
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          },
+          "needs_recheck": {
+            "title": "Needs Recheck",
+            "type": "boolean"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/PartOut"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "transaction_id": {
+            "title": "Transaction Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "parts",
+          "id",
+          "transaction_id",
+          "amount_minor",
+          "currency",
+          "needs_recheck",
+          "ledger_version"
+        ],
+        "title": "SplitOut",
         "type": "object"
       },
       "SubscriptionOut": {
@@ -1757,6 +1907,189 @@
           }
         },
         "summary": "Spending"
+      }
+    },
+    "/api/splits/{transaction_id}": {
+      "delete": {
+        "description": "Undo the live Split as a whole; it stays in the history, reverted.",
+        "operationId": "revert_api_splits__transaction_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevertOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert"
+      },
+      "get": {
+        "operationId": "read_api_splits__transaction_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read"
+      },
+      "put": {
+        "description": "Split the Transaction; a live Split is replaced and kept in the history.",
+        "operationId": "save_api_splits__transaction_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save"
+      }
+    },
+    "/api/splits/{transaction_id}/preview": {
+      "post": {
+        "description": "The parts as they would be saved; nothing is written.",
+        "operationId": "preview_api_splits__transaction_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview"
       }
     },
     "/api/subscriptions": {
