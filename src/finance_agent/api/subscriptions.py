@@ -77,7 +77,7 @@ def _out(e: SubscriptionEntry) -> SubscriptionOut:
     )
 
 
-def _apply(
+def apply_change(
     led: Ledger, merchant_id: int, change: Callable[[], object]
 ) -> SubscriptionOut:
     try:
@@ -98,12 +98,12 @@ def subscriptions(led: Led) -> list[SubscriptionOut]:
 @router.post("", status_code=201)
 def add(led: Led, body: AddIn) -> SubscriptionOut:
     m = body.merchant_id
-    return _apply(led, m, lambda: led.add_subscription(m, body.kind, body.group))
+    return apply_change(led, m, lambda: led.add_subscription(m, body.kind, body.group))
 
 
 @router.patch("/{merchant_id}")
 def regroup(led: Led, merchant_id: MerchantId, body: GroupIn) -> SubscriptionOut:
-    return _apply(
+    return apply_change(
         led,
         merchant_id,
         lambda: led.regroup_subscription(merchant_id, body.kind, body.group),
@@ -112,7 +112,7 @@ def regroup(led: Led, merchant_id: MerchantId, body: GroupIn) -> SubscriptionOut
 
 @router.post("/{merchant_id}/confirm")
 def confirm(led: Led, merchant_id: MerchantId, body: ConfirmIn) -> SubscriptionOut:
-    return _apply(
+    return apply_change(
         led,
         merchant_id,
         lambda: led.confirm_subscription(merchant_id, body.kind, body.group),
@@ -122,10 +122,10 @@ def confirm(led: Led, merchant_id: MerchantId, body: ConfirmIn) -> SubscriptionO
 @router.post("/{merchant_id}/dismiss")
 def dismiss(led: Led, merchant_id: MerchantId) -> SubscriptionOut:
     """No to a suggestion: remembered as "not a subscription"."""
-    return _apply(led, merchant_id, lambda: led.not_a_subscription(merchant_id))
+    return apply_change(led, merchant_id, lambda: led.not_a_subscription(merchant_id))
 
 
 @router.delete("/{merchant_id}")
 def remove(led: Led, merchant_id: MerchantId) -> SubscriptionOut:
     """Take an entry off the list: remembered as "not a subscription"."""
-    return _apply(led, merchant_id, lambda: led.not_a_subscription(merchant_id))
+    return apply_change(led, merchant_id, lambda: led.not_a_subscription(merchant_id))
