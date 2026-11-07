@@ -32,6 +32,14 @@ _Avoid_: Type (the bank's own "Transaction Type" column is a different thing)
 A Transaction moving money between two of the user's own Accounts; it is neither spending nor income.
 _Avoid_: Internal payment, top-up
 
+**Conversion**:
+A foreign-currency figure counted in GBP through exactly one Rate, which records its source and date. Derived on every read, never stored on the Transaction, which stays in its own currency.
+_Avoid_: FX amount, converted transaction
+
+**Rate**:
+GBP per unit of a foreign currency, as a Decimal. Taken in order from the Bank's own GBP amount on the Transaction (`bank`), the user's own currency exchanges (`exchange`), or one the user entered (`user`); never fetched. With none, the figure is "rate needed": left out of every total and shown as such, never guessed.
+_Avoid_: Exchange rate feed, FX quote
+
 **Pending Transaction**:
 A Transaction the Bank has not yet completed. Shown as provisional and excluded from every total until it completes; a reverted one is recorded but never counted.
 _Avoid_: Uncleared, authorisation
@@ -83,7 +91,7 @@ Derived each time from a registry entry and its Merchant's last charge (#105): *
 _Avoid_: Expired, inactive
 
 **Monthly cost**:
-A Subscription's or Bill's last GBP charge as a monthly equivalent, in exact pence (weekly × 52 ÷ 12, annual ÷ 12), rounded half-even to the penny only when shown. Totals per group and per kind are the exact sums, rounded once. A charge in another currency has no Monthly cost ("rate needed") until FX conversion exists; it is never guessed.
+A Subscription's or Bill's last charge in GBP as a monthly equivalent, in exact pence (weekly × 52 ÷ 12, annual ÷ 12), rounded half-even to the penny only when shown. Totals per group and per kind are the exact sums, rounded once. A foreign-currency charge is in GBP through the Ledger's one FX rate; without a rate it has no Monthly cost ("rate needed") and stays out of the totals, never guessed.
 
 ## Intelligence
 

@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
 from random import Random
@@ -20,6 +21,7 @@ from finance_agent.categorise.subscriptions import (
     subscription_costs,
 )
 from finance_agent.ledger import Ledger, SubscriptionEntry, UnknownTarget
+from synthetic_banks import revolut_pockets
 
 Export = Callable[[str], Path]
 
@@ -299,3 +301,26 @@ def test_cancelling_an_unlisted_merchant_is_refused(
 ) -> None:
     with pytest.raises(UnknownTarget):
         ledger_for(1).cancel_subscription(999)
+
+
+def test_a_foreign_charge_costs_in_gbp_once_a_rate_exists(
+    engine: Engine, tmp_path: Path
+) -> None:
+    eur = [
+        ("CARD_PAYMENT", "EUR", date(2026, m, 3), "SPOTIFY", -1150) for m in (4, 5, 6)
+    ]
+    p = tmp_path / "revolut.csv"
+    p.write_text(revolut_pockets(eur))
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        assert led.import_files([p]).rejected == []
+        categorise.run(conn, 1)
+        s = costs(led, TODAY)
+        (c,) = s.items
+        assert (c.monthly, c.cost_note, c.counted, s.rate_needed) == (
+            None, "rate_needed", False, 1,
+        )  # fmt: skip
+        led.set_rate("EUR", Decimal("0.8"), date(2026, 1, 1))
+        s = costs(led, TODAY)
+    assert (s.items[0].monthly, s.items[0].cost_note) == (920, None)  # 11.50 EUR
+    assert s.kind_totals == {"subscription": 920} and s.rate_needed == 0

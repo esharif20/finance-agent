@@ -179,7 +179,7 @@ class Charge:
     merchant_id: int
     posted_on: date
     minor: int  # positive, money out, in `currency`'s minor units
-    currency: str = "GBP"
+    currency: str = "GBP"  # anything else is a charge still needing an FX rate
 
 
 @dataclass(frozen=True)
@@ -238,7 +238,7 @@ def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> Subscript
     if last is None:
         note = "no_charge"
     elif last.currency != "GBP":
-        note = "rate_needed"  # shortcut: no FX on main yet; convert once #156 lands
+        note = "rate_needed"  # the latest charge had no FX rate: never guessed
     elif interval is None:
         note = "interval_needed"
     else:
@@ -284,12 +284,16 @@ def subscription_costs(
 
 def costs(led: Ledger, today: date) -> CostSummary:
     """`subscription_costs` over the Ledger's registry and Spending charges."""
-    charges = [
-        Charge(m, t.posted_on, int(-t.amount * 100), t.currency)
-        for m, ts in _merchant_spending(led).items()
-        for t in ts
-        if t.amount < 0
-    ]
+    in_gbp = led.foreign_in_gbp()  # the Ledger's one rate choice (#156)
+    charges: list[Charge] = []
+    for m, ts in _merchant_spending(led).items():
+        for t in (t for t in ts if t.amount < 0):  # refunds are not charges
+            own = int(-t.amount * 100)
+            gbp = own if t.currency == "GBP" else in_gbp.get(t.id)
+            if gbp is None:  # rate needed: kept in its own currency, never guessed
+                charges.append(Charge(m, t.posted_on, own, t.currency))
+            else:  # a converted charge keeps its sign
+                charges.append(Charge(m, t.posted_on, abs(gbp)))
     s = subscription_costs(led.subscriptions(), charges, today)
     counted = sum(x.counted for x in s.items)
     log.info("subscription_costs items=%d counted=%d", len(s.items), counted)

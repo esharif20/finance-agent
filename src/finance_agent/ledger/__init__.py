@@ -11,7 +11,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from datetime import time as clock
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +19,6 @@ from sqlalchemy import (
     ColumnElement,
     Connection,
     Select,
-    and_,
-    case,
     func,
     or_,
     select,
@@ -29,12 +27,14 @@ from sqlalchemy import (
 
 from finance_agent import ingest
 from finance_agent.ingest import simplefin
+from finance_agent.ledger import fx
 from finance_agent.ledger.taxonomy import TAXONOMY, current
 from finance_agent.ledger.taxonomy import UNCATEGORISED as UNCATEGORISED
 from finance_agent.storage import Scoped, keyed_ref, schema
 
 TRANSFER_TYPES = ("TFR",)  # Lloyds Type that favours a pair; not required
 TRANSFER_DAYS = 3  # the two legs post at most this many days apart
+EXCHANGE = "EXCHANGE"  # Revolut Type of each leg of a currency exchange (#156)
 
 
 @dataclass(frozen=True)
@@ -154,6 +154,7 @@ class Split:
     reverted_at: datetime | None
     amount_minor: int  # the Transaction's amount now
     needs_recheck: bool = False
+    currency: str = "GBP"  # the Transaction's; parts are in it too
 
     @property
     def largest(self) -> SplitPart:
@@ -288,7 +289,7 @@ class Transaction:
     transfer_with: int | None = None  # the other leg of an own-account Transfer
     categorisation: Categorisation | None = None  # None until `categorise.run`
     account_id: int = 0
-    currency: str = "GBP"  # the Transaction's own currency, before any FX
+    currency: str = "GBP"  # `amount` is in this currency, never converted
 
 
 @dataclass(frozen=True)
@@ -423,6 +424,33 @@ class MonthSummary:
     # Transfers between the user's own Accounts, left out of money in and out
     transfers_in: Decimal = Decimal(0)
     transfers_out: Decimal = Decimal(0)  # positive
+    # foreign-currency Transactions left out for want of a rate (#156)
+    rate_needed: int = 0
+
+
+@dataclass(frozen=True)
+class FxMonth:
+    """How a month's GBP totals treat its foreign-currency Transactions: each
+    one is in `conversions` (with the one rate used) or in `rate_needed`
+    (left out of every total, never guessed)."""
+
+    conversions: tuple[fx.Conversion, ...]
+    rate_needed: tuple[Transaction, ...]
+
+
+@dataclass(frozen=True)
+class AccountInGbp:
+    account_id: int
+    conversion: fx.Conversion | None  # None: rate needed
+
+
+@dataclass(frozen=True)
+class BalancesInGbp:
+    """Every Account's Bank balance in GBP; `total` is None when any balance is
+    unknown (no balance from the Bank, or rate needed)."""
+
+    total: Decimal | None
+    accounts: tuple[AccountInGbp, ...]  # foreign-currency Accounts only
 
 
 @dataclass(frozen=True)
@@ -446,8 +474,26 @@ def _decimal(minor: int) -> Decimal:
     return Decimal(minor).scaleb(-2)
 
 
-# shortcut: one currency until FX conversion lands; then sum gbp_minor
-CURRENCY = "GBP"
+CURRENCY = fx.GBP  # every total is in GBP; foreign figures convert (#156)
+
+
+def _shares_in_gbp(
+    shares: list[tuple[tuple[str, str], int]], amount_minor: int, gbp_minor: int
+) -> list[tuple[tuple[str, str], int]]:
+    """`shares` of a Transaction of `amount_minor` rescaled to its GBP figure:
+    each by share, the last takes the remainder, so they add up exactly."""
+    if gbp_minor == amount_minor or not shares:
+        return shares
+    out: list[tuple[tuple[str, str], int]] = []
+    left = gbp_minor
+    for i, (cat, minor) in enumerate(shares):
+        g = left
+        if i < len(shares) - 1:
+            exact = Decimal(minor) * gbp_minor / amount_minor
+            g = int(exact.to_integral_value(ROUND_HALF_EVEN))
+        out.append((cat, g))
+        left -= g
+    return out
 
 
 def _only(account_id: int | None) -> list[ColumnElement[bool]]:
@@ -681,6 +727,7 @@ class Ledger:
                         currency=row.currency,
                         running_balance_minor=row.balance_minor,
                         status="completed",
+                        gbp_minor=row.gbp_minor,
                     )
                     accounts[account_id] = row.masked_number
                     file_added += 1
@@ -1441,23 +1488,12 @@ class Ledger:
     ) -> list[Spend]:
         """Spending minus Refunds received in `month` (ADR 0004), by Category,
         then Subcategory, then Merchant ("Unknown" when none), largest first."""
-        start, end = _month_bounds(month)
-        t = schema.transaction
-        amounts: dict[int, int] = {
-            r.id: r.amount_minor
-            for r in self._db.execute(
-                self._db.select(t, t.c.id, t.c.amount_minor).where(
-                    t.c.posted_on >= start,
-                    t.c.posted_on < end,
-                    t.c.currency == CURRENCY,
-                    *_only(account_id),
-                )
-            )
-        }
+        amounts = self._in_gbp(month, account_id)
         tree: dict[str, dict[str, dict[tuple[int | None, str], int]]] = {}
         for txn_id, c in self._categorisations().items():
             if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
-                for (top, sub), minor in _shares(c, amounts[txn_id]):
+                own, gbp = amounts[txn_id]
+                for (top, sub), minor in _shares_in_gbp(_shares(c, own), own, gbp):
                     merchants = tree.setdefault(top, {}).setdefault(sub, {})
                     key = (c.merchant_id, c.merchant or "Unknown")
                     merchants[key] = merchants.get(key, 0) - minor
@@ -1539,19 +1575,21 @@ class Ledger:
                     self._db.select(tt, tt.c.id).where(*_only(account_id))
                 ).scalars()
             )
+        amounts = self._in_gbp(month, account_id)
         for t in self.transactions():
             c = t.categorisation
-            if c is None or not start <= t.posted_on < end:
-                continue
+            if c is None or not start <= t.posted_on < end or t.id not in amounts:
+                continue  # outside the month, or rate needed
             if mine is not None and t.id not in mine:
                 continue
+            own, gbp = amounts[t.id]
             if c.kind == "Fee":
-                fees -= t.amount
+                fees -= _decimal(gbp)
             elif c.kind == "Refund":
-                refunds += t.amount
+                refunds += _decimal(gbp)
                 # only the Uncategorised and To review shares: a split
                 # Refund's other parts are matched in their own Categories
-                for (top, _), minor in _shares(c, int(t.amount.scaleb(2))):
+                for (top, _), minor in _shares_in_gbp(_shares(c, own), own, gbp):
                     if top in unmatched:
                         unmatched[top] -= _decimal(minor)
         cats: list[Spend] = []
@@ -1914,6 +1952,7 @@ class Ledger:
                 k.c.created_at,
                 k.c.reverted_at,
                 t.c.amount_minor.label("total"),
+                t.c.currency,
                 p.c.amount_minor,
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
@@ -1947,6 +1986,7 @@ class Ledger:
                     r.reverted_at,
                     r.total,
                     sum(x.amount_minor for x in parts) != r.total,
+                    r.currency,
                 )
             )
         return out
@@ -2360,31 +2400,200 @@ class Ledger:
             raise UnknownTarget("unknown target")
         return int(row[0])
 
+    # --- FX with provenance (#156): rates are never fetched -----------------
+
+    def set_rate(self, currency: str, rate: Decimal, on: date) -> fx.Rate:
+        """Enter a rate: GBP per unit of `currency` from `on`. Re-entering one
+        for the same currency and date replaces it."""
+        if currency == fx.GBP or not fx.CURRENCY_CODE.fullmatch(currency):
+            raise fx.InvalidRate("a rate is for a foreign currency code")
+        if currency in ingest.NOT_HUNDREDTHS:  # never imported, so never used
+            raise fx.InvalidRate(ingest.NOT_HUNDREDTHS_REASON)
+        fx.check_rate(rate)
+        r = schema.fx_rate
+        self._db.execute(
+            self._db.delete(r).where(r.c.currency == currency, r.c.rate_on == on)
+        )
+        self._db.insert(
+            r,
+            currency=currency,
+            rate=str(rate),
+            rate_on=on,
+            created_at=datetime.now(UTC),
+        )
+        self._db.bump_ledger_version()
+        return fx.Rate(currency, rate, on, "user")
+
+    def fx_rates(self) -> list[fx.Rate]:
+        """Rates implied by the user's own exchanges, then those entered,
+        each oldest first."""
+        return self._exchange_rates() + self._entered_rates()
+
+    def _entered_rates(self) -> list[fx.Rate]:
+        r = schema.fx_rate
+        return [
+            fx.Rate(x.currency, Decimal(x.rate), x.rate_on, "user")
+            for x in self._db.execute(
+                self._db.select(r, r.c.currency, r.c.rate, r.c.rate_on).order_by(
+                    r.c.rate_on, r.c.currency
+                )
+            )
+        ]
+
+    def _exchange_rates(self) -> list[fx.Rate]:
+        """Per day and currency: GBP paid or received over the foreign amount,
+        across that day's exchange legs linked as Transfers. A day that
+        exchanged GBP with more than one currency implies nothing: which GBP
+        leg went with which is not knowable."""
+        t = schema.transaction
+        legs = {
+            r.id: r
+            for r in self._db.execute(
+                self._db.select(
+                    t, t.c.id, t.c.posted_on, t.c.amount_minor, t.c.currency
+                ).where(t.c.bank_type == EXCHANGE)
+            )
+        }
+        sums: dict[tuple[date, str], tuple[int, int]] = {}
+        for a, b in self._transfer_legs().items():
+            if a not in legs or b not in legs or legs[a].currency != fx.GBP:
+                continue
+            g, f = legs[a], legs[b]
+            if f.currency == fx.GBP:
+                continue
+            gbp, fgn = sums.get((g.posted_on, f.currency), (0, 0))
+            sums[(g.posted_on, f.currency)] = (
+                gbp + abs(g.amount_minor),
+                fgn + abs(f.amount_minor),
+            )
+        per_day = Counter(day for day, _ in sums)
+        out: list[fx.Rate] = []
+        for (day, cur), (gbp, fgn) in sorted(sums.items()):
+            rate = Decimal(gbp) / Decimal(fgn)
+            if per_day[day] == 1 and fx.MIN_RATE <= rate <= fx.MAX_RATE:
+                out.append(fx.Rate(cur, rate, day, "exchange"))
+        return out
+
+    def _conversions(self, *where: ColumnElement[bool]) -> dict[int, Any]:
+        """{id: (row, Conversion | None)} for each foreign-currency Transaction
+        matching `where`; None is rate needed. The one place a rate is chosen."""
+        t = schema.transaction
+        rates = self.fx_rates()
+        out: dict[int, Any] = {}
+        for r in self._db.execute(
+            self._db.select(
+                t, t.c.id, t.c.posted_on, t.c.amount_minor, t.c.currency, t.c.gbp_minor
+            ).where(t.c.currency != fx.GBP, *where)
+        ):
+            out[r.id] = (r, self._convert(r, rates))
+        return out
+
+    def foreign_in_gbp(self) -> dict[int, int | None]:
+        """{Transaction id: GBP minor units} for every foreign-currency
+        Transaction; None is rate needed."""
+        return {
+            i: None if c is None else c.gbp_minor
+            for i, (_, c) in self._conversions().items()
+        }
+
+    @staticmethod
+    def _convert(r: Any, rates: list[fx.Rate]) -> fx.Conversion | None:
+        g, a = r.gbp_minor, r.amount_minor
+        if g is not None and a and g and (g > 0) == (a > 0):
+            rate = Decimal(g) / Decimal(a)
+            if fx.MIN_RATE <= rate <= fx.MAX_RATE:  # the Bank's own: used as is
+                bank = fx.Rate(r.currency, rate, r.posted_on, "bank")
+                return fx.Conversion(r.currency, a, g, bank, r.id)
+        picked = fx.pick(rates, r.currency, r.posted_on)
+        if picked is None:
+            return None
+        gbp = fx.convert(a, picked.gbp_per_unit)
+        return fx.Conversion(r.currency, a, gbp, picked, r.id)
+
+    def _month_terms(
+        self, month: str, account_id: int | None
+    ) -> list[ColumnElement[bool]]:
+        start, end = _month_bounds(month)
+        t = schema.transaction
+        return [t.c.posted_on >= start, t.c.posted_on < end, *_only(account_id)]
+
+    def _in_gbp(self, month: str, account_id: int | None) -> dict[int, tuple[int, int]]:
+        """{id: (amount in its own currency, in GBP)} for the month's
+        Transactions; a rate-needed one is left out, so no total counts it."""
+        t = schema.transaction
+        terms = self._month_terms(month, account_id)
+        out = {
+            r.id: (r.amount_minor, r.amount_minor)
+            for r in self._db.execute(
+                self._db.select(t, t.c.id, t.c.amount_minor).where(
+                    t.c.currency == fx.GBP, *terms
+                )
+            )
+        }
+        for txn_id, (_, c) in self._conversions(*terms).items():
+            if c is not None:
+                out[txn_id] = (c.amount_minor, c.gbp_minor)
+        return out
+
+    def fx_month(self, month: str, account_id: int | None = None) -> FxMonth:
+        """The provenance of `month`'s GBP totals: the same choice `_in_gbp`
+        makes, Transaction by Transaction."""
+        found = self._conversions(*self._month_terms(month, account_id))
+        needed = {i for i, (_, c) in found.items() if c is None}
+        return FxMonth(
+            tuple(c for _, (_, c) in sorted(found.items()) if c is not None),
+            tuple(x for x in self._transactions(schema.transaction.c.id.in_(needed)))
+            if needed
+            else (),
+        )
+
+    def balances_in_gbp(self) -> BalancesInGbp:
+        """Each Account's Bank balance in GBP: a foreign one at the rate on its
+        last Transaction's date (an exchange rate or one entered)."""
+        t = schema.transaction
+        last: dict[int, date] = {
+            r.account_id: r.last
+            for r in self._db.execute(
+                self._db.select(
+                    t, t.c.account_id, func.max(t.c.posted_on).label("last")
+                ).group_by(t.c.account_id)
+            )
+        }
+        rates = self.fx_rates()
+        total: int | None = 0
+        foreign: list[AccountInGbp] = []
+        for a in self.accounts():
+            if a.bank_balance is None:
+                total = None
+                continue
+            minor = int(a.bank_balance.scaleb(2))
+            if a.currency == fx.GBP:
+                total = None if total is None else total + minor
+                continue
+            on = last[a.id]
+            picked = fx.pick(rates, a.currency, on)
+            c = (
+                None
+                if picked is None
+                else fx.Conversion(
+                    a.currency, minor, fx.convert(minor, picked.gbp_per_unit), picked
+                )
+            )
+            foreign.append(AccountInGbp(a.id, c))
+            total = None if total is None or c is None else total + c.gbp_minor
+        return BalancesInGbp(None if total is None else _decimal(total), tuple(foreign))
+
     def summarise_month(
         self, month: str, account_id: int | None = None
     ) -> MonthSummary:
         start, end = _month_bounds(month)
-        t = schema.transaction
-        amt = t.c.amount_minor
-        moved = t.c.id.in_(self._transfer_ids())  # neither spending nor income
-
-        def total(*when: ColumnElement[bool], sign: int = 1) -> Any:
-            return func.coalesce(func.sum(case((and_(*when), amt * sign), else_=0)), 0)
-
-        stmt = self._db.select(
-            t,
-            total(amt > 0, ~moved),
-            total(amt < 0, ~moved, sign=-1),
-            total(amt > 0, moved),
-            total(amt < 0, moved, sign=-1),
-        ).where(
-            t.c.posted_on >= start,
-            t.c.posted_on < end,
-            t.c.currency == CURRENCY,
-            *_only(account_id),
-        )
-        row = self._db.execute(stmt).one()
-        ins, outs, moved_in, moved_out = (int(v) for v in row)
+        moved = self._transfer_legs()  # neither spending nor income
+        ins = outs = moved_in = moved_out = 0
+        for txn_id, (_, gbp) in self._in_gbp(month, account_id).items():
+            if txn_id in moved:
+                moved_in, moved_out = moved_in + max(gbp, 0), moved_out - min(gbp, 0)
+            else:
+                ins, outs = ins + max(gbp, 0), outs - min(gbp, 0)
         return MonthSummary(
             month,
             CURRENCY,
@@ -2400,6 +2609,12 @@ class Ledger:
             ],
             _decimal(moved_in),
             _decimal(moved_out),
+            sum(
+                c is None
+                for _, c in self._conversions(
+                    *self._month_terms(month, account_id)
+                ).values()
+            ),
         )
 
     def _align(
@@ -2586,6 +2801,19 @@ class Ledger:
             for i in incoming.get((o.currency, -o.amount_minor), [])
             if i.account_id != o.account_id
             and abs((i.posted_on - o.posted_on).days) <= TRANSFER_DAYS
+        ]
+        # a currency exchange (#156): both legs EXCHANGE, same day, two of the
+        # user's Accounts in different currencies; adjacent rows pair first
+        candidates += [
+            ((False, False, abs(i.id - o.id), o.id, i.id), o.id, i.id)
+            for o in rows
+            if o.amount_minor < 0 and o.bank_type == EXCHANGE
+            for i in rows
+            if i.amount_minor > 0
+            and i.bank_type == EXCHANGE
+            and i.currency != o.currency
+            and i.account_id != o.account_id
+            and i.posted_on == o.posted_on
         ]
         used: set[int] = set()
         for _, out_id, in_id in sorted(candidates):  # best pairs claim legs first

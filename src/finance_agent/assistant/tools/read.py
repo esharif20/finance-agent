@@ -83,8 +83,8 @@ class Money(BaseModel):
     currency: str
 
 
-def _money(amount: Decimal) -> Money:
-    return Money(minor=int(amount.scaleb(2)), currency=CURRENCY)  # as the API
+def _money(amount: Decimal, currency: str = CURRENCY) -> Money:
+    return Money(minor=int(amount.scaleb(2)), currency=currency)  # as the API
 
 
 def _month(led: Reads, month: str | None) -> str:
@@ -123,7 +123,9 @@ class SpendingSummaryOut(BaseModel):
     unmatched_refunds: Money
     categories: list[CategoryRow]
     truncated: bool
-    incomplete: bool  # an import Gap touches the month, as /api/summary's gaps
+    # an import Gap touches the month (/api/summary's gaps), or a foreign
+    # Transaction is left out for want of a rate (/api/fx/month's rate_needed)
+    incomplete: bool
 
 
 def spending_summary(led: Reads, inp: SpendingSummaryIn) -> SpendingSummaryOut:
@@ -147,7 +149,7 @@ def spending_summary(led: Reads, inp: SpendingSummaryIn) -> SpendingSummaryOut:
         unmatched_refunds=_money(b.unmatched_refunds),
         categories=rows[:MAX_ROWS],
         truncated=len(rows) > MAX_ROWS,
-        incomplete=bool(s.gaps),
+        incomplete=bool(s.gaps) or s.rate_needed > 0,
     )
 
 
@@ -287,7 +289,7 @@ def find_transactions(led: Reads, inp: FindTransactionsIn) -> FindTransactionsOu
                 posted_on=t.posted_on.isoformat(),
                 description=Data(data=t.description),
                 merchant=Data(data=c.merchant) if c and c.merchant else None,
-                amount=_money(t.amount),
+                amount=_money(t.amount, t.currency),  # its own currency
                 kind=c.kind if c else None,
                 category=list(c.category) if c and c.category else None,
             )

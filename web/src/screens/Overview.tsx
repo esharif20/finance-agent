@@ -1,7 +1,15 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
-import { NoData, fetchAccounts, fetchMonths, fetchSpending, fetchSummary } from "@/api/client";
+import {
+  NoData,
+  fetchAccounts,
+  fetchFxBalances,
+  fetchFxMonth,
+  fetchMonths,
+  fetchSpending,
+  fetchSummary,
+} from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { groupSpending } from "@/lib/categories";
@@ -34,6 +42,15 @@ export function Overview({ account }: { account?: number }) {
   });
   const months = useQuery({ queryKey: ["months"], queryFn: fetchMonths });
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: fetchAccounts });
+  // FX provenance and "rate needed" (#156), only once a foreign-currency Account exists
+  const foreign = !!accounts.data?.some((a) => a.currency !== "GBP");
+  const fx = useQuery({
+    queryKey: ["fx-month", month, account],
+    queryFn: () => fetchFxMonth(month as string, account),
+    enabled: foreign && !!month,
+    placeholderData: keepPreviousData,
+  });
+  const balances = useQuery({ queryKey: ["fx-balances"], queryFn: fetchFxBalances, enabled: foreign });
   // a hash naming an Account that isn't there (any more) shows All accounts
   const known = accounts.data?.some((a) => a.id === account) ? account : undefined;
   const select = (id: number | undefined) => {
@@ -101,7 +118,7 @@ export function Overview({ account }: { account?: number }) {
       <div className="grid items-start gap-6 lg:grid-cols-[7fr_5fr]">
         {/* first in the DOM: on a phone the view sits under the card stack */}
         <div className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1">
-          <AccountStack accounts={accounts.data} selected={account} onSelect={select} />
+          <AccountStack accounts={accounts.data} balances={balances.data} selected={account} onSelect={select} />
           {/* relative: paints above the stack's WebGL canvas, which overflows below the cards */}
           <motion.div key={view} {...settle} className="relative">
             {one ? (
@@ -112,7 +129,7 @@ export function Overview({ account }: { account?: number }) {
           </motion.div>
         </div>
         <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
-          <MonthCard summary={summary.data} slices={slices}>
+          <MonthCard summary={summary.data} slices={slices} fx={fx.data}>
             <TransfersLine summary={summary.data} combined={account === undefined} />
           </MonthCard>
           <SpendingDonut spending={spending.data} account={account} />

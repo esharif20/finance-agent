@@ -27,6 +27,8 @@ from typing import Any, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from finance_agent.ingest.types import NOT_HUNDREDTHS, NOT_HUNDREDTHS_REASON
+
 HOST = "www.lunchflow.app"  # the one allowlisted aggregator host (ADR 0013)
 # Spike: one 730-day request returned 684-727 days per Account. Other SimpleFIN
 # bridges truncate to 90 days (firefly-iii#12128); lower this for them.
@@ -120,7 +122,7 @@ def _minor(obj: dict[str, Any], key: str) -> int:
     text = _str(obj, key)
     if len(text) > 32 or not _AMOUNT.fullmatch(text):
         raise UnreadableResponse(f"field {key} is not a decimal amount")
-    # shortcut: assumes a 2-digit minor unit (GBP, EUR, USD); JPY/KWD need ISO 4217
+    # hundredths: an Account in a currency without them is refused (#156)
     minor = Decimal(text).scaleb(2)
     if minor != minor.to_integral_value():
         raise UnreadableResponse(f"field {key} has sub-minor-unit digits")
@@ -159,6 +161,8 @@ def _account(a: dict[str, Any]) -> SyncedAccount:
     currency = _str(a, "currency")
     if not pid or len(pid) > 256 or not _CURRENCY.fullmatch(currency):
         raise UnreadableResponse("account id or currency is malformed")
+    if currency in NOT_HUNDREDTHS:  # amounts are stored in hundredths (#156)
+        raise UnreadableResponse(f"account {NOT_HUNDREDTHS_REASON}")
     org = _obj(a.get("org", {}), "org")
     # spike: org.domain is always null; name, then id, identifies the Bank
     org_name = _str(org, "name", required=False) or _str(org, "id", required=False)
