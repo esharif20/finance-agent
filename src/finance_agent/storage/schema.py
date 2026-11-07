@@ -277,3 +277,25 @@ correction = Table(
         name="ck_correction_one_target",
     ),
 )
+
+# Subscription registry (#103), append-only like `correction`: the latest row per
+# Merchant is its entry, the rest is the history. `source` is "user" or
+# "detection"; once a Merchant has a user row, detection never writes for it.
+# A negative entry ("not a subscription") has status `not_subscription`.
+subscription_entry = Table(
+    "subscription_entry",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("merchant_id", Integer, ForeignKey("merchant.id"), nullable=False),
+    Column("source", String(16), nullable=False),
+    Column("kind", String(16)),  # "subscription" or "bill"; NULL when negative
+    Column("group_name", String(64)),  # a leaf of Subscriptions or Bills
+    Column("status", String(16), nullable=False),
+    Column("reason", String(16)),  # NULL when negative
+    Column("evidence_on", Date, nullable=False),
+    Column("charge_count", Integer),
+    Column("interval", String(16)),  # "weekly", "monthly" or "annual"
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Index("ix_subscription_entry_merchant", "user_id", "merchant_id"),
+)
