@@ -97,7 +97,8 @@ class CategoryItems:
                 and c.merchant_id is not None
                 and c.kind in CATEGORISED_KINDS
                 and c.category == (UNCATEGORISED, UNCATEGORISED)
-                and c.source != "correction"  # the user chose Uncategorised
+                # the user chose Uncategorised, or split it (its own items)
+                and c.source not in ("correction", "split", "split_refund")
             ):
                 rows.setdefault(c.merchant_id, []).append(t.id)
                 names[c.merchant_id] = c.merchant or ""
@@ -192,8 +193,96 @@ class DuplicateItems:
         pass  # keep_both writes nothing
 
 
+def _merchants(txns: Sequence[Transaction]) -> dict[int, tuple[int | None, str]]:
+    return {
+        t.id: (c.merchant_id, c.merchant or "")
+        for t in txns
+        if (c := t.categorisation) is not None
+    }
+
+
+class SplitRecheckItems:
+    """A Split whose Transaction amount changed, so its parts no longer add up
+    (#123). It counts whole under its largest part until re-split (through the
+    Splits API) or reverted here; parts are never rescaled."""
+
+    name = "split_recheck"
+
+    def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
+        names = _merchants(txns)
+        for s in led.splits():
+            if s.needs_recheck:
+                merchant_id, title = names.get(s.transaction_id, (None, ""))
+                yield Item(
+                    self.name,
+                    str(s.id),
+                    _version(s.id, s.amount_minor),
+                    1,
+                    title,
+                    merchant_id,
+                    (s.transaction_id,),
+                    choices=("revert",),
+                )
+
+    def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
+        if answer != Answer(choice="revert"):
+            raise InvalidAnswer("a re-check item takes revert; re-split instead")
+        return led.revert_split(item.transaction_ids[0])
+
+    def undo(self, led: Ledger, effect_id: int) -> None:
+        led.restore_split(effect_id)
+
+
+class SplitRefundItems:
+    """ "Which part?": a Refund of a split purchase (#123), counted under the
+    largest part until answered with one of the parts' Categories, which
+    becomes a Correction on the Refund."""
+
+    name = "split_refund"
+
+    def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
+        for t in txns:
+            c = t.categorisation
+            if c is not None and c.refund_of is not None:
+                split = led.split(c.refund_of)
+                yield Item(
+                    self.name,
+                    str(t.id),
+                    _version(c.refund_of, split.id if split else None),
+                    1,
+                    c.merchant or "",
+                    c.merchant_id,
+                    (t.id, c.refund_of),  # the Refund, then the split purchase
+                )
+
+    def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
+        refund, purchase = item.transaction_ids
+        split = led.split(purchase)
+        parts = {p.category for p in (split.parts if split else ())}
+        if (
+            answer.category is None
+            or answer.choice is not None
+            or answer.transaction_id not in (None, refund)
+        ):
+            raise InvalidAnswer("a Which part? item takes one part's Category")
+        cat = (answer.category[0], answer.category[1])
+        if cat not in parts:
+            raise InvalidAnswer("not one of the split's parts")
+        return led.correct_transaction(refund, cat).id
+
+    def undo(self, led: Ledger, effect_id: int) -> None:
+        CategoryItems().undo(led, effect_id)
+
+
 ITEM_TYPES: dict[str, ItemType] = {
-    t.name: t for t in (CategoryItems(), SubscriptionItems(), DuplicateItems())
+    t.name: t
+    for t in (
+        CategoryItems(),
+        SubscriptionItems(),
+        DuplicateItems(),
+        SplitRecheckItems(),
+        SplitRefundItems(),
+    )
 }
 
 # money modules take no float: a later scorer (information gain) returns a Decimal
