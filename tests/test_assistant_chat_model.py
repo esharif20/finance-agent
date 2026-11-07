@@ -106,6 +106,14 @@ def test_ollama_accepts_only_local_11434(url: str) -> None:
         "http://0.0.0.0:11434",
         "file:///etc/passwd",
         "localhost:11434",
+        # verifier (#164): more look-alikes and a malformed IPv6 literal
+        "http://[::ffff:127.0.0.1]:11434",
+        "http://localhost.:11434",
+        "http://127.1:11434",
+        "http://2130706433:11434",
+        "http://[::1:11434]",
+        "http://localhost:11434\\@evil.example",
+        "http://localhost:+11434",
     ],
 )
 def test_ollama_refuses_any_other_base_url(url: str) -> None:
@@ -333,6 +341,17 @@ def test_ollama_stream_rejects_a_malformed_tool_call() -> None:
         "done": True,
     }
     model, _ = ollama_with(body=json.dumps(line).encode())
+    with pytest.raises(OllamaError):
+        list(model.stream(ASK))
+
+
+def test_a_socket_error_mid_stream_is_an_ollama_error() -> None:
+    class Dropped(FakeResponse):
+        def __iter__(self) -> Iterator[bytes]:
+            yield b'{"message": {"content": "Eating "}, "done": false}\n'
+            raise TimeoutError("synthetic drop")
+
+    model = OllamaChatModel(connect=lambda: FakeConnection(Dropped(200, b"", {})))
     with pytest.raises(OllamaError):
         list(model.stream(ASK))
 

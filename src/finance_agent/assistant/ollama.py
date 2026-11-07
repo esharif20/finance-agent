@@ -74,11 +74,13 @@ _TOOL_CALLS = TypeAdapter(list[_WireToolCall])
 
 
 def _local_endpoint(base_url: str) -> tuple[str, int]:
-    parts = urlsplit(base_url)
     try:
+        parts = urlsplit(base_url)
         port = parts.port
-    except ValueError:
-        port = None
+    except ValueError:  # e.g. a malformed IPv6 literal or port
+        raise OllamaHostRefused(
+            "the assistant may only talk to http://localhost:11434"
+        ) from None
     if (
         parts.scheme != "http"
         or parts.hostname not in LOCAL_HOSTS
@@ -206,7 +208,14 @@ class OllamaChatModel:
         self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()
     ) -> Iterator[Reply]:
         with self._post(messages, tools, stream=True) as resp:
-            for line in resp:
+            lines = iter(resp)
+            while True:
+                try:
+                    line = next(lines, None)
+                except (OSError, http.client.HTTPException):
+                    raise OllamaError("the Ollama stream broke off") from None
+                if line is None:
+                    return
                 if not line.strip():
                     continue
                 chunk = _json(line)

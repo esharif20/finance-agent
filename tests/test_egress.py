@@ -79,16 +79,57 @@ sys.exit(1 if attempts else 0)
 """
 
 
-def test_assistant_import_and_a_graph_run_open_no_socket() -> None:
+# Verifier (#164): langgraph imported and a graph compiled before the assistant
+# (as another module might), runs twice through invoke and stream, then a wait
+# for delayed telemetry; DNS, UDP and TLS hooks too.
+LATE_PROBE = """
+import socket, ssl, sys, time
+attempts = []
+def record(name):
+    def guard(*a, **k):
+        attempts.append((name, repr(a[:3])))
+        raise OSError("egress blocked by probe")
+    return guard
+for n in ("getaddrinfo", "gethostbyname", "gethostbyname_ex", "create_connection"):
+    setattr(socket, n, record(n))
+for n in ("connect", "connect_ex", "sendto", "sendmsg"):
+    setattr(socket.socket, n, record(n))
+ssl.SSLContext.wrap_socket = record("ssl.wrap_socket")
+
+from typing import TypedDict
+from langchain_core.runnables import RunnableLambda
+from langgraph.graph import StateGraph, START, END
+
+class S(TypedDict):
+    n: int
+
+g = StateGraph(S)
+g.add_node("inc", RunnableLambda(lambda s: {"n": s["n"] + 1}))
+g.add_edge(START, "inc")
+g.add_edge("inc", END)
+app = g.compile()
+import finance_agent.assistant
+for _ in range(2):
+    assert app.invoke({"n": 1}) == {"n": 2}
+    assert list(app.stream({"n": 1}))
+time.sleep(3)
+print(attempts)
+sys.exit(1 if attempts else 0)
+"""
+
+
+@pytest.mark.parametrize("probe", [PROBE, LATE_PROBE], ids=["first", "late"])
+def test_assistant_import_and_a_graph_run_open_no_socket(probe: str) -> None:
     env = {
         **os.environ,
         "LANGSMITH_TRACING": "true",
         "LANGCHAIN_TRACING_V2": "true",
         "LANGSMITH_API_KEY": "lsv2_synthetic_not_a_key",
         "LANGSMITH_ENDPOINT": "http://tracer.invalid",
+        "LANGSMITH_OTEL_ENABLED": "true",
     }
     run = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", PROBE], env=env, capture_output=True, text=True
+        [sys.executable, "-c", probe], env=env, capture_output=True, text=True
     )
     assert run.returncode == 0, run.stdout + run.stderr
 
