@@ -21,10 +21,10 @@
   --data: #0e6f8a; /* single-series chart hue, 195: between the ambient blue and teal */
   --ring: #0b66c3;
   /* Ambient fields: blue 210, teal 172, sky 198, apricot 22. None in 235-290. */
-  --field-a: rgb(40 128 222 / 0.24);
-  --field-b: rgb(22 176 152 / 0.2);
-  --field-c: rgb(60 170 230 / 0.18);
-  --field-d: rgb(255 168 120 / 0.14);
+  --field-a: rgb(40 128 222 / 0.36);
+  --field-b: rgb(22 176 152 / 0.3);
+  --field-c: rgb(60 170 230 / 0.2);
+  --field-d: rgb(255 168 120 / 0.21);
   --glass-bg: rgb(255 255 255 / 0.58);
   --glass-edge: rgb(255 255 255 / 0.75);
   --glass-shadow: 0 8px 24px rgb(27 29 31 / 0.08);
@@ -52,10 +52,10 @@
     --spent: #c9cdd2;
     --data: #5cc3dc;
     --ring: #7da2f7;
-    --field-a: rgb(30 110 220 / 0.36);
-    --field-b: rgb(16 160 136 / 0.28);
+    --field-a: rgb(30 110 220 / 0.5);
+    --field-b: rgb(16 160 136 / 0.42);
     --field-c: rgb(40 150 210 / 0.26);
-    --field-d: rgb(214 120 80 / 0.16);
+    --field-d: rgb(214 120 80 / 0.24);
     --glass-bg: rgb(40 44 48 / 0.5);
     --glass-edge: rgb(255 255 255 / 0.16);
     --glass-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
@@ -146,7 +146,7 @@
   }
 }
 
-/* Ambient: four large soft colour fields drifting on 37-59s loops (unequal, so the pattern
+/* Ambient: four large soft colour fields drifting on 24-38s loops (unequal, so the pattern
    never visibly repeats). Fixed to the viewport, so it covers the whole document in both
    schemes with no seam. Transform only: compositor work, no repaint per frame. */
 .ambient {
@@ -164,7 +164,7 @@
   border-radius: 50%;
   will-change: transform;
   /* Longhands: the build minifier turns a nameless `animation` shorthand into `animation:none`. */
-  animation-duration: 47s;
+  animation-duration: 31s;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
   animation-direction: alternate;
@@ -181,14 +181,14 @@
   top: -22vmax;
   background: radial-gradient(closest-side, var(--field-b), transparent);
   animation-name: drift-2;
-  animation-duration: 59s;
+  animation-duration: 38s;
 }
 .ambient i:nth-child(3) {
   left: 4vmax;
   bottom: -34vmax;
   background: radial-gradient(closest-side, var(--field-c), transparent);
   animation-name: drift-3;
-  animation-duration: 53s;
+  animation-duration: 34s;
 }
 .ambient i:nth-child(4) {
   right: -18vmax;
@@ -197,27 +197,27 @@
   height: 62vmax;
   background: radial-gradient(closest-side, var(--field-d), transparent);
   animation-name: drift-4;
-  animation-duration: 37s;
+  animation-duration: 24s;
 }
 @keyframes drift-1 {
   0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(24vmax, 14vmax, 0) scale(1.12); }
-  100% { transform: translate3d(10vmax, 30vmax, 0) scale(0.94); }
+  50% { transform: translate3d(30vmax, 18vmax, 0) scale(1.16); }
+  100% { transform: translate3d(12vmax, 38vmax, 0) scale(0.92); }
 }
 @keyframes drift-2 {
   0% { transform: translate3d(0, 0, 0) scale(1.05); }
-  50% { transform: translate3d(-22vmax, 20vmax, 0) scale(0.92); }
-  100% { transform: translate3d(-8vmax, 40vmax, 0) scale(1.1); }
+  50% { transform: translate3d(-28vmax, 26vmax, 0) scale(0.9); }
+  100% { transform: translate3d(-10vmax, 50vmax, 0) scale(1.14); }
 }
 @keyframes drift-3 {
   0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(26vmax, -18vmax, 0) scale(1.15); }
-  100% { transform: translate3d(44vmax, -6vmax, 0) scale(0.95); }
+  50% { transform: translate3d(32vmax, -22vmax, 0) scale(1.18); }
+  100% { transform: translate3d(54vmax, -8vmax, 0) scale(0.93); }
 }
 @keyframes drift-4 {
   0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(-30vmax, -14vmax, 0) scale(1.18); }
-  100% { transform: translate3d(-12vmax, -32vmax, 0) scale(1); }
+  50% { transform: translate3d(-38vmax, -18vmax, 0) scale(1.22); }
+  100% { transform: translate3d(-15vmax, -40vmax, 0) scale(1); }
 }
 .ambient[data-paused] i {
   animation-play-state: paused;
