@@ -33,6 +33,9 @@ LEVEL = 0.8
 HORIZON = 3
 MIN_TRAIN = 13
 SEASON = 12
+# ETS fits in float: another platform's optimiser can move a score in its last
+# digits (one pence crossing an interval edge moves a coverage by 1/414)
+REPRODUCE_TOLERANCE = 0.005
 
 
 class Forecast(NamedTuple):
@@ -158,4 +161,9 @@ def lower_is_better(name: str) -> bool:
 
 
 if __name__ == "__main__":
-    sys.exit(gate.run("forecast", evaluate, RESULTS, lower_is_better, sys.argv[1:]))
+    argv = sys.argv[1:]
+    sys.exit(
+        gate.run(
+            "forecast", evaluate, RESULTS, lower_is_better, argv, REPRODUCE_TOLERANCE
+        )
+    )

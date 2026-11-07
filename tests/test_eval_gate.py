@@ -89,3 +89,20 @@ def test_a_results_file_edited_to_claim_better_numbers_fails_ci(
     path.write_text(json.dumps(claimed))
     run = gate.run("detectors", detectors.evaluate, path, detectors.lower_is_better, [])
     assert run == 1
+
+
+def test_a_float_model_reproduces_within_its_declared_tolerance(
+    tmp_path: Path,
+) -> None:
+    # #149: ETS fits in float, so another platform's optimiser can move a
+    # number in its last digits; such a harness declares how far
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(_results(0.8)))
+    near, far = _results(0.8 + 0.004), _results(0.8 + 0.006)
+    assert gate.run("t", lambda: near, path, _lower, []) == 1  # exact by default
+    assert gate.run("t", lambda: near, path, _lower, [], tolerance=0.005) == 0
+    assert gate.run("t", lambda: far, path, _lower, [], tolerance=0.005) == 1
+    renamed = {**_results(0.8), "dataset_sha256": "b"}  # text is always exact
+    assert gate.run("t", lambda: renamed, path, _lower, [], tolerance=0.005) == 1
+    recount = {**_results(0.8), "dataset_version": 1.004}  # so are integers
+    assert gate.run("t", lambda: recount, path, _lower, [], tolerance=0.005) == 1

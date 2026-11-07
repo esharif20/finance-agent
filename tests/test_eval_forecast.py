@@ -65,6 +65,7 @@ def test_committed_results_are_reproducible_from_the_seed() -> None:
             forecast.RESULTS,
             forecast.lower_is_better,
             [],
+            forecast.REPRODUCE_TOLERANCE,
         )
         == 0
     )
