@@ -7,6 +7,7 @@ import pytest
 
 from finance_agent.cli import launcher
 from finance_agent.cli import main as fa
+from finance_agent.storage import open_db
 
 
 class Fake:
@@ -108,6 +109,7 @@ def test_fa_with_no_arguments_and_fa_stop_use_the_launcher(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     calls: list[str] = []
+    open_db().dispose()  # `fa import` made the ledger earlier
 
     class Spy:
         def start(self) -> None:
@@ -124,6 +126,21 @@ def test_fa_with_no_arguments_and_fa_stop_use_the_launcher(
 
     assert calls == ["start", "stop"]
     assert "not running" in capsys.readouterr().out
+
+
+def test_fa_never_creates_the_ledger_it_would_serve(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "nowhere" / "ledger.db"
+    monkeypatch.setenv("FA_DB_PATH", str(db))
+    monkeypatch.setattr(launcher, "default", lambda: pytest.fail("started"))
+
+    assert fa([]) == 1
+
+    assert "fa import" in capsys.readouterr().err
+    assert not db.parent.exists()
 
 
 def test_fa_no_browser_env_keeps_the_browser_closed(

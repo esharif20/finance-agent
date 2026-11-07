@@ -7,15 +7,25 @@ import logging
 import time
 import unicodedata
 from collections import Counter, defaultdict
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from datetime import time as clock
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Connection, Select, case, func, select, union
+from sqlalchemy import (
+    ColumnElement,
+    Connection,
+    Select,
+    and_,
+    case,
+    func,
+    or_,
+    select,
+    union,
+)
 
 from finance_agent import ingest
 from finance_agent.ingest import simplefin
@@ -48,6 +58,7 @@ class ImportReport:
     # such as one row that is either of two twins (ADR 0006); longest, then
     # earliest, is used
     ambiguous: int = 0
+    files_imported: int = 0  # files stored or already known; not rejected
 
 
 log = logging.getLogger(__name__)  # counts, IDs and timings only
@@ -108,6 +119,13 @@ class UnknownTarget(ValueError):
     """No such Transaction, Merchant, Category or Correction for this user."""
 
 
+CATEGORISED_KINDS = ("Spending", "Refund")  # the only Kinds that take a Category
+
+
+class KindHasNoCategory(ValueError):
+    """Transfers, Income and Fees take no Category, so a Correction is refused."""
+
+
 @dataclass(frozen=True)
 class Merchant:
     id: int  # stable across imports and rule changes
@@ -126,6 +144,13 @@ class Transaction:
     bank_type: str = ""  # the Bank's Transaction Type code; not the Kind
     transfer_with: int | None = None  # the other leg of an own-account Transfer
     categorisation: Categorisation | None = None  # None until `categorise.run`
+    account_id: int = 0
+
+
+@dataclass(frozen=True)
+class TransactionPage:
+    items: list[Transaction]
+    total: int  # every match, before limit and offset
 
 
 @dataclass(frozen=True)
@@ -171,6 +196,33 @@ class Spend:
     name: str
     amount: Decimal
     children: tuple["Spend", ...] = ()
+    # set on Merchant rows (None for "Unknown"); a key, not a figure, so equality
+    # stays about names and amounts
+    merchant_id: int | None = field(default=None, compare=False)
+
+
+def _top_merchants(subs: Iterable[Spend], n: int) -> tuple[Spend, ...]:
+    """The `n` largest Merchants across Subcategories, keyed by Merchant id."""
+    total: dict[tuple[int | None, str], Decimal] = {}
+    for m in (m for sub in subs for m in sub.children):
+        key = (m.merchant_id, m.name)
+        total[key] = total.get(key, Decimal(0)) + m.amount
+    ranked = sorted(total.items(), key=lambda kv: (-kv[1], kv[0][1]))[:n]
+    return tuple(Spend(name, a, merchant_id=i) for (i, name), a in ranked)
+
+
+@dataclass(frozen=True)
+class CategoryDetail:
+    """One Category in one month: its Subcategories, top Merchants (across
+    Subcategories), spending per month for the trailing `trend` months (oldest
+    first, ending at `month`) and the month's Spending and Refund Transactions."""
+
+    name: str
+    total: Decimal
+    subcategories: tuple[Spend, ...]
+    merchants: tuple[Spend, ...]
+    trend: tuple[tuple[str, Decimal], ...]
+    transactions: tuple[Transaction, ...]
 
 
 @dataclass(frozen=True)
@@ -195,6 +247,22 @@ class AccountBalance:
     bank_balance: Decimal  # the Bank's last running balance (the truth)
     ledger_balance: Decimal  # opening balance plus every Transaction we hold
     gaps: list[Gap]  # bank_balance - ledger_balance == sum of these amounts
+    bank: str = ""  # the Bank's name, e.g. "Lloyds"
+    last_import: datetime | None = None  # newest statement holding its rows
+    source: str = ""  # how that statement came in: "csv"
+
+
+@dataclass(frozen=True)
+class Breakdown:
+    """A month's spending by Category and what separates it from Money out:
+    money_out == spending_after_refunds + refunds + fees (ADR 0004)."""
+
+    categories: tuple[Spend, ...]  # Uncategorised is gross; never negative here
+    unmatched_refunds: Decimal  # <= 0: Refunds with no Category, kept off the ring
+    spending_after_refunds: Decimal  # == sum(categories) + unmatched_refunds
+    refunds: Decimal  # all Refunds received in the month
+    fees: Decimal
+    merchants: tuple[Spend, ...] = ()  # top Merchants across Categories
 
 
 @dataclass(frozen=True)
@@ -205,6 +273,9 @@ class MonthSummary:
     money_out: Decimal  # positive
     net: Decimal
     gaps: list[Gap]  # Gaps touching the month: the figures may be incomplete
+    # Transfers between the user's own Accounts, left out of money in and out
+    transfers_in: Decimal = Decimal(0)
+    transfers_out: Decimal = Decimal(0)  # positive
 
 
 @dataclass(frozen=True)
@@ -218,6 +289,16 @@ class BankOrderRow:
 
 def _decimal(minor: int) -> Decimal:
     return Decimal(minor).scaleb(-2)
+
+
+UNCATEGORISED = "Uncategorised"  # the catch-all Category; categorise seeds it
+# shortcut: one currency until FX conversion lands; then sum gbp_minor
+CURRENCY = "GBP"
+
+
+def _only(account_id: int | None) -> list[ColumnElement[bool]]:
+    """WHERE terms narrowing a Transaction query to one Account, if given."""
+    return [] if account_id is None else [schema.transaction.c.account_id == account_id]
 
 
 MATCH_DAYS = 3  # ADR 0014; first guess until a superseding ADR
@@ -277,7 +358,7 @@ class Ledger:
         self._merged = 0  # pairs merged by _match, for reports
 
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
-        added = known = ambiguous = 0
+        added = known = ambiguous = files = 0
         stored = False
         rejected: list[Rejection] = []
         accounts: dict[int, str] = {}
@@ -286,6 +367,13 @@ class Ledger:
             data = path.read_bytes()
             try:
                 parsed = ingest.parse(data)
+            except ingest.UnknownFormat:
+                # the whole batch stops (the caller's transaction rolls back), so a
+                # file of another Bank is never half of an import
+                raise ingest.UnknownFormat(
+                    f"{path.name}: no Importer recognises this file's header; "
+                    "nothing in this batch was imported"
+                ) from None
             except ingest.UnreadableFile as e:
                 rejected.append(Rejection(path.name, e.line, e.reason))
                 log.info("import file=%d rejected=1", n)
@@ -302,6 +390,7 @@ class Ledger:
                 self._db.select(si, si.c.id).where(si.c.file_hash == digest)
             ).first():
                 known += len(parsed.rows)
+                files += 1
                 log.info("import file=%d already_known=%d", n, len(parsed.rows))
                 continue
             stored = True
@@ -349,6 +438,7 @@ class Ledger:
                     bank_position=position,
                 )
             added += file_added
+            files += 1
             log.info(
                 "import file=%d statement_import_id=%d added=%d ms=%d",
                 n,
@@ -369,10 +459,59 @@ class Ledger:
             rejected,
             [AffectedAccount(i, m) for i, m in sorted(accounts.items())],
             ambiguous,
+            files,
         )
 
     def transactions(self) -> list[Transaction]:
         """Every stored Transaction, oldest first."""
+        return self._transactions()
+
+    def search_transactions(
+        self,
+        account_id: int | None = None,
+        kind: str | None = None,
+        category: str | None = None,
+        month: str | None = None,
+        query: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> TransactionPage:
+        """Transactions matching every filter given, newest first. `category` is
+        a top-level name, after Corrections; `query` is a case-insensitive
+        substring of the description or the Merchant's name."""
+        t, c, m = schema.transaction, schema.categorisation, schema.merchant
+        terms = _only(account_id)
+        if month is not None:
+            start, end = _month_bounds(month)
+            terms += [t.c.posted_on >= start, t.c.posted_on < end]
+        if kind is not None:  # Corrections change the Category, never the Kind
+            terms.append(
+                t.c.id.in_(
+                    self._db.select(c, c.c.transaction_id).where(c.c.kind == kind)
+                )
+            )
+        needle = (query or "").strip().lower()
+        if needle:
+            named = (
+                self._db.select(c, c.c.transaction_id)
+                .join(m, self._db.on(m, m.c.id == c.c.merchant_id))
+                .where(func.lower(m.c.name).contains(needle, autoescape=True))
+            )
+            terms.append(
+                or_(
+                    func.lower(t.c.description).contains(needle, autoescape=True),
+                    t.c.id.in_(named),
+                )
+            )
+        rows = [
+            x
+            for x in reversed(self._transactions(*terms))
+            if category is None
+            or ((k := x.categorisation) and k.category and k.category[0] == category)
+        ]
+        return TransactionPage(rows[offset : offset + limit], len(rows))
+
+    def _transactions(self, *where: ColumnElement[bool]) -> list[Transaction]:
         t, src, si = (
             schema.transaction,
             schema.transaction_source,
@@ -387,14 +526,17 @@ class Ledger:
                 t.c.amount_minor,
                 t.c.running_balance_minor,
                 t.c.bank_type,
-            ).order_by(t.c.posted_on, t.c.id)
+                t.c.account_id,
+            )
+            .where(*where)
+            .order_by(t.c.posted_on, t.c.id)
         ).all()
         other_leg = self._transfer_legs()
         cats = self._categorisations()
         hashes: dict[int, set[str]] = {}
         for link in self._db.execute(
             self._db.select(src, src.c.transaction_id, si.c.file_hash).join(
-                si, si.c.id == src.c.statement_import_id
+                si, self._db.on(si, si.c.id == src.c.statement_import_id)
             )
         ):
             hashes.setdefault(link.transaction_id, set()).add(link.file_hash)
@@ -411,6 +553,7 @@ class Ledger:
                 r.bank_type,
                 other_leg.get(r.id),
                 cats.get(r.id),
+                r.account_id,
             )
             for r in rows
         ]
@@ -600,7 +743,7 @@ class Ledger:
         rows = self._db.execute(
             self._db.select(g, g.c.account_id, a.c.masked_number, g.c.balance_ts)
             .add_columns(g.c.amount_minor)
-            .join(a, a.c.id == g.c.account_id)
+            .join(a, self._db.on(a, a.c.id == g.c.account_id))
             .order_by(g.c.id)
         )
         return [
@@ -818,7 +961,7 @@ class Ledger:
                 t.c.currency,
                 k.c.provider_id,
             )
-            .outerjoin(k, k.c.transaction_id == t.c.id)
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
             .where(t.c.account_id == account_id)
         ).all()
         groups: dict[tuple[int, str, str], list[_MatchRow]] = defaultdict(list)
@@ -904,7 +1047,7 @@ class Ledger:
         moved = 0
         for r in self._db.execute(
             self._db.select(t, t.c.posted_on, t.c.amount_minor, k.c.posted_ts)
-            .outerjoin(k, k.c.transaction_id == t.c.id)
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
             .where(t.c.account_id == account_id)
         ):
             instant = (
@@ -921,7 +1064,9 @@ class Ledger:
             _decimal(gap),
         )
 
-    def spending_by_category(self, month: str) -> list[Spend]:
+    def spending_by_category(
+        self, month: str, account_id: int | None = None
+    ) -> list[Spend]:
         """Spending minus Refunds received in `month` (ADR 0004), by Category,
         then Subcategory, then Merchant ("Unknown" when none), largest first."""
         start, end = _month_bounds(month)
@@ -932,23 +1077,25 @@ class Ledger:
                 self._db.select(t, t.c.id, t.c.amount_minor).where(
                     t.c.posted_on >= start,
                     t.c.posted_on < end,
-                    t.c.currency == "GBP",  # shortcut: as in summarise_month
+                    t.c.currency == CURRENCY,
+                    *_only(account_id),
                 )
             )
         }
-        tree: dict[str, dict[str, dict[str, int]]] = {}
+        tree: dict[str, dict[str, dict[tuple[int | None, str], int]]] = {}
         for txn_id, c in self._categorisations().items():
             if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
                 top, sub = c.category
                 merchants = tree.setdefault(top, {}).setdefault(sub, {})
-                key = c.merchant or "Unknown"
+                key = (c.merchant_id, c.merchant or "Unknown")
                 merchants[key] = merchants.get(key, 0) - amounts[txn_id]
 
-        def level(nodes: dict[str, Any]) -> tuple[Spend, ...]:
+        def level(nodes: dict[Any, Any]) -> tuple[Spend, ...]:
             out: list[Spend] = []
             for name, v in nodes.items():
                 if isinstance(v, int):  # a Merchant's minor-unit total
-                    out.append(Spend(name, _decimal(v)))
+                    merchant_id, label = name
+                    out.append(Spend(label, _decimal(v), merchant_id=merchant_id))
                 else:
                     kids = level(v)
                     total = sum((k.amount for k in kids), Decimal(0))
@@ -956,6 +1103,96 @@ class Ledger:
             return tuple(sorted(out, key=lambda s: (-s.amount, s.name)))
 
         return list(level(tree))
+
+    def category_detail(
+        self,
+        name: str,
+        month: str,
+        trend: int = 6,
+        top_merchants: int = 5,
+        account_id: int | None = None,
+    ) -> CategoryDetail | None:
+        """None when the month has nothing in Category `name`."""
+        start, end = _month_bounds(month)
+
+        def total_in(m: str) -> Spend | None:
+            return next(
+                (s for s in self.spending_by_category(m, account_id) if s.name == name),
+                None,
+            )
+
+        here = total_in(month)
+        if here is None:
+            return None
+        months = [
+            f"{(end.year * 12 + end.month - 2 - i) // 12}-"
+            f"{(end.month - 2 - i) % 12 + 1:02d}"
+            for i in range(trend - 1, -1, -1)
+        ]
+        series = tuple(
+            (m, s.amount if (s := total_in(m)) else Decimal(0)) for m in months
+        )
+        txns = tuple(
+            t
+            for t in reversed(self.transactions())
+            if start <= t.posted_on < end
+            and account_id in (None, t.account_id)
+            and (c := t.categorisation)
+            and c.kind in ("Spending", "Refund")
+            and c.category
+            and c.category[0] == name
+        )
+        return CategoryDetail(
+            name,
+            here.amount,
+            here.children,
+            _top_merchants(here.children, top_merchants),
+            series,
+            txns,
+        )
+
+    def category_breakdown(
+        self, month: str, account_id: int | None = None
+    ) -> Breakdown:
+        start, end = _month_bounds(month)
+        spends = self.spending_by_category(month, account_id)
+        refunds = fees = unmatched = Decimal(0)
+        mine = None
+        if account_id is not None:
+            tt = schema.transaction
+            mine = set(
+                self._db.execute(
+                    self._db.select(tt, tt.c.id).where(*_only(account_id))
+                ).scalars()
+            )
+        for t in self.transactions():
+            c = t.categorisation
+            if c is None or not start <= t.posted_on < end:
+                continue
+            if mine is not None and t.id not in mine:
+                continue
+            if c.kind == "Fee":
+                fees -= t.amount
+            elif c.kind == "Refund":
+                refunds += t.amount
+                if c.category and c.category[0] == UNCATEGORISED:
+                    unmatched -= t.amount
+        cats: list[Spend] = []
+        for sp in spends:
+            if sp.name == UNCATEGORISED:
+                sp = replace(sp, amount=sp.amount - unmatched)
+                if sp.amount == 0:
+                    continue
+            cats.append(sp)
+        total = sum((sp.amount for sp in spends), Decimal(0))
+        return Breakdown(
+            tuple(cats),
+            unmatched,
+            total,
+            refunds,
+            fees,
+            _top_merchants((sub for sp in spends for sub in sp.children), 5),
+        )
 
     def merchants(self) -> list[Merchant]:
         """Every Merchant of this user with its default Category, by name."""
@@ -972,8 +1209,8 @@ class Ledger:
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
             )
-            .outerjoin(sub, sub.c.id == m.c.default_category_id)
-            .outerjoin(top, top.c.id == sub.c.parent_id)
+            .outerjoin(sub, self._db.on(sub, sub.c.id == m.c.default_category_id))
+            .outerjoin(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .order_by(m.c.name)
         )
         return [
@@ -1000,9 +1237,9 @@ class Ledger:
                 top.c.name.label("top"),
                 sub.c.name.label("sub"),
             )
-            .outerjoin(m, m.c.id == c.c.merchant_id)
-            .outerjoin(sub, sub.c.id == c.c.category_id)
-            .outerjoin(top, top.c.id == sub.c.parent_id)
+            .outerjoin(m, self._db.on(m, m.c.id == c.c.merchant_id))
+            .outerjoin(sub, self._db.on(sub, sub.c.id == c.c.category_id))
+            .outerjoin(top, self._db.on(top, top.c.id == sub.c.parent_id))
         )
         by_txn: dict[int, tuple[str, str]] = {}
         by_merchant: dict[int, tuple[str, str]] = {}
@@ -1018,7 +1255,7 @@ class Ledger:
             # Corrections beat every rule (ADR 0005); Kinds without a Category
             # (Income, Transfer, Fee) ignore them
             fix = by_txn.get(r.transaction_id) or by_merchant.get(r.merchant_id)
-            if fix and r.kind in ("Spending", "Refund"):
+            if fix and r.kind in CATEGORISED_KINDS:
                 category, source = fix, "correction"
             out[r.transaction_id] = Categorisation(
                 r.kind, r.merchant, category, source, r.taxonomy_version, r.merchant_id
@@ -1033,9 +1270,15 @@ class Ledger:
         self, transaction_id: int, category: tuple[str, str]
     ) -> Correction:
         """Give one Transaction this Category, over any rule or Merchant."""
-        t = schema.transaction
+        t, c = schema.transaction, schema.categorisation
         self._exists(self._db.select(t, t.c.id).where(t.c.id == transaction_id))
-        return self._correct(category, transaction_id=transaction_id)
+        kind = self._db.execute(
+            self._db.select(c, c.c.kind).where(c.c.transaction_id == transaction_id)
+        ).scalar()
+        category_id = self._category_id(category)  # an unknown one is a 404 first
+        if kind is not None and kind not in CATEGORISED_KINDS:
+            raise KindHasNoCategory(f"{kind} takes no Category")
+        return self._correct(category_id, transaction_id=transaction_id)
 
     def correct_merchant(
         self, merchant_id: int, category: tuple[str, str]
@@ -1044,7 +1287,7 @@ class Ledger:
         a Correction for one Transaction still beats it."""
         m = schema.merchant
         self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
-        return self._correct(category, merchant_id=merchant_id)
+        return self._correct(self._category_id(category), merchant_id=merchant_id)
 
     def revert_correction(self, correction_id: int) -> None:
         """Undo a Correction; it stays in the history, marked reverted."""
@@ -1076,8 +1319,8 @@ class Ledger:
                 k.c.created_at,
                 k.c.reverted_at,
             )
-            .join(sub, sub.c.id == k.c.category_id)
-            .join(top, top.c.id == sub.c.parent_id)
+            .join(sub, self._db.on(sub, sub.c.id == k.c.category_id))
+            .join(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .order_by(k.c.id)
         )
         return [
@@ -1092,20 +1335,22 @@ class Ledger:
             for r in rows
         ]
 
-    def _correct(self, category: tuple[str, str], **target: int) -> Correction:
+    def _category_id(self, category: tuple[str, str]) -> int:
         sub, top = schema.category, schema.category.alias("top")
         latest = self._db.execute(
             self._db.select(sub, func.max(sub.c.taxonomy_version))
         ).scalar()
-        category_id = self._exists(  # a leaf of the current taxonomy version only
+        return self._exists(  # a leaf of the current taxonomy version only
             self._db.select(sub, sub.c.id)
-            .join(top, top.c.id == sub.c.parent_id)
+            .join(top, self._db.on(top, top.c.id == sub.c.parent_id))
             .where(
                 top.c.name == category[0],
                 sub.c.name == category[1],
                 sub.c.taxonomy_version == latest,
             )
         )
+
+    def _correct(self, category_id: int, **target: int) -> Correction:
         cid = self._db.insert(
             schema.correction,
             category_id=category_id,
@@ -1121,30 +1366,46 @@ class Ledger:
             raise UnknownTarget("unknown target")
         return int(row[0])
 
-    def summarise_month(self, month: str) -> MonthSummary:
+    def summarise_month(
+        self, month: str, account_id: int | None = None
+    ) -> MonthSummary:
         start, end = _month_bounds(month)
         t = schema.transaction
         amt = t.c.amount_minor
+        moved = t.c.id.in_(self._transfer_ids())  # neither spending nor income
+
+        def total(*when: ColumnElement[bool], sign: int = 1) -> Any:
+            return func.coalesce(func.sum(case((and_(*when), amt * sign), else_=0)), 0)
+
         stmt = self._db.select(
             t,
-            func.coalesce(func.sum(case((amt > 0, amt), else_=0)), 0),
-            func.coalesce(func.sum(case((amt < 0, -amt), else_=0)), 0),
+            total(amt > 0, ~moved),
+            total(amt < 0, ~moved, sign=-1),
+            total(amt > 0, moved),
+            total(amt < 0, moved, sign=-1),
         ).where(
             t.c.posted_on >= start,
             t.c.posted_on < end,
-            # shortcut: GBP only until FX conversion lands; then sum gbp_minor
-            t.c.currency == "GBP",
-            t.c.id.not_in(self._transfer_ids()),  # neither spending nor income
+            t.c.currency == CURRENCY,
+            *_only(account_id),
         )
         row = self._db.execute(stmt).one()
-        ins, outs = (int(v) for v in row)
+        ins, outs, moved_in, moved_out = (int(v) for v in row)
         return MonthSummary(
             month,
-            "GBP",
+            CURRENCY,
             _decimal(ins),
             _decimal(outs),
             _decimal(ins - outs),
-            [g for g in self.gaps() if g.from_date < end and g.to_date >= start],
+            [
+                g
+                for g in self.gaps()
+                if g.from_date < end
+                and g.to_date >= start
+                and account_id in (None, g.account.id)
+            ],
+            _decimal(moved_in),
+            _decimal(moved_out),
         )
 
     def _align(
@@ -1182,15 +1443,45 @@ class Ledger:
         newest = self._db.execute(self._db.select(t, func.max(t.c.posted_on))).scalar()
         return None if newest is None else f"{newest:%Y-%m}"
 
+    def months(self) -> list[str]:
+        """Months (YYYY-MM) that have Transactions, newest first."""
+        t = schema.transaction
+        days = self._db.execute(self._db.select(t, t.c.posted_on).distinct()).scalars()
+        return sorted({f"{d:%Y-%m}" for d in days}, reverse=True)
+
     def accounts(self) -> list[AccountBalance]:
         """Accounts with Bank and Ledger balances; an empty Account is skipped."""
         a = schema.account
         gaps = self.gaps()
+        si, ts, tx = (
+            schema.statement_import,
+            schema.transaction_source,
+            schema.transaction,
+        )
+        latest: dict[int, tuple[datetime, str]] = {}
+        for r in self._db.execute(
+            self._db.select(si, tx.c.account_id, si.c.imported_at, si.c.source)
+            .join(ts, self._db.on(ts, ts.c.statement_import_id == si.c.id))
+            .join(tx, self._db.on(tx, tx.c.id == ts.c.transaction_id))
+            .distinct()
+        ):
+            if r.account_id not in latest or r.imported_at > latest[r.account_id][0]:
+                latest[r.account_id] = (r.imported_at, r.source)
         out: list[AccountBalance] = []
         for r in self._db.execute(
             self._db.select(
-                a, a.c.id, a.c.masked_number, a.c.name, a.c.kind, a.c.currency
-            ).order_by(a.c.id)
+                a,
+                a.c.id,
+                a.c.masked_number,
+                a.c.name,
+                a.c.kind,
+                a.c.currency,
+                schema.bank.c.name.label("bank"),
+            )
+            .join(
+                schema.bank, self._db.on(schema.bank, schema.bank.c.id == a.c.bank_id)
+            )
+            .order_by(a.c.id)
         ).all():
             rows = self._transactions_in_bank_order(r.id)
             if not rows:
@@ -1206,6 +1497,8 @@ class Ledger:
                     _decimal(rows[-1].running_balance_minor),
                     _decimal(opening + sum(x.amount_minor for x in rows)),
                     [g for g in gaps if g.account.id == r.id],
+                    r.bank,
+                    *latest.get(r.id, (None, "")),
                 )
             )
         return out
@@ -1305,7 +1598,7 @@ class Ledger:
                 a.c.id,
                 a.c.masked_number,
             )
-            .join(a, a.c.id == g.c.account_id)
+            .join(a, self._db.on(a, a.c.id == g.c.account_id))
             .order_by(a.c.id, g.c.from_date, g.c.id)
         ).all()
         return [
@@ -1437,7 +1730,7 @@ class Ledger:
                 t.c.amount_minor,
                 t.c.running_balance_minor,
             )
-            .join(t, t.c.id == src.c.transaction_id)
+            .join(t, self._db.on(t, t.c.id == src.c.transaction_id))
             .where(t.c.account_id == account_id)
             .order_by(src.c.statement_import_id, src.c.bank_position)
         ).all()

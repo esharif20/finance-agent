@@ -11,6 +11,20 @@ const summary = {
   money_out: m(247560),
   net: m(93690),
   gaps: [],
+  transfers_in: m(0),
+  transfers_out: m(0),
+  accounts: [],
+};
+const spending = {
+  month: "2026-02",
+  currency: "GBP",
+  total: m(247560),
+  categories: [{ name: "Housing", amount: m(247560) }],
+  unmatched_refunds: m(0),
+  refunds: m(0),
+  fees: m(0),
+  money_out: m(247560),
+  merchants: [],
 };
 const accounts = [
   {
@@ -22,6 +36,9 @@ const accounts = [
     bank_balance: m(117979),
     ledger_balance: m(117979),
     gaps: [],
+    art: null,
+    last_import: null,
+    source: "csv",
   },
 ];
 
@@ -29,7 +46,19 @@ beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => Response.json(url.startsWith("/api/summary") ? summary : accounts)),
+    vi.fn(async (url: string) =>
+      Response.json(
+        url.startsWith("/api/summary")
+          ? summary
+          : url.startsWith("/api/spending")
+            ? spending
+            : url.startsWith("/api/months")
+              ? ["2026-02"]
+              : url.startsWith("/api/transactions")
+                ? { items: [], total: 0 }
+                : accounts,
+      ),
+    ),
   );
 });
 afterEach(() => {

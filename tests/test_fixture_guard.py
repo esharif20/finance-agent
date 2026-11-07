@@ -10,7 +10,7 @@ import pytest
 
 from fixture_guard import find_violations
 
-OUTSIDE = "data file outside tests/fixtures/synthetic/"
+OUTSIDE = "data file outside tests/fixtures/synthetic/ or evals/datasets/"
 
 
 def write(root: Path, rel: str, content: bytes) -> str:
@@ -180,3 +180,67 @@ def test_sqlite_renamed_and_committed_is_rejected(tmp_path: Path) -> None:
     result = run_guard(tmp_path)
     assert result.returncode == 1
     assert "docs/diagram.png" in result.stderr
+
+
+# Fix pass: content sniffing for CSV, and evals/datasets/ (docs/DATA_POLICY.md).
+
+LLOYDS = (
+    b"Transaction Date,Transaction Type,Sort Code,Account Number,"
+    b"Transaction Description,Debit Amount,Credit Amount,Balance\n"
+    b"01/03/2026,DEB,11-22-33,00000001,SHOP,5.00,,10.00\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("rel", "content"),
+    [
+        ("notes.txt", LLOYDS),  # renamed export
+        ("statement", LLOYDS),  # no extension
+        ("export.md", LLOYDS),
+        ("statement.txt", b"\xef\xbb\xbf" + LLOYDS),  # BOM
+        ("statement.txt", b"# synthetic\n" + LLOYDS),  # header outside the folder
+        ("monzo.txt", b"Date,Name,Amount,Currency,Category\n"),
+        ("hsbc.txt", b'"Date","Description","Amount"\n'),
+        ("tab.txt", b"Date\tDescription\tAmount\tBalance\n"),
+        ("semi.txt", b"Date;Payee;Amount\n"),
+        ("crlf.txt", LLOYDS.replace(b"\n", b"\r\n")),
+        ("utf16.txt", LLOYDS.decode().encode("utf-16")),  # Excel "Unicode text"
+        ("utf16be.txt", b"\xfe\xff" + LLOYDS.decode().encode("utf-16-be")),
+        ("evals/datasets_evil/a.csv", b"# synthetic\n"),
+        ("src/evals/datasets/a.csv", b"# synthetic\n"),
+    ],
+)
+def test_csv_content_is_caught_whatever_the_name(
+    tmp_path: Path, rel: str, content: bytes
+) -> None:
+    write(tmp_path, rel, content)
+    assert find_violations(tmp_path, [rel]) == [f"{rel}: {OUTSIDE}"]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"# Title\n\nA note about dates, amounts and balances in prose.\n",
+        b"import csv\nHEADER = ('Date', 'Amount')\n",
+        b"a,b,c\n1,2,3\n",  # a CSV, but nothing like a bank's columns
+        b"",
+        b"\x89PNG\r\n\x1a\n\x00\x00",
+    ],
+)
+def test_ordinary_text_is_not_mistaken_for_an_export(
+    tmp_path: Path, content: bytes
+) -> None:
+    rel = write(tmp_path, "docs/thing.txt", content)
+    assert find_violations(tmp_path, [rel]) == []
+
+
+def test_evals_datasets_follow_the_synthetic_header_rule(tmp_path: Path) -> None:
+    ok = write(tmp_path, "evals/datasets/cat/a.csv", b"# synthetic\n" + LLOYDS)
+    bad = write(tmp_path, "evals/datasets/b.jsonl", b'{"description": "x"}\n')
+    assert find_violations(tmp_path, [ok, bad]) == [
+        f"{bad}: synthetic fixture must start with '# synthetic'"
+    ]
+
+
+def test_the_repository_itself_passes() -> None:
+    assert run_guard(SCRIPT.parents[1]).returncode == 0
