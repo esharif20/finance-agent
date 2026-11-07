@@ -97,3 +97,44 @@ def test_open_without_create_refuses_a_missing_ledger(tmp_path: Path) -> None:
     assert not db.parent.exists()
     open_db(db).dispose()
     open_db(db, create=False).dispose()  # an existing one opens
+
+
+def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
+    """0008 -> 0009 keeps synthetic registry rows (not reverted), and 0009 ->
+    0008 drops only what 0009 added (#110)."""
+    from alembic import command
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import create_engine, inspect, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0009"]
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+    rows = "SELECT id, status FROM subscription_entry"
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0008")
+        for stmt in (
+            "INSERT INTO user (id, created_at) VALUES (1, '2026-01-01')",
+            "INSERT INTO merchant (id, user_id, name) VALUES (1, 1, 'SYNTH GYM')",
+            "INSERT INTO subscription_entry (user_id, merchant_id, source, status,"
+            " evidence_on, created_at) VALUES (1, 1, 'user', 'not_subscription',"
+            " '2026-01-01', '2026-01-01')",
+        ):
+            conn.execute(text(stmt))
+        before = conn.execute(text(rows)).all()
+
+        command.upgrade(cfg, "head")
+        assert conn.execute(text(rows)).all() == before
+        reverted = conn.execute(text("SELECT reverted_at FROM subscription_entry"))
+        assert reverted.all() == [(None,)]
+        assert "review_decision" in inspect(conn).get_table_names()
+
+        command.downgrade(cfg, "0008")
+        assert conn.execute(text(rows)).all() == before
+        insp = inspect(conn)
+        assert "review_decision" not in insp.get_table_names()
+        cols = {c["name"] for c in insp.get_columns("subscription_entry")}
+        assert "reverted_at" not in cols
+    eng.dispose()

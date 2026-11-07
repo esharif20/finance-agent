@@ -166,6 +166,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue */
+        get: operations["queue_api_review_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review-queue/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo
+         * @description Undo the latest answer or skip.
+         */
+        post: operations["undo_api_review_queue_undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review-queue/{item_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer */
+        post: operations["answer_api_review_queue__item_id__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/review-queue/{item_id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip */
+        post: operations["skip_api_review_queue__item_id__skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spending": {
         parameters: {
             query?: never;
@@ -383,6 +454,20 @@ export interface components {
             /** Merchant Id */
             merchant_id: number;
         };
+        /** AnswerIn */
+        AnswerIn: {
+            /** Category */
+            category?: [
+                string,
+                string
+            ] | null;
+            /** Choice */
+            choice?: string | null;
+            /** Transaction Id */
+            transaction_id?: number | null;
+            /** Version */
+            version: string;
+        };
         /** CategoryDetailOut */
         CategoryDetailOut: {
             /** Currency */
@@ -490,6 +575,27 @@ export interface components {
             /** App */
             app: string;
         };
+        /** ItemOut */
+        ItemOut: {
+            /** Choices */
+            choices: string[];
+            /** Id */
+            id: string;
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Skipped */
+            skipped: boolean;
+            /** Title */
+            title: string;
+            /** Transaction Ids */
+            transaction_ids: number[];
+            /** Type */
+            type: string;
+            /** Version */
+            version: string;
+            /** Weight */
+            weight: number;
+        };
         /** MerchantSpendOut */
         MerchantSpendOut: {
             amount: components["schemas"]["Money"];
@@ -513,6 +619,15 @@ export interface components {
             money_out: components["schemas"]["Money"];
             /** Month */
             month: string;
+        };
+        /** QueueOut */
+        QueueOut: {
+            /** Items */
+            items: components["schemas"]["ItemOut"][];
+            /** Ledger Version */
+            ledger_version: number;
+            /** Remaining */
+            remaining: number;
         };
         /** SpendingOut */
         SpendingOut: {
@@ -648,6 +763,11 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VersionIn */
+        VersionIn: {
+            /** Version */
+            version: string;
         };
     };
     responses: never;
@@ -916,6 +1036,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": string[];
+                };
+            };
+        };
+    };
+    queue_api_review_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+        };
+    };
+    undo_api_review_queue_undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+        };
+    };
+    answer_api_review_queue__item_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_api_review_queue__item_id__skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

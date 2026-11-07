@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
-from finance_agent.api import card_art, subscriptions
+from finance_agent.api import card_art, review_queue, subscriptions
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -478,8 +478,10 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             raise HTTPException(409, "A sync is already running.") from None
         except NotConnected:
             raise HTTPException(409, "Not connected. Run `fa connect` first.") from None
-        except Exception as e:
-            raise HTTPException(502, f"Sync failed ({type(e).__name__}).") from None
+        except Exception:  # the failure class is kept in sync status for `fa status`
+            raise HTTPException(
+                502, "Couldn't reach your bank. Try again in a little while."
+            ) from None
         return SyncOut(
             added=sum(r.added for r in reports),
             matched=sum(r.matched for r in reports),
@@ -560,6 +562,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         return CorrectionOut(id=correction_id, ledger_version=led.ledger_version())
 
     app.include_router(subscriptions.router)
+    app.include_router(review_queue.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():

@@ -1601,6 +1601,7 @@ class Ledger:
         rows = self._db.execute(
             self._db.select(e, e, m.c.name.label("merchant"))
             .join(m, self._db.on(m, m.c.id == e.c.merchant_id))
+            .where(e.c.reverted_at.is_(None))
             .order_by(e.c.id)
         )
         first: dict[int, datetime] = {}
@@ -1661,12 +1662,13 @@ class Ledger:
 
     def confirm_subscription(
         self, merchant_id: int, kind: str | None = None, group: str | None = None
-    ) -> None:
-        """The user says yes, it is one (to a suggestion, or after removing it)."""
+    ) -> int:
+        """The user says yes, it is one (to a suggestion, or after removing it).
+        Returns the registry row written."""
         x = self.subscription(merchant_id)
         if x is None:
             raise UnknownTarget("no such registry entry")
-        self._registry(
+        return self._registry(
             merchant_id,
             "user",
             kind or x.kind,
@@ -1678,11 +1680,25 @@ class Ledger:
             x.interval,
         )
 
-    def not_a_subscription(self, merchant_id: int) -> None:
-        """Remove or dismiss: remembered as "not a subscription", never deleted."""
-        self._registry(
+    def not_a_subscription(self, merchant_id: int) -> int:
+        """Remove or dismiss: remembered as "not a subscription", never deleted.
+        Returns the registry row written."""
+        return self._registry(
             merchant_id, "user", None, None, NOT_SUBSCRIPTION, None, date.today()
         )
+
+    def revert_subscription_decision(self, entry_id: int) -> None:
+        """Undo one user decision: the row stays as history, marked reverted,
+        and the Merchant's entry is what it was before."""
+        e = schema.subscription_entry
+        res = self._db.execute(
+            self._db.update(e)
+            .where(e.c.id == entry_id, e.c.source == "user", e.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active registry decision")
+        self._db.bump_ledger_version()
 
     def record_detection(
         self,
@@ -1703,7 +1719,9 @@ class Ledger:
         e = schema.subscription_entry
         decided = self._db.execute(
             self._db.select(e, e.c.id).where(
-                e.c.merchant_id == merchant_id, e.c.source == "user"
+                e.c.merchant_id == merchant_id,
+                e.c.source == "user",
+                e.c.reverted_at.is_(None),
             )
         ).first()
         if decided is not None:
@@ -1740,7 +1758,7 @@ class Ledger:
         evidence_on: date,
         charge_count: int | None = None,
         interval: str | None = None,
-    ) -> None:
+    ) -> int:
         m = schema.merchant
         self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
         if status != NOT_SUBSCRIPTION and (
@@ -1749,7 +1767,7 @@ class Ledger:
             raise InvalidEntry("kind and group must be a Subscriptions or Bills leaf")
         if interval is not None and interval not in INTERVALS:
             raise InvalidEntry("interval must be weekly, monthly or annual")
-        self._db.insert(
+        entry_id = self._db.insert(
             schema.subscription_entry,
             merchant_id=merchant_id,
             source=source,
@@ -1763,6 +1781,7 @@ class Ledger:
             created_at=datetime.now(UTC),
         )
         self._db.bump_ledger_version()
+        return entry_id
 
     def _exists(self, stmt: Select[Any]) -> int:
         row = self._db.execute(stmt).first()
