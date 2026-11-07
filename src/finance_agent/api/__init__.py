@@ -24,6 +24,7 @@ from finance_agent.api import (
     notes,
     review_queue,
     splits,
+    subscription_costs,
     subscriptions,
 )
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
@@ -582,6 +583,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         return CorrectionOut(id=correction_id, ledger_version=led.ledger_version())
 
     app.include_router(subscriptions.router)
+    app.include_router(subscription_costs.router)
     app.include_router(review_queue.router)
     app.include_router(splits.router)
     app.include_router(notes.router)
