@@ -240,31 +240,6 @@ def _transaction(t: Transaction) -> TransactionOut:
     )
 
 
-def _matches(
-    t: Transaction,
-    account_id: int | None,
-    kind: str | None,
-    category: str | None,
-    month: str | None,
-    needle: str,
-) -> bool:
-    c = t.categorisation
-    return (
-        (account_id is None or t.account_id == account_id)
-        and (month is None or t.posted_on.strftime("%Y-%m") == month)
-        and (kind is None or (c is not None and c.kind == kind))
-        and (
-            category is None
-            or (c is not None and c.category is not None and c.category[0] == category)
-        )
-        and (
-            not needle
-            or needle in t.description.lower()
-            or needle in ((c.merchant if c else None) or "").lower()
-        )
-    )
-
-
 def _spending(month: str, b: Breakdown, money_out: Decimal) -> SpendingOut:
     c = CURRENCY
     return SpendingOut(
@@ -463,16 +438,11 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> TransactionsOut:
-        needle = q.strip().lower() if q else ""
-        # shortcut: filters in Python over every row; fine for one person's Ledger
-        rows = [
-            t
-            for t in reversed(led.transactions())
-            if _matches(t, account_id, kind, category, month, needle)
-        ]
+        page = led.search_transactions(
+            account_id, kind, category, month, q, limit, offset
+        )
         return TransactionsOut(
-            items=[_transaction(t) for t in rows[offset : offset + limit]],
-            total=len(rows),
+            items=[_transaction(t) for t in page.items], total=page.total
         )
 
     @app.post("/api/corrections", status_code=201)

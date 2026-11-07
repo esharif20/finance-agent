@@ -13,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import ColumnElement, Connection, Select, and_, case, func, union
+from sqlalchemy import ColumnElement, Connection, Select, and_, case, func, or_, union
 
 from finance_agent import ingest
 from finance_agent.storage import Scoped, schema
@@ -124,6 +124,12 @@ class Transaction:
     transfer_with: int | None = None  # the other leg of an own-account Transfer
     categorisation: Categorisation | None = None  # None until `categorise.run`
     account_id: int = 0
+
+
+@dataclass(frozen=True)
+class TransactionPage:
+    items: list[Transaction]
+    total: int  # every match, before limit and offset
 
 
 @dataclass(frozen=True)
@@ -331,6 +337,54 @@ class Ledger:
 
     def transactions(self) -> list[Transaction]:
         """Every stored Transaction, oldest first."""
+        return self._transactions()
+
+    def search_transactions(
+        self,
+        account_id: int | None = None,
+        kind: str | None = None,
+        category: str | None = None,
+        month: str | None = None,
+        query: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> TransactionPage:
+        """Transactions matching every filter given, newest first. `category` is
+        a top-level name, after Corrections; `query` is a case-insensitive
+        substring of the description or the Merchant's name."""
+        t, c, m = schema.transaction, schema.categorisation, schema.merchant
+        terms = _only(account_id)
+        if month is not None:
+            start, end = _month_bounds(month)
+            terms += [t.c.posted_on >= start, t.c.posted_on < end]
+        if kind is not None:  # Corrections change the Category, never the Kind
+            terms.append(
+                t.c.id.in_(
+                    self._db.select(c, c.c.transaction_id).where(c.c.kind == kind)
+                )
+            )
+        needle = (query or "").strip().lower()
+        if needle:
+            named = (
+                self._db.select(c, c.c.transaction_id)
+                .join(m, m.c.id == c.c.merchant_id)
+                .where(func.lower(m.c.name).contains(needle, autoescape=True))
+            )
+            terms.append(
+                or_(
+                    func.lower(t.c.description).contains(needle, autoescape=True),
+                    t.c.id.in_(named),
+                )
+            )
+        rows = [
+            x
+            for x in reversed(self._transactions(*terms))
+            if category is None
+            or ((k := x.categorisation) and k.category and k.category[0] == category)
+        ]
+        return TransactionPage(rows[offset : offset + limit], len(rows))
+
+    def _transactions(self, *where: ColumnElement[bool]) -> list[Transaction]:
         t, src, si = (
             schema.transaction,
             schema.transaction_source,
@@ -346,7 +400,9 @@ class Ledger:
                 t.c.running_balance_minor,
                 t.c.bank_type,
                 t.c.account_id,
-            ).order_by(t.c.posted_on, t.c.id)
+            )
+            .where(*where)
+            .order_by(t.c.posted_on, t.c.id)
         ).all()
         other_leg = self._transfer_legs()
         cats = self._categorisations()
