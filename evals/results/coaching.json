@@ -1,0 +1,34 @@
+{
+  "harness": "coaching",
+  "dataset": "synthetic_goals",
+  "dataset_version": 1,
+  "dataset_sha256": "85c1795bde93bef377f788545764a9a866bf9be6ea7f8a1975c30e5df2ce48f3",
+  "scenarios": 240,
+  "at_risk_scenarios": 98,
+  "models": {
+    "coaching": {
+      "model": "engine.coaching weekly target",
+      "model_version": "coaching-1",
+      "metrics": {
+        "target_exact": 1.0,
+        "feasibility_agreement": 1.0,
+        "at_risk_precision": 1.0,
+        "at_risk_recall": 1.0,
+        "overdue_reported": 1.0,
+        "negative_targets": 0
+      }
+    },
+    "fixed_target": {
+      "model": "amount / weeks at start",
+      "model_version": "baseline",
+      "metrics": {
+        "target_exact": 0.033333,
+        "feasibility_agreement": 0.595238,
+        "at_risk_precision": 1.0,
+        "at_risk_recall": 0.306122,
+        "overdue_reported": 0.0,
+        "negative_targets": 0
+      }
+    }
+  }
+}
