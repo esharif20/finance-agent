@@ -1,0 +1,25 @@
+{
+  "id": "emergency-fund",
+  "version": 1,
+  "topic": "emergency_fund",
+  "principles": [
+    "Keep a cushion of easy-access savings for surprises, separate from money you plan to spend.",
+    "Size it from your essential costs, not your whole spending.",
+    "Build it in small, automatic steps on payday, with each bank's deposits kept within the protection limit."
+  ],
+  "when": {
+    "all": [
+      {"signal": "emergency_fund_months", "op": "<", "value": 3}
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "A cushion for surprises",
+      "body": "Your savings of {savings_balance} would cover about {emergency_fund_months} months of essentials, which run to {essential_monthly_spend} a month. A few months' cushion makes a broken boiler or a gap between jobs much less stressful. Even a small amount set aside each payday adds up, and a cash ISA lets you save up to {fact:isa_allowance} a year tax-free."
+    },
+    "blunt": {
+      "title": "Your safety net is thin",
+      "body": "Your savings of {savings_balance} cover {emergency_fund_months} months of essentials at {essential_monthly_spend} a month. One surprise bill could push you into debt. Set up an automatic transfer on payday into easy-access savings; a cash ISA takes up to {fact:isa_allowance} a year tax-free, and deposits up to {fact:fscs_deposit_limit} per bank are protected."
+    }
+  }
+}
