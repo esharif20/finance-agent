@@ -2,8 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   fetchBriefing,
+  fetchKnowYou,
+  fetchLearned,
   fetchMemories,
   forgetMemory,
+  resetBandit,
+  resetLifeChanges,
+  resetMap,
+  resetPreferences,
   resetAssistantFeedback,
   resetInsightFeedback,
   resetRegretAnswers,
@@ -16,6 +22,11 @@ import { BRIEFING_KEY } from "@/screens/Briefing";
 // the demo has no cloud and no spend store
 const DEMO = import.meta.env.VITE_DEMO === "1";
 const MEMORIES_KEY = ["memories"] as const;
+const KNOW_KEY = ["know-you"] as const;
+const LEARNED_KEY = ["preferences", "cut"] as const;
+const SERIES: Record<string, string> = { income: "Income", rent: "Rent", bills: "Bills", groceries: "Groceries" };
+const monthName = (m: string) =>
+  new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
 const btn =
   "inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:bg-active disabled:opacity-50";
@@ -64,7 +75,7 @@ function Item({ title, body, children }: { title: string; body: string; children
 /** What the app has learned about you, in plain words, each with a reset that wipes it (#154). */
 export function KnowYou() {
   const client = useQueryClient();
-  const refresh = () => Promise.all([INSIGHTS_KEY, BRIEFING_KEY, MEMORIES_KEY].map((k) => client.invalidateQueries({ queryKey: k })));
+  const refresh = () => Promise.all([INSIGHTS_KEY, BRIEFING_KEY, MEMORIES_KEY, KNOW_KEY, LEARNED_KEY].map((k) => client.invalidateQueries({ queryKey: k })));
   const reset = (fn: () => Promise<void>) => async () => {
     await fn();
     await refresh();
@@ -75,6 +86,12 @@ export function KnowYou() {
     mutationFn: forgetMemory,
     onSettled: () => void client.invalidateQueries({ queryKey: MEMORIES_KEY }),
   });
+  const know = useQuery({ queryKey: KNOW_KEY, queryFn: fetchKnowYou });
+  const learned = useQuery({ queryKey: LEARNED_KEY, queryFn: fetchLearned });
+  const strengths = learned.data?.items ?? [];
+  const lifeChanges = know.data?.life_changes ?? [];
+  const b = know.data?.bandit;
+  const edges = know.data?.map_edges ?? 0;
   const answered = briefing.data?.regret.filter((r) => r.worth_it !== null).length;
   const gaps = briefing.data?.insufficient ?? [];
   return (
@@ -109,6 +126,53 @@ export function KnowYou() {
             body="Which proposals you confirmed or turned down, so I stop suggesting what you keep declining."
           >
             <Reset label="Reset" what="assistant feedback" run={reset(resetAssistantFeedback)} />
+          </Item>
+        </ul>
+      </Card>
+      <Card aria-labelledby="know-deeper">
+        <CardHeader>
+          <CardTitle id="know-deeper">What I have worked out</CardTitle>
+        </CardHeader>
+        <ul className="divide-y divide-border">
+          <Item
+            title="What you would cut first"
+            body={
+              strengths.length
+                ? `From ${learned.data?.answers} answers: you'd keep ${strengths.at(0)?.label} longest and cut ${strengths.at(-1)?.label} first.`
+                : "No answers yet. Answer a “which would you cut first?” and it shows here."
+            }
+          >
+            {strengths.length > 0 && <Reset label="Reset" what="cut-first answers" run={reset(resetPreferences)} />}
+          </Item>
+          <Item
+            title="How my shadow ranker compares"
+            body={
+              b && b.rated > 0 && b.live_pct !== null && b.shadow_pct !== null
+                ? `On ${b.rated} insights you rated, the ranker you see scored ${b.live_pct}% and my shadow ranker would have scored ${b.shadow_pct}%. It only watches: it never changes what you see.`
+                : "Not enough rated insights yet to compare. Nothing changes what you see until you decide."
+            }
+          >
+            {b && b.rated > 0 && <Reset label="Reset" what="shadow ranker" run={reset(resetBandit)} />}
+          </Item>
+          <Item
+            title="Life changes you confirmed"
+            body={
+              lifeChanges.length
+                ? lifeChanges.map((c) => `${SERIES[c.series] ?? c.series} changed in ${monthName(c.month)}`).join(". ") + "."
+                : "None yet. I only note a change when you confirm it."
+            }
+          >
+            {lifeChanges.length > 0 && <Reset label="Reset" what="life changes" run={reset(resetLifeChanges)} />}
+          </Item>
+          <Item
+            title="Connections you confirmed"
+            body={
+              edges
+                ? `${edges} connection${edges === 1 ? "" : "s"} between your merchants, categories and goals.`
+                : "None yet. I only join two things when you confirm it."
+            }
+          >
+            {edges > 0 && <Reset label="Reset" what="connections" run={reset(resetMap)} />}
           </Item>
         </ul>
       </Card>

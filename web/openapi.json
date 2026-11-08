@@ -418,6 +418,43 @@
         "title": "BalancesOut",
         "type": "object"
       },
+      "BanditOut": {
+        "properties": {
+          "live_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Pct"
+          },
+          "rated": {
+            "title": "Rated",
+            "type": "integer"
+          },
+          "shadow_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shadow Pct"
+          }
+        },
+        "required": [
+          "rated",
+          "live_pct",
+          "shadow_pct"
+        ],
+        "title": "BanditOut",
+        "type": "object"
+      },
       "BatchAnswerIn": {
         "properties": {
           "category": {
@@ -2000,6 +2037,31 @@
         "title": "KindTotal",
         "type": "object"
       },
+      "KnowYouOut": {
+        "properties": {
+          "bandit": {
+            "$ref": "#/components/schemas/BanditOut"
+          },
+          "life_changes": {
+            "items": {
+              "$ref": "#/components/schemas/LifeChangeOut"
+            },
+            "title": "Life Changes",
+            "type": "array"
+          },
+          "map_edges": {
+            "title": "Map Edges",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bandit",
+          "life_changes",
+          "map_edges"
+        ],
+        "title": "KnowYouOut",
+        "type": "object"
+      },
       "LearnedOut": {
         "properties": {
           "answers": {
@@ -2028,6 +2090,24 @@
           "items"
         ],
         "title": "LearnedOut",
+        "type": "object"
+      },
+      "LifeChangeOut": {
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "series": {
+            "title": "Series",
+            "type": "string"
+          }
+        },
+        "required": [
+          "series",
+          "month"
+        ],
+        "title": "LifeChangeOut",
         "type": "object"
       },
       "LocalModelOut": {
@@ -6060,6 +6140,78 @@
           }
         },
         "summary": "Feedback"
+      }
+    },
+    "/api/know-you": {
+      "get": {
+        "operationId": "summary_api_know_you_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowYouOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Summary"
+      }
+    },
+    "/api/know-you/bandit": {
+      "delete": {
+        "operationId": "reset_bandit_api_know_you_bandit_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset Bandit"
+      }
+    },
+    "/api/know-you/life-changes": {
+      "delete": {
+        "operationId": "reset_life_changes_api_know_you_life_changes_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset Life Changes"
+      }
+    },
+    "/api/know-you/map": {
+      "delete": {
+        "operationId": "reset_map_api_know_you_map_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset Map"
       }
     },
     "/api/local-model": {

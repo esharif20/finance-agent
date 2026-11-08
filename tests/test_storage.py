@@ -825,3 +825,107 @@ def test_migration_0026_backfills_once_and_drops_only_the_search_index(
             (hostile, 300000)
         ]
     eng.dispose()
+
+
+def test_migration_0031_rebuild_keeps_every_proposal_and_fk_and_triggers_stay_scoped(
+    tmp_path: Path,
+) -> None:
+    """0031 (#275, #282 verifier): the `proposal` rebuild keeps every row of
+    every kind and status for two users, the FKs that pin them and every other
+    schema object; the new triggers delete nothing of another user's even when
+    a hostile edge points at another user's node or Proposal. Synthetic."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = _fk_engine(tmp_path)
+    seed = (
+        "INSERT INTO user (id, created_at) VALUES (2, '2026-01-01')",
+        "INSERT INTO proposal (id, user_id, kind, payload, status, created_at,"
+        " decided_at) VALUES"
+        " (1, 1, 'memory', '{\"a\": 1}', 'confirmed', '2026-01-03', '2026-01-04'),"
+        " (2, 1, 'memory', '{}', 'pending', '2026-01-03', NULL),"
+        " (3, 1, 'memory', '{}', 'rejected', '2026-01-03', '2026-01-04'),"
+        " (4, 1, 'correction', '{\"t\": 9}', 'confirmed', '2026-01-03', NULL),"
+        " (5, 2, 'memory', '{}', 'confirmed', '2026-01-03', NULL),"
+        " (6, 2, 'correction', '{}', 'rejected', '2026-01-03', NULL)",
+        "INSERT INTO memory (id, user_id, proposal_id, type, text, tags, turn_id,"
+        " quote, said_on, created_at) VALUES"
+        " (1, 1, 1, 'goal', 'synthetic', '[]', 't', 'q', '2026-01-03', '2026-01-03'),"
+        " (2, 2, 5, 'goal', 'synthetic', '[]', 't', 'q', '2026-01-03', '2026-01-03')",
+        "INSERT INTO feedback (user_id, proposal_id, kind, signal, created_at)"
+        " VALUES (1, 3, 'memory', 'rejected', '2026-01-04'),"
+        " (2, 6, 'correction', 'rejected', '2026-01-04')",
+    )
+    snap = (
+        "SELECT * FROM proposal ORDER BY id",
+        "SELECT * FROM memory ORDER BY id",
+        "SELECT * FROM feedback ORDER BY id",
+        "SELECT * FROM pragma_foreign_key_list('memory')",
+        "SELECT * FROM pragma_foreign_key_list('feedback')",
+        "SELECT * FROM pragma_index_list('proposal') ORDER BY name",
+        "SELECT type, name, sql FROM sqlite_master WHERE tbl_name NOT IN"
+        " ('proposal', 'map_edge') AND name NOT LIKE 'map_edge_%' ORDER BY name",
+    )
+
+    def state(conn: Any) -> list[Any]:
+        return [conn.execute(text(q)).all() for q in snap]
+
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0030")
+        for sql in _NOTED_TXN + seed:
+            conn.execute(text(sql))
+        before = state(conn)
+        conn.execute(text("CREATE TABLE _alembic_tmp_proposal (id INTEGER)"))  # stuck
+    bad = (
+        "INSERT INTO proposal (id, user_id, kind, payload, status, created_at)"
+        " VALUES (99, 1, :k, '{}', 'pending', '2026-01-05')"
+    )
+    for target in ("0031", "0030", "0031"):
+        with eng.begin() as conn:
+            cfg.attributes["connection"] = conn
+            (command.upgrade if target == "0031" else command.downgrade)(cfg, target)
+            assert state(conn) == before
+            assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+            assert conn.execute(text("PRAGMA integrity_check")).all() == [("ok",)]
+            with conn.begin_nested(), pytest.raises(Exception, match="CHECK"):
+                k = "map" if target == "0031" else "map_edge"
+                conn.execute(text(bad), {"k": k})
+    with eng.begin() as conn, pytest.raises(Exception, match="FOREIGN KEY"):
+        conn.execute(text("DELETE FROM proposal WHERE id = 5"))  # still pinned
+    with eng.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO proposal (id, user_id, kind, payload, status,"
+                " created_at) VALUES (7, 1, 'map_edge', '{}', 'confirmed',"
+                " '2026-01-05'), (8, 2, 'map_edge', '{}', 'confirmed', '2026-01-05')"
+            )
+        )
+        # user 2's hostile edge names user 1's goal Memory and life change ids
+        conn.execute(
+            text(
+                "INSERT INTO life_change (id, user_id, series, month, before_minor,"
+                " after_minor, created_at) VALUES (1, 1, 'rent', '2026-02', 1, 2,"
+                " '2026-03-01')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO map_edge (id, user_id, proposal_id, a_kind, a_id,"
+                " b_kind, b_id, created_at) VALUES"
+                " (1, 1, 7, 'goal', 1, 'life_change', 1, '2026-01-05'),"
+                " (2, 2, 8, 'goal', 1, 'life_change', 1, '2026-01-05')"
+            )
+        )
+        conn.execute(text("DELETE FROM life_change WHERE id = 1"))
+        edges = conn.execute(text("SELECT id FROM map_edge ORDER BY id")).all()
+        assert edges == [(2,)]  # user 1's edge went with its node, user 2's stayed
+        kinds = "SELECT id FROM proposal ORDER BY id"
+        assert conn.execute(text(kinds)).all() == [(i,) for i in (1, 2, 3, 4, 5, 6, 8)]
+        conn.execute(text("DELETE FROM map_edge WHERE id = 2"))
+        assert conn.execute(text(kinds)).all() == [(i,) for i in range(1, 7)]
+        assert state(conn) == before  # no memory, feedback or other Proposal went
+    eng.dispose()
