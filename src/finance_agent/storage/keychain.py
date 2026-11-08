@@ -3,6 +3,7 @@ calls Security.framework directly, so secrets never appear on a command line).
 Tests install an in-memory backend in conftest."""
 
 import secrets
+from pathlib import Path
 
 import keyring
 
@@ -62,8 +63,46 @@ def delete_legacy(service: str) -> None:
 
 
 def gemini_key() -> str | None:
-    """The gateway's Gemini key, or None if the user has not stored one."""
+    """The gateway's Gemini key, or None if the user has not stored one. Each
+    call is a Keychain read, which macOS may prompt for: the app reads it
+    through `cached_gemini_key`, and only when a thread uses the cloud."""
     return keyring.get_password(GEMINI_SERVICE, GEMINI_ACCOUNT) or None
+
+
+# Non-secret: a file beside the ledger that says a Gemini key was stored, so
+# "is the cloud set up?" never reads the Keychain. `fa keys set gemini` writes
+# it, `fa keys remove gemini` deletes it, and `fa doctor` adds it for a key
+# stored before the flag existed.
+GEMINI_FLAG = "gemini-configured"
+_gemini: str | None = None  # the key, once read, for this process only
+
+
+def gemini_configured(ledger_path: Path) -> bool:
+    return ledger_path.with_name(GEMINI_FLAG).exists()
+
+
+def mark_gemini(ledger_path: Path, stored: bool) -> None:
+    flag = ledger_path.with_name(GEMINI_FLAG)
+    if stored:
+        flag.parent.mkdir(parents=True, exist_ok=True)
+        flag.write_text("a Gemini key is in the Keychain; this file holds no secret\n")
+    else:
+        flag.unlink(missing_ok=True)
+    forget_gemini()
+
+
+def cached_gemini_key() -> str | None:
+    """The Gemini key, read from the Keychain at most once per process (a
+    missing key is read again next time, so one stored later is found)."""
+    global _gemini
+    if _gemini is None:
+        _gemini = gemini_key()
+    return _gemini
+
+
+def forget_gemini() -> None:
+    global _gemini
+    _gemini = None
 
 
 def item(service: str, account: str = ACCOUNT) -> str | None:

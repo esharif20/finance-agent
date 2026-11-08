@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import Engine
 from starlette.datastructures import Headers
 from starlette.requests import HTTPConnection
-from starlette.responses import PlainTextResponse
+from starlette.responses import FileResponse, PlainTextResponse
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -279,6 +279,14 @@ def build(environ: Mapping[str, str] = os.environ) -> FastAPI:
         visit: Visit = request.scope["fa_demo"]  # the object Guard holds
         visit.visitor, visit.fresh = new, True  # so Guard sends the new cookie
         return PersonaOut(persona=new.persona)
+
+    index = cfg.dir / "web" / "index.html"
+
+    @app.get("/app", include_in_schema=False)
+    @app.get("/app/{rest:path}", include_in_schema=False)
+    def spa(rest: str = "") -> FileResponse:
+        """As vercel.json: /app and /app/* are the one-page app."""
+        return FileResponse(index)
 
     # create_app mounts the web build at "/" last; the routes above must precede
     # it, or a POST to /api/demo/* reaches the static files (405)

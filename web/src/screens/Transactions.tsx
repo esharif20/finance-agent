@@ -112,7 +112,7 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
         role="search"
         aria-label="Filter transactions"
         onSubmit={(e) => e.preventDefault()}
-        className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
+        className="filter-bar grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
       >
         <label className="relative col-span-2 sm:min-w-44 sm:flex-1">
           <span className="sr-only">Search</span>
@@ -177,7 +177,7 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
       ) : !page.data ? (
         <Skeleton className="h-[480px] rounded-card" />
       ) : (
-        <Card className="p-2 sm:p-3" aria-busy={page.isFetching}>
+        <Card data-still className="p-2 sm:p-3" aria-busy={page.isFetching}>
           <p role="status" className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm text-muted-foreground">
             <span>{page.data.total === 0 ? "No transactions match." : <><CountTick value={page.data.total} /> transactions</>}</span>
             {correct.isError && <span className="text-foreground">{correct.error.message}</span>}

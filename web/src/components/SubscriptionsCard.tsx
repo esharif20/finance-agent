@@ -38,7 +38,7 @@ export function SubscriptionsCard() {
       </div>
       {subs && (
         <p className="mt-1">
-          <Money value={subs} className="text-title tabular-nums" />
+          <Money value={subs} countUp className="text-title tabular-nums" />
           <span className="text-label text-muted-foreground"> a month</span>
         </p>
       )}

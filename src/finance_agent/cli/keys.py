@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from keyring.errors import KeyringError
 
-from finance_agent.storage import keychain
+from finance_agent.storage import default_db_path, keychain
 
 Ask = Callable[[str], str]
 
@@ -108,6 +108,8 @@ def set_key(name: str, hidden: Ask = getpass.getpass) -> int:
     except EmptySecret as e:
         print(f"fa: {e}", file=sys.stderr)
         return 1
+    if item.name == "gemini":
+        keychain.mark_gemini(default_db_path(), True)
     print(f"Stored the {item.label}: {n} characters.")
     return 0
 
@@ -124,6 +126,8 @@ def remove(name: str, ask: Ask = input) -> int:
         print("Nothing removed.")
         return 1
     gone = keychain.delete_item(item.service, item.account)
+    if item.name == "gemini":
+        keychain.mark_gemini(default_db_path(), False)
     print(f"Removed the {item.label}." if gone else "It was not there.")
     return 0
 

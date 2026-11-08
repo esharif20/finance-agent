@@ -37,7 +37,7 @@ function Ask({ entry }: { entry: SubscriptionEntry }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <PlacementSelect label={`Group for ${name}`} value={place} onChange={setPlace} disabled={busy} />
-        <button type="button" disabled={busy} onClick={() => yes.mutate()} className={`${btn} bg-primary text-primary-foreground`}>
+        <button type="button" disabled={busy} onClick={() => yes.mutate()} data-magnetic className={`${btn} bg-primary text-primary-foreground`}>
           Yes
         </button>
         <button

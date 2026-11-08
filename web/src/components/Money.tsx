@@ -1,5 +1,5 @@
 import { useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCountUp } from "@/lib/countup";
 import { type Money as MoneyValue, formatMoney, formatMoneyParts } from "@/lib/money";
 import { usePrivacy } from "@/lib/privacy";
@@ -56,10 +56,11 @@ export function Money({
     if (odometer !== undefined) played.add(odometer);
   }, [odometer]);
   const reel = roll && !hidden && !reduce;
-  const minor = useCountUp(value.minor, countUp === true);
+  const ref = useRef<HTMLSpanElement>(null);
+  const minor = useCountUp(value.minor, countUp === true, ref);
   const { main, fraction } = formatMoneyParts({ ...value, minor }, { sign });
   return (
-    <span className={cn("money whitespace-nowrap", className)}>
+    <span ref={ref} className={cn("money whitespace-nowrap", className)}>
       <span className="sr-only">{hidden ? "Amount hidden" : formatMoney(value, { sign })}</span>
       <span aria-hidden="true" className={reel ? "odometer" : undefined} data-play={reel ? "" : undefined}>
         {reel ? <Reel text={main} /> : main}

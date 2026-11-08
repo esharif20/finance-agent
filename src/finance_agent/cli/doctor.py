@@ -85,7 +85,8 @@ def checks(p: Probes | None = None) -> list[Check]:
     else:
         stale = store.status(db.parent, datetime.now(UTC)).warning
         out.append((not stale, "backup in the last 7 days", "plug in the backup drive"))
-    if keychain.gemini_key():
+    if keychain.gemini_key():  # an explicit check: it may read the Keychain
+        keychain.mark_gemini(db, True)  # a key stored before the flag existed
         out.append(
             (
                 True,
