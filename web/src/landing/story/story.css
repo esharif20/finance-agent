@@ -1,26 +1,12 @@
-/* #300 scroll story. Tokens from landing.css; transform and opacity only, except the focus list's
-   weight axis, which #76 asks for. No glow, no gradient, no hue between 235 and 290. */
+/* The scroll story: three chapters, three fields. The pile is night, the gateway is lemon with
+   black water rising through it (the peak), the rules are mint. Transform, opacity and clip-path
+   only, except the focus list's weight axis. No gradient, no hue between 235 and 290. */
 
-.st {
-  --st-card: #ffffff;
-  --st-card-ink: #1b1d1f;
-  --st-card-soft: #5c6166;
-  --st-token: #0b66c3;
-  --st-token-bg: #e3eefa;
-}
-@media (prefers-color-scheme: dark) {
-  .st {
-    --st-card: #1c1e20;
-    --st-card-ink: #f4f5f6;
-    --st-card-soft: #a9aeb4;
-    --st-token: #9cc9f7;
-    --st-token-bg: #0a3a6b;
-  }
-}
-
-/* chapter 1: the sticky pile */
+/* chapter 1: the sticky pile, on night */
 .st-pile {
-  padding-block: clamp(96px, 14vw, 200px) clamp(64px, 10vw, 140px);
+  padding-block: clamp(96px, 12vw, 176px);
+  background: var(--lp-black);
+  color: var(--lp-white);
 }
 .st-pile-grid {
   display: grid;
@@ -31,57 +17,85 @@
 .st-pile-title {
   position: sticky;
   top: 18vh;
+  display: grid;
+  gap: 24px;
+}
+.st-pile-note {
+  max-width: 30ch;
+  font-size: var(--lp-step-lead);
+  line-height: 1.35;
 }
 .st-slot {
   position: sticky;
-  top: 16vh;
+  top: 14vh;
   margin-bottom: 36vh;
 }
 .st-slot:last-child {
   margin-bottom: 0;
 }
 .st-card {
-  /* the app's chips mix with --card */
   --card: var(--st-card);
+  /* the cards are candy in both themes, so the app's chips keep their light-theme ink */
+  --cat-0: #0b66c3; --cat-1: #0e7a82; --cat-2: #b45309; --cat-3: #c03a5e; --cat-4: #2f7a45;
+  --cat-5: #8a6a00; --cat-6: #a03c96; --cat-7: #0a6fa8; --cat-8: #7a5636; --cat-9: #5f6b0f;
+  --cat-other: #4a4e52; --cat-review: #7a4500; --chip-ink-mix: black 42%; --chip-tint: 14%;
+  --foreground: #0a0a0a;
+  --muted-foreground: #3a3d40;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --border: #d9dcd6;
   position: relative;
   display: grid;
   align-content: start;
   gap: 14px;
-  min-height: 440px;
-  padding: clamp(24px, 3vw, 36px);
-  border-radius: 28px;
+  min-height: 460px;
+  padding: clamp(24px, 3vw, 40px);
+  border-radius: 8px;
   background: var(--st-card);
-  color: var(--st-card-ink);
+  color: var(--lp-black);
   transform-origin: 50% 0;
   will-change: transform;
+}
+.st-slot[data-layer="0"] {
+  --st-card: var(--lp-mint);
+}
+.st-slot[data-layer="1"] {
+  --st-card: var(--lp-cyan);
+}
+.st-slot[data-layer="2"] {
+  --st-card: var(--lp-lemon);
 }
 .st-card-veil {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--lp-ground);
+  background: var(--lp-black);
   pointer-events: none;
 }
 .st-card-title {
   margin-bottom: 8px;
+  font-size: clamp(1.75rem, 1rem + 2vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 1;
 }
 .st-card-kicker,
 .st-card-note,
 .st-source {
-  color: var(--st-card-soft);
   font-size: 0.9375rem;
+  font-weight: 600;
 }
 .st-card-figure {
-  font-size: clamp(2.5rem, 1.6rem + 2.4vw, 3.5rem);
-  font-weight: 720;
-  letter-spacing: -0.03em;
+  font-family: var(--lp-display);
+  font-size: clamp(2.75rem, 1.6rem + 2.8vw, 4.25rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
   line-height: 1;
 }
 .st-bars,
 .st-rows {
   display: grid;
   gap: 12px;
-  list-style: none;
   margin-top: 6px;
 }
 .st-bars li {
@@ -92,9 +106,9 @@
 }
 .st-bars i {
   grid-column: 1 / -1;
-  height: 8px;
-  border-radius: 4px;
-  background: var(--lp-card);
+  height: 10px;
+  border-radius: 5px;
+  background: var(--lp-black);
   transform: scaleX(var(--share));
   transform-origin: 0 50%;
 }
@@ -106,21 +120,21 @@
   min-height: 52px;
 }
 .st-row-name {
-  font-weight: 650;
+  font-weight: 700;
   min-width: 0;
 }
 .st-row-amount {
   min-width: 5.5em;
   text-align: right;
-  font-weight: 600;
+  font-weight: 700;
 }
 .st-ask {
   justify-self: end;
   max-width: 85%;
   padding: 12px 16px;
   border-radius: 20px 20px 6px 20px;
-  background: var(--lp-field);
-  color: var(--lp-field-ink);
+  background: var(--lp-black);
+  color: var(--lp-lemon);
   font-weight: 600;
 }
 .st-reply {
@@ -128,117 +142,44 @@
   line-height: 1.45;
 }
 .st-reply .money {
-  font-weight: 720;
+  font-weight: 800;
 }
 
-/* chapter 2: the gateway, the peak */
+/* chapter 2: the gateway, the peak. Lemon is your Mac; the black water is what leaves. */
 .st-gate {
-  /* the gateway is night in both themes */
-  --st-token: #8cc2f8;
   position: relative;
-  padding-top: clamp(96px, 12vw, 180px);
-  background: var(--lp-night);
-  color: var(--lp-night-ink);
+  background: var(--lp-lemon);
+  color: var(--lp-black);
 }
 .st-gate-track {
-  height: 260vh;
+  height: 340vh;
 }
 .st-gate-stage {
   position: sticky;
   top: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(32px, 6vw, 112px);
-  min-height: 100vh;
+  height: 100svh;
+  overflow: clip;
 }
-.st-gate-still {
-  position: static;
-  min-height: 0;
-  padding-block: 64px 160px;
+.st-gate-title {
+  position: absolute;
+  z-index: 4;
+  top: clamp(72px, 10vh, 112px);
+  left: var(--lp-gutter);
 }
-.st-gate-copy {
-  display: grid;
-  gap: 16px;
-}
-.st-gate-label {
-  display: grid;
-  color: var(--lp-night-soft);
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-.st-gate-label > span {
-  grid-area: 1 / 1;
-}
-.st-gate-line {
-  font-size: clamp(2.25rem, 0.9rem + 4.6vw, 5rem);
-  font-weight: 720;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-}
-.st-gate-still .st-gate-line + .st-gate-label {
-  margin-top: 16px;
-}
-.st-token,
-.st-flip-token {
-  color: var(--st-token);
-}
-.st-gate-lead {
-  max-width: 44ch;
-  margin-top: 16px;
-  color: var(--lp-night-soft);
-  font-size: 1.125rem;
-  line-height: 1.55;
-}
-.st-flip {
-  display: inline-grid;
-}
-/* the amount sits right, so "{P1} at" closes up when the shorter token shows */
-.st-flip:first-child {
-  justify-items: end;
-}
-.st-flip > span {
-  grid-area: 1 / 1;
-  white-space: nowrap;
-}
-
-/* the #76 coin */
-.st-coin-stage {
-  perspective: 900px;
-}
-.st-coin {
-  position: relative;
-  width: clamp(120px, 16vw, 240px);
-  aspect-ratio: 1;
-  transform-style: preserve-3d;
-}
-.st-coin-face {
+.st-water {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 10px solid var(--lp-card-low);
-  background: var(--lp-card);
-  color: #ffffff;
-  font-size: clamp(3rem, 6vw, 6rem);
-  font-weight: 760;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  /* WebKit honours backface-visibility only on faces with their own 3D transform */
-  transform: translateZ(1px);
+  z-index: 1;
+  background: var(--lp-black);
+  will-change: transform;
 }
-.st-coin-back {
-  transform: rotateY(180deg) translateZ(1px);
-  font-size: clamp(2rem, 4vw, 4rem);
-}
-
-/* the one wave wipe, at the cut into the principles */
 .st-wave {
-  height: clamp(64px, 9vw, 128px);
-  margin-top: -1px;
-  transform-origin: 50% 100%;
-  color: var(--lp-ground);
+  position: absolute;
+  bottom: calc(100% - 1px);
+  left: 0;
+  width: 200%;
+  height: clamp(14px, 1.6vw, 24px);
+  color: var(--lp-black);
 }
 .st-wave svg {
   display: block;
@@ -246,10 +187,126 @@
   height: 100%;
   fill: currentColor;
 }
+.st-plane {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  padding-inline: var(--lp-gutter);
+  pointer-events: none;
+}
+.st-plane-real {
+  color: var(--lp-black);
+}
+.st-plane-token {
+  color: var(--lp-lemon);
+}
+.st-plane-lens {
+  z-index: 3;
+  background: var(--lp-lemon);
+  color: var(--lp-black);
+}
+.st-line {
+  display: grid;
+  font-family: var(--lp-display);
+  font-size: clamp(3rem, 0.4rem + 8.6vw, 10rem);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+.st-token {
+  font-variant-numeric: tabular-nums;
+}
+.st-gate-foot {
+  position: absolute;
+  z-index: 4;
+  bottom: clamp(24px, 5vh, 48px);
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: end;
+  gap: 16px 40px;
+  color: var(--lp-lemon);
+}
+.st-gate-label {
+  display: grid;
+  font-family: var(--lp-display);
+  font-size: var(--lp-step-lead);
+  font-weight: 800;
+}
+.st-gate-label > span {
+  grid-area: 1 / 1;
+}
+.st-gate-lead {
+  max-width: 46ch;
+  font-size: var(--lp-step-body);
+  line-height: 1.5;
+}
+.st-gate-peek {
+  min-height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lp-lemon);
+  color: var(--lp-black);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: scale 140ms var(--lp-ease-out);
+}
+.st-gate-peek:active {
+  scale: 0.97;
+}
+.st-gate-peek:focus-visible {
+  outline-color: var(--lp-lemon);
+}
 
-/* chapter 3: the focus list */
+/* peeking from the keyboard: the whole stage shows the real values, so the foot takes black ink */
+.st-gate-stage[data-pinned] .st-gate-foot {
+  color: var(--lp-black);
+}
+.st-gate-stage[data-pinned] .st-gate-peek {
+  background: var(--lp-black);
+  color: var(--lp-lemon);
+}
+.st-gate-stage[data-pinned] .st-gate-peek:focus-visible {
+  outline-color: var(--lp-black);
+}
+
+/* the still gateway: dry above, wet below, both readable at once */
+.st-gate-dry {
+  display: grid;
+  gap: 24px;
+  padding-block: clamp(96px, 12vw, 176px) clamp(48px, 6vw, 96px);
+}
+.st-gate-dry .st-gate-title {
+  position: static;
+  padding: 0;
+  margin-bottom: 24px;
+}
+.st-gate-wet {
+  position: relative;
+  display: grid;
+  padding-block: clamp(48px, 6vw, 96px) clamp(96px, 12vw, 176px);
+  background: var(--lp-black);
+  color: var(--lp-lemon);
+}
+.st-gate-wet .lp-wrap {
+  display: grid;
+  gap: 24px;
+}
+.st-gate-wet .st-wave {
+  width: 100%;
+}
+
+/* chapter 3: the focus list, on mint */
 .st-principles {
-  padding-block: clamp(64px, 8vw, 120px) clamp(96px, 12vw, 180px);
+  padding-block: clamp(96px, 12vw, 176px);
+  background: var(--lp-mint);
+  color: var(--lp-black);
 }
 .st-principles-grid {
   display: grid;
@@ -264,14 +321,14 @@
 .st-principle-list {
   display: grid;
   gap: clamp(32px, 6vh, 64px);
-  list-style: none;
   padding-block: 12vh;
 }
 .st-principle {
-  font-size: clamp(1.75rem, 1rem + 2.4vw, 3rem);
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.12;
+  font-family: var(--lp-display);
+  font-size: clamp(1.9rem, 1rem + 2.8vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
 }
 
 @media (max-width: 900px) {
@@ -301,22 +358,23 @@
     grid-column: 1 / -1;
   }
   .st-gate-track {
-    height: 220vh;
+    height: 280vh;
   }
-  .st-gate-stage {
+  .st-line {
+    font-size: 11.2vw;
+  }
+  .st-principle {
+    font-size: 1.5rem;
+  }
+  .st-plane {
+    align-content: start;
+    padding-top: 36svh;
+  }
+  .st-gate-foot {
     grid-template-columns: 1fr;
-    align-content: center;
-    gap: 32px;
   }
-  .st-coin {
-    width: 112px;
-  }
-  .st-coin-face {
-    border-width: 6px;
-    font-size: 3rem;
-  }
-  .st-coin-back {
-    font-size: 1.75rem;
+  .st-gate-foot .st-gate-lead {
+    display: none;
   }
 }
 
@@ -329,4 +387,9 @@
 }
 .st[data-still] .st-card {
   will-change: auto;
+}
+
+/* keyboard focus always shows the foot, even before the water reaches it */
+.st-gate-foot:focus-within {
+  opacity: 1 !important;
 }

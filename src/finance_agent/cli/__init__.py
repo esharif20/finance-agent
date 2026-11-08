@@ -128,7 +128,11 @@ def _front_door(args: argparse.Namespace) -> int | None:
     if c == "demo":
         from finance_agent.cli import demo
 
-        return demo.list_personas() if args.list else demo.run(args.persona)
+        return (
+            demo.list_personas()
+            if args.list
+            else demo.run(args.persona, open_browser=not args.no_open)
+        )
     if c == "setup":
         from finance_agent.cli import banner, setup
 
@@ -236,6 +240,7 @@ def _add_front_door(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") 
     de = sub.add_parser("demo", help="try it on synthetic data, no setup")
     de.add_argument("--persona", type=int, metavar="N", help="pick a persona")
     de.add_argument("--list", action="store_true", help="list the personas")
+    de.add_argument("--no-open", action="store_true", help="don't open the browser")
     sub.add_parser("status", help="a terminal dashboard")
     mo = sub.add_parser("month", help="a month by Category, with bars")
     mo.add_argument("month", nargs="?", metavar="YYYY-MM")
