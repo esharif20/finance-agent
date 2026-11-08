@@ -1,13 +1,12 @@
 /* ===== the hero's visual layer: headline reveal, card lighting, pointer light, chips =====
-   Compositor-only: every moving thing here animates transform or opacity. The one exception is the
-   headline's weight settle, a single short run on load. Reduced motion renders the still hero
+   Compositor-only: every moving thing here animates transform or opacity. Reduced motion renders the still hero
    (useStill), which carries none of these elements or animations. */
 
 .lp-hero {
   --hero-ease: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* --- headline: each word slides up out of its line's mask, its letters settle from light to bold --- */
+/* --- headline: each word slides up out of its line's mask; transform and opacity only --- */
 .lp-hero .lp-flex[data-play] .lp-flex-line {
   /* the line is the mask; padding keeps descenders inside it */
   padding-bottom: 0.12em;
@@ -31,9 +30,14 @@
 .lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(2) { --w: 7; }
 .lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(3) { --w: 8; }
 .lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(4) { --w: 9; }
+/* the letters keep their final weight from the first frame: no weight, width or variation change on
+   load or under the pointer, so the headline never reflows (this overrides fx.tsx's inline swell) */
+.lp-hero .lp-flex [data-l] {
+  font-variation-settings: normal !important;
+  transition: none;
+}
 .lp-hero .lp-flex[data-play] [data-l] {
-  animation: hero-settle 820ms var(--hero-ease) backwards;
-  animation-delay: calc(var(--hd, 0s) + 0.5s + var(--i) * 18ms);
+  animation: none;
 }
 @keyframes hero-word {
   from {
@@ -44,9 +48,25 @@
     opacity: 1;
   }
 }
-@keyframes hero-settle {
-  from {
-    font-variation-settings: "wght" 200, "wdth" 125;
+/* under a fine pointer a word lifts a touch as the pointer crosses it: transform only */
+@media (hover: hover) and (pointer: fine) {
+  .lp-hero .lp-flex-word {
+    transition: transform 320ms var(--hero-ease);
+  }
+  .lp-hero .lp-flex-word:hover {
+    transform: translate3d(0, -0.05em, 0);
+  }
+}
+/* a column that stays clear of the hand: three lines on desktop, balanced */
+.lp-hero .lp-flex-line {
+  text-wrap: balance;
+}
+@media (min-width: 720px) {
+  .lp-hero .lp-hero-copy {
+    max-width: min(52rem, 46%);
+  }
+  .lp-hero .lp-display {
+    font-size: clamp(3.4rem, 0.4rem + 6.6vw, 8rem);
   }
 }
 
@@ -204,7 +224,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lp-hero .lp-flex-word,
-  .lp-hero .lp-flex [data-l],
   .lp-acard-light::before {
     animation: none;
   }
