@@ -29,7 +29,7 @@ import synthetic_personas as sp
 from finance_agent.engine import playbook
 
 RESULTS = Path(__file__).parent / "results" / "playbook.json"
-NUMBER = re.compile(r"£?\d[\d,]*(?:\.\d+)?")
+NUMBER = re.compile(r"£?\d+(?:,\d{3})*(?:\.\d+)?")
 TONES = ("gentle", "blunt")
 
 

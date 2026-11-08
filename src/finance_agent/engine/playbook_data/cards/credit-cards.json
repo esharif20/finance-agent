@@ -1,0 +1,29 @@
+{
+  "id": "credit-cards",
+  "version": 1,
+  "topic": "credit_cards",
+  "principles": [
+    "Paying only the minimum keeps the balance, and the interest, going for years.",
+    "Clear the card with the highest interest rate first.",
+    "If you cannot clear it, ask your card provider for help before you miss a payment."
+  ],
+  "when": {
+    "all": [
+      {
+        "signal": "card_interest_last_month",
+        "op": ">",
+        "value": 0
+      }
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Card interest is costing you",
+      "body": "You were charged {card_interest_last_month} in card interest last month. Paying a little more than the minimum each month brings that down, and it is worth asking whether your provider offers a lower rate."
+    },
+    "blunt": {
+      "title": "You paid {card_interest_last_month} in card interest",
+      "body": "Card interest cost you {card_interest_last_month} last month and it will keep coming until the balance is cleared. Pay more than the minimum, starting with the card that charges most."
+    }
+  }
+}
