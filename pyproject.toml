@@ -66,13 +66,13 @@ root_package = "finance_agent"
 # database nor the Ledger, so full account numbers cannot leak past it.
 # categorise reads through the Ledger and writes only its derived tables.
 [[tool.importlinter.contracts]]
-name = "cli | api -> categorise -> ledger -> ingest | storage"
+name = "cli | api -> categorise -> ledger -> ingest | storage | sanitise"
 type = "layers"
 layers = [
     "finance_agent.cli | finance_agent.api",
     "finance_agent.categorise",
     "finance_agent.ledger",
-    "finance_agent.ingest | finance_agent.storage | finance_agent.identity",
+    "finance_agent.ingest | finance_agent.storage | finance_agent.identity | finance_agent.sanitise",
 ]
 
 [[tool.importlinter.contracts]]
@@ -106,6 +106,26 @@ forbidden_modules = [
     "finance_agent.memory",
     "finance_agent.assistant",
     "finance_agent.notify",
+]
+
+# #215 F: the one sanitiser for bank text is shared by the Assistant and the
+# categoriser's LLM; it is a leaf and imports nothing of ours.
+[[tool.importlinter.contracts]]
+name = "sanitise is a leaf"
+type = "forbidden"
+source_modules = ["finance_agent.sanitise"]
+forbidden_modules = [
+    "finance_agent.storage",
+    "finance_agent.identity",
+    "finance_agent.ingest",
+    "finance_agent.ledger",
+    "finance_agent.categorise",
+    "finance_agent.engine",
+    "finance_agent.memory",
+    "finance_agent.assistant",
+    "finance_agent.gateway",
+    "finance_agent.cli",
+    "finance_agent.api",
 ]
 
 # #149: engine reads categorise (recurring detection) and the Ledger, never

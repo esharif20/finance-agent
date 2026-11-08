@@ -1,5 +1,5 @@
 # synthetic
-# categoriser dataset v3, seed 112, labels in taxonomy v1
+# categoriser dataset v4, seed 112, labels in taxonomy v1
 id,split,case,descriptor,amount_minor,top,sub
 1,correction,clean,MARLOW GROCERS,-15919,Food & Drink,Groceries
 2,correction,noise,marlow grocers,-23069,Food & Drink,Groceries
@@ -915,3 +915,111 @@ id,split,case,descriptor,amount_minor,top,sub
 912,test,uk_lookalike,NEXTDOOR GARDENS,-15395,Entertainment,Hobbies
 913,test,uk_lookalike,ARGOSY BOOKS,-13932,Entertainment,Hobbies
 914,test,uk_lookalike,BPM FITNESS STUDIO,-17822,Health,Fitness
+915,test,long_tail,THE RUSTY ANCHOR,-943,Food & Drink,Eating out
+916,test,long_tail,THE  RUSTY  ANCHOR,-12372,Food & Drink,Eating out
+917,test,long_tail,LITTLE SAIGON,-23767,Food & Drink,Eating out
+918,test,long_tail,LITTLE SAIGON 27JUN,-8849,Food & Drink,Eating out
+919,test,long_tail,CASA ROSSI,-21299,Food & Drink,Eating out
+920,test,long_tail,CASA ROSSI 04JAN,-17000,Food & Drink,Eating out
+921,test,long_tail,THE DAILY GRIND,-410,Food & Drink,Coffee
+922,test,long_tail,THE DAILY GRIND,-9658,Food & Drink,Coffee
+923,test,long_tail,FLAT WHITE CORNER,-1063,Food & Drink,Coffee
+924,test,long_tail,flat white corner,-4319,Food & Drink,Coffee
+925,test,long_tail,THE BEANERY,-6684,Food & Drink,Coffee
+926,test,long_tail,THE BEANERY CD 8604,-414,Food & Drink,Coffee
+927,test,long_tail,GOLDEN WOK,-24285,Food & Drink,Takeaway
+928,test,long_tail,GOLDEN WOK 15NOV,-23322,Food & Drink,Takeaway
+929,test,long_tail,PIZZA PRONTO,-12250,Food & Drink,Takeaway
+930,test,long_tail,PIZZA PRONTO,-5983,Food & Drink,Takeaway
+931,test,long_tail,SPICE HUT,-12565,Food & Drink,Takeaway
+932,test,long_tail,spice hut,-10434,Food & Drink,Takeaway
+933,test,long_tail,PATELS MINI MARKET,-19916,Food & Drink,Groceries
+934,test,long_tail,SQ *PATELS MINI MARKET,-14740,Food & Drink,Groceries
+935,test,long_tail,FRESHWAY FOODS,-9209,Food & Drink,Groceries
+936,test,long_tail,FRESHWAY  FOODS,-9124,Food & Drink,Groceries
+937,test,long_tail,OAKLEY NEWS AND BOOZE,-1200,Food & Drink,Groceries
+938,test,long_tail,SUMUP *OAKLEY NEWS AND BOOZE,-13497,Food & Drink,Groceries
+939,test,long_tail,SPEEDY MINICABS,-23066,Transport,Taxi
+940,test,long_tail,SQ *SPEEDY MINICABS,-13324,Transport,Taxi
+941,test,long_tail,STARLINE PRIVATE HIRE,-17745,Transport,Taxi
+942,test,long_tail,STARLINE PRIVAT,-21544,Transport,Taxi
+943,test,long_tail,RIDGEWAY GARAGE PFS,-4565,Transport,Fuel
+944,test,long_tail,RIDGEWAY GARAGE PFS CD 6883,-17907,Transport,Fuel
+945,test,long_tail,KINGSWAY PETROL STATION,-8020,Transport,Fuel
+946,test,long_tail,KINGSWAY PETROL STATION CD 5487,-5324,Transport,Fuel
+947,test,long_tail,CITYHOPPER BUS,-23081,Transport,Public transport
+948,test,long_tail,CITYHOPPER BUS,-17175,Transport,Public transport
+949,test,long_tail,LOOP TRAMWAY,-4616,Transport,Public transport
+950,test,long_tail,ZTL*LOOP TRAMWAY,-14536,Transport,Public transport
+951,test,long_tail,MARKET SQ CAR PARK,-9708,Transport,Parking
+952,test,long_tail,MARKET SQ CAR PARK GBR,-24260,Transport,Parking
+953,test,long_tail,TOWN HALL PAY AND DISPLAY,-9900,Transport,Parking
+954,test,long_tail,TOWN HALL PAY AND DISPLAY BRISTOL,-1037,Transport,Parking
+955,test,long_tail,THREADBARE VINTAGE,-18127,Shopping,Clothing
+956,test,long_tail,THREADBARE VINTAGE GBR,-10340,Shopping,Clothing
+957,test,long_tail,SOLE STREET SHOES,-20800,Shopping,Clothing
+958,test,long_tail,SOLE STREET SHOES 3457,-22416,Shopping,Clothing
+959,test,long_tail,CHIPFIX PHONE REPAIRS,-20668,Shopping,Electronics
+960,test,long_tail,ZTL*CHIPFIX PHONE REPAIRS,-18793,Shopping,Electronics
+961,test,long_tail,HOMEBITS,-8499,Shopping,Household
+962,test,long_tail,HOMEBITS LEEDS,-839,Shopping,Household
+963,test,long_tail,PARCELPOINT MARKETPLACE,-19316,Shopping,Online
+964,test,long_tail,ZTL*PARCELPOINT MARKETPLACE,-17151,Shopping,Online
+965,test,long_tail,SUNRAY POWER,-20557,Bills & Utilities,Energy
+966,test,long_tail,SUNRAY POWER CD 9502,-16231,Bills & Utilities,Energy
+967,test,long_tail,AQUAFLOW,-5614,Bills & Utilities,Water
+968,test,long_tail,AQUAFLOW CD 8523,-20747,Bills & Utilities,Water
+969,test,long_tail,SIGNALBOX MOBILE,-20262,Bills & Utilities,Phone & internet
+970,test,long_tail,SIGNALBOX MOBILE 22NOV,-16554,Bills & Utilities,Phone & internet
+971,test,long_tail,NOTEWISE,-1788,Subscriptions,Software
+972,test,long_tail,SQ *NOTEWISE,-18897,Subscriptions,Software
+973,test,long_tail,TUNEBOX,-22639,Subscriptions,Streaming
+974,test,long_tail,TUNEBOX 20JAN,-13468,Subscriptions,Streaming
+975,test,long_tail,RIVERSIDE ALLOTMENT SOCIETY,-12719,Subscriptions,Memberships
+976,test,long_tail,SUMUP *RIVERSIDE ALLOTMENT SOCIETY,-4191,Subscriptions,Memberships
+977,test,long_tail,FIXITALL HOME REPAIRS,-11502,Housing,Maintenance
+978,test,long_tail,FIXITALL HOME R,-22432,Housing,Maintenance
+979,test,long_tail,CLEARVIEW EYECARE,-21354,Health,Medical
+980,test,long_tail,ZTL*CLEARVIEW EYECARE,-1867,Health,Medical
+981,test,long_tail,PEAK BOULDERING,-17286,Health,Fitness
+982,test,long_tail,SQ *PEAK BOULDERING,-4634,Health,Fitness
+983,test,long_tail,FLOW YOGA,-11170,Health,Fitness
+984,test,long_tail,FLOW YOGA 9469,-18766,Health,Fitness
+985,test,long_tail,GREENCROSS CHEMIST,-7696,Health,Pharmacy
+986,test,long_tail,greencross chemist,-7296,Health,Pharmacy
+987,test,long_tail,STAGEDOOR TICKETS,-5668,Entertainment,Events
+988,test,long_tail,STAGEDOOR TICKE,-454,Entertainment,Events
+989,test,long_tail,STRIKE ZONE BOWLING,-2464,Entertainment,Events
+990,test,long_tail,SUMUP *STRIKE ZONE BOWLING,-9750,Entertainment,Events
+991,test,long_tail,CRITICAL HIT GAMES,-667,Entertainment,Games
+992,test,long_tail,CRITICAL HIT GA,-8427,Entertainment,Games
+993,test,long_tail,WOOL AND WHIMSY,-11795,Entertainment,Hobbies
+994,test,long_tail,WOOL AND WHIMSY 5157,-6248,Entertainment,Hobbies
+995,test,long_tail,AEROLINK,-10145,Travel,Flights
+996,test,long_tail,AEROLINK 27JUN,-24567,Travel,Flights
+997,test,long_tail,SEASHELL COTTAGES,-24129,Travel,Holidays
+998,test,long_tail,SEASHELL COTTAGES 4355,-10863,Travel,Holidays
+999,test,long_tail,THE BAY ROOMS,-11429,Travel,Hotels
+1000,test,long_tail,THE BAY ROOMS 07JUN,-549,Travel,Hotels
+1001,test,long_tail,FADE MASTERS,-7402,Personal care,Hair & beauty
+1002,test,long_tail,FADE MASTERS,-1672,Personal care,Hair & beauty
+1003,test,long_tail,SOAP AND SUDS,-13535,Personal care,Toiletries
+1004,test,long_tail,soap and suds,-22360,Personal care,Toiletries
+1005,test,vague,SQ *THE KITCHEN,-5301,Food & Drink,Eating out
+1006,test,vague,SUMUP *BREW CART,-19810,Food & Drink,Coffee
+1007,test,vague,ZTL*STALL 12 MARKET,-3407,Food & Drink,Groceries
+1008,test,vague,IZ *HAIR BY SAM,-23088,Personal care,Hair & beauty
+1009,test,vague,SQ *JO FIT,-10168,Health,Fitness
+1010,test,vague,PAYPAL *GAMEVAULT,-16969,Entertainment,Games
+1011,test,vague,SQ *TICKETS ON THE DOOR,-5005,Entertainment,Events
+1012,test,vague,SUMUP *RIDE HOME,-16210,Transport,Taxi
+1013,test,vague,CARD PAYMENT KJ SERVICES,-21445,Housing,Maintenance
+1014,test,vague,PAYPAL *AB TRADING,-15096,Shopping,Online
+1015,test,tail_lookalike,SHELLEYS PANTRY,-23755,Food & Drink,Eating out
+1016,test,tail_lookalike,PETROLHEAD MONTHLY,-10546,Subscriptions,Memberships
+1017,test,tail_lookalike,PERSONAL TRAINER JO,-24744,Health,Fitness
+1018,test,tail_lookalike,GREEN TRAIN MODELS,-13874,Entertainment,Hobbies
+1019,test,tail_lookalike,HYDE PARK WINTER FAIR,-4375,Entertainment,Events
+1020,test,tail_lookalike,TUBE AND TYRE BIKES,-15521,Entertainment,Hobbies
+1021,test,tail_lookalike,STATION ROAD NOODLES,-5288,Food & Drink,Takeaway
+1022,test,tail_lookalike,ESSENCE PERFUMERY,-17073,Personal care,Toiletries

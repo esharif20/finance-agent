@@ -4,7 +4,6 @@ undone Merchant, and a Correction always wins. Every guess is logged as a
 live accuracy record that suspends a version whose agreement falls below 95%.
 Synthetic Merchants and the trigram stand-in embedder only."""
 
-import json
 import tempfile
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
@@ -109,15 +108,13 @@ def _suspensions(conn: Connection) -> int:
     return conn.execute(text("SELECT count(*) FROM model_suspension")).scalar() or 0
 
 
-def test_the_app_thresholds_are_the_committed_synthetic_calibration(
+def test_no_model_ships_a_confident_threshold(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """#287: held out, no model kept 95%, so confident rows come from rules,
+    the UK base and Corrections only; every model guess files `auto-low:`."""
     monkeypatch.undo()  # the real table, not the autouse override
-    for name in ("categoriser_baseline.json", "categoriser_ollama.json"):
-        nn = json.loads((RESULTS / name).read_text())["models"]["nn"]
-        model = nn["model_version"].split("@")[0]
-        assert auto.THRESHOLDS[model] == nn["calibration"]["threshold"]
-        assert nn["calibration"]["precision"] >= 0.95
+    assert auto.THRESHOLDS == {}
 
 
 def test_every_review_item_guess_is_logged_with_ids_and_scores_only(

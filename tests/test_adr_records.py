@@ -54,4 +54,8 @@ def test_agents_egress_rule_cites_the_egress_adr() -> None:
         assert number in adrs
         text = adrs[number].read_text()
         assert _status(adrs[number]) == "accepted"
-        assert "Egress is allowed to exactly one SimpleFIN host" in text
+        # each cited ADR names the host it allows (0013 SimpleFIN, 0016 Gemini)
+        assert (
+            "Egress is allowed to exactly one SimpleFIN host" in text
+            or "generativelanguage.googleapis.com" in text
+        )
