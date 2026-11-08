@@ -431,3 +431,86 @@ def test_random_merge_and_undo_sequences_match_a_reference(
             assert s.money_out == -sum((v for v in kept if v < 0), Decimal(0))
             assert len(led.transactions()) == len(kept)
             assert led.search_transactions(month=MONTH).total == len(kept)
+
+
+# --- verifier (#250): interleaved syncs ------------------------------------------
+
+
+def _feed(rows: dict[str, dict[str, Any]], pending: str | None) -> bytes:
+    out = [{"id": k} | v for k, v in rows.items()]
+    if pending is not None:
+        out.append({"id": pending, "posted": 0, "pending": True} | CAFE)
+    acc = {
+        "org": {"name": "Synthetic Bank"},
+        "id": "ACC-1",
+        "name": "Synthetic Current",
+        "currency": "GBP",
+        "balance": "100.00",
+        "balance-date": _ts(28, 999),
+        "transactions": out,
+    }
+    return json.dumps({"errors": [], "accounts": [acc]}).encode()
+
+
+CAFE = {"amount": "-3.50", "description": "SYNTH CAFE"}
+
+
+@settings(max_examples=40, deadline=None)
+@given(
+    steps=st.lists(
+        st.sampled_from(["twin", "reissue", "pending", "post", "resync"]),
+        min_size=1,
+        max_size=10,
+    )
+)
+def test_interleaved_twins_reissues_and_pending_keep_totals_and_real_doubt(
+    steps: list[str],
+) -> None:
+    """Adversarial interleaving: same-day twins under their own IDs never queue;
+    a re-issued ID (old one gone) always queues with both rows; a pending row
+    counts only once it posts under its new ID; totals always equal every posted
+    ID stored, and nothing is deleted or merged."""
+    from finance_agent.storage import schema
+
+    feed: dict[str, dict[str, Any]] = {  # days 1 and 28 make the feed cover day 10
+        "lo": {"posted": _ts(1, 0), "amount": "-1.00", "description": "SYNTH LO"},
+        "hi": {"posted": _ts(28, 0), "amount": "-2.00", "description": "SYNTH HI"},
+        "c0": {"posted": _ts(10, 0)} | CAFE,
+    }
+    stored = {"lo": -100, "hi": -200, "c0": -350}
+    reissued: list[tuple[str, str]] = []
+    pending: str | None = None
+    with temp_ledger() as (led, _):
+        led.apply_sync(_feed(feed, pending))
+        for n, step in enumerate(steps, 1):
+            cafes = [k for k in feed if k.startswith("c")]
+            new = f"c{n}"
+            if step == "twin":  # a second coffee that day
+                feed[new] = {"posted": _ts(10, n)} | CAFE
+            elif step == "reissue" and cafes:  # same purchase, old ID dropped
+                feed[new] = feed.pop(cafes[0])
+                reissued.append((cafes[0], new))
+            elif step == "pending" and pending is None:
+                pending = f"p{n}"
+            elif step == "post" and pending is not None:
+                feed[new], pending = {"posted": _ts(10, n)} | CAFE, None
+            if new in feed:
+                stored[new] = -350
+            led.apply_sync(_feed(feed, pending))
+
+            db = led._db  # pyright: ignore[reportPrivateUsage]
+            k = schema.synced_key
+            txn = {
+                str(r.provider_id): int(r.transaction_id)
+                for r in db.execute(db.select(k, k.c.provider_id, k.c.transaction_id))
+            }
+            assert txn.keys() == stored.keys()  # no row lost, none counted twice
+            assert len(led.transactions(merged=True)) == len(stored)
+            assert led.merged_ids() == set()
+            net = Decimal(sum(stored.values())).scaleb(-2)
+            assert led.summarise_month(MONTH).net == net
+            groups = led.possible_duplicates()
+            for old, re in reissued:
+                assert any({txn[old], txn[re]} <= g for g in groups)
+            if not reissued:
+                assert groups == [] and queued_duplicates(led) == []
