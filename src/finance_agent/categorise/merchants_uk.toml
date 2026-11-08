@@ -1,0 +1,1217 @@
+# UK merchant and keyword base (#215). Data, not code: loaded once by
+# categorise/__init__.py. Taxonomy v2 Category ids ("Top/Sub"); a test checks
+# every one exists.
+#
+# Matching runs on the upper-cased descriptor with `*` and apostrophes
+# removed and spaces collapsed. A token matches on word boundaries anywhere in
+# the descriptor, so "SQ *" or "PAYPAL *" prefixes do not matter. Spelling:
+#   "^TOKEN"  only at the start (short or common words)
+#   "TOKEN*"  no word boundary after it (AMZN*, for AMZNMKTPLACE)
+# Order is the precedence: [[sub_brand]] groups first (TESCO PFS before
+# TESCO), then [[base]] groups; the first Merchant that matches wins. A
+# Merchant without `match` matches its own upper-cased name.
+# Public brand names only; no real account data.
+
+# --- sub-brands: one retailer, a different kind of purchase -----------------
+
+[[sub_brand]]
+category = "Transport/Fuel"
+merchants = [
+  { name = "Tesco Fuel", match = ["^TESCO PFS", "^TESCO PETROL", "^TESCO FUEL"] },
+  { name = "Sainsbury's Fuel", match = ["^SAINSBURYS PFS", "^SAINSBURYS PETROL", "^SAINSBURYS FUEL", "^SAINSBURYS S/MKTS PFS"] },
+  { name = "Asda Fuel", match = ["^ASDA PFS", "^ASDA PETROL", "^ASDA FUEL", "^ASDA EXPRESS PFS"] },
+  { name = "Morrisons Fuel", match = ["^MORRISONS PFS", "^MORRISONS PETROL", "^MORRISONS FUEL", "^MORRISONS DAILY FUEL"] },
+  { name = "Co-op Fuel", match = ["^CO-OP FUEL", "^CO-OP PETROL", "^COOP PFS"] },
+  { name = "M&S Fuel", match = ["^M&S PFS", "^M&S PETROL", "^MARKS & SPENCER PFS"] },
+]
+
+[[sub_brand]]
+category = "Bills/Phone & broadband"
+merchants = [
+  { name = "Tesco Mobile", match = ["^TESCO MOBILE"] },
+  { name = "Sainsbury's Mobile", match = ["^SAINSBURYS MOBILE"] },
+  { name = "Asda Mobile", match = ["^ASDA MOBILE"] },
+]
+
+[[sub_brand]]
+category = "Bills/Insurance"
+merchants = [
+  { name = "Tesco Insurance", match = ["^TESCO INSURANCE", "^TESCO BANK INSURANCE", "^TESCO PET INSURANCE"] },
+  { name = "Sainsbury's Insurance", match = ["^SAINSBURYS INSURANCE"] },
+  { name = "M&S Insurance", match = ["^M&S INSURANCE", "^MARKS & SPENCER INSURANCE"] },
+  { name = "Co-op Insurance", match = ["^CO-OP INSURANCE", "^COOP INSURANCE"] },
+]
+
+# Banking arms: bank charges, card or loan payments. No finance Category in
+# taxonomy v2, so Other bills.
+[[sub_brand]]
+category = "Bills/Other bills"
+merchants = [
+  { name = "Tesco Bank", match = ["^TESCO BANK", "^TESCO CREDIT CARD", "^TESCO PERSONAL FINANCE"] },
+  { name = "Sainsbury's Bank", match = ["^SAINSBURYS BANK"] },
+  { name = "M&S Bank", match = ["^M&S BANK", "^MARKS & SPENCER BANK", "^M&S FINANCIAL SERVICES"] },
+]
+
+[[sub_brand]]
+category = "Food & Drink/Takeaway"
+merchants = [
+  { name = "Uber Eats", match = ["UBER EATS", "UBEREATS"] },
+  { name = "Just Eat", match = ["JUST EAT", "JUSTEAT"] },
+]
+
+[[sub_brand]]
+category = "Subscriptions/Streaming"
+merchants = [
+  { name = "Amazon Prime", match = ["AMAZON PRIME", "AMZN PRIME", "PRIME VIDEO", "AMAZON MUSIC", "AMZ PRIME"] },
+  { name = "YouTube Premium", match = ["YOUTUBE PREMIUM", "YOUTUBEPREMIUM", "YOUTUBE MUSIC"] },
+]
+
+[[sub_brand]]
+category = "Subscriptions/Other subscriptions"
+merchants = [
+  { name = "Xbox Game Pass", match = ["XBOX GAME PASS", "GAME PASS"] },
+  { name = "PlayStation Plus", match = ["PLAYSTATION PLUS", "PS PLUS", "PLAYSTATION NETWORK PLUS"] },
+]
+
+[[sub_brand]]
+category = "Subscriptions/Software"
+merchants = [
+  { name = "Microsoft 365", match = ["MICROSOFT 365", "MSFT 365", "OFFICE 365", "MICROSOFT OFFICE"] },
+  { name = "Google Workspace", match = ["GSUITE", "GOOGLE WORKSPACE"] },
+]
+
+[[sub_brand]]
+category = "Subscriptions/Cloud storage"
+merchants = [
+  { name = "Google One", match = ["GOOGLE ONE", "GOOGLE STORAGE"], whole = true },
+  { name = "iCloud", match = ["ICLOUD", "APPLE ICLOUD"], whole = true },
+]
+
+[[sub_brand]]
+category = "Subscriptions/AI tools"
+merchants = [
+  { name = "Anthropic", match = ["ANTHROPIC", "CLAUDE.AI", "CLAUDE AI"] },
+  { name = "OpenAI", match = ["OPENAI", "CHATGPT"] },
+  { name = "Perplexity", match = ["PERPLEXITY"] },
+  { name = "Midjourney", match = ["MIDJOURNEY"], whole = true },
+  { name = "Cursor", match = ["^CURSOR", "ANYSPHERE"] },
+]
+
+[[sub_brand]]
+category = "Entertainment/Games"
+merchants = [
+  { name = "Google Play", match = ["GOOGLE PLAY"] },
+  { name = "Xbox", match = ["^XBOX", "MICROSOFT XBOX"] },
+]
+
+[[sub_brand]]
+category = "Transport/Fuel"
+merchants = [
+  { name = "bp pulse", match = ["BP PULSE", "BPPULSE"] },
+  { name = "Shell Recharge", match = ["SHELL RECHARGE"] },
+  { name = "Gridserve", match = ["^GRIDSERVE"] },
+]
+
+[[sub_brand]]
+category = "Bills/Energy"
+merchants = [
+  { name = "Shell Energy", match = ["SHELL ENERGY"] },
+]
+
+[[sub_brand]]
+category = "Bills/Phone & broadband"
+merchants = [
+  { name = "Tesco Broadband", match = ["^TESCO BROADBAND"] },
+  { name = "Sky Mobile", match = ["^SKY MOBILE"] },
+]
+
+[[sub_brand]]
+category = "Health/Pharmacy"
+merchants = [
+  { name = "Tesco Pharmacy", match = ["^TESCO PHARMACY"] },
+  { name = "Asda Pharmacy", match = ["^ASDA PHARMACY"] },
+  { name = "Morrisons Pharmacy", match = ["^MORRISONS PHARMACY"] },
+  { name = "Sainsbury's Pharmacy", match = ["^SAINSBURYS PHARMACY"] },
+]
+
+[[sub_brand]]
+category = "Health/Medical"
+merchants = [
+  { name = "Boots Opticians", match = ["BOOTS OPTICIANS"] },
+  { name = "Bupa Dental", match = ["BUPA DENTAL", "BUPA CROMWELL"] },
+]
+
+[[sub_brand]]
+category = "Shopping/Household"
+merchants = [
+  { name = "Argos", match = ["ARGOS"] },
+]
+
+[[sub_brand]]
+category = "Subscriptions/Streaming"
+merchants = [
+  { name = "Sky Go", match = ["^SKY GO", "^SKY SPORTS", "^SKY CINEMA", "^NOW SPORTS"] },
+  { name = "TNT Sports", match = ["TNT SPORTS", "^BT SPORT"] },
+]
+
+[[sub_brand]]
+category = "Bills/Insurance"
+merchants = [
+  { name = "Travel Insurance", match = ["TRAVEL INSURANCE"] },
+]
+
+[[sub_brand]]
+category = "Food & Drink/Coffee"
+merchants = [
+  { name = "Pret A Manger", match = ["^PRET"] },
+]
+
+[[sub_brand]]
+category = "Food & Drink/Takeaway"
+merchants = [
+  { name = "Greggs", match = ["^GREGGS"] },
+]
+
+# --- groceries --------------------------------------------------------------
+
+[[base]]
+category = "Food & Drink/Groceries"
+merchants = [
+  { name = "Tesco", match = ["^TESCO"] },
+  { name = "Sainsbury's", match = ["SAINSBURYS", "SAINSBURY", "^JS ONLINE"] },
+  { name = "Asda", match = ["^ASDA"] },
+  { name = "Morrisons", match = ["^MORRISONS", "^WM MORRISON", "^WM MORRISONS"] },
+  { name = "Waitrose", match = ["WAITROSE"] },
+  { name = "Aldi", match = ["^ALDI"] },
+  { name = "Lidl", match = ["^LIDL"] },
+  { name = "Co-op", match = ["^CO-OP", "^COOP", "^CO OP", "^THE CO-OPERATIVE", "^CO-OPERATIVE FOOD", "^CENTRAL CO-OP"] },
+  { name = "Marks & Spencer Food", match = ["^M&S SIMPLY FOOD", "^M&S FOOD", "^MARKS & SPENCER SIMPLY FOOD", "^MARKS & SPENCER FOOD", "^M&S SIMPLY"] },
+  { name = "Ocado", match = ["OCADO"] },
+  { name = "Iceland", match = ["^ICELAND STORES", "^ICELAND FOODS", "^ICELAND FOOD"] },
+  { name = "Spar", match = ["^SPAR"] },
+  { name = "Budgens", match = ["^BUDGENS"] },
+  { name = "Nisa", match = ["^NISA"] },
+  { name = "Costcutter", match = ["^COSTCUTTER"] },
+  { name = "Londis", match = ["^LONDIS"] },
+  { name = "Booths", match = ["^BOOTHS"] },
+  { name = "Farmfoods", match = ["^FARMFOODS"] },
+  { name = "Whole Foods", match = ["^WHOLE FOODS"] },
+  { name = "Planet Organic", match = ["PLANET ORGANIC"] },
+  { name = "Riverford", match = ["RIVERFORD"] },
+  { name = "Abel & Cole", match = ["ABEL & COLE", "ABEL AND COLE"] },
+  { name = "HelloFresh", match = ["HELLOFRESH", "HELLO FRESH"] },
+  { name = "Gousto", match = ["GOUSTO"] },
+  { name = "Costco", match = ["^COSTCO"] },
+  { name = "One Stop", match = ["^ONE STOP"] },
+  { name = "McColls", match = ["^MCCOLLS"] },
+]
+
+# --- eating out, takeaway, coffee -------------------------------------------
+
+[[base]]
+category = "Food & Drink/Takeaway"
+merchants = [
+  { name = "Deliveroo", match = ["^DELIVEROO"] },
+  { name = "McDonald's", match = ["MCDONALDS", "MC DONALDS"] },
+  { name = "KFC", match = ["^KFC"] },
+  { name = "Domino's", match = ["DOMINOS"] },
+  { name = "Burger King", match = ["BURGER KING"] },
+  { name = "Subway", match = ["^SUBWAY"] },
+  { name = "Papa John's", match = ["PAPA JOHNS"] },
+  { name = "Five Guys", match = ["FIVE GUYS"] },
+  { name = "Leon", match = ["^LEON"] },
+  { name = "Itsu", match = ["^ITSU"] },
+  { name = "Wasabi", match = ["^WASABI"] },
+  { name = "Tortilla", match = ["^TORTILLA"] },
+  { name = "Chipotle", match = ["^CHIPOTLE"] },
+  { name = "Wendy's", match = ["^WENDYS"] },
+  { name = "Taco Bell", match = ["TACO BELL"] },
+  { name = "Popeyes", match = ["^POPEYES"] },
+  { name = "Wimpy", match = ["^WIMPY"] },
+  { name = "Cooplands", match = ["^COOPLANDS"] },
+  { name = "Pizza Hut Delivery", match = ["PIZZA HUT DELIVERY"] },
+]
+
+[[base]]
+category = "Food & Drink/Eating out"
+merchants = [
+  { name = "Nando's", match = ["NANDOS"] },
+  { name = "Wagamama", match = ["WAGAMAMA"] },
+  { name = "Pizza Express", match = ["PIZZA EXPRESS", "PIZZAEXPRESS"] },
+  { name = "Pizza Hut", match = ["^PIZZA HUT"] },
+  { name = "Wetherspoons", match = ["WETHERSPOON*"] },
+  { name = "Pizza Pilgrims", match = ["PIZZA PILGRIMS"] },
+  { name = "Zizzi", match = ["^ZIZZI"] },
+  { name = "Ask Italian", match = ["^ASK ITALIAN"] },
+  { name = "Prezzo", match = ["^PREZZO"] },
+  { name = "Bella Italia", match = ["BELLA ITALIA"] },
+  { name = "Carluccio's", match = ["CARLUCCIOS"] },
+  { name = "Frankie & Benny's", match = ["FRANKIE & BENNYS", "FRANKIE AND BENNYS"] },
+  { name = "Harvester", match = ["^HARVESTER"] },
+  { name = "Toby Carvery", match = ["TOBY CARVERY"] },
+  { name = "Beefeater", match = ["^BEEFEATER"] },
+  { name = "Brewers Fayre", match = ["BREWERS FAYRE"] },
+  { name = "Giraffe", match = ["^GIRAFFE"] },
+  { name = "Yo! Sushi", match = ["YO SUSHI", "^YO! SUSHI"] },
+  { name = "Honest Burgers", match = ["HONEST BURGERS"] },
+  { name = "Gourmet Burger Kitchen", match = ["GOURMET BURGER"] },
+  { name = "Byron", match = ["^BYRON"] },
+  { name = "Dishoom", match = ["DISHOOM"] },
+  { name = "Cote", match = ["^COTE BRASSERIE", "^COTE RESTAURANT"] },
+  { name = "Las Iguanas", match = ["LAS IGUANAS"] },
+  { name = "Turtle Bay", match = ["TURTLE BAY"] },
+  { name = "Bill's", match = ["^BILLS RESTAURANT"] },
+  { name = "Greene King", match = ["GREENE KING"] },
+  { name = "Mitchells & Butlers", match = ["MITCHELLS & BUTLERS"] },
+  { name = "Wahaca", match = ["WAHACA"] },
+]
+
+[[base]]
+category = "Food & Drink/Coffee"
+merchants = [
+  { name = "Starbucks", match = ["STARBUCKS"] },
+  { name = "Costa Coffee", match = ["^COSTA COFFEE", "^COSTA"] },
+  { name = "Caffe Nero", match = ["CAFFE NERO"] },
+  { name = "Gail's", match = ["^GAILS"] },
+  { name = "Black Sheep Coffee", match = ["BLACK SHEEP COFFEE"] },
+  { name = "Joe & the Juice", match = ["JOE & THE JUICE", "JOE AND THE JUICE"] },
+  { name = "Paul", match = ["^PAUL UK", "^PAUL BAKERY"] },
+  { name = "Patisserie Valerie", match = ["PATISSERIE VALERIE"] },
+  { name = "Tim Hortons", match = ["TIM HORTONS"] },
+  { name = "Esquires Coffee", match = ["ESQUIRES COFFEE"] },
+  { name = "Coffee#1", match = ["^COFFEE#1", "^COFFEE 1"] },
+  { name = "Krispy Kreme", match = ["KRISPY KREME"] },
+  { name = "Dunkin'", match = ["^DUNKIN"] },
+]
+
+# --- transport --------------------------------------------------------------
+
+[[base]]
+category = "Transport/Public transport"
+merchants = [
+  { name = "TfL", match = ["^TFL", "TRANSPORT FOR LONDON"] },
+  { name = "Trainline", match = ["TRAINLINE"] },
+  { name = "National Rail", match = ["NATIONAL RAIL", "RAIL DELIVERY GROUP"] },
+  { name = "LNER", match = ["^LNER"] },
+  { name = "Avanti West Coast", match = ["AVANTI WEST"] },
+  { name = "Great Western Railway", match = ["^GWR", "GREAT WESTERN RAILWAY"] },
+  { name = "Southeastern", match = ["SOUTHEASTERN"] },
+  { name = "Southern Rail", match = ["^SOUTHERN RAIL", "^SOUTHERN RAILWAY", "^GOVIA THAMESLINK"] },
+  { name = "ScotRail", match = ["SCOTRAIL"] },
+  { name = "TransPennine Express", match = ["TRANSPENNINE"] },
+  { name = "Northern Rail", match = ["^NORTHERN RAIL", "^NORTHERN TRAINS"] },
+  { name = "CrossCountry", match = ["CROSSCOUNTRY", "CROSS COUNTRY TRAINS"] },
+  { name = "East Midlands Railway", match = ["EAST MIDLANDS RAILWAY"] },
+  { name = "Greater Anglia", match = ["GREATER ANGLIA"] },
+  { name = "c2c", match = ["^C2C RAIL", "^C2C"] },
+  { name = "Chiltern Railways", match = ["CHILTERN RAILWAYS"] },
+  { name = "Heathrow Express", match = ["HEATHROW EXPRESS"] },
+  { name = "Gatwick Express", match = ["GATWICK EXPRESS"] },
+  { name = "Eurostar", match = ["EUROSTAR"] },
+  { name = "Stagecoach", match = ["STAGECOACH"] },
+  { name = "First Bus", match = ["^FIRST BUS", "^FIRSTGROUP", "^FIRST GROUP"] },
+  { name = "Arriva", match = ["^ARRIVA"] },
+  { name = "Go-Ahead", match = ["GO-AHEAD", "GO AHEAD BUS"] },
+  { name = "National Express", match = ["NATIONAL EXPRESS"] },
+  { name = "Megabus", match = ["MEGABUS"] },
+  { name = "FlixBus", match = ["FLIXBUS"] },
+  { name = "Lime", match = ["^LIME RIDE", "^LIME BIKE", "^LIME SCOOT"] },
+  { name = "Dott", match = ["^DOTT"] },
+  { name = "Santander Cycles", match = ["SANTANDER CYCLES"] },
+  { name = "Oyster", match = ["OYSTER"] },
+  { name = "Translink", match = ["TRANSLINK"] },
+  { name = "Merseyrail", match = ["MERSEYRAIL"] },
+  { name = "Metrolink", match = ["METROLINK"] },
+  { name = "West Midlands Metro", match = ["WEST MIDLANDS METRO", "^NETWORK WEST MIDLANDS"] },
+  { name = "Dart Charge", match = ["DART CHARGE", "DARTCHARGE"] },
+  { name = "Tyne and Wear Metro", match = ["TYNE AND WEAR METRO"] },
+]
+
+[[base]]
+category = "Transport/Taxi"
+merchants = [
+  { name = "Uber", match = ["^UBER"] },
+  { name = "Bolt", match = ["^BOLT"] },
+  { name = "Free Now", match = ["FREE NOW", "FREENOW"] },
+  { name = "Addison Lee", match = ["ADDISON LEE"] },
+  { name = "Gett", match = ["^GETT"] },
+  { name = "Veezu", match = ["^VEEZU"] },
+  { name = "Ola", match = ["^OLA CABS"] },
+  { name = "Cabfind", match = ["CABFIND"] },
+]
+
+[[base]]
+category = "Transport/Parking"
+merchants = [
+  { name = "RingGo", match = ["RINGGO"] },
+  { name = "PayByPhone", match = ["PAYBYPHONE"] },
+  { name = "JustPark", match = ["JUSTPARK"] },
+  { name = "NCP", match = ["^NCP"] },
+  { name = "APCOA", match = ["APCOA"] },
+  { name = "Q-Park", match = ["Q-PARK", "^QPARK"] },
+  { name = "Euro Car Parks", match = ["EURO CAR PARKS"] },
+  { name = "Parkopedia", match = ["PARKOPEDIA"] },
+  { name = "Saba Parking", match = ["^SABA PARK"] },
+  { name = "Indigo Parking", match = ["INDIGO PARK"] },
+  { name = "ParkMobile", match = ["PARKMOBILE"] },
+]
+
+[[base]]
+category = "Transport/Fuel"
+merchants = [
+  { name = "BP", match = ["^BP", "BP CONNECT"] },
+  { name = "Shell", match = ["^SHELL"] },
+  { name = "Esso", match = ["^ESSO"] },
+  { name = "Texaco", match = ["^TEXACO"] },
+  { name = "Jet", match = ["^JET FILLING", "^JET PETROL", "^JET GARAGE"] },
+  { name = "Gulf", match = ["^GULF PETROL", "^GULF FILLING"] },
+  { name = "Murco", match = ["^MURCO"] },
+  { name = "Applegreen", match = ["APPLEGREEN"] },
+  { name = "Motorway Services", match = ["MOTO HOSPITALITY", "^MOTO SERVICES", "WELCOME BREAK", "ROADCHEF", "EXTRA MSA", "^MOTORWAY SERVICE"] },
+  { name = "Maxol", match = ["^MAXOL"] },
+  { name = "Certas Energy", match = ["CERTAS ENERGY"] },
+  { name = "Rontec", match = ["^RONTEC"] },
+  { name = "EG On The Move", match = ["^EG ON THE MOVE", "^EURO GARAGES"] },
+  { name = "Pod Point", match = ["POD POINT", "PODPOINT"] },
+  { name = "Ionity", match = ["^IONITY"] },
+  { name = "InstaVolt", match = ["INSTAVOLT"] },
+  { name = "Osprey Charging", match = ["OSPREY CHARGING"] },
+  { name = "Tesla Supercharger", match = ["TESLA SUPERCHARGER"] },
+  { name = "Charge Place Scotland", match = ["CHARGE PLACE SCOTLAND"] },
+]
+
+[[base]]
+category = "Transport/Parking"
+merchants = [
+]
+
+# --- bills ------------------------------------------------------------------
+
+[[base]]
+category = "Bills/Energy"
+merchants = [
+  { name = "British Gas", match = ["BRITISH GAS"] },
+  { name = "Octopus Energy", match = ["OCTOPUS ENERGY", "^OCTOPUS"] },
+  { name = "EDF Energy", match = ["EDF ENERGY", "^EDF"] },
+  { name = "E.ON Next", match = ["E.ON", "EON NEXT", "^EON"] },
+  { name = "OVO Energy", match = ["OVO ENERGY", "^OVO"] },
+  { name = "Scottish Power", match = ["SCOTTISH POWER", "SCOTTISHPOWER"] },
+  { name = "Bulb", match = ["^BULB ENERGY", "^BULB"] },
+  { name = "SSE", match = ["^SSE", "^SSE ENERGY", "SCOTTISH AND SOUTHERN ENERGY"] },
+  { name = "Utility Warehouse", match = ["UTILITY WAREHOUSE", "^UTILITYWAREHOUSE"] },
+  { name = "Utilita", match = ["UTILITA"] },
+  { name = "So Energy", match = ["SO ENERGY"] },
+  { name = "Good Energy", match = ["GOOD ENERGY"] },
+  { name = "Ecotricity", match = ["ECOTRICITY"] },
+  { name = "Outfox the Market", match = ["OUTFOX THE MARKET"] },
+  { name = "Affect Energy", match = ["AFFECT ENERGY"] },
+  { name = "Pure Planet", match = ["PURE PLANET"] },
+  { name = "Rebel Energy", match = ["REBEL ENERGY"] },
+  { name = "Together Energy", match = ["TOGETHER ENERGY"] },
+  { name = "Opus Energy", match = ["OPUS ENERGY"] },
+  { name = "Calor Gas", match = ["CALOR GAS", "^CALOR"] },
+]
+
+[[base]]
+category = "Bills/Water"
+merchants = [
+  { name = "Thames Water", match = ["THAMES WATER"] },
+  { name = "Severn Trent", match = ["SEVERN TRENT"] },
+  { name = "United Utilities", match = ["UNITED UTILITIES"] },
+  { name = "Anglian Water", match = ["ANGLIAN WATER"] },
+  { name = "Yorkshire Water", match = ["YORKSHIRE WATER"] },
+  { name = "Southern Water", match = ["SOUTHERN WATER"] },
+  { name = "Welsh Water", match = ["WELSH WATER", "DWR CYMRU"] },
+  { name = "Scottish Water", match = ["SCOTTISH WATER"] },
+  { name = "Northumbrian Water", match = ["NORTHUMBRIAN WATER"] },
+  { name = "South West Water", match = ["SOUTH WEST WATER"] },
+  { name = "Wessex Water", match = ["WESSEX WATER"] },
+  { name = "Affinity Water", match = ["AFFINITY WATER"] },
+  { name = "Essex & Suffolk Water", match = ["ESSEX & SUFFOLK WATER", "ESSEX AND SUFFOLK WATER"] },
+  { name = "South East Water", match = ["SOUTH EAST WATER"] },
+  { name = "Hafren Dyfrdwy", match = ["HAFREN DYFRDWY"] },
+  { name = "Bristol Water", match = ["BRISTOL WATER"] },
+  { name = "Portsmouth Water", match = ["PORTSMOUTH WATER"] },
+  { name = "SES Water", match = ["SES WATER"] },
+]
+
+[[base]]
+category = "Bills/Phone & broadband"
+merchants = [
+  { name = "BT", match = ["^BT GROUP", "^BT BROADBAND", "^BT MOBILE", "^BT RETAIL", "^BT CONSUMER", "^BT"] },
+  { name = "Vodafone", match = ["^VODAFONE"] },
+  { name = "EE", match = ["^EE LIMITED", "^EE LTD", "^EE MOBILE", "^EE BROADBAND", "^EE"] },
+  { name = "O2", match = ["^O2", "TELEFONICA"] },
+  { name = "Three", match = ["^THREE MOBILE", "^THREE UK", "^HUTCHISON 3G", "^THREE"] },
+  { name = "giffgaff", match = ["GIFFGAFF"] },
+  { name = "Sky", match = ["^SKY DIGITAL", "^SKY UK", "^SKY BROADBAND", "^SKY MOBILE", "^SKY TV", "^SKY SUBSCRIPTION", "^SKY"] },
+  { name = "Virgin Media", match = ["VIRGIN MEDIA"] },
+  { name = "Plusnet", match = ["PLUSNET"] },
+  { name = "TalkTalk", match = ["TALKTALK", "TALK TALK"] },
+  { name = "Now Broadband", match = ["NOW BROADBAND"] },
+  { name = "Hyperoptic", match = ["HYPEROPTIC"] },
+  { name = "Community Fibre", match = ["COMMUNITY FIBRE"] },
+  { name = "Zen Internet", match = ["ZEN INTERNET"] },
+  { name = "Lebara", match = ["LEBARA"] },
+  { name = "Lycamobile", match = ["LYCAMOBILE", "LYCA MOBILE"] },
+  { name = "iD Mobile", match = ["^ID MOBILE"] },
+  { name = "SMARTY", match = ["^SMARTY"] },
+  { name = "VOXI", match = ["^VOXI"] },
+  { name = "Talkmobile", match = ["TALKMOBILE"] },
+  { name = "CityFibre", match = ["CITYFIBRE"] },
+  { name = "Gigaclear", match = ["GIGACLEAR"] },
+  { name = "Trooli", match = ["TROOLI"] },
+  { name = "Giganet", match = ["GIGANET"] },
+  { name = "Honest Broadband", match = ["HONEST BROADBAND"] },
+  { name = "Post Office Broadband", match = ["POST OFFICE BROADBAND"] },
+]
+
+[[base]]
+category = "Bills/Council tax"
+merchants = [
+]
+
+[[base]]
+category = "Bills/Other bills"
+merchants = [
+  { name = "HMRC", match = ["^HMRC", "HM REVENUE", "^HMRC CUMBERNAULD", "^HMRC SHIPLEY", "^HMRC NDDS", "HMRC VAT"] },
+  { name = "DVLA", match = ["^DVLA", "DRIVER AND VEHICLE LICENSING", "DRIVER & VEHICLE LICENSING"] },
+  { name = "TV Licence", match = ["TV LICENCE", "TV LICENSE", "TV LICENSING", "TVLICENCE"] },
+  { name = "Student Loans Company", match = ["STUDENT LOANS CO", "STUDENT LOAN CO", "^SLC"] },
+  { name = "DVSA", match = ["^DVSA"] },
+  { name = "Gov.uk", match = ["GOV.UK", "GOVUK"] },
+  { name = "Companies House", match = ["COMPANIES HOUSE"] },
+  { name = "Royal Mail", match = ["ROYAL MAIL"] },
+  { name = "Parcelforce", match = ["PARCELFORCE"] },
+  { name = "Evri", match = ["^EVRI", "^HERMES"] },
+  { name = "DPD", match = ["^DPD"] },
+  { name = "Yodel", match = ["^YODEL"] },
+  { name = "Experian", match = ["EXPERIAN"] },
+  { name = "Equifax", match = ["EQUIFAX"] },
+  { name = "TransUnion", match = ["TRANSUNION", "^CALLCREDIT"] },
+  { name = "ClearScore", match = ["CLEARSCORE"] },
+  { name = "PayPal Credit", match = ["PAYPAL CREDIT"] },
+]
+
+[[base]]
+category = "Bills/Insurance"
+merchants = [
+  { name = "Aviva", match = ["^AVIVA"] },
+  { name = "Direct Line", match = ["DIRECT LINE"] },
+  { name = "Admiral", match = ["^ADMIRAL"] },
+  { name = "LV=", match = ["^LV=", "^LV ", "LIVERPOOL VICTORIA"] },
+  { name = "AXA", match = ["^AXA"] },
+  { name = "Churchill", match = ["^CHURCHILL INS", "^CHURCHILL"] },
+  { name = "Legal & General", match = ["LEGAL AND GENERAL", "LEGAL & GENERAL"] },
+  { name = "Hastings Direct", match = ["HASTINGS DIRECT", "^HASTINGS INS"] },
+  { name = "Esure", match = ["^ESURE"] },
+  { name = "Zurich", match = ["^ZURICH"] },
+  { name = "RAC", match = ["^RAC LTD", "^RAC MOTORING", "^RAC BREAKDOWN", "^RAC INS", "^RAC"] },
+  { name = "AA", match = ["^THE AA", "^AA MEMBERSHIP", "^AA INSURANCE", "^AA BREAKDOWN", "^AUTOMOBILE ASSOCIATION"] },
+  { name = "Green Flag", match = ["GREEN FLAG"] },
+  { name = "Compare the Market", match = ["COMPARE THE MARKET", "COMPAREtheMARKET"] },
+  { name = "MoneySupermarket", match = ["MONEYSUPERMARKET"] },
+  { name = "Go Compare", match = ["GO COMPARE", "GOCOMPARE"] },
+  { name = "Confused.com", match = ["CONFUSED.COM"] },
+  { name = "Bupa", match = ["^BUPA"] },
+  { name = "Vitality", match = ["^VITALITY"] },
+  { name = "Simplyhealth", match = ["SIMPLYHEALTH"] },
+  { name = "Petplan", match = ["PETPLAN"] },
+  { name = "Many Pets", match = ["MANY PETS", "MANYPETS"] },
+  { name = "Bought By Many", match = ["BOUGHT BY MANY"] },
+  { name = "Lemonade", match = ["^LEMONADE"] },
+  { name = "Policy Expert", match = ["POLICY EXPERT"] },
+  { name = "Saga", match = ["^SAGA"] },
+  { name = "More Than", match = ["^MORE THAN"] },
+  { name = "NFU Mutual", match = ["NFU MUTUAL"] },
+  { name = "Royal London", match = ["ROYAL LONDON"] },
+  { name = "Scottish Widows", match = ["SCOTTISH WIDOWS"] },
+  { name = "Prudential", match = ["^PRUDENTIAL"] },
+  { name = "Ageas", match = ["^AGEAS"] },
+  { name = "Allianz", match = ["^ALLIANZ"] },
+  { name = "Hiscox", match = ["^HISCOX"] },
+  { name = "Cover-More", match = ["COVER-MORE", "COVERMORE"] },
+  { name = "Endsleigh", match = ["ENDSLEIGH"] },
+  { name = "Sheilas' Wheels", match = ["SHEILAS WHEELS"] },
+  { name = "Privilege", match = ["^PRIVILEGE INS"] },
+  { name = "John Lewis Finance", match = ["JOHN LEWIS FINANCE", "JOHN LEWIS INS"] },
+  { name = "HomeServe", match = ["HOMESERVE"] },
+  { name = "British Gas Home Care", match = ["BG HOMECARE", "BRITISH GAS HOMECARE"] },
+  { name = "Policy Bazaar", match = ["POLICYBAZAAR"] },
+]
+
+# --- subscriptions ----------------------------------------------------------
+
+[[base]]
+category = "Subscriptions/Streaming"
+merchants = [
+  { name = "Netflix", match = ["NETFLIX"], whole = true },
+  { name = "Spotify", match = ["SPOTIFY"], whole = true },
+  { name = "Disney Plus", match = ["DISNEY PLUS", "DISNEYPLUS", "DISNEY+"], whole = true },
+  { name = "NOW TV", match = ["^NOW TV", "^NOWTV", "^NOW ENTERTAINMENT"], whole = true },
+  { name = "Apple Music", match = ["APPLE MUSIC"], whole = true },
+  { name = "Apple TV", match = ["APPLE TV"], whole = true },
+  { name = "YouTube", match = ["^YOUTUBE", "GOOGLE YOUTUBE"] },
+  { name = "BritBox", match = ["BRITBOX"] },
+  { name = "Paramount Plus", match = ["PARAMOUNT+", "PARAMOUNT PLUS"], whole = true },
+  { name = "Discovery+", match = ["DISCOVERY+", "DISCOVERY PLUS"] },
+  { name = "DAZN", match = ["^DAZN"] },
+  { name = "Audible", match = ["AUDIBLE"], whole = true },
+  { name = "Deezer", match = ["DEEZER"], whole = true },
+  { name = "Tidal", match = ["^TIDAL"], whole = true },
+  { name = "Crunchyroll", match = ["CRUNCHYROLL"] },
+  { name = "Twitch", match = ["^TWITCH"] },
+  { name = "MUBI", match = ["^MUBI"] },
+  { name = "Hayu", match = ["^HAYU"] },
+  { name = "ITVX", match = ["^ITVX", "^ITV PLAYER"] },
+  { name = "Channel 4", match = ["^ALL 4", "^CHANNEL 4"] },
+  { name = "Kindle Unlimited", match = ["KINDLE UNLIMITED", "KINDLE SVCS"] },
+  { name = "Apple", match = ["^APPLE.COM", "APPLE.COM/BILL", "^APPLE SERVICES", "^APPLE ONE", "ITUNES"], category = "Subscriptions/Other subscriptions" },
+]
+
+[[base]]
+category = "Subscriptions/Software"
+merchants = [
+  { name = "Microsoft", match = ["^MICROSOFT", "^MSFT"] },
+  { name = "Adobe", match = ["^ADOBE"], whole = true },
+  { name = "GitHub", match = ["^GITHUB"], whole = true },
+  { name = "Google", match = ["^GOOGLE"] },
+  { name = "Canva", match = ["^CANVA"], whole = true },
+  { name = "Notion", match = ["^NOTION"], whole = true },
+  { name = "Slack", match = ["^SLACK"] },
+  { name = "Zoom", match = ["^ZOOM.US", "^ZOOM VIDEO"] },
+  { name = "Figma", match = ["^FIGMA"] },
+  { name = "JetBrains", match = ["JETBRAINS"] },
+  { name = "1Password", match = ["1PASSWORD", "AGILEBITS"], whole = true },
+  { name = "Bitwarden", match = ["BITWARDEN"] },
+  { name = "NordVPN", match = ["NORDVPN", "NORD SECURITY"] },
+  { name = "ExpressVPN", match = ["EXPRESSVPN"] },
+  { name = "Proton", match = ["^PROTON"] },
+  { name = "Evernote", match = ["EVERNOTE"] },
+  { name = "Grammarly", match = ["GRAMMARLY"] },
+  { name = "LastPass", match = ["LASTPASS"] },
+  { name = "Dashlane", match = ["DASHLANE"] },
+  { name = "McAfee", match = ["MCAFEE"] },
+  { name = "Norton", match = ["^NORTON"] },
+  { name = "Duolingo", match = ["DUOLINGO"], whole = true },
+  { name = "Todoist", match = ["TODOIST"] },
+  { name = "Linear", match = ["^LINEAR.APP", "^LINEAR ORBIT"] },
+  { name = "Vercel", match = ["^VERCEL"] },
+  { name = "Cloudflare", match = ["CLOUDFLARE"] },
+  { name = "DigitalOcean", match = ["DIGITALOCEAN"] },
+  { name = "Amazon Web Services", match = ["AMAZON WEB SERVICES", "^AWS"] },
+  { name = "Namecheap", match = ["NAMECHEAP"] },
+  { name = "GoDaddy", match = ["GODADDY"] },
+  { name = "Squarespace", match = ["SQUARESPACE"] },
+  { name = "Wix", match = ["^WIX.COM", "^WIX"] },
+  { name = "Xero", match = ["^XERO"] },
+  { name = "QuickBooks", match = ["QUICKBOOKS", "INTUIT"] },
+  { name = "FreeAgent", match = ["FREEAGENT"] },
+  { name = "Mailchimp", match = ["MAILCHIMP"] },
+]
+
+[[base]]
+category = "Subscriptions/Cloud storage"
+merchants = [
+  { name = "Dropbox", match = ["^DROPBOX"], whole = true },
+  { name = "Backblaze", match = ["BACKBLAZE"] },
+  { name = "pCloud", match = ["PCLOUD"] },
+  { name = "Box", match = ["^BOX.COM", "^BOX INC"] },
+  { name = "OneDrive", match = ["ONEDRIVE"] },
+]
+
+[[base]]
+category = "Subscriptions/Memberships"
+merchants = [
+  { name = "National Trust", match = ["NATIONAL TRUST"] },
+  { name = "English Heritage", match = ["ENGLISH HERITAGE"] },
+  { name = "RSPB", match = ["^RSPB"] },
+  { name = "Which?", match = ["^WHICH?", "^WHICH MAGAZINE", "^WHICH.CO.UK"] },
+  { name = "The Economist", match = ["ECONOMIST"], whole = true },
+  { name = "The Times", match = ["^THE TIMES", "TIMES NEWSPAPER", "NEWS UK"] },
+  { name = "The Guardian", match = ["^GUARDIAN"] },
+  { name = "Financial Times", match = ["FINANCIAL TIMES"] },
+  { name = "The Telegraph", match = ["TELEGRAPH MEDIA", "^THE TELEGRAPH"] },
+  { name = "Patreon", match = ["PATREON"], whole = true },
+  { name = "Substack", match = ["SUBSTACK"] },
+  { name = "Medium", match = ["^MEDIUM.COM", "^MEDIUM MONTHLY"] },
+  { name = "Railcard", match = ["RAILCARD", "NATIONAL RAILCARD", "16-25 RAILCARD"] },
+]
+
+# --- health, fitness --------------------------------------------------------
+
+[[base]]
+category = "Health/Fitness"
+merchants = [
+  { name = "PureGym", match = ["PURE GYM", "PUREGYM"], whole = true },
+  { name = "The Gym Group", match = ["THE GYM GROUP", "GYM GROUP", "THEGYMGROUP"], whole = true },
+  { name = "David Lloyd", match = ["DAVID LLOYD"] },
+  { name = "Better", match = ["BETTER LEISURE", "^GLL", "BETTER GYM", "GLL BETTER"] },
+  { name = "Nuffield Health", match = ["NUFFIELD HEALTH"] },
+  { name = "Virgin Active", match = ["VIRGIN ACTIVE"] },
+  { name = "Fitness First", match = ["FITNESS FIRST"] },
+  { name = "Anytime Fitness", match = ["ANYTIME FITNESS"] },
+  { name = "Third Space", match = ["THIRD SPACE"] },
+  { name = "1Rebel", match = ["1REBEL"] },
+  { name = "Barry's", match = ["^BARRYS"] },
+  { name = "F45", match = ["^F45"] },
+  { name = "Everyone Active", match = ["EVERYONE ACTIVE"] },
+  { name = "Places Leisure", match = ["PLACES LEISURE"] },
+  { name = "Jd Gyms", match = ["^JD GYMS"] },
+  { name = "Strava", match = ["STRAVA"] },
+  { name = "Peloton", match = ["PELOTON"] },
+  { name = "Parkrun", match = ["PARKRUN"] },
+  { name = "ClassPass", match = ["CLASSPASS"] },
+  { name = "MyFitnessPal", match = ["MYFITNESSPAL"] },
+  { name = "Fitbit", match = ["^FITBIT"] },
+  { name = "Headspace", match = ["HEADSPACE"] },
+  { name = "Calm", match = ["^CALM.COM", "^CALM APP"] },
+  { name = "Gymbox", match = ["GYMBOX"] },
+  { name = "Snap Fitness", match = ["SNAP FITNESS"] },
+]
+
+[[base]]
+category = "Health/Pharmacy"
+merchants = [
+  { name = "Boots", match = ["^BOOTS"] },
+  { name = "Superdrug", match = ["SUPERDRUG"] },
+  { name = "Lloyds Pharmacy", match = ["LLOYDS PHARMACY", "LLOYDSPHARMACY"] },
+  { name = "Well Pharmacy", match = ["^WELL PHARMACY", "^WELL HEALTH"] },
+  { name = "Rowlands Pharmacy", match = ["ROWLANDS PHARMACY"] },
+  { name = "Pharmacy2U", match = ["PHARMACY2U", "PHARMACY 2U"] },
+  { name = "Chemist Direct", match = ["CHEMIST DIRECT"] },
+  { name = "Holland & Barrett", match = ["HOLLAND & BARRETT", "HOLLAND AND BARRETT"], category = "Health/Pharmacy" },
+  { name = "Pharmacierge", match = ["PHARMACIERGE"] },
+  { name = "Jhoots", match = ["JHOOTS"] },
+  { name = "Day Lewis", match = ["DAY LEWIS"] },
+]
+
+[[base]]
+category = "Health/Medical"
+merchants = [
+  { name = "Specsavers", match = ["SPECSAVERS"] },
+  { name = "Vision Express", match = ["VISION EXPRESS"] },
+  { name = "Optical Express", match = ["OPTICAL EXPRESS"] },
+  { name = "mydentist", match = ["MYDENTIST"] },
+  { name = "Spire Healthcare", match = ["SPIRE HEALTHCARE"] },
+  { name = "Nuffield Hospital", match = ["NUFFIELD HOSPITAL"] },
+  { name = "NHS", match = ["^NHS", "NHS PRESCRIPTION"] },
+  { name = "Doctor on Demand", match = ["DOCTOR ON DEMAND", "BABYLON HEALTH", "PUSHDOCTOR"] },
+  { name = "Pall Mall Medical", match = ["PALL MALL MEDICAL"] },
+]
+
+# --- shopping ---------------------------------------------------------------
+
+[[base]]
+category = "Shopping/Online"
+merchants = [
+  { name = "Amazon", match = ["^AMZN*", "^AMAZON", "^AMZ"] },
+  { name = "PayPal", match = ["^PAYPAL$"] },
+  { name = "eBay", match = ["EBAY"] },
+  { name = "Etsy", match = ["ETSY"] },
+  { name = "Vinted", match = ["VINTED"] },
+  { name = "Depop", match = ["DEPOP"] },
+  { name = "AliExpress", match = ["ALIEXPRESS"] },
+  { name = "Temu", match = ["^TEMU"] },
+  { name = "Shein", match = ["^SHEIN"] },
+  { name = "Wish", match = ["^WISH.COM"] },
+  { name = "Gumtree", match = ["GUMTREE"] },
+  { name = "Shopify", match = ["^SHOPIFY"] },
+  { name = "Wayfair", match = ["WAYFAIR"], category = "Shopping/Household" },
+  { name = "OnBuy", match = ["^ONBUY"] },
+  { name = "Notonthehighstreet", match = ["NOTONTHEHIGHSTREET"] },
+  { name = "Very", match = ["^VERY.CO.UK", "^VERY GROUP", "^LITTLEWOODS"] },
+  { name = "Cex", match = ["^CEX ", "^WEBUY", "^CEX"] },
+  { name = "Wickes", match = ["^WICKES"], category = "Shopping/Household" },
+  { name = "B&M", match = ["^B&M", "^B & M"], category = "Shopping/Household" },
+  { name = "Home Bargains", match = ["^HOME BARGAINS"], category = "Shopping/Household" },
+  { name = "Poundland", match = ["^POUNDLAND"], category = "Shopping/Household" },
+]
+
+[[base]]
+category = "Shopping/Clothing"
+merchants = [
+  { name = "Primark", match = ["PRIMARK"] },
+  { name = "H&M", match = ["^H&M", "^H & M", "^HENNES"] },
+  { name = "Zara", match = ["^ZARA"] },
+  { name = "Next", match = ["^NEXT RETAIL", "^NEXT PLC", "^NEXT.CO.UK", "^NEXT DIRECTORY", "^NEXT"] },
+  { name = "ASOS", match = ["^ASOS"] },
+  { name = "Sports Direct", match = ["SPORTS DIRECT", "^SPORTSDIRECT"] },
+  { name = "JD Sports", match = ["^JD SPORTS", "^JDSPORTS"] },
+  { name = "Marks & Spencer", match = ["^M&S", "^MARKS & SPENCER", "^MARKS AND SPENCER", "^MARKS&SPENCER"] },
+  { name = "Uniqlo", match = ["UNIQLO"] },
+  { name = "TK Maxx", match = ["TK MAXX", "TKMAXX"] },
+  { name = "River Island", match = ["RIVER ISLAND"] },
+  { name = "New Look", match = ["NEW LOOK"] },
+  { name = "Topshop", match = ["TOPSHOP"] },
+  { name = "Boohoo", match = ["BOOHOO"] },
+  { name = "PrettyLittleThing", match = ["PRETTYLITTLETHING", "PRETTY LITTLE THING"] },
+  { name = "Superdry", match = ["SUPERDRY"] },
+  { name = "Gap", match = ["^GAP "] },
+  { name = "Mango", match = ["^MANGO"] },
+  { name = "Monsoon", match = ["^MONSOON"] },
+  { name = "Fat Face", match = ["FAT FACE", "FATFACE"] },
+  { name = "White Stuff", match = ["WHITE STUFF"] },
+  { name = "Joules", match = ["^JOULES"] },
+  { name = "Schuh", match = ["^SCHUH"] },
+  { name = "Office Shoes", match = ["^OFFICE SHOES", "^OFFICE LONDON"] },
+  { name = "Clarks", match = ["^CLARKS"] },
+  { name = "Dr Martens", match = ["DR MARTENS"] },
+  { name = "Nike", match = ["^NIKE"] },
+  { name = "Adidas", match = ["^ADIDAS"] },
+  { name = "Foot Locker", match = ["FOOT LOCKER", "FOOTLOCKER"] },
+  { name = "Decathlon", match = ["DECATHLON"] },
+  { name = "Millets", match = ["^MILLETS"] },
+  { name = "Go Outdoors", match = ["GO OUTDOORS"] },
+  { name = "Cotswold Outdoor", match = ["COTSWOLD OUTDOOR"] },
+  { name = "Mountain Warehouse", match = ["MOUNTAIN WAREHOUSE"] },
+  { name = "Pull&Bear", match = ["PULL&BEAR", "PULL & BEAR"] },
+  { name = "Bershka", match = ["BERSHKA"] },
+  { name = "COS", match = ["^COS "] },
+  { name = "Arket", match = ["^ARKET"] },
+  { name = "& Other Stories", match = ["& OTHER STORIES"] },
+  { name = "Reiss", match = ["^REISS"] },
+  { name = "Ted Baker", match = ["TED BAKER"] },
+  { name = "Burton", match = ["^BURTON"] },
+  { name = "Moss Bros", match = ["MOSS BROS"] },
+  { name = "Charles Tyrwhitt", match = ["CHARLES TYRWHITT"] },
+  { name = "Hollister", match = ["HOLLISTER"] },
+  { name = "Levi's", match = ["^LEVIS"] },
+  { name = "Gymshark", match = ["^GYMSHARK"] },
+  { name = "Lululemon", match = ["LULULEMON"] },
+  { name = "Matalan", match = ["^MATALAN"] },
+  { name = "Peacocks", match = ["^PEACOCKS"] },
+  { name = "George", match = ["^GEORGE AT ASDA", "^ASDA GEORGE"] },
+  { name = "Sainsbury's Tu", match = ["^TU CLOTHING"] },
+  { name = "Quiz", match = ["^QUIZ CLOTHING"] },
+  { name = "Warehouse", match = ["^WAREHOUSE FASHION"] },
+  { name = "Oasis", match = ["^OASIS FASHION"] },
+  { name = "Phase Eight", match = ["PHASE EIGHT"] },
+  { name = "Whistles", match = ["^WHISTLES"] },
+  { name = "Jigsaw", match = ["^JIGSAW"] },
+  { name = "LK Bennett", match = ["LK BENNETT"] },
+  { name = "Mamas & Papas", match = ["MAMAS & PAPAS"] },
+  { name = "Mothercare", match = ["MOTHERCARE"] },
+  { name = "Claire's", match = ["^CLAIRES"] },
+  { name = "Accessorize", match = ["ACCESSORIZE"] },
+  { name = "Pandora", match = ["^PANDORA"] },
+  { name = "H Samuel", match = ["^H SAMUEL"] },
+  { name = "Ernest Jones", match = ["ERNEST JONES"] },
+  { name = "Goldsmiths", match = ["^GOLDSMITHS"] },
+]
+
+[[base]]
+category = "Shopping/Electronics"
+merchants = [
+  { name = "Currys", match = ["^CURRYS", "^DIXONS"] },
+  { name = "Apple Store", match = ["^APPLE STORE", "^APPLE RETAIL"] },
+  { name = "Dell", match = ["^DELL "] },
+  { name = "Samsung", match = ["^SAMSUNG"] },
+  { name = "Scan Computers", match = ["SCAN COMPUTERS", "^SCAN.CO.UK"] },
+  { name = "Overclockers", match = ["OVERCLOCKERS"] },
+  { name = "Ebuyer", match = ["EBUYER"] },
+  { name = "CPC Farnell", match = ["^FARNELL", "^CPC "] },
+  { name = "Pimoroni", match = ["PIMORONI"] },
+  { name = "The Hut", match = ["^THEHUT", "^THE HUT"] },
+  { name = "Maplin", match = ["MAPLIN"] },
+  { name = "Richer Sounds", match = ["RICHER SOUNDS"] },
+  { name = "Carphone Warehouse", match = ["CARPHONE WAREHOUSE"] },
+  { name = "Mobile Phones Direct", match = ["MOBILE PHONES DIRECT"] },
+  { name = "Lenovo", match = ["^LENOVO"] },
+  { name = "HP Store", match = ["^HP STORE", "^HP INC"] },
+  { name = "Logitech", match = ["^LOGITECH"] },
+  { name = "Sonos", match = ["^SONOS"] },
+  { name = "Bose", match = ["^BOSE"] },
+  { name = "Garmin", match = ["^GARMIN"] },
+  { name = "GoPro", match = ["^GOPRO"] },
+  { name = "Jessops", match = ["^JESSOPS"] },
+  { name = "Wex Photographic", match = ["WEX PHOTOGRAPHIC"] },
+  { name = "Back Market", match = ["BACK MARKET", "BACKMARKET"] },
+  { name = "musicMagpie", match = ["MUSICMAGPIE"] },
+  { name = "Laptops Direct", match = ["LAPTOPS DIRECT"] },
+  { name = "Novatech", match = ["NOVATECH"] },
+  { name = "Box.co.uk", match = ["^BOX.CO.UK"] },
+  { name = "Cclonline", match = ["CCLONLINE"] },
+  { name = "Dyson", match = ["^DYSON"], category = "Shopping/Household" },
+]
+
+[[base]]
+category = "Shopping/Household"
+merchants = [
+  { name = "IKEA", match = ["^IKEA"] },
+  { name = "B&Q", match = ["^B&Q", "^B & Q"] },
+  { name = "John Lewis", match = ["JOHN LEWIS", "^JOHNLEWIS", "^JLP"] },
+  { name = "Homebase", match = ["^HOMEBASE"] },
+  { name = "Screwfix", match = ["^SCREWFIX"] },
+  { name = "Toolstation", match = ["^TOOLSTATION"] },
+  { name = "Wilko", match = ["^WILKO", "^WILKINSON"] },
+  { name = "The Range", match = ["^THE RANGE"] },
+  { name = "Dunelm", match = ["^DUNELM"] },
+  { name = "Robert Dyas", match = ["ROBERT DYAS"] },
+  { name = "Lakeland", match = ["^LAKELAND"] },
+  { name = "Oak Furnitureland", match = ["OAK FURNITURELAND"] },
+  { name = "DFS", match = ["^DFS "] },
+  { name = "SCS", match = ["^SCS "] },
+  { name = "Sofology", match = ["SOFOLOGY"] },
+  { name = "Furniture Village", match = ["FURNITURE VILLAGE"] },
+  { name = "Made.com", match = ["^MADE.COM"] },
+  { name = "Habitat", match = ["^HABITAT"] },
+  { name = "Heal's", match = ["^HEALS"] },
+  { name = "Laura Ashley", match = ["LAURA ASHLEY"] },
+  { name = "Cath Kidston", match = ["CATH KIDSTON"] },
+  { name = "The White Company", match = ["WHITE COMPANY"] },
+  { name = "Bensons for Beds", match = ["BENSONS FOR BEDS"] },
+  { name = "Dreams", match = ["^DREAMS "] },
+  { name = "Wren Kitchens", match = ["WREN KITCHENS"] },
+  { name = "Howdens", match = ["^HOWDENS"] },
+  { name = "Travis Perkins", match = ["TRAVIS PERKINS"] },
+  { name = "Jewson", match = ["^JEWSON"] },
+  { name = "Selco", match = ["^SELCO"] },
+  { name = "Topps Tiles", match = ["TOPPS TILES"] },
+  { name = "Victorian Plumbing", match = ["VICTORIAN PLUMBING"] },
+  { name = "Plumbase", match = ["PLUMBASE"] },
+  { name = "Dobbies", match = ["^DOBBIES"] },
+  { name = "Wyevale", match = ["WYEVALE"] },
+  { name = "Notcutts", match = ["^NOTCUTTS"] },
+  { name = "Hobbycraft", match = ["^HOBBYCRAFT"], category = "Entertainment/Hobbies" },
+  { name = "Tiger", match = ["^FLYING TIGER", "^TIGER STORES"] },
+  { name = "Paperchase", match = ["^PAPERCHASE"] },
+  { name = "WHSmith", match = ["^WHSMITH", "^WH SMITH", "^SMITHS"] },
+  { name = "Ryman", match = ["^RYMAN"] },
+  { name = "Staples", match = ["^STAPLES"] },
+  { name = "Waterstones", match = ["WATERSTONES"], category = "Entertainment/Hobbies" },
+  { name = "Blackwell's", match = ["^BLACKWELLS"], category = "Entertainment/Hobbies" },
+  { name = "Pets at Home", match = ["PETS AT HOME"] },
+  { name = "Jollyes", match = ["^JOLLYES"] },
+  { name = "Zooplus", match = ["ZOOPLUS"] },
+  { name = "Pets Corner", match = ["PETS CORNER"] },
+  { name = "Vets4Pets", match = ["VETS4PETS", "VETS 4 PETS"], category = "Health/Medical" },
+  { name = "Medivet", match = ["^MEDIVET"], category = "Health/Medical" },
+  { name = "CVS Vets", match = ["^CVS VET"], category = "Health/Medical" },
+]
+
+# --- entertainment ----------------------------------------------------------
+
+[[base]]
+category = "Entertainment/Events"
+merchants = [
+  { name = "Ticketmaster", match = ["TICKETMASTER", "TICKET MASTER"] },
+  { name = "See Tickets", match = ["SEE TICKETS", "SEETICKETS"] },
+  { name = "Eventbrite", match = ["EVENTBRITE"] },
+  { name = "Odeon", match = ["^ODEON"] },
+  { name = "Vue Cinemas", match = ["^VUE ", "^VUE CINEMA", "^VUE ENTERTAINMENT"] },
+  { name = "Cineworld", match = ["CINEWORLD"] },
+  { name = "Picturehouse", match = ["PICTUREHOUSE"] },
+  { name = "Everyman Cinema", match = ["EVERYMAN CINEMA", "^EVERYMAN"] },
+  { name = "Showcase Cinemas", match = ["SHOWCASE CINEMA"] },
+  { name = "Curzon", match = ["^CURZON"] },
+  { name = "Hollywood Bowl", match = ["HOLLYWOOD BOWL"] },
+  { name = "Viagogo", match = ["VIAGOGO"] },
+  { name = "StubHub", match = ["STUBHUB"] },
+  { name = "AXS", match = ["^AXS "] },
+  { name = "Skiddle", match = ["SKIDDLE"] },
+  { name = "DICE", match = ["^DICE.FM"] },
+  { name = "Fatsoma", match = ["FATSOMA"] },
+  { name = "Merlin Entertainments", match = ["MERLIN ENTERTAINMENTS", "MADAME TUSSAUDS", "LEGOLAND", "ALTON TOWERS", "THORPE PARK", "SEA LIFE"] },
+  { name = "Bowlplex", match = ["BOWLPLEX"] },
+  { name = "Puttshack", match = ["PUTTSHACK"] },
+  { name = "London Theatre", match = ["LONDON THEATRE", "ATG TICKETS", "AMBASSADOR THEATRE", "DELFONT MACKINTOSH", "LW THEATRES"] },
+]
+
+[[base]]
+category = "Entertainment/Games"
+merchants = [
+  { name = "Steam", match = ["^STEAM", "STEAMPOWERED", "VALVE CORP"] },
+  { name = "PlayStation", match = ["PLAYSTATION", "SONY INTERACTIVE", "^PSN"] },
+  { name = "Nintendo", match = ["^NINTENDO"] },
+  { name = "Epic Games", match = ["EPIC GAMES"] },
+  { name = "Game", match = ["^GAME RETAIL", "^GAME STORES", "^GAME DIGITAL", "^GAME.CO.UK"] },
+  { name = "Blizzard", match = ["BLIZZARD"] },
+  { name = "Riot Games", match = ["RIOT GAMES"] },
+  { name = "EA", match = ["^EA ", "ELECTRONIC ARTS"] },
+  { name = "Ubisoft", match = ["^UBISOFT"] },
+  { name = "Roblox", match = ["ROBLOX"] },
+  { name = "Fortnite", match = ["FORTNITE"] },
+  { name = "Humble Bundle", match = ["HUMBLE BUNDLE"] },
+  { name = "GOG", match = ["^GOG.COM", "^GOG "] },
+  { name = "Games Workshop", match = ["GAMES WORKSHOP"] },
+  { name = "Forbidden Planet", match = ["FORBIDDEN PLANET"] },
+  { name = "Smyths Toys", match = ["SMYTHS TOYS"] },
+  { name = "The Entertainer", match = ["^THE ENTERTAINER"] },
+  { name = "Hamleys", match = ["^HAMLEYS"] },
+  { name = "LEGO", match = ["^LEGO"] },
+  { name = "Build-A-Bear", match = ["BUILD-A-BEAR", "BUILD A BEAR"] },
+]
+
+# --- travel -----------------------------------------------------------------
+
+[[base]]
+category = "Travel/Flights"
+merchants = [
+  { name = "easyJet", match = ["EASYJET"] },
+  { name = "Ryanair", match = ["RYANAIR"] },
+  { name = "British Airways", match = ["BRITISH AIRWAYS"] },
+  { name = "Jet2", match = ["^JET2"] },
+  { name = "TUI Airways", match = ["TUI AIRWAYS"] },
+  { name = "Wizz Air", match = ["WIZZ AIR", "WIZZAIR"] },
+  { name = "Virgin Atlantic", match = ["VIRGIN ATLANTIC"] },
+  { name = "Emirates", match = ["^EMIRATES"] },
+  { name = "Qatar Airways", match = ["QATAR AIRWAYS"] },
+  { name = "Lufthansa", match = ["LUFTHANSA"] },
+  { name = "KLM", match = ["^KLM"] },
+  { name = "Air France", match = ["AIR FRANCE"] },
+  { name = "Iberia", match = ["^IBERIA"] },
+  { name = "Vueling", match = ["^VUELING"] },
+  { name = "Norwegian Air", match = ["NORWEGIAN AIR"] },
+  { name = "Aer Lingus", match = ["AER LINGUS"] },
+  { name = "Loganair", match = ["LOGANAIR"] },
+  { name = "Flybe", match = ["^FLYBE"] },
+  { name = "Skyscanner", match = ["SKYSCANNER"] },
+  { name = "Kiwi.com", match = ["KIWI.COM"] },
+  { name = "Opodo", match = ["^OPODO"] },
+  { name = "Heathrow", match = ["^HEATHROW", "^GATWICK AIRPORT", "^LUTON AIRPORT", "^STANSTED AIRPORT", "^MANCHESTER AIRPORT"] },
+  { name = "Holiday Extras", match = ["HOLIDAY EXTRAS"] },
+  { name = "Turkish Airlines", match = ["TURKISH AIRLINES"] },
+  { name = "Etihad", match = ["ETIHAD"] },
+  { name = "Delta", match = ["^DELTA AIR"] },
+  { name = "United Airlines", match = ["UNITED AIRLINES"] },
+  { name = "American Airlines", match = ["AMERICAN AIRLINES"] },
+  { name = "Singapore Airlines", match = ["SINGAPORE AIRLINES"] },
+  { name = "Air Canada", match = ["AIR CANADA"] },
+  { name = "TAP Portugal", match = ["TAP AIR PORTUGAL"] },
+  { name = "SAS", match = ["^SAS SCANDINAVIAN"] },
+  { name = "Finnair", match = ["FINNAIR"] },
+  { name = "Swiss Air", match = ["SWISS INTERNATIONAL AIR"] },
+]
+
+[[base]]
+category = "Travel/Hotels"
+merchants = [
+  { name = "Booking.com", match = ["BOOKING.COM", "^BOOKING COM"] },
+  { name = "Premier Inn", match = ["PREMIER INN"] },
+  { name = "Travelodge", match = ["TRAVELODGE"] },
+  { name = "Airbnb", match = ["AIRBNB"] },
+  { name = "Hotels.com", match = ["HOTELS.COM"] },
+  { name = "Expedia", match = ["EXPEDIA"] },
+  { name = "Trivago", match = ["TRIVAGO"] },
+  { name = "Hilton", match = ["^HILTON"] },
+  { name = "Holiday Inn", match = ["HOLIDAY INN"] },
+  { name = "Marriott", match = ["MARRIOTT"] },
+  { name = "Ibis", match = ["^IBIS"] },
+  { name = "Novotel", match = ["NOVOTEL"] },
+  { name = "Radisson", match = ["RADISSON"] },
+  { name = "Hyatt", match = ["^HYATT"] },
+  { name = "Best Western", match = ["BEST WESTERN"] },
+  { name = "Sykes Cottages", match = ["SYKES COTTAGES"] },
+  { name = "Vrbo", match = ["^VRBO"] },
+  { name = "Hostelworld", match = ["HOSTELWORLD"] },
+  { name = "Crowne Plaza", match = ["CROWNE PLAZA"] },
+  { name = "Landmark Trust", match = ["LANDMARK TRUST"] },
+  { name = "YHA", match = ["^YHA"] },
+  { name = "Center Parcs", match = ["CENTER PARCS", "CENTRE PARCS"], category = "Travel/Holidays" },
+  { name = "Butlins", match = ["^BUTLINS"], category = "Travel/Holidays" },
+  { name = "Haven Holidays", match = ["HAVEN HOLIDAYS"], category = "Travel/Holidays" },
+  { name = "Parkdean Resorts", match = ["PARKDEAN"], category = "Travel/Holidays" },
+  { name = "Pitchup", match = ["PITCHUP"], category = "Travel/Holidays" },
+]
+
+[[base]]
+category = "Travel/Holidays"
+merchants = [
+  { name = "TUI", match = ["^TUI"] },
+  { name = "On the Beach", match = ["ON THE BEACH"] },
+  { name = "Loveholidays", match = ["LOVEHOLIDAYS"] },
+  { name = "Jet2holidays", match = ["JET2HOLIDAYS"] },
+  { name = "Thomas Cook", match = ["THOMAS COOK"] },
+  { name = "Trailfinders", match = ["TRAILFINDERS"] },
+  { name = "Intrepid Travel", match = ["INTREPID TRAVEL"] },
+  { name = "GetYourGuide", match = ["GETYOURGUIDE"] },
+  { name = "Viator", match = ["^VIATOR"] },
+  { name = "Eurotunnel", match = ["EUROTUNNEL", "LE SHUTTLE"] },
+  { name = "P&O Ferries", match = ["P&O FERRIES", "^P & O FERRIES"] },
+  { name = "Brittany Ferries", match = ["BRITTANY FERRIES"] },
+  { name = "Stena Line", match = ["STENA LINE"] },
+  { name = "DFDS", match = ["^DFDS"] },
+  { name = "Irish Ferries", match = ["IRISH FERRIES"] },
+  { name = "CalMac", match = ["CALMAC"] },
+  { name = "Hertz", match = ["^HERTZ"] },
+  { name = "Avis", match = ["^AVIS"] },
+  { name = "Enterprise Rent-A-Car", match = ["ENTERPRISE RENT", "ENTERPRISE CAR"] },
+  { name = "Sixt", match = ["^SIXT"] },
+  { name = "Europcar", match = ["EUROPCAR"] },
+  { name = "Rentalcars.com", match = ["RENTALCARS"] },
+  { name = "World Duty Free", match = ["WORLD DUTY FREE"], category = "Shopping/Online" },
+]
+
+# --- personal care ----------------------------------------------------------
+
+[[base]]
+category = "Personal care/Hair & beauty"
+merchants = [
+  { name = "Toni & Guy", match = ["TONI & GUY", "TONI AND GUY"] },
+  { name = "Supercuts", match = ["SUPERCUTS"] },
+  { name = "Great Clips", match = ["GREAT CLIPS"] },
+  { name = "Rush Hair", match = ["RUSH HAIR"] },
+  { name = "Headmasters", match = ["HEADMASTERS"] },
+  { name = "Sally Beauty", match = ["SALLY BEAUTY"] },
+  { name = "Space NK", match = ["SPACE NK"] },
+  { name = "Sephora", match = ["^SEPHORA"] },
+  { name = "Charlotte Tilbury", match = ["CHARLOTTE TILBURY"] },
+  { name = "Lookfantastic", match = ["LOOKFANTASTIC", "LOOK FANTASTIC"] },
+  { name = "Cult Beauty", match = ["CULT BEAUTY"] },
+  { name = "Beauty Bay", match = ["BEAUTY BAY"] },
+  { name = "Treatwell", match = ["TREATWELL"] },
+  { name = "Fresha", match = ["^FRESHA"] },
+  { name = "Elemis", match = ["^ELEMIS"] },
+  { name = "Estee Lauder", match = ["ESTEE LAUDER"] },
+  { name = "MAC Cosmetics", match = ["MAC COSMETICS"] },
+  { name = "Rituals", match = ["^RITUALS"] },
+  { name = "Lush", match = ["^LUSH"] },
+  { name = "The Body Shop", match = ["BODY SHOP"], category = "Personal care/Toiletries" },
+]
+
+[[base]]
+category = "Personal care/Toiletries"
+merchants = [
+  { name = "Harry's", match = ["^HARRYS"] },
+  { name = "Gillette", match = ["^GILLETTE"] },
+  { name = "Dollar Shave Club", match = ["DOLLAR SHAVE"] },
+  { name = "Beauty Pie", match = ["BEAUTY PIE"] },
+  { name = "Bulldog Skincare", match = ["BULLDOG SKINCARE"] },
+]
+
+# --- housing ----------------------------------------------------------------
+
+[[base]]
+category = "Housing/Maintenance"
+merchants = [
+  { name = "Checkatrade", match = ["CHECKATRADE"] },
+  { name = "TrustATrader", match = ["TRUSTATRADER"] },
+  { name = "MyBuilder", match = ["MYBUILDER"] },
+  { name = "Rentokil", match = ["^RENTOKIL"] },
+  { name = "Dyno-Rod", match = ["DYNO-ROD", "DYNO ROD"] },
+]
+
+[[base]]
+category = "Bills/Rent or mortgage"
+merchants = [
+  { name = "Nationwide Mortgage", match = ["NATIONWIDE MORTGAGE", "NATIONWIDE BS MORT"] },
+  { name = "Halifax Mortgage", match = ["HALIFAX MORTGAGE"] },
+  { name = "Santander Mortgage", match = ["SANTANDER MORTGAGE"] },
+  { name = "Barclays Mortgage", match = ["BARCLAYS MORTGAGE"] },
+  { name = "OpenRent", match = ["OPENRENT"] },
+  { name = "Goodlord", match = ["GOODLORD"] },
+]
+
+# --- keyword rules (after the Merchant base, before Uncategorised) ----------
+# Pattern is an upper-case regex on the raw descriptor, like RULES in code.
+
+[[rule]]
+id = "takeaway-words"
+pattern = '\b(TAKEAWAY|KEBAB|PIZZERIA|CHIPPY|FISH BAR|CHINESE|CURRY HOUSE|TANDOORI|SHAWARMA)\b'
+category = "Food & Drink/Takeaway"
+
+[[rule]]
+id = "coffee-words"
+pattern = '\b(COFFEE|ESPRESSO|CAFFE|COFFEE SHOP|ROASTERS?)\b'
+category = "Food & Drink/Coffee"
+
+[[rule]]
+id = "eating-out-words"
+pattern = '\b(RESTAURANT|BISTRO|BRASSERIE|TAVERN|GASTROPUB|STEAKHOUSE|TRATTORIA|OSTERIA|BAR & GRILL)\b'
+category = "Food & Drink/Eating out"
+
+[[rule]]
+id = "pub-words"
+pattern = '\b(PUB|INN|ARMS|TAP ROOM|ALEHOUSE|BREWERY|BREWING)\b'
+category = "Food & Drink/Eating out"
+
+[[rule]]
+id = "grocery-words"
+pattern = '\b(SUPERMARKET|GROCER|GROCERS|GREENGROCER|BUTCHER|BUTCHERS|BAKERY|FISHMONGER|DELI|CONVENIENCE)\b'
+category = "Food & Drink/Groceries"
+
+[[rule]]
+id = "rail-words"
+pattern = '\b(RAILWAY|RAIL TICKET|TRAIN TICKET|BUS FARE|TRAMS?)\b'
+category = "Transport/Public transport"
+
+[[rule]]
+id = "fuel-words"
+pattern = '\b(DIESEL|UNLEADED|FORECOURT|FILLING STATION|SERVICE STATION|GARAGE FUEL)\b'
+category = "Transport/Fuel"
+
+[[rule]]
+id = "water-words"
+pattern = '\b(WATER SERVICES|WATER BILL|WATER PLC)\b'
+category = "Bills/Water"
+
+[[rule]]
+id = "energy-words"
+pattern = '\b(ENERGY SUPPLY|GAS AND ELECTRIC|ELECTRICITY|ELECTRIC BILL)\b'
+category = "Bills/Energy"
+
+[[rule]]
+id = "broadband-words"
+pattern = '\b(BROADBAND|TELECOM|TELECOMS|FIBRE)\b'
+category = "Bills/Phone & broadband"
+
+[[rule]]
+id = "insurance-words"
+pattern = '\b(INSURANCE|ASSURANCE|INSURE)\b'
+category = "Bills/Insurance"
+
+[[rule]]
+id = "mortgage-words"
+pattern = '\bMORTGAGE\b'
+category = "Bills/Rent or mortgage"
+
+[[rule]]
+id = "council-words"
+pattern = '\b(COUNCIL|BOROUGH)\b'
+category = "Bills/Council tax"
+
+[[rule]]
+id = "tax-words"
+pattern = '\b(HMRC|HM REVENUE|SELF ASSESSMENT|PAYE|VAT PAYMENT)\b'
+category = "Bills/Other bills"
+
+[[rule]]
+id = "medical-words"
+pattern = '\b(DENTAL|DENTIST|OPTICIANS?|PHYSIO|PHYSIOTHERAPY|CLINIC|HOSPITAL|SURGERY|OSTEOPATH|CHIROPRACTOR)\b'
+category = "Health/Medical"
+
+[[rule]]
+id = "salon-words"
+pattern = '\b(BARBERS?|SALON|HAIRDRESSERS?|NAILS|BEAUTY)\b'
+category = "Personal care/Hair & beauty"
+
+[[rule]]
+id = "cinema-words"
+pattern = '\b(CINEMA|THEATRE|THEATER|CONCERT|FESTIVAL|MUSEUM|GALLERY)\b'
+category = "Entertainment/Events"
+
+[[rule]]
+id = "hotel-words"
+pattern = '\b(HOTEL|HOSTEL|B&B|GUEST HOUSE|GUESTHOUSE|LODGE)\b'
+category = "Travel/Hotels"
+
+[[rule]]
+id = "airline-words"
+pattern = '\b(AIRLINES?|AIRWAYS)\b'
+category = "Travel/Flights"
+
+[[rule]]
+id = "maintenance-words"
+pattern = '\b(PLUMBING|PLUMBER|ELECTRICIAN|LOCKSMITH|ROOFING|ROOFERS?|HANDYMAN|BOILER)\b'
+category = "Housing/Maintenance"
+
+[[rule]]
+id = "vet-words"
+pattern = '\b(VETERINARY|VETERINARIAN|VETS)\b'
+category = "Health/Medical"
+
+[[rule]]
+id = "garden-words"
+pattern = '\b(GARDEN CENTRE|GARDEN CENTER|HARDWARE|DIY)\b'
+category = "Shopping/Household"

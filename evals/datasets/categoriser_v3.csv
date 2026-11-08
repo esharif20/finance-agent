@@ -1,5 +1,5 @@
 # synthetic
-# categoriser dataset v2, seed 112, labels in taxonomy v1
+# categoriser dataset v3, seed 112, labels in taxonomy v1
 id,split,case,descriptor,amount_minor,top,sub
 1,correction,clean,MARLOW GROCERS,-15919,Food & Drink,Groceries
 2,correction,noise,marlow grocers,-23069,Food & Drink,Groceries
@@ -580,3 +580,338 @@ id,split,case,descriptor,amount_minor,top,sub
 577,correction,noise,MINTLEAF ORAL CARE 15JUN,-13157,Personal care,Toiletries
 578,correction,clean,CLEANSLATE GROOMING,-5876,Personal care,Toiletries
 579,correction,noise,CLEANSLATE GROO,-6980,Personal care,Toiletries
+580,correction,clean,SAFEHAVEN COVER,-15783,Bills,Insurance
+581,correction,noise,SAFEHAVEN COVER,-2197,Bills,Insurance
+582,correction,clean,KEYSTONE ASSURED,-13657,Bills,Insurance
+583,correction,noise,keystone assured,-19767,Bills,Insurance
+584,correction,clean,UMBRELLA INDEMNITY,-22430,Bills,Insurance
+585,correction,noise,UMBRELLA  INDEMNITY,-21738,Bills,Insurance
+586,correction,clean,BRIGHTSHIELD PROTECT,-18049,Bills,Insurance
+587,correction,noise,BRIGHTSHIELD  PROTECT,-18783,Bills,Insurance
+588,correction,clean,TRUSTGUARD LIFE,-10660,Bills,Insurance
+589,correction,noise,TRUSTGUARD LIFE GBR,-19054,Bills,Insurance
+590,correction,clean,RIVERBANK LOAN REPAYMENT,-14710,Bills,Other bills
+591,correction,noise,RIVERBANK LOAN ,-9715,Bills,Other bills
+592,correction,clean,PENNYWISE CREDIT,-19759,Bills,Other bills
+593,correction,noise,pennywise credit,-3098,Bills,Other bills
+594,correction,clean,OLDGATE PERMITS,-12141,Bills,Other bills
+595,correction,noise,OLDGATE PERMITS LEEDS,-3163,Bills,Other bills
+596,correction,clean,MERIDIAN POSTAL SERVICE,-10161,Bills,Other bills
+597,correction,noise,MERIDIAN POSTAL SERVICE 9489,-1675,Bills,Other bills
+598,correction,clean,COBBLE TAX AGENTS,-19999,Bills,Other bills
+599,correction,noise,COBBLE  TAX  AGENTS,-14731,Bills,Other bills
+600,correction,clean,NEURALNEST AI,-4593,Subscriptions,AI tools
+601,correction,noise,NEURALNEST AI LEEDS,-4297,Subscriptions,AI tools
+602,correction,clean,PROMPTWORKS,-20865,Subscriptions,AI tools
+603,correction,noise,PROMPTWORKS CD 1876,-19871,Subscriptions,AI tools
+604,correction,clean,LOGICLOOM ASSISTANT,-8862,Subscriptions,AI tools
+605,correction,noise,logicloom assistant,-659,Subscriptions,AI tools
+606,correction,clean,SYNAPSE CHAT,-20109,Subscriptions,AI tools
+607,correction,noise,SYNAPSE CHAT 6962,-24025,Subscriptions,AI tools
+608,correction,clean,CORTEXPILOT,-4364,Subscriptions,AI tools
+609,correction,noise,cortexpilot,-5215,Subscriptions,AI tools
+610,correction,clean,VAULTLY,-156,Subscriptions,Cloud storage
+611,correction,noise,vaultly,-18763,Subscriptions,Cloud storage
+612,correction,clean,CLOUDATTIC,-12206,Subscriptions,Cloud storage
+613,correction,noise,cloudattic,-10192,Subscriptions,Cloud storage
+614,correction,clean,SKYLOCKER STORAGE,-24311,Subscriptions,Cloud storage
+615,correction,noise,SKYLOCKER STORAGE GBR,-11848,Subscriptions,Cloud storage
+616,correction,clean,BACKUPBARN,-1860,Subscriptions,Cloud storage
+617,correction,noise,BACKUPBARN,-11488,Subscriptions,Cloud storage
+618,correction,clean,DRIFTDRIVE,-22909,Subscriptions,Cloud storage
+619,correction,noise,driftdrive,-24443,Subscriptions,Cloud storage
+620,correction,clean,WEEKLY CRATE BOX,-14800,Subscriptions,Other subscriptions
+621,correction,noise,WEEKLY CRATE BO,-17092,Subscriptions,Other subscriptions
+622,correction,clean,MONTHLY MUNCH CLUB,-1663,Subscriptions,Other subscriptions
+623,correction,noise,MONTHLY MUNCH CLUB 4777,-11471,Subscriptions,Other subscriptions
+624,correction,clean,PAPERTRAIL DIGEST,-2165,Subscriptions,Other subscriptions
+625,correction,noise,PAPERTRAIL DIGEST GBR,-17208,Subscriptions,Other subscriptions
+626,correction,clean,SEEDLING SUBSCRIPTIONS,-19051,Subscriptions,Other subscriptions
+627,correction,noise,SEEDLING SUBSCR,-23852,Subscriptions,Other subscriptions
+628,correction,clean,GROOVE VINYL CLUB,-10373,Subscriptions,Other subscriptions
+629,correction,noise,GROOVE VINYL CLUB BRISTOL,-9600,Subscriptions,Other subscriptions
+630,test,uk_base,SAINSBURYS S/MKTS 0412 LONDON,-18287,Food & Drink,Groceries
+631,test,uk_base,sainsburys s/mkts 0412 london,-24119,Food & Drink,Groceries
+632,test,uk_base,ASDA STORES 4521,-19228,Food & Drink,Groceries
+633,test,uk_base,ASDA STORES 4521 7255,-14294,Food & Drink,Groceries
+634,test,uk_base,MORRISONS 0334,-3637,Food & Drink,Groceries
+635,test,uk_base,MORRISONS 0334 CD 5856,-20906,Food & Drink,Groceries
+636,test,uk_base,WAITROSE 117 BRISTOL,-3075,Food & Drink,Groceries
+637,test,uk_base,SUMUP *WAITROSE 117 BRISTOL,-23522,Food & Drink,Groceries
+638,test,uk_base,ALDI 49 076 LEEDS,-17885,Food & Drink,Groceries
+639,test,uk_base,ALDI 49 076 LEEDS 0368,-4508,Food & Drink,Groceries
+640,test,uk_base,LIDL GB LONDON,-9801,Food & Drink,Groceries
+641,test,uk_base,LIDL GB LONDON 3913,-6120,Food & Drink,Groceries
+642,test,uk_base,CO-OP GROUP FOOD 1042,-16593,Food & Drink,Groceries
+643,test,uk_base,CO-OP  GROUP  FOOD  1042,-11943,Food & Drink,Groceries
+644,test,uk_base,M&S SIMPLY FOOD 202,-6182,Food & Drink,Groceries
+645,test,uk_base,M&S SIMPLY FOOD,-7918,Food & Drink,Groceries
+646,test,uk_base,OCADO RETAIL LTD,-8196,Food & Drink,Groceries
+647,test,uk_base,OCADO RETAIL LT,-13480,Food & Drink,Groceries
+648,test,uk_base,ICELAND STORES,-20748,Food & Drink,Groceries
+649,test,uk_base,ICELAND STORES 0669,-3459,Food & Drink,Groceries
+650,test,uk_base,SPAR LONDON,-21015,Food & Drink,Groceries
+651,test,uk_base,SPAR LONDON,-5533,Food & Drink,Groceries
+652,test,uk_base,HELLOFRESH,-8884,Food & Drink,Groceries
+653,test,uk_base,HELLOFRESH 25NOV,-11518,Food & Drink,Groceries
+654,test,uk_base,TESCO PFS 5432 LONDON,-3451,Transport,Fuel
+655,test,uk_base,tesco pfs 5432 london,-18586,Transport,Fuel
+656,test,uk_base,TESCO PETROL 3321,-825,Transport,Fuel
+657,test,uk_base,TESCO  PETROL  3321,-19067,Transport,Fuel
+658,test,uk_base,SAINSBURYS PETROL 0412,-9374,Transport,Fuel
+659,test,uk_base,SAINSBURYS  PETROL  0412,-523,Transport,Fuel
+660,test,uk_base,ASDA PFS 8812,-19853,Transport,Fuel
+661,test,uk_base,ASDA PFS 8812,-20315,Transport,Fuel
+662,test,uk_base,MORRISONS FUEL 233,-11410,Transport,Fuel
+663,test,uk_base,MORRISONS FUEL ,-16365,Transport,Fuel
+664,test,uk_base,TESCO MOBILE,-15026,Bills & Utilities,Phone & internet
+665,test,uk_base,TESCO MOBILE 05JAN,-8802,Bills & Utilities,Phone & internet
+666,test,uk_base,TESCO BANK,-16930,Bills,Other bills
+667,test,uk_base,TESCO BANK CD 6247,-4964,Bills,Other bills
+668,test,uk_base,SAINSBURYS BANK,-13088,Bills,Other bills
+669,test,uk_base,SAINSBURYS BANK,-7795,Bills,Other bills
+670,test,uk_base,TESCO STORES 3412,-22438,Food & Drink,Groceries
+671,test,uk_base,TESCO STORES 34,-19255,Food & Drink,Groceries
+672,test,uk_base,TESCO EXPRESS 6001,-19406,Food & Drink,Groceries
+673,test,uk_base,TESCO  EXPRESS  6001,-21578,Food & Drink,Groceries
+674,test,uk_base,TESCO EXTRA 7710,-15233,Food & Drink,Groceries
+675,test,uk_base,TESCO EXTRA 771,-7331,Food & Drink,Groceries
+676,test,uk_base,BP CONNECT 4412,-24208,Transport,Fuel
+677,test,uk_base,BP CONNECT 4412,-24462,Transport,Fuel
+678,test,uk_base,SHELL CAMBRIDGE,-17453,Transport,Fuel
+679,test,uk_base,SHELL CAMBRIDGE CD 6458,-2486,Transport,Fuel
+680,test,uk_base,ESSO MOTORWAY,-22584,Transport,Fuel
+681,test,uk_base,ESSO MOTORWAY,-5620,Transport,Fuel
+682,test,uk_base,TEXACO LEEDS,-15068,Transport,Fuel
+683,test,uk_base,TEXACO LEEDS,-17675,Transport,Fuel
+684,test,uk_base,JET FILLING STATION,-16066,Transport,Fuel
+685,test,uk_base,JET FILLING STATION 8775,-2360,Transport,Fuel
+686,test,uk_base,TRANSPORT FOR LONDON TRAVEL CH,-18104,Transport,Public transport
+687,test,uk_base,TRANSPORT  FOR  LONDON  TRAVEL  CH,-23967,Transport,Public transport
+688,test,uk_base,TFL TRAVEL CH,-15454,Transport,Public transport
+689,test,uk_base,TFL TRAVEL CH LONDON GB,-6323,Transport,Public transport
+690,test,uk_base,TRAINLINE,-5772,Transport,Public transport
+691,test,uk_base,trainline,-13725,Transport,Public transport
+692,test,uk_base,NATIONAL RAIL ENQUIRIES,-10443,Transport,Public transport
+693,test,uk_base,NATIONAL RAIL ENQUIRIES LONDON GB,-2873,Transport,Public transport
+694,test,uk_base,LNER TICKETS,-15846,Transport,Public transport
+695,test,uk_base,LNER TICKETS,-5357,Transport,Public transport
+696,test,uk_base,AVANTI WEST COAST,-8394,Transport,Public transport
+697,test,uk_base,AVANTI WEST COA,-11926,Transport,Public transport
+698,test,uk_base,GWR RAIL,-24576,Transport,Public transport
+699,test,uk_base,GWR RAIL 7671,-12203,Transport,Public transport
+700,test,uk_base,SOUTHEASTERN RAILWAY,-6214,Transport,Public transport
+701,test,uk_base,SQ *SOUTHEASTERN RAILWAY,-24328,Transport,Public transport
+702,test,uk_base,STAGECOACH BUS,-8095,Transport,Public transport
+703,test,uk_base,SQ *STAGECOACH BUS,-18326,Transport,Public transport
+704,test,uk_base,FIRST BUS,-4691,Transport,Public transport
+705,test,uk_base,FIRST BUS LEEDS,-14505,Transport,Public transport
+706,test,uk_base,NATIONAL EXPRESS,-17520,Transport,Public transport
+707,test,uk_base,NATIONAL EXPRESS LEEDS,-16011,Transport,Public transport
+708,test,uk_base,UBER *TRIP HELP.UBER.COM,-10868,Transport,Taxi
+709,test,uk_base,UBER  *TRIP  HELP.UBER.COM,-17908,Transport,Taxi
+710,test,uk_base,UBER EATS,-7741,Food & Drink,Takeaway
+711,test,uk_base,UBER  EATS,-20485,Food & Drink,Takeaway
+712,test,uk_base,BOLT.EU/O/,-975,Transport,Taxi
+713,test,uk_base,BOLT.EU/O/ 6122,-17971,Transport,Taxi
+714,test,uk_base,LIME*RIDE,-17251,Transport,Public transport
+715,test,uk_base,LIME*RIDE CD 5897,-6526,Transport,Public transport
+716,test,uk_base,FREE NOW,-4313,Transport,Taxi
+717,test,uk_base,FREE NOW,-17330,Transport,Taxi
+718,test,uk_base,ADDISON LEE,-13718,Transport,Taxi
+719,test,uk_base,ADDISON LEE 6287,-9384,Transport,Taxi
+720,test,uk_base,RINGGO PARKING,-24180,Transport,Parking
+721,test,uk_base,RINGGO PARKING 14JUN,-20319,Transport,Parking
+722,test,uk_base,PAYBYPHONE,-22190,Transport,Parking
+723,test,uk_base,PAYBYPHONE 0556,-20124,Transport,Parking
+724,test,uk_base,BRITISH GAS,-5615,Bills & Utilities,Energy
+725,test,uk_base,BRITISH GAS CD 3849,-23518,Bills & Utilities,Energy
+726,test,uk_base,OCTOPUS ENERGY,-23300,Bills & Utilities,Energy
+727,test,uk_base,SQ *OCTOPUS ENERGY,-5376,Bills & Utilities,Energy
+728,test,uk_base,EDF ENERGY,-3914,Bills & Utilities,Energy
+729,test,uk_base,EDF ENERGY CD 8626,-12485,Bills & Utilities,Energy
+730,test,uk_base,E.ON NEXT,-7646,Bills & Utilities,Energy
+731,test,uk_base,E.ON NEXT CD 7097,-13250,Bills & Utilities,Energy
+732,test,uk_base,OVO ENERGY,-4280,Bills & Utilities,Energy
+733,test,uk_base,ovo energy,-946,Bills & Utilities,Energy
+734,test,uk_base,SCOTTISH POWER,-24374,Bills & Utilities,Energy
+735,test,uk_base,SCOTTISH  POWER,-20535,Bills & Utilities,Energy
+736,test,uk_base,THAMES WATER,-21606,Bills & Utilities,Water
+737,test,uk_base,THAMES WATER,-20973,Bills & Utilities,Water
+738,test,uk_base,SEVERN TRENT WATER,-23048,Bills & Utilities,Water
+739,test,uk_base,SEVERN TRENT WATER 20JAN,-810,Bills & Utilities,Water
+740,test,uk_base,UNITED UTILITIES,-17806,Bills & Utilities,Water
+741,test,uk_base,UNITED  UTILITIES,-15378,Bills & Utilities,Water
+742,test,uk_base,ANGLIAN WATER,-12844,Bills & Utilities,Water
+743,test,uk_base,ANGLIAN WATER 24NOV,-18508,Bills & Utilities,Water
+744,test,uk_base,BT GROUP,-22806,Bills & Utilities,Phone & internet
+745,test,uk_base,ZTL*BT GROUP,-19408,Bills & Utilities,Phone & internet
+746,test,uk_base,VODAFONE LTD,-719,Bills & Utilities,Phone & internet
+747,test,uk_base,vodafone ltd,-6929,Bills & Utilities,Phone & internet
+748,test,uk_base,EE LIMITED,-15175,Bills & Utilities,Phone & internet
+749,test,uk_base,ZTL*EE LIMITED,-18027,Bills & Utilities,Phone & internet
+750,test,uk_base,O2 TELEFONICA,-23499,Bills & Utilities,Phone & internet
+751,test,uk_base,O2 TELEFONICA 5310,-916,Bills & Utilities,Phone & internet
+752,test,uk_base,THREE MOBILE,-23623,Bills & Utilities,Phone & internet
+753,test,uk_base,SQ *THREE MOBILE,-1300,Bills & Utilities,Phone & internet
+754,test,uk_base,GIFFGAFF,-4483,Bills & Utilities,Phone & internet
+755,test,uk_base,GIFFGAFF 02JAN,-23545,Bills & Utilities,Phone & internet
+756,test,uk_base,SKY DIGITAL,-2203,Bills & Utilities,Phone & internet
+757,test,uk_base,SKY DIGITAL 9982,-21798,Bills & Utilities,Phone & internet
+758,test,uk_base,VIRGIN MEDIA,-23996,Bills & Utilities,Phone & internet
+759,test,uk_base,virgin media,-10450,Bills & Utilities,Phone & internet
+760,test,uk_base,PLUSNET,-23514,Bills & Utilities,Phone & internet
+761,test,uk_base,PLUSNET,-2074,Bills & Utilities,Phone & internet
+762,test,uk_base,LONDON BOROUGH OF CAMDEN COUNCIL TAX,-8994,Bills & Utilities,Council tax
+763,test,uk_base,LONDON BOROUGH OF CAMDEN COUNCIL TAX GBR,-5099,Bills & Utilities,Council tax
+764,test,uk_base,MANCHESTER CITY COUNCIL,-10469,Bills & Utilities,Council tax
+765,test,uk_base,MANCHESTER CITY COUNCIL BRISTOL,-24145,Bills & Utilities,Council tax
+766,test,uk_base,BIRMINGHAM CC COUNCIL TAX,-19039,Bills & Utilities,Council tax
+767,test,uk_base,BIRMINGHAM CC COUNCIL TAX LONDON GB,-3369,Bills & Utilities,Council tax
+768,test,uk_base,HMRC SELF ASSESSMENT,-18854,Bills,Other bills
+769,test,uk_base,hmrc self assessment,-10558,Bills,Other bills
+770,test,uk_base,HMRC CUMBERNAULD,-6650,Bills,Other bills
+771,test,uk_base,HMRC CUMBERNAULD GBR,-5685,Bills,Other bills
+772,test,uk_base,DVLA VEHICLE TAX,-2159,Bills,Other bills
+773,test,uk_base,DVLA  VEHICLE  TAX,-9301,Bills,Other bills
+774,test,uk_base,TV LICENCE MBP,-7417,Bills,Other bills
+775,test,uk_base,TV LICENCE MBP 22JAN,-21105,Bills,Other bills
+776,test,uk_base,AVIVA INSURANCE,-13880,Bills,Insurance
+777,test,uk_base,AVIVA INSURANCE,-4125,Bills,Insurance
+778,test,uk_base,DIRECT LINE INSURANCE,-24777,Bills,Insurance
+779,test,uk_base,DIRECT LINE INSURANCE 8649,-10543,Bills,Insurance
+780,test,uk_base,ADMIRAL INSURANCE,-3660,Bills,Insurance
+781,test,uk_base,ADMIRAL INSURANCE CD 1047,-19303,Bills,Insurance
+782,test,uk_base,LV= INSURANCE,-7945,Bills,Insurance
+783,test,uk_base,LV= INSURANCE LONDON GB,-22073,Bills,Insurance
+784,test,uk_base,AXA INSURANCE,-15418,Bills,Insurance
+785,test,uk_base,AXA INSURANCE LONDON GB,-6778,Bills,Insurance
+786,test,uk_base,CHURCHILL INSURANCE,-3411,Bills,Insurance
+787,test,uk_base,CHURCHILL INSURANCE LEEDS,-2348,Bills,Insurance
+788,test,uk_base,LEGAL AND GENERAL,-3650,Bills,Insurance
+789,test,uk_base,LEGAL AND GENERAL 09NOV,-15907,Bills,Insurance
+790,test,uk_base,NETFLIX.COM,-19408,Subscriptions,Streaming
+791,test,uk_base,NETFLIX.COM 1634,-1896,Subscriptions,Streaming
+792,test,uk_base,DISNEY PLUS,-6772,Subscriptions,Streaming
+793,test,uk_base,disney plus,-8543,Subscriptions,Streaming
+794,test,uk_base,AMAZON PRIME*AB12CD,-3591,Subscriptions,Streaming
+795,test,uk_base,AMAZON PRIME*AB12CD BRISTOL,-22724,Subscriptions,Streaming
+796,test,uk_base,NOW TV,-5917,Subscriptions,Streaming
+797,test,uk_base,NOW TV 5535,-4763,Subscriptions,Streaming
+798,test,uk_base,APPLE.COM/BILL,-3660,Subscriptions,Other subscriptions
+799,test,uk_base,APPLE.COM/BILL 4141,-23328,Subscriptions,Other subscriptions
+800,test,uk_base,GOOGLE *YOUTUBE PREMIUM,-17423,Subscriptions,Streaming
+801,test,uk_base,GOOGLE *YOUTUBE PREMIUM CD 8619,-18962,Subscriptions,Streaming
+802,test,uk_base,GOOGLE *GSUITE,-17673,Subscriptions,Software
+803,test,uk_base,GOOGLE *GSUITE 9328,-22946,Subscriptions,Software
+804,test,uk_base,ANTHROPIC CLAUDE.AI SUBSCRIPTION,-1028,Subscriptions,AI tools
+805,test,uk_base,ANTHROPIC CLAUDE.AI SUBSCRIPTION CD 2192,-21234,Subscriptions,AI tools
+806,test,uk_base,OPENAI *CHATGPT SUBSCR,-10404,Subscriptions,AI tools
+807,test,uk_base,ZTL*OPENAI *CHATGPT SUBSCR,-3525,Subscriptions,AI tools
+808,test,uk_base,MICROSOFT*365,-6968,Subscriptions,Software
+809,test,uk_base,MICROSOFT*365,-17207,Subscriptions,Software
+810,test,uk_base,ADOBE SYSTEMS,-13512,Subscriptions,Software
+811,test,uk_base,ADOBE SYSTEMS GBR,-2142,Subscriptions,Software
+812,test,uk_base,"GITHUB, INC.",-648,Subscriptions,Software
+813,test,uk_base,"GITHUB, INC. CD 2222",-376,Subscriptions,Software
+814,test,uk_base,DROPBOX,-20665,Subscriptions,Cloud storage
+815,test,uk_base,DROPBOX 21JAN,-15147,Subscriptions,Cloud storage
+816,test,uk_base,PURE GYM LTD,-3673,Health,Fitness
+817,test,uk_base,PURE GYM LTD 7599,-16504,Health,Fitness
+818,test,uk_base,THE GYM GROUP,-22115,Health,Fitness
+819,test,uk_base,the gym group,-8973,Health,Fitness
+820,test,uk_base,DAVID LLOYD CLUBS,-10441,Health,Fitness
+821,test,uk_base,DAVID LLOYD CLUBS CD 5022,-22023,Health,Fitness
+822,test,uk_base,BETTER LEISURE,-8227,Health,Fitness
+823,test,uk_base,SUMUP *BETTER LEISURE,-13390,Health,Fitness
+824,test,uk_base,BOOTS 1234 LONDON,-16035,Health,Pharmacy
+825,test,uk_base,SQ *BOOTS 1234 LONDON,-2885,Health,Pharmacy
+826,test,uk_base,SUPERDRUG STORES,-9155,Health,Pharmacy
+827,test,uk_base,SUMUP *SUPERDRUG STORES,-20381,Health,Pharmacy
+828,test,uk_base,LLOYDS PHARMACY,-15957,Health,Pharmacy
+829,test,uk_base,LLOYDS PHARMACY BRISTOL,-5242,Health,Pharmacy
+830,test,uk_base,SPECSAVERS,-24379,Health,Medical
+831,test,uk_base,SQ *SPECSAVERS,-11057,Health,Medical
+832,test,uk_base,GREGGS PLC 2201,-17070,Food & Drink,Takeaway
+833,test,uk_base,GREGGS  PLC  2201,-7852,Food & Drink,Takeaway
+834,test,uk_base,MCDONALDS 4455,-2113,Food & Drink,Takeaway
+835,test,uk_base,mcdonalds 4455,-243,Food & Drink,Takeaway
+836,test,uk_base,KFC LONDON,-5713,Food & Drink,Takeaway
+837,test,uk_base,kfc london,-8623,Food & Drink,Takeaway
+838,test,uk_base,DOMINOS PIZZA,-8375,Food & Drink,Takeaway
+839,test,uk_base,DOMINOS PIZZA,-7613,Food & Drink,Takeaway
+840,test,uk_base,JUST EAT,-20637,Food & Drink,Takeaway
+841,test,uk_base,JUST EAT 27JAN,-5429,Food & Drink,Takeaway
+842,test,uk_base,BURGER KING,-14311,Food & Drink,Takeaway
+843,test,uk_base,BURGER KING LONDON GB,-19193,Food & Drink,Takeaway
+844,test,uk_base,SUBWAY 1881,-12734,Food & Drink,Takeaway
+845,test,uk_base,SUBWAY 1881 26JUN,-14313,Food & Drink,Takeaway
+846,test,uk_base,NANDOS,-6756,Food & Drink,Eating out
+847,test,uk_base,NANDOS,-15804,Food & Drink,Eating out
+848,test,uk_base,WAGAMAMA,-19724,Food & Drink,Eating out
+849,test,uk_base,WAGAMAMA,-8579,Food & Drink,Eating out
+850,test,uk_base,PIZZA EXPRESS,-603,Food & Drink,Eating out
+851,test,uk_base,PIZZA EXPRESS 28JAN,-17632,Food & Drink,Eating out
+852,test,uk_base,WETHERSPOONS,-242,Food & Drink,Eating out
+853,test,uk_base,WETHERSPOONS LEEDS,-14149,Food & Drink,Eating out
+854,test,uk_base,STARBUCKS COFFEE,-20408,Food & Drink,Coffee
+855,test,uk_base,STARBUCKS COFFEE CD 4974,-9771,Food & Drink,Coffee
+856,test,uk_base,COSTA COFFEE,-6324,Food & Drink,Coffee
+857,test,uk_base,SUMUP *COSTA COFFEE,-7267,Food & Drink,Coffee
+858,test,uk_base,CAFFE NERO,-18256,Food & Drink,Coffee
+859,test,uk_base,CAFFE NERO 28JAN,-17356,Food & Drink,Coffee
+860,test,uk_base,ARGOS,-10777,Shopping,Household
+861,test,uk_base,ARGOS 06NOV,-16855,Shopping,Household
+862,test,uk_base,IKEA LTD,-8772,Shopping,Household
+863,test,uk_base,ikea ltd,-17480,Shopping,Household
+864,test,uk_base,B&Q,-279,Shopping,Household
+865,test,uk_base,B&Q CD 2528,-22054,Shopping,Household
+866,test,uk_base,JOHN LEWIS,-1310,Shopping,Household
+867,test,uk_base,JOHN LEWIS 11JAN,-5174,Shopping,Household
+868,test,uk_base,CURRYS,-17686,Shopping,Electronics
+869,test,uk_base,ZTL*CURRYS,-14476,Shopping,Electronics
+870,test,uk_base,PRIMARK,-7284,Shopping,Clothing
+871,test,uk_base,PRIMARK,-13807,Shopping,Clothing
+872,test,uk_base,H&M,-22093,Shopping,Clothing
+873,test,uk_base,H&M 9409,-3057,Shopping,Clothing
+874,test,uk_base,ZARA,-21919,Shopping,Clothing
+875,test,uk_base,ZARA CD 3036,-21608,Shopping,Clothing
+876,test,uk_base,NEXT RETAIL,-23992,Shopping,Clothing
+877,test,uk_base,NEXT RETAIL CD 9557,-21705,Shopping,Clothing
+878,test,uk_base,ASOS.COM,-18683,Shopping,Clothing
+879,test,uk_base,ASOS.COM CD 9505,-14559,Shopping,Clothing
+880,test,uk_base,SPORTS DIRECT,-16449,Shopping,Clothing
+881,test,uk_base,SPORTS DIRECT LEEDS,-4909,Shopping,Clothing
+882,test,uk_base,EBAY,-18342,Shopping,Online
+883,test,uk_base,EBAY 2807,-23550,Shopping,Online
+884,test,uk_base,AMZNMKTPLACE,-354,Shopping,Online
+885,test,uk_base,AMZNMKTPLACE LONDON GB,-20743,Shopping,Online
+886,test,uk_base,PAYPAL *ETSY,-11936,Shopping,Online
+887,test,uk_base,PAYPAL *ETSY BRISTOL,-19324,Shopping,Online
+888,test,uk_base,EASYJET,-1656,Travel,Flights
+889,test,uk_base,EASYJET,-19058,Travel,Flights
+890,test,uk_base,RYANAIR,-15009,Travel,Flights
+891,test,uk_base,RYANAIR 0897,-3886,Travel,Flights
+892,test,uk_base,BRITISH AIRWAYS,-1307,Travel,Flights
+893,test,uk_base,BRITISH  AIRWAYS,-8987,Travel,Flights
+894,test,uk_base,BOOKING.COM,-14264,Travel,Hotels
+895,test,uk_base,SQ *BOOKING.COM,-11236,Travel,Hotels
+896,test,uk_base,PREMIER INN,-23425,Travel,Hotels
+897,test,uk_base,PREMIER INN,-18883,Travel,Hotels
+898,test,uk_base,AIRBNB,-10100,Travel,Hotels
+899,test,uk_base,airbnb,-23439,Travel,Hotels
+900,test,uk_base,ODEON CINEMAS,-21285,Entertainment,Events
+901,test,uk_base,odeon cinemas,-24201,Entertainment,Events
+902,test,uk_base,TICKETMASTER,-22933,Entertainment,Events
+903,test,uk_base,TICKETMASTER LONDON GB,-6813,Entertainment,Events
+904,test,uk_base,STEAM PURCHASE,-11987,Entertainment,Games
+905,test,uk_base,SUMUP *STEAM PURCHASE,-8853,Entertainment,Games
+906,test,uk_base,PLAYSTATION NETWORK,-20842,Entertainment,Games
+907,test,uk_base,SQ *PLAYSTATION NETWORK,-1307,Entertainment,Games
+908,test,uk_lookalike,TESCOMBE FARM SHOP,-15882,Food & Drink,Groceries
+909,test,uk_lookalike,COSTALOT BUILDERS,-15820,Housing,Maintenance
+910,test,uk_lookalike,SHELLEY HAIR SALON,-18349,Personal care,Hair & beauty
+911,test,uk_lookalike,BOOTSTRAP WORKSHOP,-12762,Shopping,Household
+912,test,uk_lookalike,NEXTDOOR GARDENS,-15395,Entertainment,Hobbies
+913,test,uk_lookalike,ARGOSY BOOKS,-13932,Entertainment,Hobbies
+914,test,uk_lookalike,BPM FITNESS STUDIO,-17822,Health,Fitness

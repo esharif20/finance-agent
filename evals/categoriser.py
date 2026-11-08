@@ -38,7 +38,7 @@ from finance_agent.ledger import taxonomy
 from metrics import expected_calibration_error, macro_f1, per_category
 
 SEED = 112
-DATASET_VERSION = 2  # v2 (#113): 136 more corrected Merchants, >= 5 per Category
+DATASET_VERSION = 3  # v2 (#113): 136 more corrected Merchants; v3 (#215): UK base
 LABEL_TAXONOMY_VERSION = 1  # the taxonomy the gold labels are named in
 HERE = Path(__file__).parent
 DATASET = HERE / "datasets" / f"categoriser_v{DATASET_VERSION}.csv"
@@ -369,6 +369,200 @@ MORE_CORRECTED: dict[Category, tuple[str, ...]] = {
         "CLEANSLATE GROOMING",
     ),
 }
+# Real UK descriptors as a Bank writes them (#215): no Correction, no fixture
+# merchant; the shipped UK merchant base should catch them. Gold is written
+# independently of merchants_uk.toml. Names are public brands, no real rows.
+BL = "Bills"
+UK_BASE: tuple[tuple[str, Category], ...] = (
+    ("SAINSBURYS S/MKTS 0412 LONDON", (F, "Groceries")),
+    ("ASDA STORES 4521", (F, "Groceries")),
+    ("MORRISONS 0334", (F, "Groceries")),
+    ("WAITROSE 117 BRISTOL", (F, "Groceries")),
+    ("ALDI 49 076 LEEDS", (F, "Groceries")),
+    ("LIDL GB LONDON", (F, "Groceries")),
+    ("CO-OP GROUP FOOD 1042", (F, "Groceries")),
+    ("M&S SIMPLY FOOD 202", (F, "Groceries")),
+    ("OCADO RETAIL LTD", (F, "Groceries")),
+    ("ICELAND STORES", (F, "Groceries")),
+    ("SPAR LONDON", (F, "Groceries")),
+    ("HELLOFRESH", (F, "Groceries")),
+    ("TESCO PFS 5432 LONDON", (T, "Fuel")),
+    ("TESCO PETROL 3321", (T, "Fuel")),
+    ("SAINSBURYS PETROL 0412", (T, "Fuel")),
+    ("ASDA PFS 8812", (T, "Fuel")),
+    ("MORRISONS FUEL 233", (T, "Fuel")),
+    ("TESCO MOBILE", (B, "Phone & internet")),
+    ("TESCO BANK", (BL, "Other bills")),
+    ("SAINSBURYS BANK", (BL, "Other bills")),
+    ("TESCO STORES 3412", (F, "Groceries")),
+    ("TESCO EXPRESS 6001", (F, "Groceries")),
+    ("TESCO EXTRA 7710", (F, "Groceries")),
+    ("BP CONNECT 4412", (T, "Fuel")),
+    ("SHELL CAMBRIDGE", (T, "Fuel")),
+    ("ESSO MOTORWAY", (T, "Fuel")),
+    ("TEXACO LEEDS", (T, "Fuel")),
+    ("JET FILLING STATION", (T, "Fuel")),
+    ("TRANSPORT FOR LONDON TRAVEL CH", (T, "Public transport")),
+    ("TFL TRAVEL CH", (T, "Public transport")),
+    ("TRAINLINE", (T, "Public transport")),
+    ("NATIONAL RAIL ENQUIRIES", (T, "Public transport")),
+    ("LNER TICKETS", (T, "Public transport")),
+    ("AVANTI WEST COAST", (T, "Public transport")),
+    ("GWR RAIL", (T, "Public transport")),
+    ("SOUTHEASTERN RAILWAY", (T, "Public transport")),
+    ("STAGECOACH BUS", (T, "Public transport")),
+    ("FIRST BUS", (T, "Public transport")),
+    ("NATIONAL EXPRESS", (T, "Public transport")),
+    ("UBER *TRIP HELP.UBER.COM", (T, "Taxi")),
+    ("UBER EATS", (F, "Takeaway")),
+    ("BOLT.EU/O/", (T, "Taxi")),
+    ("LIME*RIDE", (T, "Public transport")),
+    ("FREE NOW", (T, "Taxi")),
+    ("ADDISON LEE", (T, "Taxi")),
+    ("RINGGO PARKING", (T, "Parking")),
+    ("PAYBYPHONE", (T, "Parking")),
+    ("BRITISH GAS", (B, "Energy")),
+    ("OCTOPUS ENERGY", (B, "Energy")),
+    ("EDF ENERGY", (B, "Energy")),
+    ("E.ON NEXT", (B, "Energy")),
+    ("OVO ENERGY", (B, "Energy")),
+    ("SCOTTISH POWER", (B, "Energy")),
+    ("THAMES WATER", (B, "Water")),
+    ("SEVERN TRENT WATER", (B, "Water")),
+    ("UNITED UTILITIES", (B, "Water")),
+    ("ANGLIAN WATER", (B, "Water")),
+    ("BT GROUP", (B, "Phone & internet")),
+    ("VODAFONE LTD", (B, "Phone & internet")),
+    ("EE LIMITED", (B, "Phone & internet")),
+    ("O2 TELEFONICA", (B, "Phone & internet")),
+    ("THREE MOBILE", (B, "Phone & internet")),
+    ("GIFFGAFF", (B, "Phone & internet")),
+    ("SKY DIGITAL", (B, "Phone & internet")),
+    ("VIRGIN MEDIA", (B, "Phone & internet")),
+    ("PLUSNET", (B, "Phone & internet")),
+    ("LONDON BOROUGH OF CAMDEN COUNCIL TAX", (B, "Council tax")),
+    ("MANCHESTER CITY COUNCIL", (B, "Council tax")),
+    ("BIRMINGHAM CC COUNCIL TAX", (B, "Council tax")),
+    ("HMRC SELF ASSESSMENT", (BL, "Other bills")),
+    ("HMRC CUMBERNAULD", (BL, "Other bills")),
+    ("DVLA VEHICLE TAX", (BL, "Other bills")),
+    ("TV LICENCE MBP", (BL, "Other bills")),
+    ("AVIVA INSURANCE", (BL, "Insurance")),
+    ("DIRECT LINE INSURANCE", (BL, "Insurance")),
+    ("ADMIRAL INSURANCE", (BL, "Insurance")),
+    ("LV= INSURANCE", (BL, "Insurance")),
+    ("AXA INSURANCE", (BL, "Insurance")),
+    ("CHURCHILL INSURANCE", (BL, "Insurance")),
+    ("LEGAL AND GENERAL", (BL, "Insurance")),
+    ("NETFLIX.COM", (SUB, "Streaming")),
+    ("DISNEY PLUS", (SUB, "Streaming")),
+    ("AMAZON PRIME*AB12CD", (SUB, "Streaming")),
+    ("NOW TV", (SUB, "Streaming")),
+    ("APPLE.COM/BILL", (SUB, "Other subscriptions")),
+    ("GOOGLE *YOUTUBE PREMIUM", (SUB, "Streaming")),
+    ("GOOGLE *GSUITE", (SUB, "Software")),
+    ("ANTHROPIC CLAUDE.AI SUBSCRIPTION", (SUB, "AI tools")),
+    ("OPENAI *CHATGPT SUBSCR", (SUB, "AI tools")),
+    ("MICROSOFT*365", (SUB, "Software")),
+    ("ADOBE SYSTEMS", (SUB, "Software")),
+    ("GITHUB, INC.", (SUB, "Software")),
+    ("DROPBOX", (SUB, "Cloud storage")),
+    ("PURE GYM LTD", (HE, "Fitness")),
+    ("THE GYM GROUP", (HE, "Fitness")),
+    ("DAVID LLOYD CLUBS", (HE, "Fitness")),
+    ("BETTER LEISURE", (HE, "Fitness")),
+    ("BOOTS 1234 LONDON", (HE, "Pharmacy")),
+    ("SUPERDRUG STORES", (HE, "Pharmacy")),
+    ("LLOYDS PHARMACY", (HE, "Pharmacy")),
+    ("SPECSAVERS", (HE, "Medical")),
+    ("GREGGS PLC 2201", (F, "Takeaway")),
+    ("MCDONALDS 4455", (F, "Takeaway")),
+    ("KFC LONDON", (F, "Takeaway")),
+    ("DOMINOS PIZZA", (F, "Takeaway")),
+    ("JUST EAT", (F, "Takeaway")),
+    ("BURGER KING", (F, "Takeaway")),
+    ("SUBWAY 1881", (F, "Takeaway")),
+    ("NANDOS", (F, "Eating out")),
+    ("WAGAMAMA", (F, "Eating out")),
+    ("PIZZA EXPRESS", (F, "Eating out")),
+    ("WETHERSPOONS", (F, "Eating out")),
+    ("STARBUCKS COFFEE", (F, "Coffee")),
+    ("COSTA COFFEE", (F, "Coffee")),
+    ("CAFFE NERO", (F, "Coffee")),
+    ("ARGOS", (S, "Household")),
+    ("IKEA LTD", (S, "Household")),
+    ("B&Q", (S, "Household")),
+    ("JOHN LEWIS", (S, "Household")),
+    ("CURRYS", (S, "Electronics")),
+    ("PRIMARK", (S, "Clothing")),
+    ("H&M", (S, "Clothing")),
+    ("ZARA", (S, "Clothing")),
+    ("NEXT RETAIL", (S, "Clothing")),
+    ("ASOS.COM", (S, "Clothing")),
+    ("SPORTS DIRECT", (S, "Clothing")),
+    ("EBAY", (S, "Online")),
+    ("AMZNMKTPLACE", (S, "Online")),
+    ("PAYPAL *ETSY", (S, "Online")),
+    ("EASYJET", (TR, "Flights")),
+    ("RYANAIR", (TR, "Flights")),
+    ("BRITISH AIRWAYS", (TR, "Flights")),
+    ("BOOKING.COM", (TR, "Hotels")),
+    ("PREMIER INN", (TR, "Hotels")),
+    ("AIRBNB", (TR, "Hotels")),
+    ("ODEON CINEMAS", (E, "Events")),
+    ("TICKETMASTER", (E, "Events")),
+    ("STEAM PURCHASE", (E, "Games")),
+    ("PLAYSTATION NETWORK", (E, "Games")),
+)
+# UK descriptors the base must NOT claim: near misses and other Merchants
+UK_LOOKALIKES: tuple[tuple[str, Category], ...] = (
+    ("TESCOMBE FARM SHOP", (F, "Groceries")),
+    ("COSTALOT BUILDERS", (H, "Maintenance")),
+    ("SHELLEY HAIR SALON", (P, "Hair & beauty")),
+    ("BOOTSTRAP WORKSHOP", (S, "Household")),
+    ("NEXTDOOR GARDENS", (E, "Hobbies")),
+    ("ARGOSY BOOKS", (E, "Hobbies")),
+    ("BPM FITNESS STUDIO", (HE, "Fitness")),
+)
+# v3 (#215): the v2-only Categories the UK base adds to the gold labels also
+# need >= 5 corrected Merchants each (ADR 0015). Corrections only again.
+UK_CORRECTED: dict[Category, tuple[str, ...]] = {
+    (BL, "Insurance"): (
+        "SAFEHAVEN COVER",
+        "KEYSTONE ASSURED",
+        "UMBRELLA INDEMNITY",
+        "BRIGHTSHIELD PROTECT",
+        "TRUSTGUARD LIFE",
+    ),
+    (BL, "Other bills"): (
+        "RIVERBANK LOAN REPAYMENT",
+        "PENNYWISE CREDIT",
+        "OLDGATE PERMITS",
+        "MERIDIAN POSTAL SERVICE",
+        "COBBLE TAX AGENTS",
+    ),
+    (SUB, "AI tools"): (
+        "NEURALNEST AI",
+        "PROMPTWORKS",
+        "LOGICLOOM ASSISTANT",
+        "SYNAPSE CHAT",
+        "CORTEXPILOT",
+    ),
+    (SUB, "Cloud storage"): (
+        "VAULTLY",
+        "CLOUDATTIC",
+        "SKYLOCKER STORAGE",
+        "BACKUPBARN",
+        "DRIFTDRIVE",
+    ),
+    (SUB, "Other subscriptions"): (
+        "WEEKLY CRATE BOX",
+        "MONTHLY MUNCH CLUB",
+        "PAPERTRAIL DIGEST",
+        "SEEDLING SUBSCRIPTIONS",
+        "GROOVE VINYL CLUB",
+    ),
+}
 NOISY_VARIANTS = 4
 NOISE: tuple[Callable[[str, random.Random], str], ...] = (
     lambda d, r: f"{d} {r.randint(1, 9999):04d}",  # store number
@@ -413,6 +607,15 @@ def generate(seed: int) -> str:
         for d in names:
             rows.append(("correction", "clean", d, spend(), cat))
             rows.append(("correction", "noise", noisy(d), spend(), cat))
+    for cat, names in UK_CORRECTED.items():
+        for d in names:
+            rows.append(("correction", "clean", d, spend(), cat))
+            rows.append(("correction", "noise", noisy(d), spend(), cat))
+    # v3 (#215): last, so every v2 row keeps its id, descriptor and amount
+    for d, cat in UK_BASE:
+        rows.append(("test", "uk_base", d, spend(), cat))
+        rows.append(("test", "uk_base", noisy(d), spend(), cat))
+    rows += [("test", "uk_lookalike", d, spend(), cat) for d, cat in UK_LOOKALIKES]
 
     out = io.StringIO()
     out.write(

@@ -82,10 +82,10 @@ def test_the_merchant_tables_default_wins_over_the_seed() -> None:
 
 
 def test_descriptor_rules_apply_when_the_merchant_has_no_default() -> None:
-    got = c("NCP CAR PARKING 0231", -800)
+    got = c("RIVERSIDE CAR PARKING 0231", -800)
     assert (got.kind, got.merchant, got.category) == (
         "Spending",
-        "NCP CAR PARKING",
+        "RIVERSIDE CAR PARKING",
         ("Transport", "Parking"),
     )
     assert got.source == "rule:parking"

@@ -72,7 +72,7 @@ def test_spending_by_category_drills_down_to_subcategory_and_merchant(
             (0, "FPI", "ACME LTD SALARY", 200000),
             (1, "DEB", "TESCO STORES 3021", -1250),
             (2, "DEB", "TESCO EXP 0042", -750),
-            (3, "DEB", "NCP CAR PARKING 12", -800),
+            (3, "DEB", "OAKLEY CAR PARKING 12", -800),
             (4, "DEB", "UNHEARD-OF SHOP 99", -300),
             (5, "DEB", "TESCO REFUND", 500),
             (6, "FEE", "ARRANGED OVERDRAFT FEE", -1000),
@@ -96,7 +96,7 @@ def test_spending_by_category_drills_down_to_subcategory_and_merchant(
         Spend(
             "Transport",
             d("8.00"),
-            (Spend("Parking", d("8.00"), (Spend("NCP CAR PARKING", d("8.00")),)),),
+            (Spend("Parking", d("8.00"), (Spend("OAKLEY CAR PARKING", d("8.00")),)),),
         ),
         Spend(
             "Uncategorised",
@@ -125,11 +125,11 @@ def test_merchants_are_stable_rows_with_a_default_category(
 ) -> None:
     rows = [
         (1, "DEB", "TESCO STORES 3021", -1250),
-        (2, "DEB", "NCP CAR PARKING 12", -800),
+        (2, "DEB", "OAKLEY CAR PARKING 12", -800),
         (3, "DEB", "TESCO EXP 0042", -750),
     ]
     h = history(rows)
-    later = history([*rows, (9, "DEB", "NCP CAR PARKING 77 LONDON", -400)])
+    later = history([*rows, (9, "DEB", "OAKLEY CAR PARKING 77 LONDON", -400)])
     with engine.begin() as conn:
         ledger = Ledger(conn, 1)
         ledger.import_files([write_export(render_export(h, 0, 9).text)])
@@ -145,10 +145,11 @@ def test_merchants_are_stable_rows_with_a_default_category(
 
     assert first["TESCO STORES 3021"] == first["TESCO EXP 0042"]
     assert second.items() >= first.items()
-    assert second["NCP CAR PARKING 77 LONDON"] == first["NCP CAR PARKING 12"]
-    assert set(merchants) == set(categorise.MERCHANTS) | {"NCP CAR PARKING"}
+    assert second["OAKLEY CAR PARKING 77 LONDON"] == first["OAKLEY CAR PARKING 12"]
+    # the base Merchants are seeded when they appear (#215), not all up front
+    assert set(merchants) == {"Tesco", "OAKLEY CAR PARKING"}
     assert merchants["Tesco"].default_category == ("Food & Drink", "Groceries")
-    assert merchants["NCP CAR PARKING"].default_category is None
+    assert merchants["OAKLEY CAR PARKING"].default_category is None
     assert merchants["Tesco"].id == first["TESCO STORES 3021"]
 
 

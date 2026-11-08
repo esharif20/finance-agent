@@ -286,7 +286,7 @@ def test_costs_read_the_registry_and_the_merchants_charges(
     rows += [(date(2026, 6, 4), "SYNTH CAFE", "-3.20")]
     (c,) = import_and_cost(engine, write_export, rows).items
     assert (c.entry.merchant, c.status, c.interval, c.monthly) == (
-        "NETFLIX.COM", "active", "monthly", 1099,
+        "Netflix", "active", "monthly", 1099,
     )  # fmt: skip
 
 

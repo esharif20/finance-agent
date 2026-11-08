@@ -64,7 +64,7 @@ def check(engine: Engine, caplog: pytest.LogCaptureFixture) -> None:
             for t in led.transactions()
             if t.categorisation and t.categorisation.merchant
         }
-    assert subs["NETFLIX.COM"].status == "active"
+    assert subs["NETFLIX"].status == "active"
     assert cats["TESCO"] == ("Food & Drink", "Groceries")
     for word in ("netflix", "tesco", "10.99", "25.00"):
         assert word not in caplog.text.lower()
