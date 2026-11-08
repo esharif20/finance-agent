@@ -61,6 +61,10 @@ class Item:
     # not part of `version`, so a model refresh never invalidates a decision
     suggestions: tuple[tuple[str, str], ...] = ()
     skipped: bool = False
+    # what an answer touches, in `currency` (bulk review orders by it); not part
+    # of `version`. Set by Category items only.
+    spend: Decimal = Decimal(0)
+    currency: str = "GBP"
 
     @property
     def id(self) -> str:
@@ -102,6 +106,7 @@ class CategoryItems:
         # `weight`: every row a Merchant-wide answer changes, rule-categorised
         # too; never a Transaction's own Correction or a Split, which beat it
         counts: dict[int, int] = {}
+        spend: dict[int, Decimal] = {}
         for t in txns:
             c = t.categorisation
             if (
@@ -116,15 +121,33 @@ class CategoryItems:
             if c.category == (UNCATEGORISED, UNCATEGORISED):
                 if c.merchant_id is None:
                     yield Item(
-                        self.name, f"t{t.id}", _version(t.id), 1, "", None, (t.id,)
+                        self.name,
+                        f"t{t.id}",
+                        _version(t.id),
+                        1,
+                        "",
+                        None,
+                        (t.id,),
+                        spend=abs(t.amount),
+                        currency=t.currency,
                     )
                     continue
                 rows.setdefault(c.merchant_id, []).append(t.id)
+                spend[c.merchant_id] = spend.get(c.merchant_id, Decimal(0)) + abs(
+                    t.amount
+                )
                 names[c.merchant_id] = c.merchant or ""
         for m, ids in rows.items():
             ids.sort()
             yield Item(
-                self.name, str(m), _version(ids), counts[m], names[m], m, tuple(ids)
+                self.name,
+                str(m),
+                _version(ids),
+                counts[m],
+                names[m],
+                m,
+                tuple(ids),
+                spend=spend[m],
             )
 
     def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
@@ -457,12 +480,36 @@ class ReviewQueue:
         effect = ITEM_TYPES[item.type].answer(self._led, item, answer)
         self._record(item, "answer", effect)
 
+    def answer_many(self, answers: Sequence[tuple[str, str, Answer]]) -> list[str]:
+        """Apply each answer exactly as `answer` would, or none: returns the ids
+        of items no longer in the queue or changed since shown, and applies
+        nothing then. The caller's transaction rolls back any later failure."""
+        held = {i.id: i for i in self.items()}
+        stale = [
+            id_
+            for id_, v, _ in answers
+            if (i := held.get(id_)) is None or i.version != v
+        ]
+        if stale:
+            return stale
+        for id_, _, a in answers:
+            item = held[id_]
+            self._record(
+                item, "answer", ITEM_TYPES[item.type].answer(self._led, item, a)
+            )
+        return []
+
     def skip(self, item_id: str, version: str) -> None:
         self._record(self._current(item_id, version), "skip", None)
 
-    def undo(self) -> str | None:
-        """Undo the latest answer or skip that is not undone yet. Returns a
-        message when the answer's Correction was already reverted elsewhere."""
+    def undo(self, count: int = 1) -> str | None:
+        """Undo the latest `count` answers or skips (a whole bulk batch) in
+        turn; if there are fewer, none is undone. Returns a message when an
+        answer's Correction was already reverted elsewhere."""
+        messages = [m for _ in range(count) if (m := self._undo_one())]
+        return messages[-1] if messages else None
+
+    def _undo_one(self) -> str | None:
         d = schema.review_decision
         r = self._db.execute(
             self._db.select(d, d.c.id, d.c.item_type, d.c.action, d.c.effect_id)
