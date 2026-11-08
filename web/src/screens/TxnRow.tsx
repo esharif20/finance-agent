@@ -9,6 +9,7 @@ import { NoteField } from "@/components/NoteField";
 import { SplitBadge, SplitParts } from "@/components/SplitBadge";
 import { SplitEditor } from "@/components/SplitEditor";
 import { isSubscription } from "@/lib/manageLinks";
+import { addsDetail, joinParts } from "@/lib/txnText";
 
 export const day = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
@@ -39,6 +40,7 @@ export function TxnRow({
   const panel = useId();
   const partsId = useId();
   const isSplit = t.source === "split";
+  const secondary = joinParts([t.merchant && addsDetail(t.merchant, t.description) ? t.description : null, mask]);
   const toReview = t.category?.[0] === "To review";
 
   return (
@@ -51,10 +53,7 @@ export function TxnRow({
       </time>
       <div className="order-1 min-w-0 sm:order-none">
         <p className="truncate text-row font-semibold">{t.merchant ?? t.description}</p>
-        <p className="truncate text-label font-normal text-muted-foreground">
-          {t.merchant ? `${t.description} · ` : ""}
-          {mask}
-        </p>
+        {secondary && <p className="truncate text-label font-normal text-muted-foreground">{secondary}</p>}
       </div>
       <div className="order-2 text-right sm:order-none sm:min-w-28">
         <Money

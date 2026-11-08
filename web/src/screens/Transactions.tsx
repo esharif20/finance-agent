@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   type Txn,
   type TxnFilters,
@@ -14,6 +14,7 @@ import { type Category } from "@/components/CategoryChip";
 import { CountTick } from "@/components/CountTick";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { monthKey, monthLabel } from "@/lib/txnText";
 import { TxnRow } from "./TxnRow";
 
 const PAGE = 100;
@@ -85,6 +86,8 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
   };
   const accountName = (id: number) => accounts.data?.find((a) => a.id === id);
   const groups = categories.data ?? [];
+  // a narrowed list reads best one month at a time
+  const byMonth = Boolean(applied.category || applied.q);
 
   const save = (t: Txn, category: Category, all: boolean) =>
     correct.mutate(
@@ -184,14 +187,20 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
             )}
           </p>
           <ul aria-label="Transactions">
-            {page.data.items.map((t) => (
-              <TxnRow
-                key={t.id}
-                t={t}
-                mask={accountName(t.account_id)?.masked_number}
-                groups={groups}
-                onCategory={(c, all) => save(t, c, all)}
-              />
+            {page.data.items.map((t, i) => (
+              <Fragment key={t.id}>
+                {byMonth && (i === 0 || monthKey(t.posted_on) !== monthKey(page.data.items[i - 1]?.posted_on ?? "")) && (
+                  <li className="px-3 pt-4 pb-1 text-label font-semibold text-muted-foreground">
+                    {monthLabel(monthKey(t.posted_on))}
+                  </li>
+                )}
+                <TxnRow
+                  t={t}
+                  mask={accountName(t.account_id)?.masked_number}
+                  groups={groups}
+                  onCategory={(c, all) => save(t, c, all)}
+                />
+              </Fragment>
             ))}
           </ul>
           {page.data.items.length < page.data.total && (
