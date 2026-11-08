@@ -31,6 +31,7 @@ from finance_agent.api import (
     manage_links,
     merchants,
     notes,
+    plan,
     proposals,
     review_queue,
     splits,
@@ -635,6 +636,7 @@ def create_app(
     app.include_router(proposals.router)
     app.include_router(chat.router)
     app.include_router(cash_flow.router)
+    app.include_router(plan.router)
     app.include_router(guidance.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)

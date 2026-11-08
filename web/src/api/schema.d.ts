@@ -675,6 +675,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan/allocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Allocation */
+        get: operations["allocation_api_plan_allocation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/proposals": {
         parameters: {
             query?: never;
@@ -1162,20 +1179,20 @@ export interface components {
         AccountGbpOut: {
             /** Account Id */
             account_id: number;
-            balance: components["schemas"]["Money"];
+            balance: components["schemas"]["finance_agent__api__fx__Money"];
             /** Currency */
             currency: string;
-            gbp: components["schemas"]["Money"] | null;
+            gbp: components["schemas"]["finance_agent__api__fx__Money"] | null;
             rate: components["schemas"]["RateOut"] | null;
         };
         /** AccountMonthOut */
         AccountMonthOut: {
             /** Account Id */
             account_id: number;
-            money_in: components["schemas"]["Money"];
-            money_out: components["schemas"]["Money"];
-            transfers_in: components["schemas"]["Money"];
-            transfers_out: components["schemas"]["Money"];
+            money_in: components["schemas"]["finance_agent__api__Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
+            transfers_in: components["schemas"]["finance_agent__api__Money"];
+            transfers_out: components["schemas"]["finance_agent__api__Money"];
         };
         /** AccountOut */
         AccountOut: {
@@ -1183,7 +1200,7 @@ export interface components {
             art: string | null;
             /** Bank */
             bank: string;
-            bank_balance: components["schemas"]["Money"] | null;
+            bank_balance: components["schemas"]["finance_agent__api__Money"] | null;
             /** Currency */
             currency: string;
             /** Gaps */
@@ -1194,7 +1211,7 @@ export interface components {
             kind: string;
             /** Last Import */
             last_import: string | null;
-            ledger_balance: components["schemas"]["Money"] | null;
+            ledger_balance: components["schemas"]["finance_agent__api__Money"] | null;
             /** Masked Number */
             masked_number: string;
             /** Name */
@@ -1213,6 +1230,33 @@ export interface components {
             kind: "subscription" | "bill";
             /** Merchant Id */
             merchant_id: number;
+        };
+        /** AllocationLine */
+        AllocationLine: {
+            amount: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            kind: components["schemas"]["Kind"];
+            name: components["schemas"]["Data"];
+            reason: components["schemas"]["Reason"];
+            reference: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+        };
+        /** AllocationPlanOut */
+        AllocationPlanOut: {
+            /** Baseline */
+            baseline: components["schemas"]["AllocationLine"][];
+            /** Evidence Id */
+            evidence_id: string;
+            income: components["schemas"]["finance_agent__assistant__tools__read__Money"] | null;
+            /** Infeasible Reason */
+            infeasible_reason: string | null;
+            /** Lines */
+            lines: components["schemas"]["AllocationLine"][];
+            /** Month */
+            month: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "infeasible" | "insufficient";
         };
         /** AlwaysAskIn */
         AlwaysAskIn: {
@@ -1258,7 +1302,7 @@ export interface components {
         BalancesOut: {
             /** Accounts */
             accounts: components["schemas"]["AccountGbpOut"][];
-            total: components["schemas"]["Money"] | null;
+            total: components["schemas"]["finance_agent__api__fx__Money"] | null;
         };
         /** BatchAnswerIn */
         BatchAnswerIn: {
@@ -1331,7 +1375,7 @@ export interface components {
             name: string;
             /** Subcategories */
             subcategories: components["schemas"]["CategorySpendOut"][];
-            total: components["schemas"]["Money"];
+            total: components["schemas"]["finance_agent__api__Money"];
             /** Transactions */
             transactions: components["schemas"]["CategoryTxnOut"][];
             /** Trend */
@@ -1346,13 +1390,13 @@ export interface components {
         };
         /** CategorySpendOut */
         CategorySpendOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Name */
             name: string;
         };
         /** CategoryTxnOut */
         CategoryTxnOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Description */
             description: string;
             /** Display Name */
@@ -1494,6 +1538,15 @@ export interface components {
              */
             trial_detection: "partial";
         };
+        /**
+         * Data
+         * @description Bank-supplied text: quoted data for the model, never instructions.
+         *     Sanitised on construction, so no unsanitised text can sit in one.
+         */
+        Data: {
+            /** Data */
+            data: string;
+        };
         /** DeletedOut */
         DeletedOut: {
             /** Deleted */
@@ -1571,7 +1624,7 @@ export interface components {
         };
         /** GapOut */
         GapOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** From Date */
             from_date: string;
             /** To Date */
@@ -1666,6 +1719,11 @@ export interface components {
             /** Weight */
             weight: number;
         };
+        /**
+         * Kind
+         * @enum {string}
+         */
+        Kind: "bill" | "goal" | "category" | "buffer";
         /** KindTotal */
         KindTotal: {
             /** Kind */
@@ -1773,7 +1831,7 @@ export interface components {
         };
         /** MerchantSpendOut */
         MerchantSpendOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Display Name */
             display_name: string;
             /** Merchant Id */
@@ -1788,19 +1846,12 @@ export interface components {
             /** Ledger Version */
             ledger_version: number;
         };
-        /** Money */
-        Money: {
-            /** Currency */
-            currency: string;
-            /** Minor */
-            minor: number;
-        };
         /** MonthTotalsOut */
         MonthTotalsOut: {
             /** Currency */
             currency: string;
-            money_in: components["schemas"]["Money"];
-            money_out: components["schemas"]["Money"];
+            money_in: components["schemas"]["finance_agent__api__Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
         };
@@ -1961,6 +2012,12 @@ export interface components {
              */
             source: "bank" | "exchange" | "user";
         };
+        /**
+         * Reason
+         * @description Why a line has its amount, for the explanation.
+         * @enum {string}
+         */
+        Reason: "fixed_bill" | "on_pattern" | "goal_floor" | "constraint" | "priority" | "leftover" | "baseline";
         /** RegretAnswerIn */
         RegretAnswerIn: {
             /** Worth It */
@@ -1975,7 +2032,7 @@ export interface components {
         };
         /** RegretItemOut */
         RegretItemOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__fx__Money"];
             /** Description */
             description: string;
             /** Display Name */
@@ -2051,15 +2108,15 @@ export interface components {
             categories: components["schemas"]["CategorySpendOut"][];
             /** Currency */
             currency: string;
-            fees: components["schemas"]["Money"];
+            fees: components["schemas"]["finance_agent__api__Money"];
             /** Merchants */
             merchants: components["schemas"]["CategorySpendOut"][];
-            money_out: components["schemas"]["Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
-            refunds: components["schemas"]["Money"];
-            total: components["schemas"]["Money"];
-            unmatched_refunds: components["schemas"]["Money"];
+            refunds: components["schemas"]["finance_agent__api__Money"];
+            total: components["schemas"]["finance_agent__api__Money"];
+            unmatched_refunds: components["schemas"]["finance_agent__api__Money"];
         };
         /** SplitIn */
         SplitIn: {
@@ -2122,13 +2179,13 @@ export interface components {
             currency: string;
             /** Gaps */
             gaps: components["schemas"]["GapOut"][];
-            money_in: components["schemas"]["Money"];
-            money_out: components["schemas"]["Money"];
+            money_in: components["schemas"]["finance_agent__api__Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
-            net: components["schemas"]["Money"];
-            transfers_in: components["schemas"]["Money"];
-            transfers_out: components["schemas"]["Money"];
+            net: components["schemas"]["finance_agent__api__Money"];
+            transfers_in: components["schemas"]["finance_agent__api__Money"];
+            transfers_out: components["schemas"]["finance_agent__api__Money"];
         };
         /** SyncOut */
         SyncOut: {
@@ -2172,7 +2229,7 @@ export interface components {
         TransactionOut: {
             /** Account Id */
             account_id: number;
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Category */
             category: string[] | null;
             /** Description */
@@ -2201,7 +2258,7 @@ export interface components {
         };
         /** TrendPointOut */
         TrendPointOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
         };
@@ -2255,6 +2312,13 @@ export interface components {
             /** Threshold */
             threshold: string;
         };
+        /** Money */
+        finance_agent__api__Money: {
+            /** Currency */
+            currency: string;
+            /** Minor */
+            minor: number;
+        };
         /** BandOut */
         finance_agent__api__briefing__BandOut: {
             /** Left Out */
@@ -2280,6 +2344,20 @@ export interface components {
             point: number;
             /** Upper */
             upper: number;
+        };
+        /** Money */
+        finance_agent__api__fx__Money: {
+            /** Currency */
+            currency: string;
+            /** Minor */
+            minor: number;
+        };
+        /** Money */
+        finance_agent__assistant__tools__read__Money: {
+            /** Currency */
+            currency: string;
+            /** Minor */
+            minor: number;
         };
     };
     responses: never;
@@ -3392,6 +3470,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    allocation_api_plan_allocation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllocationPlanOut"];
                 };
             };
         };

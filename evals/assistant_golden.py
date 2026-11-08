@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 5
+DATASET_VERSION = 6
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -212,6 +212,20 @@ CASES: tuple[Case, ...] = (
         (Call("forecast_cashflow", {"months": 3}),),
         "The forecast money out is £0.00 for March 2026.",
         ("£0.00",),
+    ),
+    Case(
+        "plan-split-pay",
+        "How should I split my pay this month?",
+        "plan",
+        (Call("allocation_plan"),),
+        "I can't plan your pay yet: there is no regular income to split.",
+    ),
+    Case(
+        "plan-split-pay-constraint",
+        "How should I split my pay this month, keeping eating out under my cap?",
+        "plan",
+        (Call("allocation_plan"),),
+        "I can't plan your pay yet: there is no regular income to split.",
     ),
     # --- Memory ------------------------------------------------------------
     Case(

@@ -148,6 +148,16 @@ TOOLS = {
             engine=True,
         ),
         Tool(
+            "allocation_plan",
+            "How next month's expected income splits across fixed bills, the"
+            " user's goals and spending Categories under their confirmed"
+            " constraints, beside a 50/30/20 split, in minor units. Or why no"
+            " plan fits. Advice only: nothing is moved, scheduled or paid." + _DATA,
+            plan.AllocationPlanIn,
+            plan.allocation_plan,
+            engine=True,
+        ),
+        Tool(
             "propose_correction",
             "Propose a Correction to one Transaction (txn:<id>): a new Category"
             " [top, sub], a Split into parts, or a purpose note. It changes"
@@ -189,7 +199,7 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
         "list_guidance",
         "explain_card",
     ),
-    "plan": ("forecast_cashflow", "simulate_purchase"),
+    "plan": ("forecast_cashflow", "simulate_purchase", "allocation_plan"),
     "correct": ("find_transactions", "propose_correction"),
     "memory": ("list_memories", "propose_memory"),
 }

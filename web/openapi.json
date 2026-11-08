@@ -8,7 +8,7 @@
             "type": "integer"
           },
           "balance": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__fx__Money"
           },
           "currency": {
             "title": "Currency",
@@ -17,7 +17,7 @@
           "gbp": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__fx__Money"
               },
               {
                 "type": "null"
@@ -52,16 +52,16 @@
             "type": "integer"
           },
           "money_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           }
         },
         "required": [
@@ -94,7 +94,7 @@
           "bank_balance": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__Money"
               },
               {
                 "type": "null"
@@ -134,7 +134,7 @@
           "ledger_balance": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__Money"
               },
               {
                 "type": "null"
@@ -198,6 +198,110 @@
           "merchant_id"
         ],
         "title": "AddIn",
+        "type": "object"
+      },
+      "AllocationLine": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "amount",
+          "reference",
+          "reason"
+        ],
+        "title": "AllocationLine",
+        "type": "object"
+      },
+      "AllocationPlanOut": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationLine"
+            },
+            "title": "Baseline",
+            "type": "array"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "income": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "infeasible_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Infeasible Reason"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "infeasible",
+              "insufficient"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "status",
+          "month",
+          "income",
+          "lines",
+          "baseline",
+          "infeasible_reason"
+        ],
+        "title": "AllocationPlanOut",
         "type": "object"
       },
       "AlwaysAskIn": {
@@ -333,7 +437,7 @@
           "total": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__fx__Money"
               },
               {
                 "type": "null"
@@ -568,7 +672,7 @@
             "type": "array"
           },
           "total": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transactions": {
             "items": {
@@ -622,7 +726,7 @@
       "CategorySpendOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "name": {
             "title": "Name",
@@ -639,7 +743,7 @@
       "CategoryTxnOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "description": {
             "title": "Description",
@@ -1189,6 +1293,21 @@
         "title": "CostsOut",
         "type": "object"
       },
+      "Data": {
+        "additionalProperties": false,
+        "description": "Bank-supplied text: quoted data for the model, never instructions.\nSanitised on construction, so no unsanitised text can sit in one.",
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Data",
+        "type": "object"
+      },
       "DeletedOut": {
         "properties": {
           "deleted": {
@@ -1418,7 +1537,7 @@
       "GapOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "from_date": {
             "title": "From Date",
@@ -1688,6 +1807,16 @@
         ],
         "title": "ItemOut",
         "type": "object"
+      },
+      "Kind": {
+        "enum": [
+          "bill",
+          "goal",
+          "category",
+          "buffer"
+        ],
+        "title": "Kind",
+        "type": "string"
       },
       "KindTotal": {
         "properties": {
@@ -2035,7 +2164,7 @@
       "MerchantSpendOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "display_name": {
             "title": "Display Name",
@@ -2087,24 +2216,6 @@
         "title": "MerchantsOut",
         "type": "object"
       },
-      "Money": {
-        "properties": {
-          "currency": {
-            "title": "Currency",
-            "type": "string"
-          },
-          "minor": {
-            "title": "Minor",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "minor",
-          "currency"
-        ],
-        "title": "Money",
-        "type": "object"
-      },
       "MonthTotalsOut": {
         "properties": {
           "currency": {
@@ -2112,10 +2223,10 @@
             "type": "string"
           },
           "money_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
@@ -2561,6 +2672,20 @@
         "title": "RateUsedOut",
         "type": "object"
       },
+      "Reason": {
+        "description": "Why a line has its amount, for the explanation.",
+        "enum": [
+          "fixed_bill",
+          "on_pattern",
+          "goal_floor",
+          "constraint",
+          "priority",
+          "leftover",
+          "baseline"
+        ],
+        "title": "Reason",
+        "type": "string"
+      },
       "RegretAnswerIn": {
         "properties": {
           "worth_it": {
@@ -2595,7 +2720,7 @@
       "RegretItemOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__fx__Money"
           },
           "description": {
             "title": "Description",
@@ -2851,7 +2976,7 @@
             "type": "string"
           },
           "fees": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "merchants": {
             "items": {
@@ -2861,20 +2986,20 @@
             "type": "array"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
             "type": "string"
           },
           "refunds": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "total": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "unmatched_refunds": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           }
         },
         "required": [
@@ -3080,23 +3205,23 @@
             "type": "array"
           },
           "money_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
             "type": "string"
           },
           "net": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           }
         },
         "required": [
@@ -3255,7 +3380,7 @@
             "type": "integer"
           },
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "category": {
             "anyOf": [
@@ -3379,7 +3504,7 @@
       "TrendPointOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
@@ -3529,6 +3654,24 @@
         "title": "WhyOut",
         "type": "object"
       },
+      "finance_agent__api__Money": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "title": "Money",
+        "type": "object"
+      },
       "finance_agent__api__briefing__BandOut": {
         "properties": {
           "left_out": {
@@ -3593,6 +3736,43 @@
           "upper"
         ],
         "title": "BandOut",
+        "type": "object"
+      },
+      "finance_agent__api__fx__Money": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "title": "Money",
+        "type": "object"
+      },
+      "finance_agent__assistant__tools__read__Money": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "title": "Money",
         "type": "object"
       }
     }
@@ -5126,6 +5306,24 @@
           }
         },
         "summary": "Save"
+      }
+    },
+    "/api/plan/allocation": {
+      "get": {
+        "operationId": "allocation_api_plan_allocation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllocationPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Allocation"
       }
     },
     "/api/proposals": {
