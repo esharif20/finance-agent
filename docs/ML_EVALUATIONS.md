@@ -35,7 +35,7 @@ Status: draft for review.
 | Forecasting | MASE, prediction-interval coverage | seasonal naive |
 | Preference prediction | log loss and calibration on accept/dismiss | global acceptance rate |
 | Recommendation ranking | offline replay: acceptance of top 3 | rank by £ impact |
-| Change-point detection | detection delay and false alarms on synthetic shifts | none |
+| Change-point detection (#256) | detection delay, false alarms per series-year, spike alarm rate, recall per shift type, precision per series (`evals/changepoint.py`) | 3-month mean vs 12-month mean differing by > 20%; BOCPD as the challenger |
 
 ### Categorisation (#112, #113)
 
