@@ -63,3 +63,30 @@ def test_any_reply_parses_to_a_taxonomy_label_or_none(content: str) -> None:
 def test_any_json_category_parses_to_a_taxonomy_label_or_none(cat: str) -> None:
     got = llm.parse(json.dumps({"category": cat}))
     assert got is None or got in llm.LABELS.values()
+
+
+def test_suspending_the_llm_after_it_filed_unfiles_at_once_but_keeps_corrections(
+    engine: Engine, tmp_path: Path
+) -> None:
+    from finance_agent.categorise import auto
+    from finance_agent.ledger import Ledger
+    from test_categorise_gate import COFFEE, LLM
+
+    _setup(engine, tmp_path)
+    _final(engine, dict.fromkeys(GUESSED, COFFEE))  # every one filed low by the LLM
+    kept = GUESSED[0]
+    with engine.begin() as c:
+        led = Ledger(c, 1)
+        led.correct_merchant(
+            next(m.id for m in led.merchants() if m.name == kept), FUEL
+        )
+        Scoped(c, 1).insert(
+            schema.model_suspension,
+            model=f"{llm.PREFIX}{LLM}@abc123",
+            decisions=50,
+            suspended_at=datetime.now(UTC),
+        )
+        auto.apply(c, 1, auto.ids(c, 1), final=True)  # no recompute first
+    got = _sources(engine)
+    assert not [n for n in GUESSED if "llm:" in got[n][1]]
+    assert got[kept] == (FUEL, "correction")
