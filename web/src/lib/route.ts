@@ -47,6 +47,16 @@ export const categoryHref = (category: string, month?: string, account?: number)
 /** The Overview for one Account, or for all of them. */
 export const accountHref = (account?: number) => (account === undefined ? "#overview" : `#account/${account}`);
 
+/** Go to a hash route in the page: a history entry (Back returns) and a hashchange for useRoute,
+    with no navigation, so nothing reloads or jumps. Safari can treat a `location.hash` write as
+    a navigation (scroll restore, a flash); pushState never does. */
+export function goHash(href: string) {
+  if (window.location.hash === href) return;
+  const old = window.location.href;
+  window.history.pushState(null, "", href);
+  window.dispatchEvent(new HashChangeEvent("hashchange", { oldURL: old, newURL: window.location.href }));
+}
+
 export function useRoute(): Route {
   const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => {
