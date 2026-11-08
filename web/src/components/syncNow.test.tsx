@@ -80,8 +80,15 @@ describe("SyncNow", () => {
 
   it("does not sync on open when the last sync is recent", async () => {
     const { posts } = setup(RECENT, ok);
-    await screen.findByText(/Synced/);
+    await screen.findByRole("button", { name: /^Last synced/ });
     await new Promise((r) => setTimeout(r, 30));
     expect(posts()).toBe(0);
+  });
+
+  it("is one icon control: its name says when it last synced and what it does", async () => {
+    setup(RECENT, ok);
+    const button = await screen.findByRole("button", { name: "Last synced just now · Sync now" });
+    expect(button).toHaveAttribute("data-tip", "Last synced just now · Sync now");
+    expect(button).toHaveTextContent("");
   });
 });
