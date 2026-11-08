@@ -227,6 +227,43 @@ describe("Transactions", () => {
   });
 });
 
+describe("Transactions row text and month headers", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const mount = (items: Txn[], scope = {}) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.startsWith("/api/transactions")) return Response.json({ items, total: items.length });
+        if (url.startsWith("/api/categories")) return Response.json(groups);
+        return Response.json([{ id: 1, masked_number: "••••0001", name: "Everyday", kind: "current", currency: "GBP" }]);
+      }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <Transactions scope={scope} />
+      </QueryClientProvider>,
+    );
+  };
+  const spot = (id: number, on: string, description = "Spotify P487971923") =>
+    txn({ id, posted_on: on, merchant: "Spotify", description });
+
+  it("hides a description that only repeats the Merchant and never leaves a dangling separator", async () => {
+    mount([spot(1, "2026-03-04"), spot(2, "2026-02-04", "Spotify Limited")]);
+    const row = await screen.findAllByRole("listitem", { name: /Spotify/ });
+    expect(row[0]).not.toHaveTextContent("P487971923");
+    expect(row[0]).toHaveTextContent("••••0001");
+    expect(row[0]?.textContent).not.toMatch(/·\s*$/);
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+  });
+
+  it("adds a month header per month when filtered to a Category", async () => {
+    mount([spot(1, "2026-03-04"), spot(2, "2026-03-01"), spot(3, "2026-02-04")], { category: "Food & Drink" });
+    expect(await screen.findByText("March 2026")).toBeInTheDocument();
+    expect(screen.getAllByText("March 2026")).toHaveLength(1);
+    expect(screen.getByText("February 2026")).toBeInTheDocument();
+  });
+});
+
 describe("CategoryChip placement", () => {
   it("opens towards the left when the right edge has no room", async () => {
     const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 32, width: right - left, height: 32, x: left, y: 0, toJSON: () => ({}) });
