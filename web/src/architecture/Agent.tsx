@@ -121,7 +121,8 @@ export default function Agent({ wide, live }: { wide: boolean; live: boolean }) 
         className="ar-chart-agent"
         title="The Assistant's graph: a message goes to the router, which picks a template with no model call, one writer call after a parallel fetch, or a bounded tool loop. Every reply passes the grounding check: on a miss it regenerates once, then shows a table. Finish records the turn; confirm pauses on a Proposal until you answer, with the thread checkpointed in the encrypted database. Planned, not built: a learned model router and bandit-ranked follow-ups."
         layout={layout}
-        edges={[...EDGES, loopArc(layout)]}
+        // a phone has no room for the route names between the boxes; the boxes name them
+        edges={[...(wide ? EDGES : EDGES.map((e) => (e.from === "router" ? { ...e, label: undefined } : e))), loopArc(layout)]}
         active={[0, 2, 5, 7, 10]}
         live={live}
       />
