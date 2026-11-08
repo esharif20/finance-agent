@@ -205,6 +205,9 @@ DISABLED = [
     ("GET", "/api/backup"),
     ("POST", "/api/gateway/rewrite"),
     ("GET", "/api/cloud/spend"),
+    ("GET", "/api/preferences"),  # M6 writes: off in the demo
+    ("POST", "/api/preferences/answer"),
+    ("DELETE", "/api/preferences"),
     ("GET", "/openapi.json"),
     ("GET", "/api/summary-and-more"),
     ("GET", "/api"),
@@ -227,6 +230,14 @@ def test_every_api_route_off_the_allowlist_is_404(app: FastAPI) -> None:
     for method, path in off:
         url = re.sub(r"{[^}]+}", "1", path)
         assert c.request(method.upper(), url).status_code == 404, (method, path)
+
+
+@pytest.mark.parametrize(
+    "path", ["/api/goals", "/api/guidance", "/api/plan/allocation", "/api/search"]
+)
+def test_m6_read_routes_answer_in_the_demo(app: FastAPI, path: str) -> None:
+    r = client(app, A).get(path, params={"q": "synthetic"})
+    assert r.status_code == 200, (path, r.text)
 
 
 def test_a_root_path_cannot_smuggle_a_disabled_route(app: FastAPI) -> None:
@@ -291,6 +302,7 @@ def test_the_demo_never_reaches_the_network(
         assert c.get(p, params={"month": month}).status_code < 500, p
     c.post("/api/chat", json={"message": "What did I spend on groceries?"})
     c.get("/api/review-queue")
+    c.get("/api/search", params={"q": "groceries"})  # FTS only, no embedder
     c.post("/api/demo/shuffle")
     assert tried == []
 

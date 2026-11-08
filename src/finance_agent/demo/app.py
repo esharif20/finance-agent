@@ -20,7 +20,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from finance_agent.api import chat, create_app
+from finance_agent.api import chat, create_app, search
 from finance_agent.assistant import ChatModel, context
 from finance_agent.assistant.chat_model import Message as ChatMessage
 from finance_agent.assistant.chat_model import Reply, ToolCall, ToolSpec
@@ -54,6 +54,10 @@ ALLOWED = (
     "/api/cash-flow",
     "/api/insights",
     "/api/briefing",
+    "/api/goals",  # M6: read-only GETs over the visitor's own ledger
+    "/api/guidance",
+    "/api/plan",
+    "/api/search",
     "/api/demo",
 )
 OFF = {"/api/chat/model", "/api/chat/warm"}  # they call Ollama
@@ -252,6 +256,7 @@ def build(environ: Mapping[str, str] = os.environ) -> FastAPI:
 
     app = create_app(cast(Engine, session.VisitorEngine()), web_dir=cfg.dir / "web")
     app.dependency_overrides[chat.chat_model] = _recorded_model
+    app.dependency_overrides[search.embedder] = lambda: None  # FTS only: no Ollama
 
     def visitor(request: Request) -> session.Visitor:
         return request.scope["fa_demo"].visitor

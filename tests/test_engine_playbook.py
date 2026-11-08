@@ -1,6 +1,7 @@
 """The playbook engine (#254): signals from rows, conditions, slot filling."""
 
 import json
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -248,3 +249,54 @@ def test_a_card_whose_file_name_differs_from_its_id_fails(tmp_path: Path):
     (tmp_path / "cards" / "other-name.json").write_text(json.dumps(_card("Hi.")))
     with pytest.raises(playbook.PlaybookError):
         playbook.load(tmp_path)
+
+
+# --- tone, priority and constraints from Memories (#264) --------------------
+
+
+@dataclass(frozen=True)
+class _Mem:
+    type: str
+    tags: tuple[str, ...]
+    priority: int | None = None
+    amount_minor: int | None = None
+
+
+def _M(
+    type_: str, tags: list[str], priority: int | None = None, amount: int | None = None
+) -> _Mem:
+    return _Mem(type_, tuple(tags), priority, amount)
+
+
+def test_tone_defaults_to_gentle_and_follows_the_preference():
+    assert playbook.choose_tone([]) == "gentle"
+    assert playbook.choose_tone([_M("preference", ["tone", "blunt"])]) == "blunt"
+    assert (
+        playbook.choose_tone([_M("preference", ["blunt"])]) == "gentle"
+    )  # no tone tag
+    assert playbook.choose_tone([_M("goal", ["tone", "blunt"])]) == "gentle"
+    both = [_M("preference", ["tone", "blunt"]), _M("preference", ["tone", "gentle"])]
+    assert playbook.choose_tone(both) == "gentle"
+
+
+def test_goal_priority_orders_cards_and_amount_breaks_ties():
+    cards = playbook.load().cards
+    mems = [
+        _M("goal", ["student-money"], 2),
+        _M("goal", ["emergency-fund"], 1),
+        _M("goal", ["credit-cards"], 2, 900_000),
+    ]
+    got = [c.id for c in playbook.prioritise(cards, mems)][:3]
+    assert got == ["emergency-fund", "credit-cards", "student-money"]
+    assert playbook.prioritise(cards, mems) == playbook.prioritise(cards, mems)
+
+
+def test_constraint_suppresses_a_card_by_its_words():
+    cards = playbook.load().cards
+    out = playbook.prioritise(cards, [_M("constraint", ["small-daily-spends"])])
+    assert "small-daily-spends" not in {c.id for c in out}
+    assert len(out) == len(cards) - 1
+    # a goal never suppresses
+    assert len(
+        playbook.prioritise(cards, [_M("goal", ["small-daily-spends"], 1)])
+    ) == len(cards)

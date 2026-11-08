@@ -74,9 +74,14 @@ export function Briefing() {
           Week of {day(data.week)}
           {data.next_payday && <> · next payday {day(data.next_payday)}</>}
         </p>
-        <a href="#know" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
-          How well I know you
-        </a>
+        <span className="flex gap-4">
+          <a href="#goals" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
+            Goals
+          </a>
+          <a href="#know" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
+            How well I know you
+          </a>
+        </span>
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card aria-labelledby="brief-insights">

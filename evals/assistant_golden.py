@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 3
+DATASET_VERSION = 8
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -97,6 +97,13 @@ CASES: tuple[Case, ...] = (
         ("£92.34",),
     ),
     Case(
+        "ask-search",
+        "Find anything I have from Tesco.",
+        "ask",
+        (Call("search", {"query": "tesco"}),),
+        "I found Transactions and a Merchant matching Tesco in your records.",
+    ),
+    Case(
         "ask-subscriptions",
         "What subscriptions do I have?",
         "ask",
@@ -116,6 +123,22 @@ CASES: tuple[Case, ...] = (
         "ask",
         (Call("list_insights"),),
         "There are no Insights for you yet.",
+    ),
+    # --- Ask: guidance cards (v4, #259). The synthetic Ledger is too short for
+    # any card's condition to hold, so none is listed and none may be cited.
+    Case(
+        "ask-guidance",
+        "Is there any money guidance for me right now?",
+        "ask",
+        (Call("list_guidance"),),
+        "There is no guidance for you right now.",
+    ),
+    Case(
+        "ask-why-subscription-card",
+        "Why am I seeing the subscription card?",
+        "ask",
+        (Call("explain_card", {"card_id": "subscription-creep"}),),
+        "That card doesn't apply to you, so there is nothing to explain.",
     ),
     # --- Ask: inside a Category (v3) ------------------------------------------
     Case(
@@ -167,6 +190,33 @@ CASES: tuple[Case, ...] = (
         ("£84.00",),
         after="ask-transport-last-month",
     ),
+    # --- Ask: compound questions (v7, #271) -----------------------------------
+    Case(
+        "ask-car-december",
+        "What did my car cost me in December 2025?",
+        "ask",
+        (
+            Call(
+                "spend_for_query",
+                {
+                    "categories": ["Transport > Fuel", "Transport > Parking"],
+                    "since": "2025-12",
+                    "until": "2025-12",
+                },
+            ),
+        ),
+        "Your car cost £84.00 in December 2025, at Shell and Tesco Fuel.",
+        ("£84.00",),
+    ),
+    Case(
+        "ask-car-followup-shell",
+        "Of that, how much was Shell?",
+        "ask",
+        (Call("spend_for_query", {"merchants": ["Shell"], "follow_up": True}),),
+        "£48.00 of it was Shell.",
+        ("£48.00",),
+        after="ask-car-december",
+    ),
     # --- Plan --------------------------------------------------------------
     Case(
         "plan-afford",
@@ -197,6 +247,20 @@ CASES: tuple[Case, ...] = (
         "The forecast money out is £0.00 for March 2026.",
         ("£0.00",),
     ),
+    Case(
+        "plan-split-pay",
+        "How should I split my pay this month?",
+        "plan",
+        (Call("allocation_plan"),),
+        "I can't plan your pay yet: there is no regular income to split.",
+    ),
+    Case(
+        "plan-split-pay-constraint",
+        "How should I split my pay this month, keeping eating out under my cap?",
+        "plan",
+        (Call("allocation_plan"),),
+        "I can't plan your pay yet: there is no regular income to split.",
+    ),
     # --- Memory ------------------------------------------------------------
     Case(
         "memory-preference",
@@ -225,6 +289,56 @@ CASES: tuple[Case, ...] = (
         "memory",
         (Call("list_memories"),),
         "I haven't saved any Memories about you yet.",
+    ),
+    Case(
+        "memory-values",
+        "What matters most to me is security, not luxuries.",
+        "memory",
+        (Call("propose_memory", {"type": "preference", "text": "security"}),),
+        "I'll remember that security comes first, once you confirm it.",
+    ),
+    Case(
+        "memory-tone",
+        "Be blunt with me, I don't need it softened.",
+        "memory",
+        (
+            Call(
+                "propose_memory",
+                {"type": "preference", "text": "blunt", "tags": ["tone"]},
+            ),
+        ),
+        "I'll keep my advice blunt, once you confirm it.",
+    ),
+    Case(
+        "memory-goal-fields",
+        "I want to put £200 a month into the house fund by June 2026.",
+        "memory",
+        (
+            Call(
+                "propose_memory",
+                {
+                    "type": "goal",
+                    "text": "house fund",
+                    "amount_minor": 20000,
+                    "due_on": "2026-06",
+                },
+            ),
+        ),
+        "I'll note the house fund goal, once you confirm it on the card.",
+    ),
+    Case(
+        "memory-vague-asks-again",
+        "I'd like to save up for a house at some point.",
+        "memory",
+        (),
+        "How much would you like to put aside, and by when?",
+    ),
+    Case(
+        "refuse-past-spending-memory",
+        "Remember that I spent £300.00 on takeaways last month.",
+        "memory",
+        answer="I don't remember figures or spending patterns, only preferences.",
+        refusal=True,
     ),
     # --- Correct -----------------------------------------------------------
     Case(

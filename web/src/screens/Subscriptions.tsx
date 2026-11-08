@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   addSubscription,
   cancelSubscription,
+  confirmSubscription,
   fetchMerchants,
   fetchSubscriptionCosts,
   fetchSubscriptions,
@@ -20,6 +21,7 @@ import {
   type Band,
   type Costs,
   DEFAULT_FILTERS,
+  LISTED,
   type Filters,
   type Flag,
   KIND_TITLE,
@@ -38,6 +40,7 @@ const select = "min-h-11 max-w-full cursor-pointer rounded-full bg-active px-4 t
 
 const STATUS: Record<string, string> = {
   active: "Active",
+  likely: "Likely (new)",
   overdue: "Overdue",
   lapsed: "Lapsed",
   cancelled: "Cancelled by you",
@@ -45,6 +48,7 @@ const STATUS: Record<string, string> = {
 const STATUS_OPTION: Record<Filters["status"], string> = {
   all: "All statuses",
   active: "Active",
+  likely: "Likely (new)",
   suggested: "Suggested",
   overdue: "Overdue",
   lapsed: "Lapsed",
@@ -124,13 +128,20 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
     onError: fail,
     onSettled: refresh,
   });
-  const busy = regroup.isPending || cancel.isPending || remove.isPending;
+  const confirm = useMutation({
+    mutationFn: () => confirmSubscription(row.merchant_id, place),
+    onSuccess: () => onNote({ text: `${row.name} confirmed. It's in the monthly total now.` }),
+    onError: fail,
+    onSettled: refresh,
+  });
+  const busy = regroup.isPending || cancel.isPending || remove.isPending || confirm.isPending;
   const cancelled = row.status === "cancelled";
+  const likely = row.status === "likely";
   const note = costText(row);
   const every = row.interval ? INTERVAL[row.interval] : null;
   const due =
-    row.next_due_on && (row.status === "active" || row.status === "overdue")
-      ? `${every ? `${every}, ` : ""}${row.status === "overdue" ? "was due" : "next due"} ${dayText(row.next_due_on)}`
+    row.next_due_on && (row.status === "active" || row.status === "overdue" || likely)
+      ? `${every ? `${every}, ` : ""}${row.status === "overdue" ? "was due" : likely ? "expected" : "next due"} ${dayText(row.next_due_on)}`
       : null;
   return (
     <li className="py-4 first:pt-0 last:pb-0">
@@ -169,7 +180,18 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
           disabled={busy}
           onChange={(p) => regroup.mutate(p)}
         />
-        {!cancelled && (
+        {likely && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => confirm.mutate()}
+            aria-label={`Yes, ${row.name} is a subscription`}
+            className={`${pill} bg-primary text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50`}
+          >
+            Yes, it is
+          </button>
+        )}
+        {!cancelled && !likely && (
           <button
             type="button"
             disabled={busy}
@@ -180,8 +202,10 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
             Cancelled?
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => remove.mutate()} aria-label={`Remove ${row.name}`} className={action}>
-          Remove
+        <button type="button" disabled={busy} onClick={() => remove.mutate()} aria-label={likely ? `${row.name} is not a subscription` : `Remove ${row.name}`}
+          className={action}
+        >
+          {likely ? "Not a subscription" : "Remove"}
         </button>
       </div>
     </li>
@@ -192,6 +216,7 @@ type Note = { text: string; bad?: boolean; undo?: () => Promise<unknown> };
 
 const BAND_HINT: Record<Band["name"], string> = {
   Active: "Charging as expected.",
+  "Likely (new)": "Spotted from a first charge. Not in the total until you confirm it or it charges again.",
   "Needs a look": "Overdue, flagged, or without a cost yet.",
   Ended: "Lapsed or cancelled. Not in the total.",
 };
@@ -234,7 +259,7 @@ function Summary({ costs }: { costs: Costs }) {
             <Money value={costs.total.annual} className="tabular-nums text-foreground" /> a year
           </span>
         </p>
-        {kinds.length > 0 && (
+        {(kinds.length > 0 || !!costs.likely_monthly?.minor) && (
           <dl className="flex flex-wrap gap-x-6 gap-y-1">
             {kinds.map((t) => (
               <div key={t.kind}>
@@ -245,6 +270,15 @@ function Summary({ costs }: { costs: Costs }) {
                 </dd>
               </div>
             ))}
+            {costs.likely_monthly?.minor ? (
+              <div>
+                <dt className="text-label text-muted-foreground">Likely (new), not in the total</dt>
+                <dd>
+                  <Money value={costs.likely_monthly} className="text-heading tabular-nums text-muted-foreground" />
+                  <span className="text-label text-muted-foreground"> a month</span>
+                </dd>
+              </div>
+            ) : null}
           </dl>
         )}
       </div>
@@ -359,7 +393,7 @@ export function Subscriptions() {
     [entries.data, costs.data, filters],
   );
   const listed = useMemo(
-    () => (entries.data ?? []).some((e) => e.status === "active" || e.status === "user_cancelled"),
+    () => (entries.data ?? []).some((e) => LISTED.has(e.status)),
     [entries.data],
   );
   const filtered = filters.status !== "all" || filters.kind !== "all";

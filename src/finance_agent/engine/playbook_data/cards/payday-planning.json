@@ -1,0 +1,29 @@
+{
+  "id": "payday-planning",
+  "version": 1,
+  "topic": "payday_planning",
+  "principles": [
+    "Decide what each payday is for before it arrives: essentials, savings, then the rest.",
+    "Put savings aside first; spend what is left.",
+    "Check the month ahead for bills that land before the next payday."
+  ],
+  "when": {
+    "all": [
+      {
+        "signal": "emergency_fund_months",
+        "op": "<",
+        "value": 0.5
+      }
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Plan the month on payday",
+      "body": "With savings of {savings_balance}, a late payday or an unexpected bill could leave you short. Spend a few minutes on payday setting aside what your essentials need, around {essential_monthly_spend} a month, before the rest."
+    },
+    "blunt": {
+      "title": "Plan every payday",
+      "body": "Your savings of {savings_balance} will not last a month of essentials, which run to {essential_monthly_spend}. On payday, cover the essentials first, put something aside and spend only what remains."
+    }
+  }
+}

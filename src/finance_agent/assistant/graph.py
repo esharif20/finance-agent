@@ -47,7 +47,8 @@ from finance_agent.assistant.tools import (
     run,
     specs,
 )
-from finance_agent.assistant.tools.propose import FigureInMemory, ProposalOut
+from finance_agent.assistant.tools.propose import FigureInMemory, NotSaid, ProposalOut
+from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
@@ -62,8 +63,9 @@ MAX_ROUNDS = 3  # model calls that may ask for tools in one turn
 MAX_CALLS = 4  # tool calls run per round
 CLOUD = ("ask", "plan")  # Memory and Correct stay local: no Proposal from the cloud
 CACHED = ("ask",)  # read-only answers; Proposals are never cached (ADR 0010)
-# Insight ratings and dismissals change these without a Ledger version bump
-UNCACHED = frozenset({"list_insights", "explain_insight"})
+# Insight ratings and dismissals change these without a Ledger version bump; a
+# spend_for_query answer depends on the thread's plan and must set it (#271)
+UNCACHED = frozenset({"list_insights", "explain_insight", "spend_for_query"})
 HISTORY = 12  # messages kept in the thread for the conversation slot
 MODEL_DOWN = "The local model isn't answering, so I can't help with that right now."
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
@@ -137,6 +139,8 @@ class State(TypedDict):
     cloud: NotRequired[bool]  # this thread's opt-in (#301); kept until changed
     cost_pence: NotRequired[int | None]  # this turn's cloud call, if any
     payload_id: NotRequired[str | None]
+    # the last spend_for_query plan (#271): selectors and ids, never figures
+    query_plan: NotRequired[dict[str, Any] | None]
 
 
 type Update = dict[str, Any]  # the keys of State a node sets
@@ -157,6 +161,7 @@ class Draft:
     cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
     refusal: str | None = None  # a fixed reply that replaces the model's
     names: list[Name] = field(default_factory=list[Name])  # for the redactor
+    plan: QueryPlan | None = None  # this turn's last spend_for_query plan
 
 
 @dataclass
@@ -192,7 +197,10 @@ class Assistant:
                 return {"reply": MODEL_DOWN, "path": "deterministic"}
             if not d.reply.strip() and d.proposal_id is None:
                 d.failed = True
-            return self._ground(route, s, d)
+            out = self._ground(route, s, d)
+            if d.plan is not None:
+                out["query_plan"] = d.plan.model_dump(mode="json")
+            return out
 
         return node
 
@@ -281,7 +289,7 @@ class Assistant:
 
     def _run(self, route: Route, call: Any, s: State, d: Draft) -> str:
         try:
-            out = run(route, call, self.conn, self._turn(s))
+            out = run(route, call, self.conn, self._turn(s), d.plan or _plan(s))
         except ToolNotAllowed:
             return '{"error": "that tool is not available here"}'
         except NoData:
@@ -291,10 +299,17 @@ class Assistant:
         except FigureInMemory:
             d.refusal = NO_FIGURE_MEMORIES
             return '{"error": "refused: a Memory never holds a money figure"}'
+        except NotSaid:
+            return (
+                '{"error": "refused: that amount or date is not in what the user'
+                ' said this turn; ask them for it, do not guess"}'
+            )
         except ValueError:  # UnknownTarget, InvalidSplit, ...: refused
             return '{"error": "refused: no such Transaction or change"}'
         if isinstance(out, ProposalOut):
             d.proposal_id = out.proposal_id
+        if isinstance(out, SpendForQueryOut):
+            d.plan = out.plan
         d.values += tool_values(call.name, out)
         if self.cloud is not None:
             d.names += names(out)
@@ -412,6 +427,16 @@ _NEW_TURN: Update = {
     "cost_pence": None,
     "payload_id": None,
 }
+
+
+def _plan(state: State) -> QueryPlan | None:
+    """The thread's last QueryPlan; None when there is none or it no longer
+    validates (an older checkpoint)."""
+    raw = state.get("query_plan")
+    try:
+        return QueryPlan.model_validate(raw) if raw else None
+    except ValidationError:
+        return None
 
 
 @dataclass(frozen=True)

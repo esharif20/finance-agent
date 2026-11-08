@@ -1,0 +1,56 @@
+{
+  "harness": "preferences",
+  "dataset": "synthetic_preferences",
+  "dataset_version": 1,
+  "dataset_sha256": "4def2a4f838bf9203e166d474ca09975ea2e052893df3b59e426e5cdbff21e35",
+  "users": 300,
+  "prior_sd": 1.0,
+  "spend_weight": 0.5,
+  "models": {
+    "bt_active": {
+      "model": "engine.preferences Bradley-Terry + active picker",
+      "model_version": "bt-map-spend-prior-v1",
+      "metrics": {
+        "tau@5": 0.379211,
+        "log_loss@5": 0.665516,
+        "ece@5": 0.052764,
+        "tau@10": 0.420844,
+        "log_loss@10": 0.658344,
+        "ece@10": 0.052829,
+        "tau@20": 0.489171,
+        "log_loss@20": 0.646994,
+        "ece@20": 0.052358
+      }
+    },
+    "bt_random": {
+      "model": "engine.preferences Bradley-Terry + random pairs",
+      "model_version": "baseline",
+      "metrics": {
+        "tau@5": 0.362915,
+        "log_loss@5": 0.66979,
+        "ece@5": 0.051065,
+        "tau@10": 0.400678,
+        "log_loss@10": 0.66278,
+        "ece@10": 0.050476,
+        "tau@20": 0.458316,
+        "log_loss@20": 0.646865,
+        "ece@20": 0.044004
+      }
+    },
+    "spend_share": {
+      "model": "rank by spending share",
+      "model_version": "baseline",
+      "metrics": {
+        "tau@5": 0.326941,
+        "log_loss@5": 0.76867,
+        "ece@5": 0.149192,
+        "tau@10": 0.326941,
+        "log_loss@10": 0.76867,
+        "ece@10": 0.149192,
+        "tau@20": 0.326941,
+        "log_loss@20": 0.76867,
+        "ece@20": 0.149192
+      }
+    }
+  }
+}

@@ -10,7 +10,9 @@ import { useRoute } from "@/lib/route";
 import { Assistant } from "@/screens/Assistant";
 import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Briefing } from "@/screens/Briefing";
+import { Goals } from "@/screens/Goals";
 import { KnowYou } from "@/screens/KnowYou";
+import { Plan } from "@/screens/Plan";
 import { Overview } from "@/screens/Overview";
 import { ReviewQueue, useReviewCount } from "@/screens/ReviewQueue";
 import { Settings } from "@/screens/Settings";
@@ -32,7 +34,7 @@ function Shell() {
   const review = useReviewCount();
   const TABS = tabs(review);
   const reduced = useReducedMotion();
-  const tab = route.name === "transactions" || route.name === "review" || route.name === "subscriptions" || route.name === "assistant" ? route.name : route.name === "settings" || route.name === "briefing" || route.name === "know" ? "" : "overview";
+  const tab = route.name === "transactions" || route.name === "review" || route.name === "subscriptions" || route.name === "assistant" ? route.name : route.name === "settings" || route.name === "briefing" || route.name === "know" || route.name === "goals" || route.name === "plan" ? "" : "overview";
   return (
     <>
       <Ambient />
@@ -55,7 +57,7 @@ function Shell() {
           ) : (
             <>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <h1 className="text-title">{route.name === "settings" ? "Settings" : route.name === "briefing" ? "Briefing" : route.name === "know" ? "How well I know you" : TABS.find((t) => t.id === tab)?.label}</h1>
+                <h1 className="text-title">{route.name === "settings" ? "Settings" : route.name === "briefing" ? "Briefing" : route.name === "know" ? "How well I know you" : route.name === "goals" ? "Goals" : route.name === "plan" ? "Plan" : TABS.find((t) => t.id === tab)?.label}</h1>
                 {route.name === "overview" && review > 0 && (
                   <a href="#review" className="text-sm font-semibold underline-offset-4 hover:underline">
                     {review} to review
@@ -69,6 +71,10 @@ function Shell() {
                 <Subscriptions />
               ) : route.name === "briefing" ? (
                 <Briefing />
+              ) : route.name === "goals" ? (
+                <Goals />
+              ) : route.name === "plan" ? (
+                <Plan />
               ) : route.name === "know" ? (
                 <KnowYou />
               ) : route.name === "assistant" ? (

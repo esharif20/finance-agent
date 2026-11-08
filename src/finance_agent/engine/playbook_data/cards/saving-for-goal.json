@@ -1,0 +1,29 @@
+{
+  "id": "saving-for-goal",
+  "version": 1,
+  "topic": "saving_for_goal",
+  "principles": [
+    "Name the goal and the date you want it by; vague goals stall.",
+    "Keep goal money apart from everyday money so it is not spent by accident.",
+    "Put money towards it on payday, before you decide how to spend the rest."
+  ],
+  "when": {
+    "all": [
+      {
+        "signal": "emergency_fund_months",
+        "op": ">=",
+        "value": 3
+      }
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Your cushion is in place",
+      "body": "Your savings cover about {emergency_fund_months} months of essentials, so you have room to save towards something you want. Giving that money a name and a date makes it easier to stick to. A cash ISA takes up to {fact:isa_allowance} a year tax-free."
+    },
+    "blunt": {
+      "title": "Point your savings at a goal",
+      "body": "Your savings cover {emergency_fund_months} months of essentials, which is more than a basic cushion. Choose a goal and a date, keep that money separate and put some towards it on payday. A cash ISA takes up to {fact:isa_allowance} a year tax-free."
+    }
+  }
+}

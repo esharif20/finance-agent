@@ -27,7 +27,9 @@ const query = (month?: string, accountId?: number) => {
 
 export const fetchSummary = (month?: string, accountId?: number) =>
   get<Summary>(`/api/summary${query(month, accountId)}`);
-export const fetchAccounts = () => get<Account[]>("/api/accounts");
+export type SearchHits = components["schemas"]["SearchOut"];
+export const fetchSearch = (q: string) => get<SearchHits>(`/api/search?${new URLSearchParams({ q })}`);
+export const fetchAccounts =() => get<Account[]>("/api/accounts");
 export const fetchSpending = (month: string, accountId?: number) =>
   get<Spending>(`/api/spending${query(month, accountId)}`);
 
@@ -104,7 +106,7 @@ export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
 export const fetchCategory = (name: string, month: string, accountId?: number) =>
   get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}${query(month, accountId)}`);
 
-export type ReviewItem = components["schemas"]["ItemOut"];
+export type ReviewItem = components["schemas"]["finance_agent__api__review_queue__ItemOut"];
 export type ReviewQueueOut = components["schemas"]["QueueOut"];
 export type ReviewAnswer = { category?: [string, string]; transaction_id?: number; choice?: string };
 
@@ -241,7 +243,9 @@ export const cancelSubscription = (merchant: number) =>
 // Insights (#150) and the what-if check (#151). A refusal throws the API's own reason.
 export type Insight = components["schemas"]["InsightOut"];
 export type Simulation = components["schemas"]["SimulationOut"];
-export const fetchInsights = () => get<Insight[]>("/api/insights?limit=5");
+export type GuidanceCardData = components["schemas"]["CardOut"];
+export const fetchGuidance = () => get<GuidanceCardData[]>("/api/guidance");
+export const fetchInsights =() => get<Insight[]>("/api/insights?limit=5");
 
 async function post(url: string, body?: object): Promise<void> {
   const res = await fetch(url, {
@@ -271,6 +275,10 @@ export type Briefing = components["schemas"]["BriefingOut"];
 export type RegretItem = components["schemas"]["RegretItemOut"];
 export type Memory = components["schemas"]["MemoryOut"];
 export const fetchForecast = () => get<ForecastBand[]>("/api/cash-flow/forecast");
+export type Goals = components["schemas"]["GoalsOut"];
+export const fetchGoals = () => get<Goals>("/api/goals");
+export type AllocationPlan = components["schemas"]["AllocationPlanOut"];
+export const fetchAllocationPlan = () => get<AllocationPlan>("/api/plan/allocation");
 export const fetchBriefing = () => get<Briefing>("/api/briefing");
 export const fetchMemories = () => get<{ items: Memory[] }>("/api/memories").then((r) => r.items);
 

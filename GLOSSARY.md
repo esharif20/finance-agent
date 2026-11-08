@@ -150,7 +150,7 @@ The conversational part of the system: it interprets questions, calls read-only 
 _Avoid_: Agent, bot, chatbot, AI
 
 **Memory**:
-A user-confirmed preference, goal or constraint the Assistant may rely on, with provenance and a review date. Never a financial fact.
+A user-confirmed preference, goal or constraint the Assistant may rely on, with provenance and a review date. Never a financial fact. A goal or constraint may also carry a target the user stated: an amount, a due date, a priority and, for a goal, the Account it is saved in. These come only from the user's own words, shown on the confirm card, and are never inferred from spending. A preference carries none of them.
 _Avoid_: Profile, belief, fact
 
 **Proposal**:

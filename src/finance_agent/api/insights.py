@@ -1,7 +1,8 @@
 """The Insight feed (#150): list the ranked Insights, rate one, dismiss one, for
 `current_user` only. Listing refreshes the stored Insights from the Ledger
 first (idempotent). Only a rating or a dismissal teaches relevance; listing
-never does. Nothing here logs."""
+never does. Listing logs each shown Insight in the exposure log (#261), and a
+rating or dismissal is its outcome there. Nothing here logs to stdout."""
 
 from collections.abc import Iterator
 from datetime import date
@@ -14,6 +15,7 @@ from sqlalchemy import Connection
 from finance_agent.engine import insights
 from finance_agent.identity import current_user
 from finance_agent.ledger import UnknownTarget
+from finance_agent.ledger.exposure import Exposures, Outcome
 from finance_agent.ledger.insights import Insights, Signal
 
 SQLITE_MAX = 2**63 - 1
@@ -64,10 +66,11 @@ def ranked(
     conn: Conn, limit: Annotated[int, Query(ge=1, le=MAX_SHOWN)] = 5
 ) -> list[InsightOut]:
     """The best `limit` Insights, by impact x confidence x relevance, less
-    those a constraint Memory rules out."""
+    those a constraint Memory rules out; the last may be a seeded exploration
+    (#261). Each is logged as shown, with its propensity."""
     user = current_user()
     insights.refresh(conn, user)
-    return [insight_out(r) for r in insights.ranked(conn, user)[:limit]]
+    return [insight_out(r) for r in insights.shown(conn, user, limit, date.today())]
 
 
 def insight_out(r: insights.Ranked) -> InsightOut:
@@ -88,11 +91,20 @@ def insight_out(r: insights.Ranked) -> InsightOut:
     )
 
 
+OUTCOME: dict[Signal, Outcome] = {
+    "up": "accepted",
+    "down": "rejected",
+    "dismissed": "dismissed",
+}
+
+
 def _give(conn: Connection, insight_id: int, signal: Signal) -> FeedbackOut:
+    user = current_user()
     try:
-        i = Insights(conn, current_user()).give(insight_id, signal)
+        i = Insights(conn, user).give(insight_id, signal)
     except UnknownTarget:
         raise HTTPException(404, "no such Insight") from None
+    Exposures(conn, user).record("insight", str(i.id), OUTCOME[signal])
     return FeedbackOut(id=i.id, signal=signal)
 
 
@@ -116,3 +128,9 @@ class DeletedOut(BaseModel):
 def forget_feedback(conn: Conn) -> DeletedOut:
     """Wipe every rating and dismissal: relevance starts again from Beta(1, 1)."""
     return DeletedOut(deleted=Insights(conn, current_user()).forget_feedback())
+
+
+@router.delete("/exposures")
+def forget_exposures(conn: Conn) -> DeletedOut:
+    """Wipe the exposure log: every shown Insight and card, and its outcome."""
+    return DeletedOut(deleted=Exposures(conn, current_user()).forget())
