@@ -12,6 +12,7 @@ const insight = (id: number, over: Partial<Insight> = {}): Insight => ({
   id,
   type: "price_increase",
   key: "Streamly",
+  display_name: "Streamly",
   category: "Subscriptions",
   raised_on: "2026-03-01",
   impact_minor: 2400,

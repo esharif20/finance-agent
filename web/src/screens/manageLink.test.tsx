@@ -14,6 +14,7 @@ const txn = (over: Partial<Txn> = {}): Txn => ({
   id: 7,
   posted_on: "2026-02-04",
   description: "SPOTIFY P1234",
+  display_name: "Spotify",
   amount: m(-1099),
   account_id: 1,
   kind: "Spending",

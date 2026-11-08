@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Connection
 
 from finance_agent.assistant.tools.sanitise import sanitise
+from finance_agent.categorise.display_names import display_name
 from finance_agent.ledger import (
     CURRENCY,
     Breakdown,
@@ -244,7 +245,7 @@ def list_subscriptions(led: Reads, inp: ListSubscriptionsIn) -> ListSubscription
     rows = [
         SubscriptionRow(
             evidence_id=f"sub:{e.merchant_id}",
-            merchant=Data(data=e.merchant),
+            merchant=Data(data=display_name(e.merchant)),
             kind=e.kind,
             group=e.group,
             status=e.status,
@@ -295,7 +296,7 @@ def txn_row(t: Transaction) -> TransactionRow:
         evidence_id=f"txn:{t.id}",
         posted_on=t.posted_on.isoformat(),
         description=Data(data=t.description),
-        merchant=Data(data=c.merchant) if c and c.merchant else None,
+        merchant=Data(data=display_name(c.merchant)) if c and c.merchant else None,
         amount=_money(t.amount, t.currency),  # its own currency
         kind=c.kind if c else None,
         category=list(c.category) if c and c.category else None,

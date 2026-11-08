@@ -511,6 +511,17 @@
             "title": "Description",
             "type": "string"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -560,6 +571,7 @@
           "amount",
           "merchant_id",
           "merchant",
+          "display_name",
           "subcategory"
         ],
         "title": "CategoryTxnOut",
@@ -1199,6 +1211,10 @@
             "title": "Confidence",
             "type": "integer"
           },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
           "evidence": {
             "items": {
               "type": "integer"
@@ -1255,6 +1271,7 @@
           "id",
           "type",
           "key",
+          "display_name",
           "category",
           "raised_on",
           "impact_minor",
@@ -1275,6 +1292,10 @@
             },
             "title": "Choices",
             "type": "array"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
           },
           "id": {
             "title": "Id",
@@ -1342,6 +1363,7 @@
           "version",
           "weight",
           "title",
+          "display_name",
           "merchant_id",
           "transaction_ids",
           "choices",
@@ -1601,6 +1623,10 @@
           "amount": {
             "$ref": "#/components/schemas/Money"
           },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
           "merchant_id": {
             "anyOf": [
               {
@@ -1620,6 +1646,7 @@
         "required": [
           "merchant_id",
           "name",
+          "display_name",
           "amount"
         ],
         "title": "MerchantSpendOut",
@@ -2155,6 +2182,17 @@
             "title": "Description",
             "type": "string"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "merchant": {
             "anyOf": [
               {
@@ -2192,6 +2230,7 @@
           "posted_on",
           "description",
           "merchant",
+          "display_name",
           "amount",
           "worth_it"
         ],
@@ -2222,6 +2261,10 @@
             "title": "Amount Minor",
             "type": "integer"
           },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
           "due_on": {
             "format": "date",
             "title": "Due On",
@@ -2239,6 +2282,7 @@
         "required": [
           "insight_id",
           "merchant",
+          "display_name",
           "due_on",
           "amount_minor"
         ],
@@ -2786,6 +2830,17 @@
             "title": "Description",
             "type": "string"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -2848,6 +2903,7 @@
           "kind",
           "merchant_id",
           "merchant",
+          "display_name",
           "category",
           "source"
         ],

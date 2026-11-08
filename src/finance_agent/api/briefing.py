@@ -13,6 +13,7 @@ from sqlalchemy import Connection
 
 from finance_agent.api.fx import Money
 from finance_agent.api.insights import DeletedOut, InsightOut, insight_out
+from finance_agent.categorise.display_names import display_name
 from finance_agent.engine import briefing
 from finance_agent.identity import current_user
 from finance_agent.ledger.regret import Regret
@@ -35,6 +36,7 @@ class BandOut(BaseModel):
 class RenewalOut(BaseModel):
     insight_id: int
     merchant: str
+    display_name: str
     due_on: date
     amount_minor: int  # pence, the last charge
 
@@ -44,6 +46,7 @@ class RegretItemOut(BaseModel):
     posted_on: date
     description: str
     merchant: str | None
+    display_name: str | None
     amount: Money
     worth_it: bool | None  # None until answered
 
@@ -99,6 +102,7 @@ def weekly(conn: Conn, on: On = None) -> BriefingOut:
             RenewalOut(
                 insight_id=r.insight_id,
                 merchant=r.merchant,
+                display_name=display_name(r.merchant),
                 due_on=r.due_on,
                 amount_minor=r.amount,
             )
@@ -110,6 +114,11 @@ def weekly(conn: Conn, on: On = None) -> BriefingOut:
                 posted_on=t.posted_on,
                 description=t.description,
                 merchant=t.categorisation.merchant if t.categorisation else None,
+                display_name=(
+                    display_name(t.categorisation.merchant)
+                    if t.categorisation and t.categorisation.merchant
+                    else None
+                ),
                 amount=Money(minor=int(t.amount.scaleb(2)), currency=t.currency),
                 worth_it=b.answered.get(t.id),
             )

@@ -189,7 +189,7 @@ def test_an_injected_merchant_name_reaches_the_model_only_as_the_merchant(
     (result,) = tool_results(m)
     rows = json.loads(result)["rows"]
     assert [r["merchant"] for r in rows if r["evidence_id"] == f"sub:{mid}"] == [
-        {"data": "TESCO"}
+        {"data": "Tesco"}
     ]
     assert not any(w in seen(m) for w in PAYLOAD_WORDS)
 

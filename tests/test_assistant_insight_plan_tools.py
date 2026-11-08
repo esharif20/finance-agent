@@ -157,11 +157,11 @@ def test_injection_text_in_an_insight_stays_inert(engine: Engine) -> None:
         )
     out = call(engine, "ask", "list_insights")
     (row,) = out.rows
-    assert row.key.data == "SPOTIFY"
+    assert row.key.data == "Spotify"
     e = call(engine, "ask", "explain_insight", insight_id=int(row.evidence_id[8:]))
     for dumped in (out.model_dump_json(), e.model_dump_json()):
         assert "ignore" not in dumped and "£0" not in dumped
-        assert '"key":{"data":"SPOTIFY"}' in dumped
+        assert '"key":{"data":"Spotify"}' in dumped
     # the explanation is code's template; the bank text never sits in it
     assert "SPOTIFY" not in row.template and "{key}" in row.template
 

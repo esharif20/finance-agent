@@ -44,7 +44,7 @@ def _row(i: StoredInsight) -> InsightRow:
     return InsightRow(
         evidence_id=f"insight:{i.id}",
         type=i.type,
-        key=Data(data=i.key),
+        key=Data(data=insights.shown_key(i)),
         category=i.category,
         raised_on=i.raised_on,
         impact=Money(minor=i.impact, currency="GBP"),

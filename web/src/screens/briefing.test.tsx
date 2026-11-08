@@ -29,9 +29,9 @@ const briefing = () => ({
   ],
   forecast: { month: "2026-03", point_minor: 123400, lower_minor: 100000, upper_minor: 150000, recurring_minor: 50000, left_out: 1 },
   next_payday: "2026-03-25",
-  renewals: [{ insight_id: 2, merchant: "Gym Club", due_on: "2026-03-06", amount_minor: 3500 }],
+  renewals: [{ insight_id: 2, merchant: "Gym Club", display_name: "Gym Club", due_on: "2026-03-06", amount_minor: 3500 }],
   regret: [
-    { transaction_id: 7, posted_on: "2026-03-01", description: "SYNTH CAFE", merchant: "Synth Cafe", amount: gbp(-1250), worth_it: answered },
+    { transaction_id: 7, posted_on: "2026-03-01", description: "SYNTH CAFE", merchant: "Synth Cafe", display_name: "Synth Cafe", amount: gbp(-1250), worth_it: answered },
   ],
   insufficient: [],
 });
