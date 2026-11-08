@@ -45,13 +45,13 @@ const HOME = [
 const OUT = [
   { name: "The local model", note: "Your own Mac (localhost), nowhere else", when: "Always" },
   { name: "Your bank feed", note: "One pinned, read-only aggregator host", when: "If you connect a bank" },
-  { name: "A cloud model", note: "Labels like “Amount 1”, never your figures", when: "Only if you opt in" },
+  { name: "A cloud model", note: "Labels like “Amount 1”, or the news topics you tick. Never your figures", when: "Only if you opt in" },
 ];
 
 const BACKGROUND = [
-  { name: "Sync", note: "A daily job fetches new transactions, then backs up." },
+  { name: "Sync", note: "Every 6 hours a background job fetches new transactions from your bank feed, then backs up." },
   { name: "Review", note: "New payments it isn’t sure about wait in one short queue." },
-  { name: "Briefing", note: "Once a week: what changed, in a few cards." },
+  { name: "Briefings", note: "A weekly one on your money, worked out on your Mac. A daily news one on topics you tick, if you turn it on." },
   { name: "Memory", note: "Things you tell it to remember, which you can read and delete." },
 ];
 
@@ -85,6 +85,7 @@ export function HowItWorks() {
   return (
     <section id="how" className="hw" aria-labelledby="hw-title">
       <div className="lp-wrap">
+        <div className="hw-top">
         <header className="hw-head">
           <h2 id="hw-title" className="lp-h2">
             {"How a question "}
@@ -106,6 +107,7 @@ export function HowItWorks() {
           </ol>
         </div>
 
+        </div>
         <div className="hw-map">
           <div className="hw-mac">
             <h3 className="lp-h3">Your Mac</h3>

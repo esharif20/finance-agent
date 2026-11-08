@@ -540,7 +540,7 @@
   background: var(--lp-paper);
   color: var(--lp-paper-ink);
 }
-.hw > .lp-wrap {
+.hw-top {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: 48px clamp(32px, 5vw, 96px);
@@ -1329,7 +1329,7 @@
     grid-row: span 2;
     margin: 0;
   }
-  .hw > .lp-wrap {
+  .hw-top {
     grid-template-columns: 1fr;
     gap: 32px;
   }
@@ -1442,4 +1442,85 @@
   .lp-learn-day-bar {
     transform: none;
   }
+}
+
+/* ===== hero drama: a slow halo of the app's hues behind the cards, which swells as they merge,
+   and a bigger total ===== */
+.lp-halo {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 46%;
+  width: min(120vw, 1400px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  --halo: conic-gradient(from 0deg, rgb(154 225 135 / 0.5), rgb(147 241 247 / 0.42), rgb(11 102 195 / 0.4), rgb(251 182 92 / 0.38), rgb(243 234 122 / 0.34), rgb(154 225 135 / 0.5));
+  -webkit-mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 72%);
+  mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 72%);
+  filter: blur(40px);
+  opacity: 0.5;
+  transform: translate(-50%, -50%) scale(0.7);
+  transition: transform 1.4s var(--lp-ease-expo), opacity 1.2s ease;
+  pointer-events: none;
+}
+.lp-halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--halo);
+  animation: lp-spin 40s linear infinite;
+}
+@keyframes lp-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.lp-halo[data-phase="1"] {
+  opacity: 0.65;
+  transform: translate(-50%, -50%) scale(0.95);
+}
+.lp-halo[data-phase="2"] {
+  opacity: 0.85;
+  transform: translate(-50%, -62%) scale(1.15);
+}
+.lp-combined .lp-combined-total {
+  font-size: clamp(2.75rem, 12vw, 6.25rem);
+  font-weight: 800;
+  text-shadow: 0 0 40px rgb(154 225 135 / 0.35);
+}
+@media (min-width: 720px) {
+  .lp-combined {
+    width: min(640px, calc(100% - 2 * var(--lp-gutter)));
+  }
+  .lp-combined .lp-combined-total {
+    font-size: clamp(4rem, 2rem + 4vw, 6.25rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-halo,
+  .lp-halo::after {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* the nav keeps its pill but drops the section links where they would not fit */
+@media (max-width: 959.98px) {
+  .lp-nav-links {
+    display: none;
+  }
+  .lp-nav .lp-pill {
+    margin-left: auto;
+  }
+}
+.hw-bg li {
+  align-content: start;
+}
+/* every chapter keeps what it pins inside itself */
+.hw,
+.lp-learn,
+.tm {
+  position: relative;
+  overflow: clip;
 }

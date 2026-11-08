@@ -132,6 +132,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
   const [three, setThree] = useState(false);
+  const playing = useRef(play);
+  playing.current = play;
   const [landed, setLanded] = useState(0);
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
   const p = useSpring(scrollYProgress, { stiffness: 90, damping: 24, restDelta: 0.0005 });
@@ -155,6 +157,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     let alive = true;
     let visible = true;
     const tilt = { x: 0, y: 0 };
+    // the deal: on load the cards rise from below the fold, fan out one after another, and a
+    // light sweeps across them; it starts when the tally hands over (playing.current)
+    let dealt = 0;
     const aim = { x: 0, y: 0 };
     const size = () => {
       const r = el.getBoundingClientRect();
@@ -173,7 +178,16 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       tilt.x += (aim.x - tilt.x) * 0.08;
       tilt.y += (aim.y - tilt.y) * 0.08;
       const { w, narrow } = dims;
-      const poses = ACCOUNTS.accounts.map((_, i) => pose(i, p.get(), w, narrow, tilt));
+      const now = performance.now();
+      if (playing.current && !dealt) dealt = now;
+      const since = dealt ? now - dealt : 0;
+      const poses = ACCOUNTS.accounts.map((_, i) => {
+        const q = pose(i, p.get(), w, narrow, tilt);
+        const k = ease(clamp01((since - 200 - i * 140) / 1300));
+        return { ...q, y: q.y + (1 - k) * w * 1.6, rz: q.rz * k + (1 - k) * (8 - i * 8), rx: q.rx + (1 - k) * 50, s: q.s * (0.82 + 0.18 * k) };
+      });
+      const sweep = clamp01((since - 700) / 1500);
+      const sweeping = sweep > 0 && sweep < 1;
       poses.forEach((q, i) => {
         const c = cards.current[i];
         if (c) c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
@@ -189,7 +203,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         // the scene's box is one card at the stage centre: offsets are from its top-left
         scene.update(
           poses.map((q) => ({ ...q, x: q.x, y: q.y })),
-          { x: dims.w / 2 + tilt.x * 260, y: dims.h / 2 - tilt.y * 200, on: finePointer() ? 1 : 0.4 },
+          sweeping
+            ? { x: mix(-dims.r.width * 0.4, dims.r.width * 0.9, ease(sweep)), y: dims.h * 0.2, on: 1.8 }
+            : { x: dims.w / 2 + tilt.x * 260, y: dims.h / 2 - tilt.y * 200, on: finePointer() ? 1 : 0.4 },
           poses.map(() => null),
         );
         scene.render();
@@ -235,12 +251,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       window.removeEventListener("resize", resize);
       scene?.dispose();
     };
-  }, [still, p]);
+  }, [still, p, playing]);
 
   return (
     <section ref={track} className="lp-hero" data-still={still ? "" : undefined} aria-labelledby="lp-title">
       <div className="lp-hero-pin">
         <div className="lp-mesh" aria-hidden="true" />
+        <div className="lp-halo" aria-hidden="true" data-phase={phase} />
         <div className="lp-grain" aria-hidden="true" />
         <div className="lp-hero-copy" data-phase={phase}>
           <h1 id="lp-title" className="lp-display">
