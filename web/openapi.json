@@ -1067,6 +1067,23 @@
             "title": "Skipped",
             "type": "boolean"
           },
+          "suggestions": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1100,6 +1117,7 @@
           "merchant_id",
           "transaction_ids",
           "choices",
+          "suggestions",
           "skipped"
         ],
         "title": "ItemOut",

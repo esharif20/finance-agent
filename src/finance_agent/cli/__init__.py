@@ -8,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from finance_agent import categorise
+from finance_agent.categorise import embedding
 from finance_agent.cli import launcher
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger, SyncStatus
@@ -120,8 +121,6 @@ def _main(argv: Sequence[str] | None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "forget-embeddings":
-        from finance_agent.categorise import embedding
-
         try:
             engine = open_db(create=False)
         except (OSError, ValueError) as e:
@@ -221,12 +220,14 @@ def _main(argv: Sequence[str] | None) -> int:
     except (OSError, ValueError) as e:
         print(f"fa: {e}", file=sys.stderr)
         return 1
+    imported = False
     try:
         with engine.begin() as conn:
             ledger = Ledger(conn, LOCAL_USER)
             if args.command == "import":
                 r = ledger.import_files(args.files)
                 categorise.run(conn, LOCAL_USER)
+                imported = True
                 print(
                     f"{r.added} added, {r.already_known} already known, "
                     f"{len(r.rejected)} rejected"
@@ -274,5 +275,7 @@ def _main(argv: Sequence[str] | None) -> int:
         print(f"fa: {e}", file=sys.stderr)
         return 1
     finally:
+        if imported:  # after the commit: no transaction is held while Ollama works
+            embedding.refresh_quietly(engine, LOCAL_USER)
         engine.dispose()
     return 0
