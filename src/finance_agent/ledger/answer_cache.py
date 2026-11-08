@@ -13,13 +13,20 @@ import hashlib
 import json
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import Connection
 
 from finance_agent.storage import Scoped, schema
 
 _T = schema.answer_cache
+
+
+class Hit(NamedTuple):
+    """A cached reply and the evidence IDs its figures came from (ADR 0007)."""
+
+    reply: str
+    evidence: tuple[str, ...]
 
 
 def cache_key(
@@ -45,18 +52,25 @@ class AnswerCache:
 
     def get(
         self, intent: str, calls: Sequence[dict[str, Any]], day: date
-    ) -> str | None:
+    ) -> Hit | None:
         version = self._db.ledger_version()
         row = self._db.execute(
-            self._db.select(_T, _T.c.reply).where(
+            self._db.select(_T, _T.c.reply, _T.c.evidence).where(
                 _T.c.key == self._key(intent, calls, day),
                 _T.c.ledger_version == version,
             )
         ).first()
-        return None if row is None else str(row.reply)
+        if row is None:
+            return None
+        return Hit(str(row.reply), tuple(json.loads(row.evidence)))
 
     def put(
-        self, intent: str, calls: Sequence[dict[str, Any]], day: date, reply: str
+        self,
+        intent: str,
+        calls: Sequence[dict[str, Any]],
+        day: date,
+        reply: str,
+        evidence: Sequence[str],
     ) -> None:
         version = self._db.ledger_version()
         key = self._key(intent, calls, day)
@@ -70,6 +84,7 @@ class AnswerCache:
             key=key,
             ledger_version=version,
             reply=reply,
+            evidence=json.dumps(list(evidence)),
             created_at=datetime.now(UTC),
         )
 

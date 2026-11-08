@@ -255,11 +255,13 @@ class Proposals:
         if current.status == "confirmed":
             raise AlreadyDecided("this Proposal was confirmed")
         now = datetime.now(UTC)
-        self._db.execute(
+        claimed = self._db.execute(
             self._db.update(p)
             .where(p.c.id == proposal_id, p.c.status == "pending")
             .values(status="rejected", decided_at=now, payload="{}")
         )
+        if claimed.rowcount != 1:  # decided between the read and the claim
+            return self.reject(proposal_id)
         self._db.insert(
             schema.feedback,
             proposal_id=proposal_id,

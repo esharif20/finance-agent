@@ -163,6 +163,17 @@ def test_a_foreign_currency_charge_needs_a_rate_and_is_never_guessed() -> None:
     assert s.rate_needed == 1
 
 
+def test_a_charge_needing_a_rate_is_not_mixed_into_the_cadence() -> None:
+    """Verifier #185: a USD amount beside GBP ones is not comparable."""
+    (c,) = subscription_costs(
+        [entry(1, interval=None)],
+        [Charge(1, date(2026, 4, 1), 999), Charge(1, date(2026, 5, 1), 999),
+         Charge(1, date(2026, 5, 15), 999, "USD")],
+        TODAY,
+    ).items  # fmt: skip
+    assert c.interval == "monthly"  # from the GBP charges, 30 days apart
+
+
 def test_no_charge_or_no_interval_gives_no_cost() -> None:
     s = subscription_costs(
         [entry(1, interval=None), entry(2), entry(3, interval=None)],
@@ -393,3 +404,24 @@ def test_extreme_amounts_total_exactly_and_round_once(
     assert type(shown) is int and abs(shown - exact) <= Fraction(1, 2)
     if exact - int(exact) == Fraction(1, 2):
         assert shown % 2 == 0  # half-even
+
+
+def test_detection_judges_a_foreign_charge_in_gbp_and_skips_one_needing_a_rate(
+    engine: Engine, tmp_path: Path
+) -> None:
+    # #187: recurring detection compares GBP, never mixed currencies. Three monthly EUR
+    # charges are no pattern while they need a rate; once a rate exists they are one.
+    eur = [
+        ("CARD_PAYMENT", "EUR", date(2026, m, 3), "ACME CLOUD", -900) for m in (3, 4, 5)
+    ]
+    p = tmp_path / "revolut.csv"
+    p.write_text(revolut_pockets(eur))
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        assert led.import_files([p]).rejected == []
+        categorise.run(conn, 1)
+        assert led.subscriptions() == []  # no rate: skipped, never guessed
+        led.set_rate("EUR", Decimal("0.8"), date(2026, 1, 1))
+        categorise.run(conn, 1)
+        (e,) = led.subscriptions()
+    assert (e.merchant, e.status, e.interval) == ("ACME CLOUD", "suggested", "monthly")

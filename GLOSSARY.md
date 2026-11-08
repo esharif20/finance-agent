@@ -83,7 +83,7 @@ The bucket in Category totals and the donut holding "Always ask" payments not ye
 _Avoid_: Pending, Uncategorised
 
 **Review Queue**:
-Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence, a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
+Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence (or one such payment with no Merchant), a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
 _Avoid_: Inbox, uncategorised
 
 **Subscription status**:
@@ -92,6 +92,14 @@ _Avoid_: Expired, inactive
 
 **Monthly cost**:
 A Subscription's or Bill's last charge in GBP as a monthly equivalent, in exact pence (weekly × 52 ÷ 12, annual ÷ 12), rounded half-even to the penny only when shown. Totals per group and per kind are the exact sums, rounded once. A foreign-currency charge is in GBP through the Ledger's one FX rate; without a rate it has no Monthly cost ("rate needed") and stays out of the totals, never guessed.
+
+**Waste flag**:
+A mark on a Subscription or Bill that may be wasting money (#106): **overlap**, two or more active Subscriptions in one group (not the catch-all Other subscriptions); **duplicate**, one service charged from two or more Accounts within a cadence gap; **charged after cancel**, a charge after the day the user cancelled it (a later regroup keeps that day); **trial converted**, a Free trial followed by a full charge; **price rise**, the latest price above the previous settled one (two or more charges, so a one-off is ignored) by more than ±5% (Bills too). Price rises and conversions older than a year are no longer flagged. Only "charged after cancel" fires on a cancelled item; no flag fires on a lapsed one.
+_Avoid_: Warning, alert
+
+**Free trial**:
+A small first charge (£1 or less) from a known service that runs trials, with an expected conversion date from that service's usual trial length. Partial by design: read from posted charges only, so a trial that starts free stays unseen until the Mail signals (#80).
+_Avoid_: Intro offer
 
 ## Intelligence
 

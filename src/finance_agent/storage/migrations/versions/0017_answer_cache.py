@@ -21,6 +21,7 @@ def upgrade() -> None:
         sa.Column("key", sa.String(64), primary_key=True),
         sa.Column("ledger_version", sa.Integer, nullable=False),
         sa.Column("reply", sa.Text, nullable=False),
+        sa.Column("evidence", sa.Text, nullable=False),  # JSON list of IDs
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
 

@@ -9,8 +9,9 @@ it. Later features (splits, "Always ask") add a type there and nothing else.
 An answer whose effect resolves the item (a Correction, a registry decision)
 removes it through that effect; an answer that is only a record ("keep both")
 hides the item while its inputs hash to the answered version. A skip sends the
-item to the end until its inputs change. Nothing here changes an amount, so
-queued items count in every figure.
+item to the end until its inputs change, and changes no figure, so it never
+bumps the ledger version (the answer cache's key, #140). Nothing here changes
+an amount, so queued items count in every figure.
 """
 
 import hashlib
@@ -40,16 +41,23 @@ class InvalidAnswer(ValueError):
     """An answer this item's type does not take."""
 
 
+class AlreadyReverted(Exception):
+    """Undo found the answer's effect already reverted elsewhere."""
+
+
 @dataclass(frozen=True)
 class Item:
     type: str
-    key: str  # stable within the type: a Merchant id, or a group's row ids
+    key: str  # stable within the type: a Merchant id, "t<id>", or row ids
     version: str  # hash of the inputs; a decision holds while it matches
-    weight: int  # Transactions an answer touches: the Merchant's frequency
+    weight: int  # Transactions a Merchant-wide answer changes
     title: str = ""  # the Merchant's name, if any
     merchant_id: int | None = None
     transaction_ids: tuple[int, ...] = ()
     choices: tuple[str, ...] = ()  # empty: the answer is a Category
+    # up to 3 Categories a local model proposes (#114); only ever buttons, and
+    # not part of `version`, so a model refresh never invalidates a decision
+    suggestions: tuple[tuple[str, str], ...] = ()
     skipped: bool = False
 
     @property
@@ -81,31 +89,40 @@ def _version(*parts: object) -> str:
 
 
 class CategoryItems:
-    """A Merchant whose Spending or Refunds are still Uncategorised."""
+    """A Merchant whose Spending or Refunds are still Uncategorised, or one
+    such Transaction with no Merchant (keyed "t<id>")."""
 
     name = "category"
 
     def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
         rows: dict[int, list[int]] = {}
         names: dict[int, str] = {}
+        # `weight`: every row a Merchant-wide answer changes, rule-categorised
+        # too; never a Transaction's own Correction or a Split, which beat it
+        counts: dict[int, int] = {}
         for t in txns:
             c = t.categorisation
-            # shortcut: rows with no Merchant are left out; queue them by
-            # Transaction if real exports have many
             if (
-                c is not None
-                and c.merchant_id is not None
-                and c.kind in CATEGORISED_KINDS
-                and c.category == (UNCATEGORISED, UNCATEGORISED)
-                # the user chose Uncategorised, or split it (its own items)
-                and c.source not in ("correction", "split", "split_refund")
+                c is None
+                or c.kind not in CATEGORISED_KINDS
+                # the user chose a Category for it, or split it (its own items)
+                or c.source in ("correction", "split", "split_refund")
             ):
+                continue
+            if c.merchant_id is not None:
+                counts[c.merchant_id] = counts.get(c.merchant_id, 0) + 1
+            if c.category == (UNCATEGORISED, UNCATEGORISED):
+                if c.merchant_id is None:
+                    yield Item(
+                        self.name, f"t{t.id}", _version(t.id), 1, "", None, (t.id,)
+                    )
+                    continue
                 rows.setdefault(c.merchant_id, []).append(t.id)
                 names[c.merchant_id] = c.merchant or ""
         for m, ids in rows.items():
             ids.sort()
             yield Item(
-                self.name, str(m), _version(ids), len(ids), names[m], m, tuple(ids)
+                self.name, str(m), _version(ids), counts[m], names[m], m, tuple(ids)
             )
 
     def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
@@ -114,15 +131,19 @@ class CategoryItems:
         cat = (answer.category[0], answer.category[1])
         if answer.transaction_id is None and item.merchant_id is not None:
             return led.correct_merchant(item.merchant_id, cat).id
-        if answer.transaction_id not in item.transaction_ids:
+        txn = answer.transaction_id
+        if txn is None and item.merchant_id is None:
+            (txn,) = item.transaction_ids  # a row with no Merchant: just this one
+        if txn not in item.transaction_ids:
             raise InvalidAnswer("not one of this item's Transactions")
-        return led.correct_transaction(answer.transaction_id, cat).id
+        return led.correct_transaction(txn, cat).id
 
     def undo(self, led: Ledger, effect_id: int) -> None:
         try:
             led.revert_correction(effect_id)
         except UnknownTarget:
-            pass  # already reverted elsewhere: the state undo wants
+            # already the state undo wants, but the user should know why
+            raise AlreadyReverted from None
 
 
 class SubscriptionItems:
@@ -321,6 +342,13 @@ ITEM_TYPES: dict[str, ItemType] = {
     )
 }
 
+# (item key -> Merchant id, Merchant id -> its corrected Categories) -> item key
+# -> suggested Categories. Injected by the API so the Ledger never imports
+# `categorise`.
+Suggester = Callable[
+    [dict[str, int], dict[int, set[tuple[str, str]]]], dict[str, list[tuple[str, str]]]
+]
+
 # money modules take no float: a later scorer (information gain) returns a Decimal
 Scorer = Callable[[Item], int | Decimal]
 
@@ -338,11 +366,16 @@ def order(items: Iterable[Item], scorer: Scorer = by_frequency) -> list[Item]:
 
 class ReviewQueue:
     def __init__(
-        self, conn: Connection, user_id: int, scorer: Scorer = by_frequency
+        self,
+        conn: Connection,
+        user_id: int,
+        scorer: Scorer = by_frequency,
+        suggester: Suggester | None = None,
     ) -> None:
         self._led = Ledger(conn, user_id)
         self._db = Scoped(conn, user_id)
         self._scorer = scorer
+        self._suggester = suggester
 
     def items(self) -> list[Item]:
         txns = self._led.transactions()
@@ -354,7 +387,39 @@ class ReviewQueue:
                 if action == "answer":
                     continue
                 out.append(replace(i, skipped=action == "skip"))
-        return order(out, self._scorer)
+        return order(self._suggest(out, txns), self._scorer)
+
+    def _suggest(self, items: list[Item], txns: Sequence[Transaction]) -> list[Item]:
+        """Fill `suggestions` on Category items; a Correction is the only thing
+        that ever assigns, so this only reads."""
+        if self._suggester is None:
+            return items
+        targets = {
+            i.key: i.merchant_id
+            for i in items
+            if i.type == CategoryItems.name and i.merchant_id is not None
+        }
+        if not targets:
+            return items
+        labelled: dict[int, set[tuple[str, str]]] = {}
+        for t in txns:
+            c = t.categorisation
+            if (
+                c is not None
+                and c.merchant_id is not None
+                and c.source == "correction"
+                and c.category is not None
+                and c.category != (UNCATEGORISED, UNCATEGORISED)
+            ):
+                cat = (c.category[0], c.category[1])
+                labelled.setdefault(c.merchant_id, set()).add(cat)
+        found = self._suggester(targets, labelled)
+        return [
+            replace(i, suggestions=tuple(found[i.key]))
+            if i.type == CategoryItems.name and i.key in found
+            else i
+            for i in items
+        ]
 
     def version(self) -> int:
         return self._led.ledger_version()
@@ -367,8 +432,9 @@ class ReviewQueue:
     def skip(self, item_id: str, version: str) -> None:
         self._record(self._current(item_id, version), "skip", None)
 
-    def undo(self) -> None:
-        """Undo the latest answer or skip that is not undone yet."""
+    def undo(self) -> str | None:
+        """Undo the latest answer or skip that is not undone yet. Returns a
+        message when the answer's Correction was already reverted elsewhere."""
         d = schema.review_decision
         r = self._db.execute(
             self._db.select(d, d.c.id, d.c.item_type, d.c.action, d.c.effect_id)
@@ -378,12 +444,18 @@ class ReviewQueue:
         ).first()
         if r is None:
             raise UnknownTarget("nothing to undo")
+        message = None
         if r.action == "answer" and r.effect_id is not None:
-            ITEM_TYPES[r.item_type].undo(self._led, r.effect_id)
+            try:
+                ITEM_TYPES[r.item_type].undo(self._led, r.effect_id)
+            except AlreadyReverted:
+                message = "That answer was already undone elsewhere; nothing changed."
         self._db.execute(
             self._db.update(d).where(d.c.id == r.id).values(undone_at=datetime.now(UTC))
         )
-        self._db.bump_ledger_version()
+        if r.action == "answer":
+            self._db.bump_ledger_version()
+        return message
 
     def _current(self, item_id: str, version: str) -> Item:
         item = next((i for i in self.items() if i.id == item_id), None)
@@ -426,4 +498,5 @@ class ReviewQueue:
             effect_id=effect,
             created_at=datetime.now(UTC),
         )
-        self._db.bump_ledger_version()
+        if action == "answer":
+            self._db.bump_ledger_version()

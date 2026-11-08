@@ -569,3 +569,71 @@ def test_memory_and_note_text_never_reach_the_logs(
         client.post(f"/api/proposals/{pid}/confirm")
     client.get("/api/memories")
     assert "zebra" not in caplog.text
+
+
+# --- verifier (adversarial): the savepoints neither leak nor commit early ---
+
+
+class _Boom(Exception):
+    pass
+
+
+@pytest.mark.parametrize("first", ["select", "write"])
+def test_dry_run_and_confirm_never_commit_or_undo_the_callers_transaction(
+    engine: Engine, txns: dict[str, int], first: str
+) -> None:
+    """Whether or not the request had written before (pysqlite opens its
+    transaction only at the first write, so a SAVEPOINT can be outermost), the
+    dry run undoes only itself, and a confirm is undone by the caller's
+    rollback: neither savepoint commits on its own."""
+    tesco = txns["TESCO STORES 3214"]
+    with engine.begin() as conn:
+        before = state(conn)
+    with pytest.raises(_Boom), engine.begin() as conn:
+        led, props = Ledger(conn, ME), Proposals(conn, ME)
+        if first == "write":
+            led.set_note(tesco, "synthetic earlier write")
+        else:
+            led.ledger_version()
+        split = CorrectionDraft(
+            transaction_id=tesco,
+            change=SplitChange(
+                parts=(
+                    SplitPartIn(amount_minor=-100, category=GROCERIES),
+                    SplitPartIn(category=EATING_OUT),
+                )
+            ),
+        )
+        p = props.propose_correction(split)
+        if first == "write":  # the dry run rolled back only its own savepoint
+            assert led.note(tesco) is not None
+        assert led.splits() == []
+        props.confirm(p.id)
+        assert len(led.splits()) == 1
+        raise _Boom
+    with engine.begin() as conn:
+        assert state(conn) == before
+        assert conn.execute(text("SELECT count(*) FROM proposal")).scalar() == 0
+
+
+def test_a_reject_that_loses_the_race_to_a_confirm_records_no_feedback(
+    engine: Engine, txns: dict[str, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Confirmed between reject's read and its update: the reject refuses, and
+    no "rejected" signal is written for a Proposal the user confirmed."""
+    with engine.begin() as conn:
+        props = Proposals(conn, ME)
+        p = props.propose_correction(category(txns["DELIVEROO 2BX9"]))
+        stale = props.get(p.id)
+        props.confirm(p.id)
+        real = Proposals.get
+        seen: list[int] = []
+
+        def first_read_is_stale(self: Proposals, pid: int) -> Any:
+            seen.append(pid)
+            return stale if len(seen) == 1 else real(self, pid)
+
+        monkeypatch.setattr(Proposals, "get", first_read_is_stale)
+        with pytest.raises(AlreadyDecided):
+            props.reject(p.id)
+        assert conn.execute(text("SELECT count(*) FROM feedback")).scalar() == 0

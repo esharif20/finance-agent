@@ -2,6 +2,7 @@ import { Info, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useId, useState } from "react";
 import type { components } from "@/api/schema";
+import { RateDialog } from "./RateDialog";
 
 // #156: provenance and "rate needed" for the GBP totals; the API chose every rate.
 
@@ -34,17 +35,34 @@ const transactions = (n: number) => `${n} transaction${n === 1 ? "" : "s"}`;
 
 /** Foreign payments left out of the month's figures for want of a rate. */
 export function RateNeeded({ fx }: { fx?: FxMonth }) {
+  const [entering, setEntering] = useState<string>();
   if (!fx?.rate_needed.length) return null;
   const which = fx.rate_needed.map((r) => `${r.count} ${r.currency} transaction${r.count === 1 ? "" : "s"}`);
   return (
-    <p role="status" className="flex items-start gap-2 rounded-[10px] bg-warning p-3 text-sm text-warning-foreground">
-      <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <span>
-        <strong className="font-semibold">Rate needed</strong> for {which.join(" and ")}, so{" "}
-        {fx.rate_needed.length === 1 && fx.rate_needed[0]!.count === 1 ? "it's" : "they're"} left out of these
-        figures. Rates are never fetched or guessed.
-      </span>
-    </p>
+    <div className="flex flex-col gap-2 rounded-[10px] bg-warning p-3 text-sm text-warning-foreground">
+      <p role="status" className="flex items-start gap-2">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          <strong className="font-semibold">Rate needed</strong> for {which.join(" and ")}, so{" "}
+          {fx.rate_needed.length === 1 && fx.rate_needed[0]!.count === 1 ? "it's" : "they're"} left out of these
+          figures. Rates are never fetched or guessed.
+        </span>
+      </p>
+      <div className="flex flex-wrap gap-2 pl-6">
+        {fx.rate_needed.map((r) => (
+          <button
+            key={r.currency}
+            type="button"
+            aria-label={`Enter a rate for ${r.currency}`}
+            onClick={() => setEntering(r.currency)}
+            className="inline-flex min-h-11 items-center rounded-full border border-current px-4 font-semibold transition-transform duration-150 ease-out active:scale-[0.97]"
+          >
+            Enter a {r.currency} rate
+          </button>
+        ))}
+      </div>
+      {entering && <RateDialog currency={entering} month={fx.month} onClose={() => setEntering(undefined)} />}
+    </div>
   );
 }
 
