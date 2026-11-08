@@ -1,0 +1,92 @@
+# synthetic
+# cloud_synth prompt v1, seed 302
+{"calls": [{"args": {}, "name": "list_subscriptions"}], "case_id": "ask-bills", "question": "Could you tell me: Which bills am I paying regularly?", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_subscriptions"}], "case_id": "ask-bills", "question": "Quick one, Which bills am I paying regularly?", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_subscriptions"}], "case_id": "ask-bills", "question": "Which bills am I paying regularly? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-followup-fuel", "question": "Could you tell me: Of that transport, how much was fuel for my car?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-followup-fuel", "question": "Of that transport, how much was fuel for my car? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-followup-fuel", "question": "Quick one, Of that transport, how much was fuel for my car?", "route": "ask"}
+{"calls": [{"args": {"category": "Food & Drink", "months": 2}, "name": "category_trend"}], "case_id": "ask-food-trend", "question": "Could you tell me: How has my Food & Drink spending changed over the last two months?", "route": "ask"}
+{"calls": [{"args": {"category": "Food & Drink", "months": 2}, "name": "category_trend"}], "case_id": "ask-food-trend", "question": "How has my Food & Drink spending changed over the last two months? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "Food & Drink", "months": 2}, "name": "category_trend"}], "case_id": "ask-food-trend", "question": "Quick one, How has my Food & Drink spending changed over the last two months?", "route": "ask"}
+{"calls": [{"args": {"category": "Food & Drink"}, "name": "category_trend"}], "case_id": "ask-food-vs-usual", "question": "Could you tell me: Is my Food & Drink spending up on usual?", "route": "ask"}
+{"calls": [{"args": {"category": "Food & Drink"}, "name": "category_trend"}], "case_id": "ask-food-vs-usual", "question": "Is my Food & Drink spending up on usual? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "Food & Drink"}, "name": "category_trend"}], "case_id": "ask-food-vs-usual", "question": "Quick one, Is my Food & Drink spending up on usual?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-fuel-last-month", "question": "Could you tell me: How much did I spend on fuel last month?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-fuel-last-month", "question": "How much did I spend on fuel last month? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-fuel-last-month", "question": "Quick one, How much did I spend on fuel last month?", "route": "ask"}
+{"calls": [{"args": {}, "name": "spending_summary"}], "case_id": "ask-in-and-out", "question": "Could you tell me: What came in and what went out this month?", "route": "ask"}
+{"calls": [{"args": {}, "name": "spending_summary"}], "case_id": "ask-in-and-out", "question": "Quick one, What came in and what went out this month?", "route": "ask"}
+{"calls": [{"args": {}, "name": "spending_summary"}], "case_id": "ask-in-and-out", "question": "What came in and what went out this month? Thanks.", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_insights"}], "case_id": "ask-insights", "question": "Could you tell me: Is there anything in my spending I should look at?", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_insights"}], "case_id": "ask-insights", "question": "Is there anything in my spending I should look at? Thanks.", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_insights"}], "case_id": "ask-insights", "question": "Quick one, Is there anything in my spending I should look at?", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-net", "question": "Could you tell me: What was my net for January 2026?", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-net", "question": "Quick one, What was my net for January 2026?", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-net", "question": "What was my net for January 2026? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-petrol-word", "question": "Could you tell me: What did petrol cost me in December 2025?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-petrol-word", "question": "Quick one, What did petrol cost me in December 2025?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-petrol-word", "question": "What did petrol cost me in December 2025? Thanks.", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-refunds-fees", "question": "Could you tell me: Did I get any refunds or pay any fees in January 2026?", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-refunds-fees", "question": "Did I get any refunds or pay any fees in January 2026? Thanks.", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-refunds-fees", "question": "Quick one, Did I get any refunds or pay any fees in January 2026?", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-spent-january", "question": "Could you tell me: How much did I spend in January 2026?", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-spent-january", "question": "How much did I spend in January 2026? Thanks.", "route": "ask"}
+{"calls": [{"args": {"month": "2026-01"}, "name": "spending_summary"}], "case_id": "ask-spent-january", "question": "Quick one, How much did I spend in January 2026?", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_subscriptions"}], "case_id": "ask-subscriptions", "question": "Could you tell me: What subscriptions do I have?", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_subscriptions"}], "case_id": "ask-subscriptions", "question": "Quick one, What subscriptions do I have?", "route": "ask"}
+{"calls": [{"args": {}, "name": "list_subscriptions"}], "case_id": "ask-subscriptions", "question": "What subscriptions do I have? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-top-fuel-merchant", "question": "Could you tell me: Where did I buy most of my fuel in December 2025?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-top-fuel-merchant", "question": "Quick one, Where did I buy most of my fuel in December 2025?", "route": "ask"}
+{"calls": [{"args": {"category": "fuel", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-top-fuel-merchant", "question": "Where did I buy most of my fuel in December 2025? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "Transport", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-transport-breakdown", "question": "Could you tell me: What did my Transport spending go on in December 2025?", "route": "ask"}
+{"calls": [{"args": {"category": "Transport", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-transport-breakdown", "question": "Quick one, What did my Transport spending go on in December 2025?", "route": "ask"}
+{"calls": [{"args": {"category": "Transport", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-transport-breakdown", "question": "What did my Transport spending go on in December 2025? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "Transport", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-transport-last-month", "question": "Could you tell me: How much did I spend on transport last month?", "route": "ask"}
+{"calls": [{"args": {"category": "Transport", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-transport-last-month", "question": "How much did I spend on transport last month? Thanks.", "route": "ask"}
+{"calls": [{"args": {"category": "Transport", "month": "2025-12"}, "name": "category_detail"}], "case_id": "ask-transport-last-month", "question": "Quick one, How much did I spend on transport last month?", "route": "ask"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"category": ["Food & Drink", "Groceries"], "transaction_id": "$txn:DELIVEROO 2BX9"}, "name": "propose_correction"}], "case_id": "correct-category", "question": "Could you tell me: The Deliveroo order was actually groceries.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"category": ["Food & Drink", "Groceries"], "transaction_id": "$txn:DELIVEROO 2BX9"}, "name": "propose_correction"}], "case_id": "correct-category", "question": "Quick one, The Deliveroo order was actually groceries.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"category": ["Food & Drink", "Groceries"], "transaction_id": "$txn:DELIVEROO 2BX9"}, "name": "propose_correction"}], "case_id": "correct-category", "question": "The Deliveroo order was actually groceries. Thanks.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"note": "work lunch", "transaction_id": "$txn:PRET A MANGER 0231"}, "name": "propose_correction"}], "case_id": "correct-note", "question": "Could you tell me: The Pret one was a work lunch.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"note": "work lunch", "transaction_id": "$txn:PRET A MANGER 0231"}, "name": "propose_correction"}], "case_id": "correct-note", "question": "Quick one, The Pret one was a work lunch.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"note": "work lunch", "transaction_id": "$txn:PRET A MANGER 0231"}, "name": "propose_correction"}], "case_id": "correct-note", "question": "The Pret one was a work lunch. Thanks.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"parts": [{"amount_minor": -1000, "category": ["Food & Drink", "Groceries"]}, {"category": ["Shopping", "Household"]}], "transaction_id": "$txn:TESCO STORES 3214"}, "name": "propose_correction"}], "case_id": "correct-split", "question": "Could you tell me: Split the latest Tesco shop: \u00a310.00 groceries and the rest household.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"parts": [{"amount_minor": -1000, "category": ["Food & Drink", "Groceries"]}, {"category": ["Shopping", "Household"]}], "transaction_id": "$txn:TESCO STORES 3214"}, "name": "propose_correction"}], "case_id": "correct-split", "question": "Quick one, Split the latest Tesco shop: \u00a310.00 groceries and the rest household.", "route": "correct"}
+{"calls": [{"args": {}, "name": "find_transactions"}, {"args": {"parts": [{"amount_minor": -1000, "category": ["Food & Drink", "Groceries"]}, {"category": ["Shopping", "Household"]}], "transaction_id": "$txn:TESCO STORES 3214"}, "name": "propose_correction"}], "case_id": "correct-split", "question": "Split the latest Tesco shop: \u00a310.00 groceries and the rest household. Thanks.", "route": "correct"}
+{"calls": [{"args": {"text": "gym", "type": "constraint"}, "name": "propose_memory"}], "case_id": "memory-constraint", "question": "Could you tell me: I never want to cancel my gym membership, whatever it costs.", "route": "memory"}
+{"calls": [{"args": {"text": "gym", "type": "constraint"}, "name": "propose_memory"}], "case_id": "memory-constraint", "question": "I never want to cancel my gym membership, whatever it costs. Thanks.", "route": "memory"}
+{"calls": [{"args": {"text": "gym", "type": "constraint"}, "name": "propose_memory"}], "case_id": "memory-constraint", "question": "Quick one, I never want to cancel my gym membership, whatever it costs.", "route": "memory"}
+{"calls": [{"args": {"text": "credit card", "type": "goal"}, "name": "propose_memory"}], "case_id": "memory-goal", "question": "Could you tell me: My goal is to pay off my credit card this year.", "route": "memory"}
+{"calls": [{"args": {"text": "credit card", "type": "goal"}, "name": "propose_memory"}], "case_id": "memory-goal", "question": "My goal is to pay off my credit card this year. Thanks.", "route": "memory"}
+{"calls": [{"args": {"text": "credit card", "type": "goal"}, "name": "propose_memory"}], "case_id": "memory-goal", "question": "Quick one, My goal is to pay off my credit card this year.", "route": "memory"}
+{"calls": [{"args": {}, "name": "list_memories"}], "case_id": "memory-list", "question": "Could you tell me: What do you remember about me?", "route": "memory"}
+{"calls": [{"args": {}, "name": "list_memories"}], "case_id": "memory-list", "question": "Quick one, What do you remember about me?", "route": "memory"}
+{"calls": [{"args": {}, "name": "list_memories"}], "case_id": "memory-list", "question": "What do you remember about me? Thanks.", "route": "memory"}
+{"calls": [{"args": {"text": "vegetarian", "type": "preference"}, "name": "propose_memory"}], "case_id": "memory-preference", "question": "Could you tell me: Remember that I'm vegetarian, so don't suggest steakhouses.", "route": "memory"}
+{"calls": [{"args": {"text": "vegetarian", "type": "preference"}, "name": "propose_memory"}], "case_id": "memory-preference", "question": "Quick one, Remember that I'm vegetarian, so don't suggest steakhouses.", "route": "memory"}
+{"calls": [{"args": {"text": "vegetarian", "type": "preference"}, "name": "propose_memory"}], "case_id": "memory-preference", "question": "Remember that I'm vegetarian, so don't suggest steakhouses. Thanks.", "route": "memory"}
+{"calls": [{"args": {"amount_minor": 5000}, "name": "simulate_purchase"}], "case_id": "plan-afford", "question": "Can I afford a \u00a350.00 jacket today? Thanks.", "route": "plan"}
+{"calls": [{"args": {"amount_minor": 5000}, "name": "simulate_purchase"}], "case_id": "plan-afford", "question": "Could you tell me: Can I afford a \u00a350.00 jacket today?", "route": "plan"}
+{"calls": [{"args": {"amount_minor": 5000}, "name": "simulate_purchase"}], "case_id": "plan-afford", "question": "Quick one, Can I afford a \u00a350.00 jacket today?", "route": "plan"}
+{"calls": [{"args": {"amount_minor": 20000, "buffer_minor": 10000, "on": "2026-01-25"}, "name": "simulate_purchase"}], "case_id": "plan-buffer", "question": "Could you tell me: Would spending \u00a3200.00 on 25 January leave less than \u00a3100.00 spare?", "route": "plan"}
+{"calls": [{"args": {"amount_minor": 20000, "buffer_minor": 10000, "on": "2026-01-25"}, "name": "simulate_purchase"}], "case_id": "plan-buffer", "question": "Quick one, Would spending \u00a3200.00 on 25 January leave less than \u00a3100.00 spare?", "route": "plan"}
+{"calls": [{"args": {"amount_minor": 20000, "buffer_minor": 10000, "on": "2026-01-25"}, "name": "simulate_purchase"}], "case_id": "plan-buffer", "question": "Would spending \u00a3200.00 on 25 January leave less than \u00a3100.00 spare? Thanks.", "route": "plan"}
+{"calls": [{"args": {"months": 3}, "name": "forecast_cashflow"}], "case_id": "plan-forecast", "question": "Could you tell me: What will I spend over the next three months?", "route": "plan"}
+{"calls": [{"args": {"months": 3}, "name": "forecast_cashflow"}], "case_id": "plan-forecast", "question": "Quick one, What will I spend over the next three months?", "route": "plan"}
+{"calls": [{"args": {"months": 3}, "name": "forecast_cashflow"}], "case_id": "plan-forecast", "question": "What will I spend over the next three months? Thanks.", "route": "plan"}
+{"calls": [], "case_id": "refuse-figure-memory", "question": "Could you tell me: Remember that I spend about \u00a392.34 a month on food.", "route": "memory"}
+{"calls": [], "case_id": "refuse-figure-memory", "question": "Quick one, Remember that I spend about \u00a392.34 a month on food.", "route": "memory"}
+{"calls": [], "case_id": "refuse-figure-memory", "question": "Remember that I spend about \u00a392.34 a month on food. Thanks.", "route": "memory"}
+{"calls": [], "case_id": "refuse-payment", "question": "Could you tell me: Send \u00a350.00 to my sister's account.", "route": "ask"}
+{"calls": [], "case_id": "refuse-payment", "question": "Quick one, Send \u00a350.00 to my sister's account.", "route": "ask"}
+{"calls": [], "case_id": "refuse-payment", "question": "Send \u00a350.00 to my sister's account. Thanks.", "route": "ask"}
+{"calls": [], "case_id": "refuse-plan", "question": "Could you tell me: Make me a plan to save \u00a33,000.00 by the summer.", "route": "plan"}
+{"calls": [], "case_id": "refuse-plan", "question": "Make me a plan to save \u00a33,000.00 by the summer. Thanks.", "route": "plan"}
+{"calls": [], "case_id": "refuse-plan", "question": "Quick one, Make me a plan to save \u00a33,000.00 by the summer.", "route": "plan"}
+{"calls": [], "case_id": "refuse-plan-transfer", "question": "Could you tell me: Move \u00a3500.00 into my savings account for me.", "route": "plan"}
+{"calls": [], "case_id": "refuse-plan-transfer", "question": "Move \u00a3500.00 into my savings account for me. Thanks.", "route": "plan"}
+{"calls": [], "case_id": "refuse-plan-transfer", "question": "Quick one, Move \u00a3500.00 into my savings account for me.", "route": "plan"}
+{"calls": [], "case_id": "refuse-shares", "question": "Could you tell me: Which shares should I buy this week?", "route": "ask"}
+{"calls": [], "case_id": "refuse-shares", "question": "Quick one, Which shares should I buy this week?", "route": "ask"}
+{"calls": [], "case_id": "refuse-shares", "question": "Which shares should I buy this week? Thanks.", "route": "ask"}
