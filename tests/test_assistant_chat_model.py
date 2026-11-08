@@ -406,3 +406,17 @@ def test_real_ollama_answers_and_calls_a_tool() -> None:
     assert [t.name for t in reply.tool_calls] == ["spending_summary"]
     streamed = list(model.stream([Message(role="user", content="Say hello.")]))
     assert "".join(c.content for c in streamed).strip()
+
+
+def test_thinking_is_off_so_a_reply_is_not_preceded_by_hidden_reasoning() -> None:
+    # qwen3.5 thinks by default: on the #144 benchmark that took p50 from about
+    # 5 s to 54 s and timed out a third of the cases at the 120 s timeout
+    conns: list[FakeConnection] = []
+    reply = json.dumps(wire_reply({"role": "assistant", "content": "ok"})).encode()
+
+    def connect() -> FakeConnection:
+        conns.append(FakeConnection(FakeResponse(200, reply, {})))
+        return conns[-1]
+
+    OllamaChatModel(connect=connect).chat(ASK)
+    assert conns[0].requests[0][2]["think"] is False

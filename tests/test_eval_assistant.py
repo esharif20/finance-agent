@@ -176,6 +176,12 @@ def test_a_local_run_unloads_the_model_even_when_it_fails(
             connect=lambda: Wire(sent),
         )
     assert sent == [
-        {"model": "qwen3.5:4b", "messages": [], "stream": False, "keep_alive": "0"}
+        {
+            "model": "qwen3.5:4b",
+            "messages": [],
+            "stream": False,
+            "keep_alive": "0",
+            "think": False,
+        }
     ]
     assert not (tmp_path / "local.json").exists()
