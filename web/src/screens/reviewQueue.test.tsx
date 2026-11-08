@@ -166,4 +166,28 @@ describe("ReviewQueue", () => {
     setup(queue([]));
     expect(await screen.findByRole("heading", { name: "Nothing to review" })).toBeInTheDocument();
   });
+
+  it("a life change shows the API's before and after levels; yes confirms and undo restores", async () => {
+    const L = item({
+      id: "life_change:rent:2025-03",
+      type: "life_change",
+      title: "Did something change in March 2025?",
+      version: "v9",
+      weight: 4,
+      merchant_id: null,
+      choices: ["yes", "no"],
+      before_minor: 85000,
+      after_minor: 120000,
+    });
+    const { calls } = setup(queue([L]), queue([]));
+    expect(await screen.findByRole("heading", { name: "Did something change in March 2025?" })).toBeInTheDocument();
+    expect(screen.getByText("£850.00")).toBeInTheDocument();
+    expect(screen.getByText("£1,200.00")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Yes/ }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ url: "/api/review-queue/life_change%3Arent%3A2025-03/answer", body: { version: "v9", choice: "yes" } });
+    await screen.findByText("Nothing to review");
+    await userEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(calls[1]).toMatchObject({ url: "/api/review-queue/undo", method: "POST" }));
+  });
 });

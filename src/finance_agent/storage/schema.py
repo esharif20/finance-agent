@@ -832,3 +832,20 @@ monthly_story = Table(
     Column("wording", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
+
+# Confirmed life changes (#270): from `month` (YYYY-MM) a series (income,
+# rent, bills or groceries) is at a new level, so baselines and forecasts read
+# only its data from then. Written only by a Review Queue confirmation; undo
+# deletes the row. The medians are the detector's, in pence, for display.
+life_change = Table(
+    "life_change",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("series", String(16), nullable=False),
+    Column("month", String(7), nullable=False),
+    Column("before_minor", BigInteger, nullable=False),
+    Column("after_minor", BigInteger, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("user_id", "series", "month"),
+)

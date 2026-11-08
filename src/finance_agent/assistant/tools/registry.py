@@ -17,6 +17,7 @@ from finance_agent.assistant.tools import (
     propose,
     query,
     read,
+    story,
 )
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
@@ -154,6 +155,26 @@ TOOLS = {
             engine=True,
         ),
         Tool(
+            "get_story",
+            "One month's money story: the Categories that moved furthest from"
+            " the user's usual, the Merchants behind each change and that"
+            " month's Insights, in minor units, with any saved wording as quoted"
+            " text. Give month, or about (a Merchant or Category) to find the"
+            " first month whose story names it, e.g. when did X start." + _DATA,
+            story.GetStoryIn,
+            story.get_story,
+            engine=True,
+        ),
+        Tool(
+            "compare_months",
+            "Two months' spending after refunds, in total and by Category, with"
+            " each difference (second - first) already computed, in minor"
+            " units: never add or subtract figures. second defaults to the"
+            " latest month ('now').",
+            story.CompareMonthsIn,
+            story.compare_months,
+        ),
+        Tool(
             "forecast_cashflow",
             "Money out and recurring money in for the coming months, with an 80%"
             " band, in minor units. left_out counts Categories with too little"
@@ -224,6 +245,8 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
         "list_guidance",
         "explain_card",
         "search",
+        "get_story",
+        "compare_months",
     ),
     "plan": ("forecast_cashflow", "simulate_purchase", "allocation_plan"),
     "correct": ("find_transactions", "propose_correction"),

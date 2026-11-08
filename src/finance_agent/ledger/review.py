@@ -32,6 +32,7 @@ from finance_agent.ledger import (
     Transaction,
     UnknownTarget,
 )
+from finance_agent.ledger.life_changes import Detected, LifeChanges, month_key
 from finance_agent.storage import Scoped, schema
 
 
@@ -65,6 +66,8 @@ class Item:
     # of `version`. Set by Category items only.
     spend: Decimal = Decimal(0)
     currency: str = "GBP"
+    # a life change's monthly level before and after, in minor units (#277)
+    levels: tuple[int, int] | None = None
 
     @property
     def id(self) -> str:
@@ -381,6 +384,63 @@ class AlwaysAskItems:
         CategoryItems().undo(led, effect_id)
 
 
+# Transactions -> the life changes the Engine detects in them (#270). Injected
+# by the API so the Ledger never imports `engine`.
+Detector = Callable[[Sequence[Transaction]], Iterable[Detected]]
+
+
+class LifeChangeItems:
+    """ "Did something change in <month>?" (#270, decision 5 of #251): a level
+    shift the Engine detected and the user has not decided. "yes" stores the
+    change, so that series' baselines and forecasts start at its month; undo
+    deletes it again. "no" is only recorded, as feedback, and hides the item
+    while the detection is unchanged. Only a detection makes an item, so a
+    confirmation for a month with none is refused (no such item)."""
+
+    name = "life_change"
+
+    def __init__(self, detector: Detector | None = None) -> None:
+        self._detector = detector
+
+    def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
+        if self._detector is None:
+            return
+        held = set(LifeChanges.of(led).confirmed())
+        for d in self._detector(txns):
+            if (d.series, month_key(d.month)) in held:
+                continue  # confirmed already
+            yield Item(
+                self.name,
+                f"{d.series}:{month_key(d.month)}",
+                _version(d.series, d.month, d.before, d.after),
+                len(d.evidence),
+                f"Did something change in {d.month:%B %Y}?",
+                transaction_ids=d.evidence,
+                choices=("yes", "no"),
+                spend=Decimal(abs(d.after - d.before)).scaleb(-2),
+                levels=(int(d.before), int(d.after)),
+            )
+
+    def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
+        if answer.category is not None or answer.transaction_id is not None:
+            raise InvalidAnswer("a life change item takes yes or no")
+        if answer.choice == "no":
+            return None
+        if answer.choice != "yes" or self._detector is None:
+            raise InvalidAnswer("a life change item takes yes or no")
+        found = {
+            f"{d.series}:{month_key(d.month)}": d
+            for d in self._detector(led.transactions())
+        }
+        if item.key not in found:  # the Engine no longer sees it
+            raise StaleItem("the item changed since it was shown")
+        return LifeChanges.of(led).confirm(found[item.key])
+
+    def undo(self, led: Ledger, effect_id: int) -> None:
+        if not LifeChanges.of(led).remove(effect_id):
+            raise AlreadyReverted
+
+
 ITEM_TYPES: dict[str, ItemType] = {
     t.name: t
     for t in (
@@ -390,6 +450,7 @@ ITEM_TYPES: dict[str, ItemType] = {
         SplitRecheckItems(),
         SplitRefundItems(),
         AlwaysAskItems(),
+        LifeChangeItems(),  # lists nothing until the API injects a detector
     )
 }
 
@@ -422,8 +483,13 @@ class ReviewQueue:
         user_id: int,
         scorer: Scorer = by_frequency,
         suggester: Suggester | None = None,
+        detector: Detector | None = None,
     ) -> None:
         self._led = Ledger(conn, user_id)
+        self._types: dict[str, ItemType] = {
+            **ITEM_TYPES,
+            LifeChangeItems.name: LifeChangeItems(detector),
+        }
         self._db = Scoped(conn, user_id)
         self._scorer = scorer
         self._suggester = suggester
@@ -432,7 +498,7 @@ class ReviewQueue:
         txns = self._led.transactions()
         held = self._decisions()
         out: list[Item] = []
-        for t in ITEM_TYPES.values():
+        for t in self._types.values():
             for i in t.items(self._led, txns):
                 action = held.get((i.type, i.key, i.version))
                 if action == "answer":
@@ -477,7 +543,7 @@ class ReviewQueue:
 
     def answer(self, item_id: str, version: str, answer: Answer) -> None:
         item = self._current(item_id, version)
-        effect = ITEM_TYPES[item.type].answer(self._led, item, answer)
+        effect = self._types[item.type].answer(self._led, item, answer)
         self._record(item, "answer", effect)
 
     def answer_many(self, answers: Sequence[tuple[str, str, Answer]]) -> list[str]:
@@ -495,7 +561,7 @@ class ReviewQueue:
         for id_, _, a in answers:
             item = held[id_]
             self._record(
-                item, "answer", ITEM_TYPES[item.type].answer(self._led, item, a)
+                item, "answer", self._types[item.type].answer(self._led, item, a)
             )
         return []
 
@@ -522,7 +588,7 @@ class ReviewQueue:
         message = None
         if r.action == "answer" and r.effect_id is not None:
             try:
-                ITEM_TYPES[r.item_type].undo(self._led, r.effect_id)
+                self._types[r.item_type].undo(self._led, r.effect_id)
             except AlreadyReverted:
                 message = "That answer was already undone elsewhere; nothing changed."
         self._db.execute(

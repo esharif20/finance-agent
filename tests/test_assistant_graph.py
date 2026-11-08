@@ -143,6 +143,8 @@ def test_a_grounded_answer_comes_from_the_local_model(
         "list_guidance",  # #259
         "explain_card",
         "search",
+        "get_story",  # #276
+        "compare_months",
         "subscription_advice",  # #308
     }
 

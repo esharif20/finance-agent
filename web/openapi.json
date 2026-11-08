@@ -1556,6 +1556,52 @@
         "title": "GapOut",
         "type": "object"
       },
+      "GetStoryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "anomalies": {
+            "items": {
+              "$ref": "#/components/schemas/StoryAnomaly"
+            },
+            "title": "Anomalies",
+            "type": "array"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/StoryChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "wording": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Data"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "evidence_id",
+          "month",
+          "changes",
+          "anomalies",
+          "wording"
+        ],
+        "title": "GetStoryOut",
+        "type": "object"
+      },
       "GoalOut": {
         "properties": {
           "amount_minor": {
@@ -3287,6 +3333,129 @@
         "title": "Status",
         "type": "string"
       },
+      "StoryAnomaly": {
+        "additionalProperties": false,
+        "properties": {
+          "impact": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "key": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "raised_on": {
+            "format": "date",
+            "title": "Raised On",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "key",
+          "raised_on",
+          "impact"
+        ],
+        "title": "StoryAnomaly",
+        "type": "object"
+      },
+      "StoryChange": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "change": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/StoryDriver"
+            },
+            "title": "Drivers",
+            "type": "array"
+          },
+          "expected": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "seasonal": {
+            "title": "Seasonal",
+            "type": "boolean"
+          },
+          "spent": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          }
+        },
+        "required": [
+          "category",
+          "spent",
+          "expected",
+          "change",
+          "seasonal",
+          "drivers"
+        ],
+        "title": "StoryChange",
+        "type": "object"
+      },
+      "StoryDriver": {
+        "additionalProperties": false,
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "expected": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "merchant": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "spent": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          }
+        },
+        "required": [
+          "merchant",
+          "spent",
+          "expected",
+          "change"
+        ],
+        "title": "StoryDriver",
+        "type": "object"
+      },
+      "StoryOut": {
+        "properties": {
+          "recap": {
+            "$ref": "#/components/schemas/GetStoryOut"
+          },
+          "saved": {
+            "title": "Saved",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "worded_by": {
+            "enum": [
+              "model",
+              "template"
+            ],
+            "title": "Worded By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recap",
+          "text",
+          "worded_by",
+          "saved"
+        ],
+        "title": "StoryOut",
+        "type": "object"
+      },
       "StrengthOut": {
         "properties": {
           "key": {
@@ -4067,6 +4236,28 @@
       },
       "finance_agent__api__review_queue__ItemOut": {
         "properties": {
+          "after_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Minor"
+          },
+          "before_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Minor"
+          },
           "choices": {
             "items": {
               "type": "string"
@@ -6651,6 +6842,90 @@
           }
         },
         "summary": "Preview"
+      }
+    },
+    "/api/story/{month}": {
+      "get": {
+        "operationId": "get_story_api_story__month__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Story",
+        "tags": [
+          "story"
+        ]
+      },
+      "post": {
+        "operationId": "word_story_api_story__month__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Word Story",
+        "tags": [
+          "story"
+        ]
       }
     },
     "/api/subscriptions": {
