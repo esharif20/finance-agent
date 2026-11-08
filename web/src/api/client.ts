@@ -298,3 +298,14 @@ export const resetInsightFeedback = () => wipe("/api/insights/feedback");
 export const resetRegretAnswers = () => wipe("/api/briefing/regret");
 export const resetAssistantFeedback = () => wipe("/api/feedback");
 export const forgetMemory = (id: number) => wipe(`/api/memories/${id}`);
+
+export type Pair = components["schemas"]["PairOut"];
+export const fetchNextPair = () => get<Pair | null>("/api/preferences/next-pair?question=cut");
+export const answerPair = async (pairId: number, choice: string): Promise<void> => {
+  const res = await fetch("/api/preferences/answer", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ pair_id: pairId, choice }),
+  });
+  if (!res.ok) throw new Error("Couldn't save that. Try again.");
+};
