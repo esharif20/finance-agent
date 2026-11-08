@@ -149,6 +149,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
   const floors = useRef<(HTMLSpanElement | null)[]>([]);
+  const backs = useRef<(HTMLSpanElement | null)[]>([]);
   const glow = useRef<HTMLSpanElement>(null);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
@@ -234,6 +235,12 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         if (f) {
           f.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.rest + dims.h * 0.78}px, 0) scale(${(1.25 - 0.25 * q.deal) * q.s}, ${0.22 * q.s})`;
           f.style.opacity = String(q.deal * onFloor);
+        }
+        // edge light: a soft backlight that spills round each card's rim from behind
+        const bk = backs.current[i];
+        if (bk) {
+          bk.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, 0) rotate(${q.rz}deg) scale(${q.s})`;
+          bk.style.opacity = String(q.deal);
         }
         const c = cards.current[i];
         if (c) c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
@@ -368,6 +375,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
             </ul>
             {ACCOUNTS.accounts.map((a, i) => (
               <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" />
+            ))}
+            {ACCOUNTS.accounts.map((a, i) => (
+              <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
             ))}
             <canvas ref={canvas} className="lp-stage-canvas" />
             {ACCOUNTS.accounts.map((a, i) => (
