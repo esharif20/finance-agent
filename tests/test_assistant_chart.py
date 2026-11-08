@@ -71,3 +71,25 @@ def test_a_figure_reply_carries_its_chart(engine: Engine, tmp_path: Path) -> Non
     assert sum(bars.values()) == a.chart["total_minor"] == 8400
     assert a.chart["title"] == "Fuel in December 2025"
     assert a.chart["evidence_id"] in a.evidence
+
+
+def test_the_by_merchant_chip_on_a_whole_month_draws_its_chart(
+    engine: Engine, tmp_path: Path
+) -> None:
+    seed(engine, ME, tmp_path, DECEMBER + ROWS)
+    with engine.begin() as conn:
+        first = ask(
+            Assistant(FakeChatModel([]), conn, TODAY, prefetch=True),
+            "How much did I spend in December 2025?",
+        )
+        assert "By merchant" in first.chips
+        a = ask(
+            Assistant(FakeChatModel([]), conn, TODAY, prefetch=True),
+            "By merchant",
+            first.thread_id,
+        )
+    assert a.path == "planner", a.reply
+    assert a.chart is not None, a.reply
+    assert "£112.80" in first.reply and "£112.80" in a.reply
+    assert sum(b["minor"] for b in a.chart["bars"]) == a.chart["total_minor"] == 11280
+    assert "By merchant" not in a.chips
