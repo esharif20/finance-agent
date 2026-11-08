@@ -417,7 +417,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Guidance */
+        /**
+         * Guidance
+         * @description `tone` left out is the Memory-chosen one (gentle by default); the cards come
+         *     best first, less those a constraint Memory rules out (#264).
+         */
         get: operations["guidance_api_guidance_get"];
         put?: never;
         post?: never;
@@ -3263,7 +3267,7 @@ export interface operations {
     guidance_api_guidance_get: {
         parameters: {
             query?: {
-                tone?: "gentle" | "blunt";
+                tone?: ("gentle" | "blunt") | null;
             };
             header?: never;
             path?: never;
