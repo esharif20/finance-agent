@@ -167,6 +167,7 @@ class OllamaChatModel:
             "messages": [_wire(m) for m in messages],
             "stream": stream,
             "keep_alive": self._keep_alive,
+            "think": False,  # qwen3.5 thinks by default: 10x slower, timeouts (#144)
         }
         if self._num_ctx is not None:
             body["options"] = {"num_ctx": self._num_ctx}
