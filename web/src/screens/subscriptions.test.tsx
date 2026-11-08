@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
@@ -68,6 +68,8 @@ const costs = (over: Partial<Costs> = {}): Costs => ({
   rate_needed: 0,
   flag_count: 1,
   trial_detection: "partial",
+  // annual is deliberately not 12 x monthly: the screen must show the API's figure, not compute one
+  total: { monthly: p(10748), annual: p(128977) },
   ...over,
 });
 
@@ -103,18 +105,68 @@ afterEach(() => {
 });
 
 describe("Subscriptions screen", () => {
-  it("shows Subscriptions and Bills with group totals that match the API", async () => {
+  it("shows the API's monthly and annual totals, and bands entries as Active, Needs a look and Ended", async () => {
     serve();
     wrap(<Subscriptions />);
-    const subs = await screen.findByRole("region", { name: "Subscriptions" });
-    expect(within(subs).getAllByText("£22.98", { selector: ".sr-only" })).toHaveLength(2); // section and group total
-    const streaming = within(subs).getByRole("region", { name: "Streaming, Subscriptions" });
-    expect(within(streaming).getByText("Netflix")).toBeInTheDocument();
-    expect(within(streaming).getByText("Spotify")).toBeInTheDocument();
-    expect(within(streaming).getByText("£22.98", { selector: ".sr-only" })).toBeInTheDocument();
-    const bills = screen.getByRole("region", { name: "Bills" });
-    expect(within(bills).getAllByText("£84.50", { selector: ".sr-only" })).toHaveLength(3);
-    expect(within(bills).getByText("Octopus Energy")).toBeInTheDocument();
+    const total = await screen.findByRole("region", { name: "Active subscriptions and bills" });
+    expect(within(total).getByText("£107.48", { selector: ".sr-only" })).toBeInTheDocument();
+    expect(within(total).getByText("£1,289.77", { selector: ".sr-only" })).toBeInTheDocument();
+    expect(within(total).getByText("£22.98", { selector: ".sr-only" })).toBeInTheDocument(); // Subscriptions
+    expect(within(total).getByText("£84.50", { selector: ".sr-only" })).toBeInTheDocument(); // Bills
+    const names = (band: string) =>
+      within(screen.getByRole("region", { name: band }))
+        .getAllByRole("listitem")
+        .map((li) => li.querySelector(".font-semibold")?.textContent)
+        .filter(Boolean);
+    expect(names("Active")).toEqual(["Octopus Energy", "Spotify"]); // dearest first
+    expect(names("Needs a look")).toEqual(["Netflix"]); // flagged
+    expect(names("Ended")).toEqual(["Gym Club"]);
+  });
+
+  it("filters by status and kind, sorts by name, and resets an empty filter", async () => {
+    serve();
+    wrap(<Subscriptions />);
+    await screen.findByText("Netflix");
+    await userEvent.selectOptions(screen.getByLabelText("Kind"), "bill");
+    expect(screen.queryByText("Netflix")).toBeNull();
+    expect(screen.getByText("Octopus Energy")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Kind"), "all");
+    await userEvent.selectOptions(screen.getByLabelText("Sort by"), "name");
+    const active = within(screen.getByRole("region", { name: "Active" })).getAllByRole("listitem");
+    expect(active[0]).toHaveTextContent("Octopus Energy");
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "lapsed");
+    expect(screen.getByRole("heading", { name: "Nothing matches these filters" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Is Mystery Box a subscription?" })).toBeNull());
+    await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+    expect(screen.getByText("Netflix")).toBeInTheDocument();
+  });
+
+  it("shows readable names, while Manage links still match the stored name", async () => {
+    const c = costs();
+    c.items[0] = { ...c.items[0]!, merchant: "NETFLIX.COM", display_name: "Netflix (synthetic)" };
+    const before = entries[0]!;
+    entries[0] = { ...before, merchant: "NETFLIX.COM", display_name: "Netflix (synthetic)" };
+    try {
+      serve(c);
+      wrap(<Subscriptions />);
+      expect(await screen.findByText("Netflix (synthetic)")).toBeInTheDocument();
+      expect(screen.queryByText("NETFLIX.COM")).toBeNull();
+      const link = await screen.findByRole("link", { name: /Manage Netflix \(synthetic\)/ });
+      expect(link).toHaveAttribute("href", "https://www.netflix.com/youraccount");
+    } finally {
+      entries[0] = before;
+    }
+  });
+
+  it("says when a cost is estimated, and why an entry has none", async () => {
+    const c = costs();
+    c.items[0] = { ...c.items[0]!, interval_source: "catalogue", next_due_on: "2026-04-01" };
+    c.items[1] = { ...c.items[1]!, monthly: null, counted: false, cost_note: "interval_needed", charge_count: 1 };
+    serve(c);
+    wrap(<Subscriptions />);
+    expect(await screen.findByText("Estimated: usual for this service")).toBeInTheDocument();
+    expect(screen.getByText("Monthly, next due 1 Apr 2026")).toBeInTheDocument();
+    expect(screen.getByText("Only one charge so far")).toBeInTheDocument();
   });
 
   it("says why each entry is on the list, and marks a cancelled one as not counted", async () => {
