@@ -156,7 +156,11 @@ def test_rerunning_recognition_writes_nothing_new(
 DECISIONS = st.sampled_from(["not", "add", "confirm"])
 
 
-@settings(max_examples=25, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(
+    max_examples=25,
+    deadline=None,  # a Ledger per example: slow under xdist load
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
 @given(
     DECISIONS,
     st.sampled_from(["NETFLIX.COM", "SYNTH VIDEO CO", "SYNTH GYM MEMBERSHIP"]),
