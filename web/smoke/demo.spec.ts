@@ -114,10 +114,15 @@ try {
     if (!done.ok()) fail(`${scheme}: Reset answered ${done.status()}`);
     await reloaded;
     await page.getByLabel("Net").waitFor();
-    await page.waitForTimeout(1200);
-    const after = { net: await net(), donut: await donut() };
+    // the figures count up after a load: read until they settle (a slow runner takes longer)
+    let after = { net: "", donut: "" };
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(400);
+      after = { net: await net(), donut: await donut() };
+      if (after.donut === first.donut && after.net === first.net) break;
+    }
     if (after.donut !== first.donut || after.net !== first.net)
-      fail(`${scheme}: Reset did not bring back the first figures (${first.donut} then ${after.donut})`);
+      fail(`${scheme}: Reset did not bring back the first figures (net ${first.net} then ${after.net})`);
 
     if (art.length) fail(`${scheme}: ${art.length} requests to /api/card-art`);
     await ctx.close();
