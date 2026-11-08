@@ -335,50 +335,12 @@
         "title": "BalancesOut",
         "type": "object"
       },
-      "BandOut": {
-        "properties": {
-          "left_out": {
-            "title": "Left Out",
-            "type": "integer"
-          },
-          "lower_minor": {
-            "title": "Lower Minor",
-            "type": "integer"
-          },
-          "month": {
-            "title": "Month",
-            "type": "string"
-          },
-          "point_minor": {
-            "title": "Point Minor",
-            "type": "integer"
-          },
-          "recurring_minor": {
-            "title": "Recurring Minor",
-            "type": "integer"
-          },
-          "upper_minor": {
-            "title": "Upper Minor",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "month",
-          "point_minor",
-          "lower_minor",
-          "upper_minor",
-          "recurring_minor",
-          "left_out"
-        ],
-        "title": "BandOut",
-        "type": "object"
-      },
       "BriefingOut": {
         "properties": {
           "forecast": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BandOut"
+                "$ref": "#/components/schemas/finance_agent__api__briefing__BandOut"
               },
               {
                 "type": "null"
@@ -3037,6 +2999,72 @@
         ],
         "title": "VersionOut",
         "type": "object"
+      },
+      "finance_agent__api__briefing__BandOut": {
+        "properties": {
+          "left_out": {
+            "title": "Left Out",
+            "type": "integer"
+          },
+          "lower_minor": {
+            "title": "Lower Minor",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "point_minor": {
+            "title": "Point Minor",
+            "type": "integer"
+          },
+          "recurring_minor": {
+            "title": "Recurring Minor",
+            "type": "integer"
+          },
+          "upper_minor": {
+            "title": "Upper Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "point_minor",
+          "lower_minor",
+          "upper_minor",
+          "recurring_minor",
+          "left_out"
+        ],
+        "title": "BandOut",
+        "type": "object"
+      },
+      "finance_agent__api__cash_flow__BandOut": {
+        "properties": {
+          "lower": {
+            "title": "Lower",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "point": {
+            "title": "Point",
+            "type": "integer"
+          },
+          "upper": {
+            "title": "Upper",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "point",
+          "lower",
+          "upper"
+        ],
+        "title": "BandOut",
+        "type": "object"
       }
     }
   },
@@ -3247,6 +3275,29 @@
           }
         },
         "summary": "Card Image"
+      }
+    },
+    "/api/cash-flow/forecast": {
+      "get": {
+        "description": "Monthly money-out band for the chart, as `engine.forecast` computes it.\nEmpty while no Category has enough history to forecast.",
+        "operationId": "forecast_api_cash_flow_forecast_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/finance_agent__api__cash_flow__BandOut"
+                  },
+                  "title": "Response Forecast Api Cash Flow Forecast Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forecast"
       }
     },
     "/api/cash-flow/simulate-purchase": {

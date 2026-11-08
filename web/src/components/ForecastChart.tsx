@@ -29,9 +29,9 @@ export function ForecastChart({ months, currency = "GBP" }: { months: Band[]; cu
   return (
     <Card aria-labelledby="forecast-title">
       <h2 id="forecast-title" className="text-heading">
-        Balance forecast
+        Spending forecast
       </h2>
-      <p className="text-label text-muted-foreground">The line is the projection; the shaded band is its likely range.</p>
+      <p className="text-label text-muted-foreground">Money out each month. The line is the projection; the shaded band is its likely range.</p>
       <div className="mt-4 flex gap-3">
         <div className="relative w-16 shrink-0 text-label text-muted-foreground tabular-nums" style={{ height: H }}>
           {ticks.map((t) => (
@@ -73,7 +73,7 @@ export function ForecastChart({ months, currency = "GBP" }: { months: Band[]; cu
         </div>
       </div>
       <table className="sr-only">
-        <caption>Balance forecast by month</caption>
+        <caption>Spending forecast by month</caption>
         <thead>
           <tr>
             <th scope="col">Month</th>
