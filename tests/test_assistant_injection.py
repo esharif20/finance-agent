@@ -219,12 +219,6 @@ def test_note_text_never_reaches_the_model(
     assert "zebra" not in " ".join(tool_results(m)).lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="ledger-level (#142 report): find_transactions' query also matches"
-    " purpose notes (Ledger.search_transactions), so the model can test guesses"
-    " about a note's text one query at a time, though the text never reaches it.",
-)
 def test_a_query_cannot_probe_note_text(engine: Engine, txns: dict[str, int]) -> None:
     with engine.begin() as conn:
         Ledger(conn, ME).set_note(txns["DELIVEROO 2BX9"], "zebra")

@@ -135,6 +135,17 @@ def test_search_finds_a_transaction_by_its_live_note_only() -> None:
         assert [t.id for t in led.search_transactions(query="boots").items] == [b]
 
 
+def test_search_can_leave_notes_out_for_the_assistant() -> None:
+    """#241: the Assistant's search must not let it probe a note by guessing."""
+    with ledger_with([(KNOWN, -1200)]) as (_, led):
+        (a,) = (t.id for t in led.transactions())
+        led.set_note(a, "Football Boots")
+        assert led.search_transactions(query="boots").total == 1
+        assert led.search_transactions(query="boots", notes=False).total == 0
+        desc = led.transactions()[0].description[:3]
+        assert led.search_transactions(query=desc, notes=False).total == 1
+
+
 @settings(max_examples=25, deadline=None)
 @given(
     st.lists(
