@@ -251,10 +251,26 @@ def _score(engine: Any, model_for: Any, timed: bool) -> dict[str, Any]:
                         ):
                             map_hits["with_map"] += 1
                         row = by.setdefault(t.kind, {"calls": [], "pass": [], "ms": []})
+                        # a real model may answer a miss or near-miss itself, grounded
+                        # (it can say it has no credit score); never with a month table.
+                        # A near-miss whose answer fails grounding may fall back to
+                        # the figures it fetched: only that query's rows, no month dump
+                        honest = timed and (
+                            (
+                                t.kind in ("miss", "near_miss")
+                                and a.path == "local_model"
+                                and "|" not in a.reply
+                            )
+                            or (
+                                t.kind == "near_miss"
+                                and a.path == "deterministic"
+                                and "spending_summary" not in a.reply
+                            )
+                        )
                         ok = (
-                            a.path == t.path
+                            (a.path == t.path or honest)
                             and len(calls) <= CALLS.get(t.kind, 9)
-                            and all(s in a.reply for s in t.says)
+                            and (honest or all(s in a.reply for s in t.says))
                             and all(
                                 tools == ()
                                 for _, tools in calls
@@ -262,6 +278,7 @@ def _score(engine: Any, model_for: Any, timed: bool) -> dict[str, Any]:
                             )
                             and (
                                 t.kind != "miss"
+                                or honest
                                 or (len(a.chips) == 3 and "|" not in a.reply)
                             )
                         )

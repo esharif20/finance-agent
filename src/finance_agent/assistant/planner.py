@@ -32,7 +32,8 @@ from finance_agent.assistant.grounding import (
     ToolValue,
     format_figure,
 )
-from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut, spend
+from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
+from finance_agent.assistant.tools.query import spend as spend
 from finance_agent.assistant.tools.read import (
     Data,
     FindTransactionsOut,
