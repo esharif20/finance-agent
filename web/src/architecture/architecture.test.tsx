@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Architecture from "./Architecture";
@@ -31,7 +31,7 @@ describe("architecture page", () => {
   it("opens a node's detail under it on a phone, and closes it again", async () => {
     setup(false, false);
     render(<Architecture />);
-    const node = screen.getByRole("button", { name: /Grounding check/ });
+    const node = screen.getByRole("button", { name: /Grounding check.+/ });
     expect(node).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(node);
     expect(node).toHaveAttribute("aria-expanded", "true");
@@ -43,28 +43,48 @@ describe("architecture page", () => {
   it("works from the keyboard", async () => {
     setup(false, false);
     render(<Architecture />);
-    const node = screen.getByRole("button", { name: /Contextual Thompson bandit/ });
+    const node = screen.getByRole("button", { name: /Contextual Thompson bandit.+/ });
     node.focus();
     await userEvent.keyboard("{Enter}");
     expect(screen.getByRole("region", { name: "Contextual Thompson bandit" })).toHaveTextContent("In shadow");
   });
 
-  it("plays the sample question step by step", async () => {
-    setup(false, true);
+  it("plays the sample question step by step on a phone", async () => {
+    setup(false, false);
     vi.useFakeTimers();
     render(<Architecture />);
     act(() => screen.getByRole("button", { name: "Play" }).click());
     expect(screen.getByText(SAMPLE.steps[0])).toBeInTheDocument();
     for (let i = 1; i < FLOW.length; i++) act(() => vi.advanceTimersByTime(1500));
     expect(screen.getByText(SAMPLE.steps[4])).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Reply and evidence" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play again" })).toBeInTheDocument();
+  });
+
+  it("holds the path in a scroll scene on a wide screen with a fine pointer", () => {
+    setup(false, true);
+    const { container } = render(<Architecture />);
+    expect(container.querySelector(".ar-track .ar-scene")).not.toBeNull();
+    expect(screen.getByText(/Scroll, or press Play/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Planner" })).toBeInTheDocument();
+  });
+
+  it("lights a part's neighbours on the map and opens its decision", async () => {
+    setup(false, true);
+    render(<Architecture />);
+    const map = screen.getByRole("group", { name: /Map of the Assistant/ });
+    const dot = within(map).getByRole("button", { name: "Grounding check" });
+    await userEvent.hover(dot);
+    expect(within(map).getByRole("button", { name: "Reply and evidence" })).not.toHaveAttribute("data-dim");
+    expect(within(map).getByRole("button", { name: "Keychain" })).toHaveAttribute("data-dim");
+    await userEvent.click(dot);
+    expect(dot).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("region", { name: "Grounding check" }).length).toBeGreaterThan(0);
   });
 
   it("rests on the whole path, lit, with reduced motion", () => {
     setup(true, true);
     render(<Architecture />);
-    for (const n of FLOW) expect(screen.getByRole("button", { name: new RegExp(n.title) })).toHaveAttribute("data-lit");
+    for (const n of FLOW) expect(screen.getByRole("button", { name: new RegExp(`${n.title}.+`) })).toHaveAttribute("data-lit");
     expect(screen.getByRole("button", { name: "Play again" })).toBeInTheDocument();
   });
 });
