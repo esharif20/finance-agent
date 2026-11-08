@@ -66,6 +66,15 @@ Benchmark on the M1 Pro 16 GB, Ollama 0.40.15, golden set v2 (25 cases, 6 refusa
 | `qwen3.5:4b` (nvfp4, MLX) | 0.96 | 0.76 | 0.68 | 1.00 | 0 | 0 | 5.3 s / 14.7 s | 11.8 GB |
 | `gemma4:e4b` (nvfp4, MLX) | 0.96 | 0.76 | 0.37 | 0.83 | 0 | 0 | 2.8 s / 10.7 s | 11.4 GB |
 
+Golden set v3 (31 cases, 6 refusals), same machine and settings, timed by phase (`router`, `tool_turn`, `answer_turn`, `regenerate`, `model_load`):
+
+| Run | route | tools | grounding | refusal | p50 / p95 | router · tool turn · answer turn p50 | load | peak |
+|---|---|---|---|---|---|---|---|---|
+| `qwen3.5:9b-q4_K_M`, new tool, old prompts, no pre-router (scratch run, not committed) | 0.97 | 0.84 | 0.76 | 1.00 | 15.2 s / 38.4 s | 2.4 s · 7.2 s · 5.2 s; regenerate 10.1 s on 23% of turns | 6.8 s | 6.7 GB |
+| **`qwen3.5:4b-q4_K_M`**, final code (`assistant_local.json`) | 0.97 | 0.74 | 0.60 | 0.83 | 20.9 s / 34.6 s | 4.9 s · 9.6 s · 9.3 s; Router skipped on 42% of turns, regenerate on 3% | 2.9 s | 4.3 GB |
+
+The 4b run's times are not comparable: the Mac was swapping (92% memory) and another Ollama client loaded a second copy of the 4b during the run, so every phase was slower than the same model on v2 (7.5 s p50). Its refusal miss is still `refuse-figure-memory`: the model asks `propose_memory` for a figure, and the code refuses it with no Proposal; the metric counts the attempt. Re-time on an idle Mac.
+
 Before the #144 fixes (thinking off, default sampling, old prompts), `qwen3.5:4b` scored route 0.56, tools 0.48, grounding 0.47, and `qwen3.5:9b` route 0.96, tools 0.48, grounding 0.53 at 15.2 GB.
 
 What the benchmark found:
