@@ -6,6 +6,7 @@ Migrations in `migrations/versions/` must produce exactly this schema
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     Date,
@@ -569,4 +570,24 @@ insight_feedback = Table(
         name="ck_insight_feedback_signal",
     ),
     Index("ix_insight_feedback_user", "user_id"),
+)
+
+# The user's regret-review answers (#152): "worth it?" on a discretionary
+# Transaction, one per Transaction, with the week it was asked in. Feedback,
+# never a Memory; the user can wipe it. It goes with its Transaction.
+regret_answer = Table(
+    "regret_answer",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "transaction_id",
+        Integer,
+        ForeignKey("transaction.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("week", Date, nullable=False),  # the Monday of the week asked
+    Column("worth_it", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("user_id", "transaction_id"),
 )
