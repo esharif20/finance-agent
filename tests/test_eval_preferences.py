@@ -44,7 +44,6 @@ def test_committed_results_are_reproducible_from_the_seed() -> None:
             preferences.RESULTS,
             preferences.lower_is_better,
             [],
-            preferences.REPRODUCE_TOLERANCE,
         )
         == 0
     )

@@ -35,9 +35,12 @@ import synthetic_preferences as sp
 from finance_agent.engine import preferences as pref
 
 RESULTS = Path(__file__).parent / "results" / "preferences.json"
-CHECKPOINTS = (5, 10, 20)
+CHECKPOINTS = (
+    5,
+    10,
+    20,
+)  # metrics are rounded to 6 places, so the run reproduces exactly
 BINS = 10
-REPRODUCE_TOLERANCE = 1e-6  # the fit is float: last-digit platform arithmetic
 
 type Picker = Callable[[sp.User, list[pref.Answer]], tuple[str, str]]
 
@@ -174,6 +177,5 @@ if __name__ == "__main__":
             RESULTS,
             lower_is_better,
             sys.argv[1:],
-            REPRODUCE_TOLERANCE,
         )
     )
