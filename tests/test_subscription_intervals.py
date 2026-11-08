@@ -2,6 +2,7 @@
 the detector, then a looser cadence fit on 2+ charges, then the known-services
 catalogue. Synthetic data only."""
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from fractions import Fraction
 
@@ -130,3 +131,45 @@ def test_the_source_order_holds(c: tuple[SubscriptionEntry, list[Charge]]) -> No
         assert x.interval_source in (None, "detected", "estimated")
     else:  # a known service always has an interval
         assert x.interval_source in ("detected", "estimated", "catalogue")
+
+
+def test_noisy_known_service_text_gets_the_catalogue_interval() -> None:
+    e = entry(1, merchant="ANTHROPIC CLAUDE SUB ANTHROPIC CLAUDE")
+    x = one(e, [(date(2026, 6, 1), 1800)])
+    assert (x.interval, x.interval_source, x.monthly) == (
+        "monthly", "catalogue", Fraction(1800),
+    )  # fmt: skip
+
+
+# --- adversarial (verifier) ---------------------------------------------------
+
+
+def test_two_takeaway_orders_a_month_apart_never_reach_the_totals() -> None:
+    # a detected suggestion is costed for display, but only a confirmed or
+    # known-service entry counts; amounts that vary stay an exact Fraction
+    e = replace(entry(7, merchant="SYNTH TAKEAWAY"), status="suggested")
+    s = subscription_costs(
+        [e], [Charge(7, date(2026, 5, 1), 2350), Charge(7, date(2026, 5, 31), 1875)],
+        TODAY,
+    )  # fmt: skip
+    (x,) = s.items
+    assert x.interval_source == "estimated" and type(x.monthly) is Fraction
+    assert not x.counted and s.kind_totals == {}
+
+
+@given(
+    st.sampled_from(("active", "suggested", "user_cancelled")),
+    st.lists(st.tuples(st.dates(date(2024, 1, 1), TODAY), st.integers(1, 10**7))),
+)
+def test_only_active_entries_ever_reach_the_totals(
+    status: str, charges: list[tuple[date, int]]
+) -> None:
+    e = replace(entry(1, merchant="SYNTH 1"), status=status)
+    s = subscription_costs([e], [Charge(1, d, m) for d, m in charges], TODAY)
+    (x,) = s.items
+    if status != "active":
+        assert not x.counted and s.kind_totals == {}
+    if len({d for d, _ in charges}) < 2:  # under the threshold: no estimate
+        assert x.interval_source is None and x.monthly is None
+    total = sum(s.kind_totals.values(), Fraction(0))
+    assert type(total) is Fraction and total == (x.monthly if x.counted else 0)

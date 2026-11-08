@@ -135,10 +135,13 @@ def known_service(merchant: str) -> tuple[str, str, str] | None:
     """(service, kind, group) when the Merchant name is a known service and
     nothing else: "NETFLIX.COM" is, "NETFLIX FAN SHOP" is not. Non-ASCII
     names fail closed, so a lookalike letter cannot be stripped into a match.
-    shortcut: whole-name match only; add aliases if real descriptors carry tails."""
+    Bank noise (a repeated tail, SUB, LTD, a reference code) is dropped first,
+    so "ANTHROPIC CLAUDE SUB ANTHROPIC CLAUDE" is Anthropic (#210)."""
+    from finance_agent.categorise.display_names import cleaned  # it imports us
+
     if not merchant.isascii():
         return None
-    name = _BY_KEY.get(_key(merchant))
+    name = _BY_KEY.get(_key(merchant)) or _BY_KEY.get(_key(cleaned(merchant)))
     return (name, *KNOWN_SERVICES[name]) if name else None
 
 

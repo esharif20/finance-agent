@@ -89,14 +89,18 @@ def display_name(raw: str) -> str:
     """The name to show for a Merchant's raw text; never empty for non-blank text."""
     if raw in CATALOGUE_NAMES or not raw.split():
         return raw
-    ts = raw.split()
-    while (nxt := _clean(ts)) != ts:  # each step only drops tokens: it ends
-        ts = nxt
-    name = " ".join(ts)
-    known = known_service(name)
+    known = known_service(raw)
     if known:
         return SERVICE_DISPLAY.get(known[0], known[0])
-    return " ".join(_title(t) for t in ts)
+    return " ".join(_title(t) for t in cleaned(raw).split())
+
+
+def cleaned(raw: str) -> str:
+    """The raw tokens without repeats, cut-off words, filler or reference codes."""
+    ts = raw.split()
+    while ts and (nxt := _clean(ts)) != ts:  # each step only drops tokens: it ends
+        ts = nxt
+    return " ".join(ts)
 
 
 CATALOGUE_NAMES = frozenset(SERVICE_DISPLAY.get(n, n) for n in KNOWN_SERVICES)
