@@ -70,39 +70,8 @@
   }
 }
 
-/* --- pointer light: one soft glow across the hero, a tighter one over the cards --- */
-.lp-glow {
-  position: absolute;
-  z-index: 1;
-  left: 0;
-  top: 0;
-  width: 1100px;
-  height: 1100px;
-  margin: -550px 0 0 -550px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(154 225 135 / 0.26), rgb(147 241 247 / 0.1) 50%, transparent);
-  pointer-events: none;
-  opacity: 0;
-  transform: translate3d(var(--gx, -2000px), var(--gy, -2000px), 0);
-  transition: opacity 600ms ease;
-}
-.lp-glow-near {
-  z-index: 2;
-  width: 560px;
-  height: 560px;
-  margin: -280px 0 0 -280px;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 0.42), rgb(220 255 240 / 0.12) 55%, transparent);
-  mix-blend-mode: plus-lighter;
-}
-.lp-hero-pin:has(.lp-stage[data-lit]) .lp-glow {
-  opacity: 1;
-}
-.lp-hero-pin:has(.lp-stage[data-lit]):not(:hover) .lp-glow {
-  opacity: 0;
-}
 /* touch and small screens get none of the light layers: no extra layers, nothing to composite */
 @media not ((hover: hover) and (pointer: fine)), (max-width: 719.98px) {
-  .lp-glow,
   .lp-acard-light,
   .lp-acard-back,
   .lp-acard-floor {
@@ -127,29 +96,39 @@
   overflow: clip;
   pointer-events: none;
 }
-/* specular sweep: a soft highlight crosses each card as it lands, then again every few seconds */
+/* specular sweep: a soft highlight crosses each card once, as it lands */
 .lp-acard-light::before {
   content: "";
   position: absolute;
   inset: 4% auto 4% 0;
   width: 50%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.2) 55%, transparent);
-  mix-blend-mode: plus-lighter;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.14) 55%, transparent);
   transform: translate3d(-110%, 0, 0) skewX(-16deg);
 }
 .lp-stage[data-play] .lp-acard-light::before {
-  animation: hero-sweep 6.4s var(--hero-ease) infinite;
+  animation: hero-sweep 1.6s var(--hero-ease) both;
   animation-delay: calc(1.5s + var(--i) * 170ms);
 }
 @keyframes hero-sweep {
   0% {
     transform: translate3d(-110%, 0, 0) skewX(-16deg);
   }
-  22%,
   100% {
     transform: translate3d(260%, 0, 0) skewX(-16deg);
   }
+}
+/* the sheen: a faint band on the face that the pointer's tilt slides across (Hero.tsx sets its
+   transform each frame); it shows only once a mouse has moved over the page */
+.lp-acard-sheen {
+  position: absolute;
+  inset: -20% 25%;
+  background: linear-gradient(100deg, transparent 10%, rgb(255 255 255 / 0.16) 45%, rgb(255 255 255 / 0.05) 60%, transparent 90%);
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.lp-stage[data-lit] .lp-acard-sheen {
+  opacity: 1;
 }
 /* edge light: a glow in the card's own hue, behind it, that rims its silhouette */
 .lp-acard-back {
@@ -182,8 +161,7 @@
   position: absolute;
   inset: 12%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, oklch(0.8 0.14 var(--h) / 0.5), transparent);
-  mix-blend-mode: plus-lighter;
+  background: radial-gradient(closest-side, oklch(0.8 0.14 var(--h) / 0.4), transparent);
   transform: translateY(-30%);
 }
 
@@ -227,7 +205,6 @@
   .lp-acard-light::before {
     animation: none;
   }
-  .lp-glow,
   .lp-acard-light,
   .lp-acard-back,
   .lp-acard-floor {
