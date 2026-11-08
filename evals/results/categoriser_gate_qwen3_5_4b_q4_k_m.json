@@ -1,0 +1,1300 @@
+{
+  "model_version": "nomic-embed-text@0a109f422b47+qwen3.5:4b-q4_K_M@d8b0f5",
+  "embedder": "nomic-embed-text@0a109f422b47",
+  "llm": "llm:qwen3.5:4b-q4_K_M@d8b0f5",
+  "harness": "categoriser_gate",
+  "dataset": "categoriser_v4.csv",
+  "dataset_version": 4,
+  "dataset_sha256": "0f07a236a238974b74a63bf8849aa7aea42fd0e7ec52b40d151219782896caad",
+  "rules_version": "rules-f87a38c55006",
+  "prompt_version": 2,
+  "residual_merchants": 125,
+  "missing_signals": [],
+  "calibration": {
+    "confident_models": [],
+    "low_prefers": "llm",
+    "low_confidence": {
+      "agree": 78,
+      "knn": 0,
+      "llm": 66
+    },
+    "folds": 5,
+    "repeats": 20
+  },
+  "review": {
+    "cap": 10,
+    "low_tier_merchants": 125,
+    "no_signal_merchants": 0,
+    "items_per_sync_575": 10
+  },
+  "groceries_share": {
+    "gold": 0.072,
+    "low_guesses": 0.074534
+  },
+  "models": {
+    "gate": {
+      "model": "rules confident; knn+llm filed auto-low",
+      "model_version": "nomic-embed-text@0a109f422b47+qwen3.5:4b-q4_K_M@d8b0f5",
+      "metrics": {
+        "confident.precision": 0.993865,
+        "confident.coverage": 0.75,
+        "confident.accuracy": 0.745399,
+        "rules+knn.precision": 0.881538,
+        "rules+knn.coverage": 0.996933,
+        "rules+knn.accuracy": 0.878834,
+        "rules+llm.precision": 0.932099,
+        "rules+llm.coverage": 0.993865,
+        "rules+llm.accuracy": 0.92638,
+        "all_tiers.precision": 0.929231,
+        "all_tiers.coverage": 0.996933,
+        "all_tiers.accuracy": 0.92638,
+        "low_held_out.accuracy": 0.732919,
+        "all_tiers_held_out.precision": 0.929231,
+        "all_tiers_held_out.coverage": 0.996933,
+        "confident.Bills \u203a Council tax.precision": 1.0,
+        "confident.Bills \u203a Energy.precision": 1.0,
+        "confident.Bills \u203a Insurance.precision": 1.0,
+        "confident.Bills \u203a Other bills.precision": 1.0,
+        "confident.Bills \u203a Phone & broadband.precision": 1.0,
+        "confident.Bills \u203a Rent or mortgage.precision": 1.0,
+        "confident.Bills \u203a Water.precision": 1.0,
+        "confident.Entertainment \u203a Events.precision": 1.0,
+        "confident.Entertainment \u203a Games.precision": 1.0,
+        "confident.Entertainment \u203a Hobbies.precision": 1.0,
+        "confident.Food & Drink \u203a Coffee.precision": 1.0,
+        "confident.Food & Drink \u203a Eating out.precision": 1.0,
+        "confident.Food & Drink \u203a Groceries.precision": 1.0,
+        "confident.Food & Drink \u203a Takeaway.precision": 1.0,
+        "confident.Health \u203a Fitness.precision": 1.0,
+        "confident.Health \u203a Medical.precision": 1.0,
+        "confident.Health \u203a Pharmacy.precision": 0.941176,
+        "confident.Housing \u203a Maintenance.precision": 1.0,
+        "confident.Personal care \u203a Hair & beauty.precision": 1.0,
+        "confident.Personal care \u203a Toiletries.precision": 1.0,
+        "confident.Shopping \u203a Clothing.precision": 1.0,
+        "confident.Shopping \u203a Electronics.precision": 1.0,
+        "confident.Shopping \u203a Household.precision": 1.0,
+        "confident.Shopping \u203a Online.precision": 1.0,
+        "confident.Subscriptions \u203a AI tools.precision": 1.0,
+        "confident.Subscriptions \u203a Cloud storage.precision": 1.0,
+        "confident.Subscriptions \u203a Memberships.precision": 1.0,
+        "confident.Subscriptions \u203a Other subscriptions.precision": 1.0,
+        "confident.Subscriptions \u203a Software.precision": 1.0,
+        "confident.Subscriptions \u203a Streaming.precision": 1.0,
+        "confident.Transport \u203a Fuel.precision": 0.965517,
+        "confident.Transport \u203a Parking.precision": 0.941176,
+        "confident.Transport \u203a Public transport.precision": 1.0,
+        "confident.Transport \u203a Taxi.precision": 1.0,
+        "confident.Travel \u203a Flights.precision": 1.0,
+        "confident.Travel \u203a Holidays.precision": 1.0,
+        "confident.Travel \u203a Hotels.precision": 1.0,
+        "all_tiers.Bills \u203a Council tax.precision": 1.0,
+        "all_tiers.Bills \u203a Energy.precision": 1.0,
+        "all_tiers.Bills \u203a Insurance.precision": 1.0,
+        "all_tiers.Bills \u203a Other bills.precision": 0.75,
+        "all_tiers.Bills \u203a Phone & broadband.precision": 0.9375,
+        "all_tiers.Bills \u203a Rent or mortgage.precision": 1.0,
+        "all_tiers.Bills \u203a Water.precision": 1.0,
+        "all_tiers.Entertainment \u203a Events.precision": 1.0,
+        "all_tiers.Entertainment \u203a Games.precision": 0.923077,
+        "all_tiers.Entertainment \u203a Hobbies.precision": 0.666667,
+        "all_tiers.Food & Drink \u203a Coffee.precision": 1.0,
+        "all_tiers.Food & Drink \u203a Eating out.precision": 0.869565,
+        "all_tiers.Food & Drink \u203a Groceries.precision": 0.981132,
+        "all_tiers.Food & Drink \u203a Takeaway.precision": 0.916667,
+        "all_tiers.Health \u203a Fitness.precision": 0.956522,
+        "all_tiers.Health \u203a Medical.precision": 1.0,
+        "all_tiers.Health \u203a Pharmacy.precision": 0.941176,
+        "all_tiers.Housing \u203a Maintenance.precision": 0.75,
+        "all_tiers.Personal care \u203a Hair & beauty.precision": 1.0,
+        "all_tiers.Personal care \u203a Toiletries.precision": 1.0,
+        "all_tiers.Shopping \u203a Clothing.precision": 0.870968,
+        "all_tiers.Shopping \u203a Electronics.precision": 0.8,
+        "all_tiers.Shopping \u203a Household.precision": 0.833333,
+        "all_tiers.Shopping \u203a Online.precision": 0.9375,
+        "all_tiers.Subscriptions \u203a AI tools.precision": 1.0,
+        "all_tiers.Subscriptions \u203a Cloud storage.precision": 0.4,
+        "all_tiers.Subscriptions \u203a Memberships.precision": 1.0,
+        "all_tiers.Subscriptions \u203a Other subscriptions.precision": 1.0,
+        "all_tiers.Subscriptions \u203a Software.precision": 1.0,
+        "all_tiers.Subscriptions \u203a Streaming.precision": 1.0,
+        "all_tiers.Transport \u203a Fuel.precision": 0.878788,
+        "all_tiers.Transport \u203a Parking.precision": 0.941176,
+        "all_tiers.Transport \u203a Public transport.precision": 1.0,
+        "all_tiers.Transport \u203a Taxi.precision": 1.0,
+        "all_tiers.Travel \u203a Flights.precision": 0.933333,
+        "all_tiers.Travel \u203a Holidays.precision": 0.714286,
+        "all_tiers.Travel \u203a Hotels.precision": 0.85
+      },
+      "by_case": {
+        "clean": {
+          "rows": 37,
+          "accuracy": 1.0
+        },
+        "long_tail": {
+          "rows": 90,
+          "accuracy": 0.755556
+        },
+        "lookalike": {
+          "rows": 14,
+          "accuracy": 0.571429
+        },
+        "noise": {
+          "rows": 148,
+          "accuracy": 0.993243
+        },
+        "refund": {
+          "rows": 12,
+          "accuracy": 0.833333
+        },
+        "tail_lookalike": {
+          "rows": 8,
+          "accuracy": 0.625
+        },
+        "uk_base": {
+          "rows": 278,
+          "accuracy": 0.996403
+        },
+        "uk_lookalike": {
+          "rows": 7,
+          "accuracy": 0.571429
+        },
+        "unseen": {
+          "rows": 48,
+          "accuracy": 0.833333
+        },
+        "vague": {
+          "rows": 10,
+          "accuracy": 0.8
+        }
+      }
+    }
+  },
+  "signals": {
+    "ADOBE SYSTEMS": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 2,
+      "knn": [
+        481,
+        "Entertainment \u203a Hobbies"
+      ],
+      "llm": "Subscriptions \u203a Software"
+    },
+    "AEROLINK": {
+      "gold": "Travel \u203a Flights",
+      "rows": 2,
+      "knn": [
+        568,
+        "Transport \u203a Fuel"
+      ],
+      "llm": "Travel \u203a Flights"
+    },
+    "AMAZONIA GRILL": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 1,
+      "knn": [
+        605,
+        "Shopping \u203a Online"
+      ],
+      "llm": "Food & Drink \u203a Eating out"
+    },
+    "AQUAFLOW": {
+      "gold": "Bills \u203a Water",
+      "rows": 1,
+      "knn": [
+        883,
+        "Bills \u203a Water"
+      ],
+      "llm": "Bills \u203a Water"
+    },
+    "AQUAFLOW CD": {
+      "gold": "Bills \u203a Water",
+      "rows": 1,
+      "knn": [
+        761,
+        "Bills \u203a Water"
+      ],
+      "llm": "Bills \u203a Water"
+    },
+    "ARGOSY BOOKS": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 1,
+      "knn": [
+        719,
+        "Shopping \u203a Household"
+      ],
+      "llm": "Shopping \u203a Online"
+    },
+    "ATLAS OUTFITTERS": {
+      "gold": "Shopping \u203a Clothing",
+      "rows": 3,
+      "knn": [
+        534,
+        "Health \u203a Pharmacy"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "ATLAS OUTFITTERS CD": {
+      "gold": "Shopping \u203a Clothing",
+      "rows": 1,
+      "knn": [
+        677,
+        "Travel \u203a Holidays"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "BEAN THERE COFF": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 1,
+      "knn": [
+        728,
+        "Food & Drink \u203a Coffee"
+      ],
+      "llm": "Food & Drink \u203a Coffee"
+    },
+    "BOOTSTRAP WORKSHOP": {
+      "gold": "Shopping \u203a Household",
+      "rows": 1,
+      "knn": [
+        587,
+        "Entertainment \u203a Hobbies"
+      ],
+      "llm": "Entertainment \u203a Hobbies"
+    },
+    "CANVAS ART SUPPLIES": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 3,
+      "knn": [
+        643,
+        "Shopping \u203a Household"
+      ],
+      "llm": "Shopping \u203a Household"
+    },
+    "CARD PAYMENT KJ SERVICES": {
+      "gold": "Housing \u203a Maintenance",
+      "rows": 1,
+      "knn": [
+        557,
+        "Transport \u203a Parking"
+      ],
+      "llm": "Bills \u203a Other bills"
+    },
+    "CASA ROSSI": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 2,
+      "knn": [
+        538,
+        "Transport \u203a Fuel"
+      ],
+      "llm": "unsure"
+    },
+    "CHIPFIX PHONE REPAIRS": {
+      "gold": "Shopping \u203a Electronics",
+      "rows": 1,
+      "knn": [
+        607,
+        "Housing \u203a Maintenance"
+      ],
+      "llm": "Bills \u203a Phone & broadband"
+    },
+    "CITYHOPPER BUS": {
+      "gold": "Transport \u203a Public transport",
+      "rows": 2,
+      "knn": [
+        643,
+        "Transport \u203a Public transport"
+      ],
+      "llm": "Transport \u203a Public transport"
+    },
+    "CLEARSPRING WAT": {
+      "gold": "Bills \u203a Water",
+      "rows": 2,
+      "knn": [
+        836,
+        "Bills \u203a Water"
+      ],
+      "llm": "Bills \u203a Water"
+    },
+    "CLEARVIEW EYECARE": {
+      "gold": "Health \u203a Medical",
+      "rows": 1,
+      "knn": [
+        830,
+        "Health \u203a Medical"
+      ],
+      "llm": "Health \u203a Medical"
+    },
+    "CLOUDNOTE APP": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 3,
+      "knn": [
+        647,
+        "Subscriptions \u203a Cloud storage"
+      ],
+      "llm": "Subscriptions \u203a Cloud storage"
+    },
+    "COSTALOT BUILDERS": {
+      "gold": "Housing \u203a Maintenance",
+      "rows": 1,
+      "knn": [
+        529,
+        "Food & Drink \u203a Coffee"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "CRITICAL HIT GA": {
+      "gold": "Entertainment \u203a Games",
+      "rows": 1,
+      "knn": [
+        459,
+        "Health \u203a Fitness"
+      ],
+      "llm": "Health \u203a Fitness"
+    },
+    "CRITICAL HIT GAMES": {
+      "gold": "Entertainment \u203a Games",
+      "rows": 1,
+      "knn": [
+        526,
+        "Entertainment \u203a Games"
+      ],
+      "llm": "Entertainment \u203a Games"
+    },
+    "ESSENCE PERFUMERY": {
+      "gold": "Personal care \u203a Toiletries",
+      "rows": 1,
+      "knn": [
+        592,
+        "Personal care \u203a Hair & beauty"
+      ],
+      "llm": "Personal care \u203a Toiletries"
+    },
+    "FADE MASTERS": {
+      "gold": "Personal care \u203a Hair & beauty",
+      "rows": 2,
+      "knn": [
+        840,
+        "Personal care \u203a Hair & beauty"
+      ],
+      "llm": "Personal care \u203a Hair & beauty"
+    },
+    "FENWICK FARM SHOP": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 2,
+      "knn": [
+        578,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "FENWICK FARM SHOP LEEDS": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        630,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "FIXITALL HOME R": {
+      "gold": "Housing \u203a Maintenance",
+      "rows": 1,
+      "knn": [
+        559,
+        "Housing \u203a Maintenance"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "FIXITALL HOME REPAIRS": {
+      "gold": "Housing \u203a Maintenance",
+      "rows": 1,
+      "knn": [
+        719,
+        "Housing \u203a Maintenance"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "FIXRIGHT PLUMBI": {
+      "gold": "Housing \u203a Maintenance",
+      "rows": 1,
+      "knn": [
+        687,
+        "Housing \u203a Maintenance"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "FLAT WHITE CORNER": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 2,
+      "knn": [
+        619,
+        "Entertainment \u203a Games"
+      ],
+      "llm": "Food & Drink \u203a Coffee"
+    },
+    "FLOW YOGA": {
+      "gold": "Health \u203a Fitness",
+      "rows": 2,
+      "knn": [
+        882,
+        "Health \u203a Fitness"
+      ],
+      "llm": "Health \u203a Fitness"
+    },
+    "FRESHWAY FOODS": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 2,
+      "knn": [
+        642,
+        "Personal care \u203a Toiletries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "GITHUB, INC.": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 1,
+      "knn": [
+        534,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Subscriptions \u203a Software"
+    },
+    "GITHUB, INC. CD": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 1,
+      "knn": [
+        599,
+        "Shopping \u203a Electronics"
+      ],
+      "llm": "Shopping \u203a Electronics"
+    },
+    "GOLDEN WOK": {
+      "gold": "Food & Drink \u203a Takeaway",
+      "rows": 2,
+      "knn": [
+        611,
+        "Food & Drink \u203a Eating out"
+      ],
+      "llm": "Food & Drink \u203a Eating out"
+    },
+    "GREEN TRAIN MODELS": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 1,
+      "knn": [
+        617,
+        "Transport \u203a Fuel"
+      ],
+      "llm": "Entertainment \u203a Hobbies"
+    },
+    "HARBOUR VIEW HO": {
+      "gold": "Travel \u203a Hotels",
+      "rows": 1,
+      "knn": [
+        832,
+        "Travel \u203a Hotels"
+      ],
+      "llm": "Travel \u203a Hotels"
+    },
+    "HARGREAVE CLOTH": {
+      "gold": "Shopping \u203a Clothing",
+      "rows": 1,
+      "knn": [
+        822,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "HARGREAVE CLOTHING CD": {
+      "gold": "Shopping \u203a Clothing",
+      "rows": 1,
+      "knn": [
+        874,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "HEARTHSTONE ENE": {
+      "gold": "Bills \u203a Energy",
+      "rows": 1,
+      "knn": [
+        522,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Entertainment \u203a Games"
+    },
+    "HEARTHSTONE ENERGY": {
+      "gold": "Bills \u203a Energy",
+      "rows": 2,
+      "knn": [
+        640,
+        "Bills \u203a Energy"
+      ],
+      "llm": "Bills \u203a Energy"
+    },
+    "HOMEBITS": {
+      "gold": "Shopping \u203a Household",
+      "rows": 1,
+      "knn": [
+        602,
+        "Shopping \u203a Household"
+      ],
+      "llm": "Shopping \u203a Household"
+    },
+    "HOMEBITS LEEDS": {
+      "gold": "Shopping \u203a Household",
+      "rows": 1,
+      "knn": [
+        650,
+        "Subscriptions \u203a AI tools"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "HYDE PARK WINTER FAIR": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        507,
+        "Transport \u203a Parking"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "IZ HAIR BY SAM": {
+      "gold": "Personal care \u203a Hair & beauty",
+      "rows": 1,
+      "knn": [
+        556,
+        "Personal care \u203a Toiletries"
+      ],
+      "llm": "Personal care \u203a Hair & beauty"
+    },
+    "KESTREL KITCHEN": {
+      "gold": "Food & Drink \u203a Takeaway",
+      "rows": 1,
+      "knn": [
+        731,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Food & Drink \u203a Eating out"
+    },
+    "KESTREL MOBILE CD": {
+      "gold": "Bills \u203a Phone & broadband",
+      "rows": 1,
+      "knn": [
+        864,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Bills \u203a Phone & broadband"
+    },
+    "LITTLE SAIGON": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 2,
+      "knn": [
+        471,
+        "Transport \u203a Fuel"
+      ],
+      "llm": "Food & Drink \u203a Takeaway"
+    },
+    "LOOP TRAMWAY": {
+      "gold": "Transport \u203a Public transport",
+      "rows": 1,
+      "knn": [
+        655,
+        "Transport \u203a Public transport"
+      ],
+      "llm": "Transport \u203a Public transport"
+    },
+    "MOONBEAM ROASTE": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 2,
+      "knn": [
+        560,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Food & Drink \u203a Coffee"
+    },
+    "NEXTDOOR GARDENS": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 1,
+      "knn": [
+        560,
+        "Entertainment \u203a Hobbies"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "NOTEWISE": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 1,
+      "knn": [
+        524,
+        "Bills \u203a Other bills"
+      ],
+      "llm": "Bills \u203a Other bills"
+    },
+    "OAKLEY NEWS AND BOOZE": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        486,
+        "Transport \u203a Taxi"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "ORCHARD BOOK CLUB CD": {
+      "gold": "Subscriptions \u203a Memberships",
+      "rows": 1,
+      "knn": [
+        861,
+        "Subscriptions \u203a Memberships"
+      ],
+      "llm": "Subscriptions \u203a Memberships"
+    },
+    "PARCELPOINT MARKETPLACE": {
+      "gold": "Shopping \u203a Online",
+      "rows": 1,
+      "knn": [
+        884,
+        "Shopping \u203a Online"
+      ],
+      "llm": "Shopping \u203a Online"
+    },
+    "PATELS MINI MARKET": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        618,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "PAYPAL AB TRADING": {
+      "gold": "Shopping \u203a Online",
+      "rows": 1,
+      "knn": [
+        488,
+        "Transport \u203a Parking"
+      ],
+      "llm": "Shopping \u203a Online"
+    },
+    "PAYPAL GAMEVAULT": {
+      "gold": "Entertainment \u203a Games",
+      "rows": 1,
+      "knn": [
+        511,
+        "Entertainment \u203a Games"
+      ],
+      "llm": "Entertainment \u203a Games"
+    },
+    "PEAK BOULDERING": {
+      "gold": "Health \u203a Fitness",
+      "rows": 1,
+      "knn": [
+        539,
+        "Travel \u203a Holidays"
+      ],
+      "llm": "Travel \u203a Holidays"
+    },
+    "PERSONAL TRAINER JO": {
+      "gold": "Health \u203a Fitness",
+      "rows": 1,
+      "knn": [
+        561,
+        "Health \u203a Fitness"
+      ],
+      "llm": "Health \u203a Fitness"
+    },
+    "PETROLHEAD MONTHLY": {
+      "gold": "Subscriptions \u203a Memberships",
+      "rows": 1,
+      "knn": [
+        617,
+        "Subscriptions \u203a Other subscriptions"
+      ],
+      "llm": "Transport \u203a Fuel"
+    },
+    "PIXELFORGE SOFTWARE BRISTOL": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 1,
+      "knn": [
+        843,
+        "Subscriptions \u203a Software"
+      ],
+      "llm": "Subscriptions \u203a Software"
+    },
+    "PIZZA PRONTO": {
+      "gold": "Food & Drink \u203a Takeaway",
+      "rows": 2,
+      "knn": [
+        597,
+        "Food & Drink \u203a Eating out"
+      ],
+      "llm": "Food & Drink \u203a Takeaway"
+    },
+    "PUREGLOW TOILET": {
+      "gold": "Personal care \u203a Toiletries",
+      "rows": 1,
+      "knn": [
+        862,
+        "Personal care \u203a Toiletries"
+      ],
+      "llm": "Personal care \u203a Toiletries"
+    },
+    "RIVERSIDE ALLOTMENT SOCIETY": {
+      "gold": "Subscriptions \u203a Memberships",
+      "rows": 1,
+      "knn": [
+        560,
+        "Bills \u203a Other bills"
+      ],
+      "llm": "Bills \u203a Other bills"
+    },
+    "RIVERSIDE PETRO": {
+      "gold": "Transport \u203a Fuel",
+      "rows": 1,
+      "knn": [
+        518,
+        "Bills \u203a Water"
+      ],
+      "llm": "Transport \u203a Fuel"
+    },
+    "ROYAL STAGE TICKETS BRISTOL": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        883,
+        "Entertainment \u203a Events"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "ROYAL STAGE TICKETS LEEDS": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        894,
+        "Entertainment \u203a Events"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "SEASHELL COTTAGES": {
+      "gold": "Travel \u203a Holidays",
+      "rows": 2,
+      "knn": [
+        614,
+        "Travel \u203a Hotels"
+      ],
+      "llm": "Travel \u203a Hotels"
+    },
+    "SHELLEYS PANTRY": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 1,
+      "knn": [
+        645,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "SIGNALBOX MOBILE": {
+      "gold": "Bills \u203a Phone & broadband",
+      "rows": 2,
+      "knn": [
+        834,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Bills \u203a Phone & broadband"
+    },
+    "SKYWING AIR CARGO": {
+      "gold": "Shopping \u203a Online",
+      "rows": 1,
+      "knn": [
+        853,
+        "Travel \u203a Flights"
+      ],
+      "llm": "Travel \u203a Flights"
+    },
+    "SOAP AND SUDS": {
+      "gold": "Personal care \u203a Toiletries",
+      "rows": 2,
+      "knn": [
+        778,
+        "Personal care \u203a Toiletries"
+      ],
+      "llm": "Personal care \u203a Toiletries"
+    },
+    "SOLE STREET SHOES": {
+      "gold": "Shopping \u203a Clothing",
+      "rows": 2,
+      "knn": [
+        674,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "SPEEDY MINICABS": {
+      "gold": "Transport \u203a Taxi",
+      "rows": 1,
+      "knn": [
+        849,
+        "Transport \u203a Taxi"
+      ],
+      "llm": "Transport \u203a Taxi"
+    },
+    "SPICE HUT": {
+      "gold": "Food & Drink \u203a Takeaway",
+      "rows": 2,
+      "knn": [
+        582,
+        "Shopping \u203a Electronics"
+      ],
+      "llm": "Food & Drink \u203a Takeaway"
+    },
+    "SQ BRIGHTWATER ENERGY": {
+      "gold": "Bills \u203a Energy",
+      "rows": 1,
+      "knn": [
+        881,
+        "Bills \u203a Energy"
+      ],
+      "llm": "Bills \u203a Energy"
+    },
+    "SQ JO FIT": {
+      "gold": "Health \u203a Fitness",
+      "rows": 1,
+      "knn": [
+        580,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Health \u203a Fitness"
+    },
+    "SQ NOTEWISE": {
+      "gold": "Subscriptions \u203a Software",
+      "rows": 1,
+      "knn": [
+        537,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "SQ PATELS MINI MARKET": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        576,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "SQ PEAK BOULDERING": {
+      "gold": "Health \u203a Fitness",
+      "rows": 1,
+      "knn": [
+        531,
+        "Health \u203a Fitness"
+      ],
+      "llm": "Health \u203a Fitness"
+    },
+    "SQ PUREGLOW TOILETRIES": {
+      "gold": "Personal care \u203a Toiletries",
+      "rows": 1,
+      "knn": [
+        889,
+        "Personal care \u203a Toiletries"
+      ],
+      "llm": "Personal care \u203a Toiletries"
+    },
+    "SQ SKYWING AIR": {
+      "gold": "Travel \u203a Flights",
+      "rows": 1,
+      "knn": [
+        934,
+        "Travel \u203a Flights"
+      ],
+      "llm": "Travel \u203a Flights"
+    },
+    "SQ SNIP AND STYLE": {
+      "gold": "Personal care \u203a Hair & beauty",
+      "rows": 1,
+      "knn": [
+        898,
+        "Personal care \u203a Hair & beauty"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "SQ SPEEDY MINICABS": {
+      "gold": "Transport \u203a Taxi",
+      "rows": 1,
+      "knn": [
+        828,
+        "Transport \u203a Taxi"
+      ],
+      "llm": "Transport \u203a Taxi"
+    },
+    "SQ THE KITCHEN": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 1,
+      "knn": [
+        678,
+        "Food & Drink \u203a Takeaway"
+      ],
+      "llm": "Food & Drink \u203a Takeaway"
+    },
+    "SQ TICKETS ON THE DOOR": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        617,
+        "Entertainment \u203a Events"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "STAGEDOOR TICKE": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        523,
+        "Shopping \u203a Online"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "STAGEDOOR TICKETS": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        681,
+        "Entertainment \u203a Events"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "STARLINE PRIVAT": {
+      "gold": "Transport \u203a Taxi",
+      "rows": 1,
+      "knn": [
+        657,
+        "Transport \u203a Taxi"
+      ],
+      "llm": "Transport \u203a Taxi"
+    },
+    "STARLINE PRIVATE HIRE": {
+      "gold": "Transport \u203a Taxi",
+      "rows": 1,
+      "knn": [
+        790,
+        "Transport \u203a Taxi"
+      ],
+      "llm": "Transport \u203a Taxi"
+    },
+    "STATION ROAD NOODLES": {
+      "gold": "Food & Drink \u203a Takeaway",
+      "rows": 1,
+      "knn": [
+        623,
+        "Food & Drink \u203a Takeaway"
+      ],
+      "llm": "Food & Drink \u203a Takeaway"
+    },
+    "STREAMLINE BIKES": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 1,
+      "knn": [
+        588,
+        "Subscriptions \u203a Streaming"
+      ],
+      "llm": "Shopping \u203a Electronics"
+    },
+    "STRIKE ZONE BOWLING": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        461,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Entertainment \u203a Hobbies"
+    },
+    "SUMUP BREW CART": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 1,
+      "knn": [
+        774,
+        "Food & Drink \u203a Coffee"
+      ],
+      "llm": "Food & Drink \u203a Coffee"
+    },
+    "SUMUP OAKLEY NEWS AND BOOZE": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        505,
+        "Transport \u203a Taxi"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "SUMUP RIDE HOME": {
+      "gold": "Transport \u203a Taxi",
+      "rows": 1,
+      "knn": [
+        630,
+        "Shopping \u203a Household"
+      ],
+      "llm": "Transport \u203a Taxi"
+    },
+    "SUMUP RIVERSIDE ALLOTMENT SOCIETY": {
+      "gold": "Subscriptions \u203a Memberships",
+      "rows": 1,
+      "knn": [
+        611,
+        "Shopping \u203a Household"
+      ],
+      "llm": "Bills \u203a Other bills"
+    },
+    "SUMUP STRIKE ZONE BOWLING": {
+      "gold": "Entertainment \u203a Events",
+      "rows": 1,
+      "knn": [
+        518,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Entertainment \u203a Events"
+    },
+    "SUMUP THE COPPER KETTLE": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 1,
+      "knn": [
+        928,
+        "Food & Drink \u203a Eating out"
+      ],
+      "llm": "Food & Drink \u203a Eating out"
+    },
+    "SUNRAY POWER": {
+      "gold": "Bills \u203a Energy",
+      "rows": 1,
+      "knn": [
+        629,
+        "Bills \u203a Energy"
+      ],
+      "llm": "Bills \u203a Energy"
+    },
+    "SUNRAY POWER CD": {
+      "gold": "Bills \u203a Energy",
+      "rows": 1,
+      "knn": [
+        705,
+        "Travel \u203a Holidays"
+      ],
+      "llm": "Travel \u203a Holidays"
+    },
+    "TESCOMBE FARM SHOP": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        635,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "THE BAY ROOMS": {
+      "gold": "Travel \u203a Hotels",
+      "rows": 2,
+      "knn": [
+        608,
+        "Travel \u203a Hotels"
+      ],
+      "llm": "Travel \u203a Hotels"
+    },
+    "THE BEANERY": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 1,
+      "knn": [
+        638,
+        "Food & Drink \u203a Coffee"
+      ],
+      "llm": "Food & Drink \u203a Coffee"
+    },
+    "THE BEANERY CD": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 1,
+      "knn": [
+        640,
+        "Health \u203a Pharmacy"
+      ],
+      "llm": "Entertainment \u203a Hobbies"
+    },
+    "THE COPPER KETT": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 1,
+      "knn": [
+        720,
+        "Food & Drink \u203a Eating out"
+      ],
+      "llm": "Food & Drink \u203a Eating out"
+    },
+    "THE DAILY GRIND": {
+      "gold": "Food & Drink \u203a Coffee",
+      "rows": 2,
+      "knn": [
+        763,
+        "Food & Drink \u203a Coffee"
+      ],
+      "llm": "Food & Drink \u203a Coffee"
+    },
+    "THE RUSTY ANCHOR": {
+      "gold": "Food & Drink \u203a Eating out",
+      "rows": 2,
+      "knn": [
+        502,
+        "Food & Drink \u203a Eating out"
+      ],
+      "llm": "Food & Drink \u203a Eating out"
+    },
+    "THREADBARE VINTAGE": {
+      "gold": "Shopping \u203a Clothing",
+      "rows": 2,
+      "knn": [
+        509,
+        "Shopping \u203a Clothing"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "TUBE AND TYRE BIKES": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 1,
+      "knn": [
+        533,
+        "Entertainment \u203a Hobbies"
+      ],
+      "llm": "Housing \u203a Maintenance"
+    },
+    "TUNEBOX": {
+      "gold": "Subscriptions \u203a Streaming",
+      "rows": 2,
+      "knn": [
+        925,
+        "Subscriptions \u203a Streaming"
+      ],
+      "llm": "Subscriptions \u203a Streaming"
+    },
+    "WILLOW SPA": {
+      "gold": "Personal care \u203a Hair & beauty",
+      "rows": 2,
+      "knn": [
+        539,
+        "Bills \u203a Water"
+      ],
+      "llm": "Personal care \u203a Hair & beauty"
+    },
+    "WILLOW SPA CD": {
+      "gold": "Personal care \u203a Hair & beauty",
+      "rows": 1,
+      "knn": [
+        629,
+        "Travel \u203a Hotels"
+      ],
+      "llm": "Travel \u203a Hotels"
+    },
+    "WOKWAY KITCHEN CD": {
+      "gold": "Food & Drink \u203a Takeaway",
+      "rows": 2,
+      "knn": [
+        830,
+        "Food & Drink \u203a Takeaway"
+      ],
+      "llm": "Food & Drink \u203a Takeaway"
+    },
+    "WOOL AND WHIMSY": {
+      "gold": "Entertainment \u203a Hobbies",
+      "rows": 2,
+      "knn": [
+        662,
+        "Entertainment \u203a Hobbies"
+      ],
+      "llm": "Shopping \u203a Clothing"
+    },
+    "ZIPLINE BUS CO": {
+      "gold": "Transport \u203a Public transport",
+      "rows": 3,
+      "knn": [
+        583,
+        "Transport \u203a Public transport"
+      ],
+      "llm": "Transport \u203a Public transport"
+    },
+    "ZTL BRIGHTWATER ENERGY": {
+      "gold": "Bills \u203a Energy",
+      "rows": 1,
+      "knn": [
+        865,
+        "Bills \u203a Energy"
+      ],
+      "llm": "Bills \u203a Energy"
+    },
+    "ZTL CHIPFIX PHONE REPAIRS": {
+      "gold": "Shopping \u203a Electronics",
+      "rows": 1,
+      "knn": [
+        592,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Bills \u203a Phone & broadband"
+    },
+    "ZTL CLEARVIEW EYECARE": {
+      "gold": "Health \u203a Medical",
+      "rows": 1,
+      "knn": [
+        719,
+        "Health \u203a Medical"
+      ],
+      "llm": "Health \u203a Medical"
+    },
+    "ZTL KESTREL MOBILE": {
+      "gold": "Bills \u203a Phone & broadband",
+      "rows": 1,
+      "knn": [
+        901,
+        "Bills \u203a Phone & broadband"
+      ],
+      "llm": "Bills \u203a Phone & broadband"
+    },
+    "ZTL LOOP TRAMWAY": {
+      "gold": "Transport \u203a Public transport",
+      "rows": 1,
+      "knn": [
+        696,
+        "Transport \u203a Public transport"
+      ],
+      "llm": "Transport \u203a Public transport"
+    },
+    "ZTL ORCHARD BOOK CLUB": {
+      "gold": "Subscriptions \u203a Memberships",
+      "rows": 1,
+      "knn": [
+        921,
+        "Subscriptions \u203a Memberships"
+      ],
+      "llm": "Subscriptions \u203a Memberships"
+    },
+    "ZTL PARCELPOINT MARKETPLACE": {
+      "gold": "Shopping \u203a Online",
+      "rows": 1,
+      "knn": [
+        728,
+        "Shopping \u203a Online"
+      ],
+      "llm": "Shopping \u203a Online"
+    },
+    "ZTL STALL MARKET": {
+      "gold": "Food & Drink \u203a Groceries",
+      "rows": 1,
+      "knn": [
+        612,
+        "Food & Drink \u203a Groceries"
+      ],
+      "llm": "Food & Drink \u203a Groceries"
+    },
+    "ZTL SUNTRAIL HOLIDAYS": {
+      "gold": "Travel \u203a Holidays",
+      "rows": 1,
+      "knn": [
+        871,
+        "Travel \u203a Holidays"
+      ],
+      "llm": "Travel \u203a Holidays"
+    }
+  }
+}

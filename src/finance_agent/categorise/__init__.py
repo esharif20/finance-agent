@@ -114,13 +114,13 @@ STORES = {"GOOGLE": "Google", "APPLE.COM/BILL": "Apple", "AMZN DIGITAL": "Amazon
 _STORE_SEEDS = frozenset({"Google", "Apple", "Amazon"})
 
 
-def _bare(words: list[str]) -> list[str]:
-    """Wallet and processor tokens dropped from the front, a wallet tag from
+def _bare(words: list[str], processors: bool = True) -> list[str]:
+    """Wallet (and processor) tokens dropped from the front, a wallet tag from
     the end. PAYPAL stays: its own patterns handle "PAYPAL *NETFLIX"."""
     while (
         len(words) > 1
         and words[0] != "PAYPAL"
-        and (words[0] in _WALLETS or words[0] in PROCESSORS)
+        and (words[0] in _WALLETS or (processors and words[0] in PROCESSORS))
     ):
         words = words[1:]
     return words[:-1] if len(words) > 1 and words[-1] == "GOOG" else words
@@ -179,15 +179,20 @@ LOCATIONS = frozenset({"GB", "GBR", "UK", "LONDON", "MANCHESTER", "BIRMINGHAM"})
 
 def normalise(description: str) -> str:
     """The Merchant name for a descriptor: a seeded alias, else the descriptor
-    without wallet and processor prefixes, store numbers, payment references,
-    locations and "REFUND". Deterministic, so the same shop maps to the same
-    Merchant row on every import; "" when nothing is left to name."""
+    without wallet prefixes, store numbers, payment references, locations and
+    "REFUND". Deterministic, so the same shop maps to the same Merchant row on
+    every import; "" when nothing is left to name. shortcut: a processor
+    prefix ("SQ *") stays in an unseeded name, as before #310, because the
+    categoriser gate's committed model signals are keyed by these names; drop
+    it with the next local `categoriser_gate.py --collect` run."""
     known = merchant_for(description)
     if known is not None:
         return known
     words = [
         w
-        for w in _bare([w for w in re.split(r"[\s*]+", _upper(description)) if w])
+        for w in _bare(
+            [w for w in re.split(r"[\s*]+", _upper(description)) if w], processors=False
+        )
         if w != "REFUND" and w not in LOCATIONS and not re.search(r"\d", w)
     ]
     return " ".join(words)[:64]

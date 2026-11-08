@@ -87,6 +87,7 @@ def test_another_users_subscriptions_are_unreachable(
         "items": [],
         "totals": [],
         "groups": [],
+        "likely_monthly": ZERO,
         "rate_needed": 0,
         "flag_count": 0,
         "trial_detection": "partial",

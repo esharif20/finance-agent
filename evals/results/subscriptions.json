@@ -10,7 +10,7 @@
     },
     "recall": 0.609375,
     "false_subscription_rate": 0.0,
-    "merchant_accuracy": 0.073499
+    "merchant_accuracy": 0.452381
   },
   "detector": {
     "dataset_version": 1,

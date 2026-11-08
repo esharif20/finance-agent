@@ -26,14 +26,14 @@ persona was built, never by running the Engine:
 """
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from fractions import Fraction
 
 import synthetic_history as sh
 from finance_agent.engine.detectors import Row
 
-DATASET_VERSION = 2
+DATASET_VERSION = 3
 MONTHS = 14  # of history before "today", from synthetic_history's start
 TODAY = sh.on_day(MONTHS, 10)  # ten days into the month after the history
 ESSENTIAL_TOPS = {"Bills"}
@@ -56,6 +56,71 @@ class Persona:
     savings_balance: int | None  # pence across savings Accounts
     today: date
     gold: frozenset[str]  # ids of the cards that should apply
+    # what the user told the Assistant (#264), set by hand per persona
+    memories: tuple["Memo", ...] = ()
+    tone: str = "gentle"  # the tone the persona wants; gentle when never said
+    want: tuple[tuple[str, int], ...] = ()  # (card id, gain 1..5) they care about
+    ruled_out: frozenset[str] = frozenset()  # cards a constraint must remove
+
+
+@dataclass(frozen=True)
+class Memo:
+    """A Memory as the playbook reads it."""
+
+    type: str
+    tags: tuple[str, ...]
+    priority: int | None = None
+    amount_minor: int | None = None
+
+
+def _tone(t: str) -> Memo:
+    return Memo("preference", ("tone", t))
+
+
+def _goal(tag: str, priority: int, amount: int | None = None) -> Memo:
+    return Memo("goal", (tag,), priority, amount)
+
+
+# persona name -> (memories, gold gains by card id, cards a constraint removes)
+TASTE: dict[str, tuple[tuple[Memo, ...], dict[str, int], set[str]]] = {
+    "student": (
+        (_tone("blunt"), _goal("student-money", 1), _goal("emergency-fund", 3)),
+        {"student-money": 5, "emergency-fund": 3},
+        set(),
+    ),
+    "credit-card revolver": (
+        (_goal("credit-cards", 1), _goal("emergency-fund", 2)),
+        {"credit-cards": 5, "emergency-fund": 4},
+        set(),
+    ),
+    "subscription creeper": (
+        (
+            _tone("blunt"),
+            _goal("saving-for-goal", 1, 500_000),
+            _goal("subscription-creep", 2),
+        ),
+        {"saving-for-goal": 5, "subscription-creep": 4},
+        set(),
+    ),
+    "payday-tight": (
+        (_tone("blunt"), _goal("payday-planning", 1)),
+        {"payday-planning": 5},
+        set(),
+    ),
+    "goal saver": (
+        (
+            _goal("saving-for-goal", 1, 200_000),
+            Memo("constraint", ("small-daily-spends",)),
+        ),
+        {"saving-for-goal": 5},
+        {"small-daily-spends"},
+    ),
+    "mixed": (
+        (_tone("gentle"), _goal("subscription-creep", 1), _goal("emergency-fund", 2)),
+        {"subscription-creep": 5, "emergency-fund": 4},
+        set(),
+    ),
+}
 
 
 def _essential(category: tuple[str, str]) -> bool:
@@ -153,6 +218,22 @@ L = MONTHS - 1  # the last complete month
 
 
 def personas() -> list[Persona]:
+    return [_taste(p) for p in _personas()]
+
+
+def _taste(p: Persona) -> Persona:
+    mems, want, out = TASTE.get(p.name, ((), {}, set()))
+    tone = "blunt" if _tone("blunt") in mems else "gentle"
+    return replace(
+        p,
+        memories=mems,
+        tone=tone,
+        want=tuple(sorted(want.items())),
+        ruled_out=frozenset(out),
+    )
+
+
+def _personas() -> list[Persona]:
     return [
         # one long-standing subscription: spend flat
         _persona("student", 0, Fraction(1), [0], {EF, SD, SM, PC}),
@@ -216,5 +297,18 @@ def personas() -> list[Persona]:
 
 def fingerprint(ps: list[Persona]) -> str:
     # gold sorted: a frozenset's repr order follows the per-run string hash
-    stable = [(p.name, p.rows, p.savings_balance, p.today, sorted(p.gold)) for p in ps]
+    stable = [
+        (
+            p.name,
+            p.rows,
+            p.savings_balance,
+            p.today,
+            sorted(p.gold),
+            p.memories,
+            p.tone,
+            p.want,
+            sorted(p.ruled_out),
+        )
+        for p in ps
+    ]
     return hashlib.sha256(repr(stable).encode()).hexdigest()

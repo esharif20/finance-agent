@@ -21,7 +21,7 @@ def test_committed_dataset_is_the_seeded_generator_output() -> None:
     text = categoriser.DATASET.read_text()
     assert text.startswith("# synthetic\n")
     assert categoriser.generate(categoriser.SEED) == text
-    assert categoriser.DATASET_VERSION == 3
+    assert categoriser.DATASET_VERSION == 4
 
 
 def test_dataset_covers_every_case_and_resolves_to_current_categories() -> None:

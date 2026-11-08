@@ -56,7 +56,9 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - name: categoriser eval (blocks on regression)
-        run: uv run python evals/categoriser.py
+        run: |
+          uv run python evals/categoriser.py
+          uv run python evals/categoriser_gate.py
       - name: detector, baseline, ranking, forecast and playbook evals (results reproduce)
         run: |
           uv run python evals/detectors.py
@@ -65,6 +67,7 @@ jobs:
           uv run python evals/forecast.py
           uv run python evals/playbook.py
           uv run python evals/changepoint.py
+          uv run python evals/search.py
       - name: assistant benchmark on FakeChatModel (results reproduce)
         run: uv run python evals/assistant_bench.py
 

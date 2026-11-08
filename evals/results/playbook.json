@@ -1,8 +1,8 @@
 {
   "harness": "playbook",
   "dataset": "synthetic_personas",
-  "dataset_version": 2,
-  "dataset_sha256": "d41a43cd4acb1ec97a3459bc407b3dabc53bd32648ed131b794f6170874fb6f0",
+  "dataset_version": 3,
+  "dataset_sha256": "9044a3af272243aed2c6e69eece5742eab3a429dcd19998f5c8978a8c6ba1f9c",
   "personas": 14,
   "gold": {
     "student": [
@@ -165,7 +165,10 @@
         "subscription-creep.precision": 1.0,
         "subscription-creep.recall": 1.0,
         "false_condition_shown": 0,
-        "figures_from_engine": 1.0
+        "figures_from_engine": 1.0,
+        "tone_match": 1.0,
+        "ndcg_at_3": 0.973638,
+        "constraint_violations": 0
       }
     },
     "show_all": {
@@ -188,7 +191,10 @@
         "student-money.recall": 1.0,
         "subscription-creep.precision": 0.142857,
         "subscription-creep.recall": 1.0,
-        "false_condition_shown": 71
+        "false_condition_shown": 71,
+        "tone_match": 0.785714,
+        "ndcg_at_3": 0.822651,
+        "constraint_violations": 1
       }
     },
     "show_none": {

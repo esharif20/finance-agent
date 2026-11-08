@@ -164,7 +164,7 @@ def generate(seed: int = SEED) -> list[Case]:
         d = start()
         for _ in range(rnd.randint(6, 12)):
             d += timedelta(rnd.randint(3, 12))
-            c.rows.append(("SQ *SYNTH CAFE", d, 350, "SYNTH CAFE"))
+            c.rows.append(("SQ *SYNTH CAFE", d, 350, "SQ SYNTH CAFE"))
         return c
 
     @case("tier_word_trap")

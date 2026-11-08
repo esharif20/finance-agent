@@ -117,7 +117,7 @@ def _main(argv: Sequence[str] | None) -> int:
     )
     sub.add_parser(
         "forget-embeddings",
-        help="delete every stored Merchant embedding (rebuilt when needed)",
+        help="delete every stored Merchant and search embedding (rebuilt when needed)",
     )
     sub.add_parser(
         "forget-alerts",
@@ -136,11 +136,15 @@ def _main(argv: Sequence[str] | None) -> int:
             with engine.begin() as conn:
                 wipe = embedding.forget if embeddings else subscription_alerts.forget
                 n = wipe(conn, LOCAL_USER)
+                if embeddings:  # and the search index's text vectors (#253)
+                    from finance_agent.ledger import search_index
+
+                    n += search_index.forget(conn, LOCAL_USER)
         finally:
             engine.dispose()
         print(
-            f"Deleted {n} Merchant embeddings; the local model rebuilds them "
-            "from your Transactions when it next runs"
+            f"Deleted {n} Merchant and search embeddings; the local model "
+            "rebuilds them from your Transactions when it next runs"
             if embeddings
             else f"Deleted {n} sent subscription alerts; any still due is sent again"
         )

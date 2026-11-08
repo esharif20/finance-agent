@@ -392,6 +392,21 @@ def suggest(
     return {k: [c for _, c in v] for k, v in found.items()}
 
 
+def neighbours[T](
+    target: Vector, labelled: Sequence[tuple[Vector, T]], k: int
+) -> list[tuple[int, T]]:
+    """The k most similar labelled items (similarity, item), most similar
+    first; ties keep `labelled`'s order. Vectors of another length are
+    skipped."""
+    scored = [
+        (similarity(target, v), i, item)
+        for i, (v, item) in enumerate(labelled)
+        if len(v) == len(target)
+    ]
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [(s, item) for s, _, item in scored[:k]]
+
+
 def ranked(
     conn: Connection,
     user_id: int,
@@ -413,16 +428,27 @@ def ranked(
     for key, m in targets.items():
         if m not in vecs:
             continue
-        best: dict[tuple[str, str], int] = {}
-        for n, cats in labelled.items():
-            if n == m or n not in vecs or len(vecs[n]) != len(vecs[m]):
-                continue
-            s = similarity(vecs[m], vecs[n])
-            for c in cats:
-                best[c] = max(best.get(c, -SIMILARITY), s)
-        scored = sorted(
-            ((s, c) for c, s in best.items() if s > 0), key=lambda x: (-x[0], x[1])
+        scored = rank(
+            vecs[m],
+            [(vecs[n], cats) for n, cats in labelled.items() if n != m and n in vecs],
         )
         if scored:
             out[key] = scored[:SUGGESTIONS]
     return model, out
+
+
+def rank(
+    target: Vector, labelled: Sequence[tuple[Vector, set[tuple[str, str]]]]
+) -> list[tuple[int, tuple[str, str]]]:
+    """Categories by their most similar labelled Merchant (similarity in
+    thousandths, best first; ties by name), positive similarities only."""
+    best: dict[tuple[str, str], int] = {}
+    for v, cats in labelled:
+        if len(v) != len(target):
+            continue
+        s = similarity(target, v)
+        for c in cats:
+            best[c] = max(best.get(c, -SIMILARITY), s)
+    return sorted(
+        ((s, c) for c, s in best.items() if s > 0), key=lambda x: (-x[0], x[1])
+    )

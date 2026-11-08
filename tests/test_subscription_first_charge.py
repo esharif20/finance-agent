@@ -30,8 +30,8 @@ AI = ("subscription", "AI tools")
         ("WL *VUE*GOOG", "Vue Cinemas", None),
         ("CRV*SPOTIFY", "Spotify", None),
         ("CURVE NETFLIX.COM", "Netflix", None),
-        ("SQ *SYNTH CAFE", "SYNTH CAFE", "Square"),
-        ("SP *SYNTH STORE", "SYNTH STORE", "Shopify"),
+        ("SQ *SYNTH CAFE", "SQ SYNTH CAFE", "Square"),  # see normalise
+        ("SP *SYNTH STORE", "SP SYNTH STORE", "Shopify"),
         ("PAYPAL *NETFLIX", "Netflix", "PayPal"),
         ("WL", "WL", None),  # a lone token is a name, never stripped to nothing
     ],
@@ -172,7 +172,7 @@ SPLIT_ROWS = [
 def pre_split() -> pytest.MonkeyPatch:
     """The normaliser before #310: no prefix stripped, no store product."""
 
-    def bare(words: list[str]) -> list[str]:
+    def bare(words: list[str], processors: bool = True) -> list[str]:
         return words
 
     def product(squashed: str) -> str | None:
@@ -215,6 +215,15 @@ def test_the_split_never_drops_a_correction_or_decision(
     decisions: list[tuple[str, int]],
 ) -> None:
     old_normaliser = pre_split()
+    try:
+        check_split(old_normaliser, decisions)
+    finally:
+        old_normaliser.undo()  # never leaks into another test
+
+
+def check_split(
+    old_normaliser: pytest.MonkeyPatch, decisions: list[tuple[str, int]]
+) -> None:
     with ledger_with(SPLIT_ROWS) as (conn, led):
         assert "GOOGLE" in {m.name.upper() for m in led.merchants()}  # one Merchant
         txns = sorted(led.transactions(), key=lambda t: t.id)

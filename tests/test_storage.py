@@ -30,9 +30,18 @@ def test_default_location_is_application_support(
     )
 
 
+def _context(conn: Any) -> MigrationContext:
+    """The FTS5 table and its shadow tables (#253) live outside the metadata."""
+
+    def ours(name: str | None, type_: str, _parent: Any) -> bool:
+        return not (type_ == "table" and (name or "").startswith("search_fts"))
+
+    return MigrationContext.configure(conn, opts={"include_name": ours})
+
+
 def test_migrations_produce_exactly_the_schema(engine: Engine) -> None:
     with engine.connect() as conn:
-        diff = compare_metadata(MigrationContext.configure(conn), schema.metadata)
+        diff = compare_metadata(_context(conn), schema.metadata)
     assert diff == []
 
 
@@ -72,7 +81,7 @@ def test_migrations_upgrade_from_0003_to_head(tmp_path: Path) -> None:
     eng = open_db(path)  # upgrades the rest of the way
     with eng.connect() as conn:
         assert {"merchant", "categorisation"} <= set(inspect(conn).get_table_names())
-        assert compare_metadata(MigrationContext.configure(conn), schema.metadata) == []
+        assert compare_metadata(_context(conn), schema.metadata) == []
     eng.dispose()
 
 
@@ -109,7 +118,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0025"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0026"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -659,7 +668,10 @@ def test_the_registry_trigger_is_present_at_head(engine: Engine) -> None:
     this catches that before the registry can outlive its Merchant."""
     from sqlalchemy import text
 
-    sql = "SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='merchant'"
+    sql = (
+        "SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='merchant'"
+        " AND name NOT LIKE 'search_%'"  # the search index's own (#253)
+    )
     with engine.connect() as conn:
         got = conn.execute(text(sql)).scalars().all()
     assert len(got) == 1 and "subscription_entry" in got[0]
