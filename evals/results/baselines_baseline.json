@@ -15,6 +15,18 @@
     "payday_week1": 1260,
     "insufficient": 252
   },
+  "life_changes": {
+    "dataset": "synthetic_life_changes",
+    "dataset_version": 1,
+    "dataset_sha256": "3f8e9be661890a1834dc5f7391e2c3651acc4c4905a10b94c23a356558c08c68",
+    "seed": 256,
+    "scored": {
+      "shifts": 31,
+      "detected": 31,
+      "months": 184,
+      "forecast_months": 79
+    }
+  },
   "models": {
     "baseline": {
       "model": "trailing-3-month-mean",
@@ -37,6 +49,12 @@
       "model": "personal-baselines",
       "model_version": "1",
       "metrics": {
+        "after_shift.all.wape": 0.243127,
+        "after_shift.childcare.wape": 0.342167,
+        "after_shift.job_loss.wape": 0.704797,
+        "after_shift.pay_rise.wape": 0.091062,
+        "after_shift.rent_rise.wape": 0.08128,
+        "after_shift_forecast.all.wape": 0.011442,
         "payday_week1.all.wape": 0.4722,
         "seasonal.Food & Drink / Coffee.wape": 0.07882,
         "seasonal.Food & Drink / Eating out.wape": 0.085708,
@@ -48,6 +66,18 @@
         "seasonal.after_year1.wape": 0.078423,
         "seasonal.all.wape": 0.102031,
         "seasonal.year1.wape": 0.190128
+      }
+    },
+    "no_reset": {
+      "model": "personal-baselines-no-reset",
+      "model_version": "1",
+      "metrics": {
+        "after_shift.all.wape": 0.460654,
+        "after_shift.childcare.wape": 0.628061,
+        "after_shift.job_loss.wape": 1.320006,
+        "after_shift.pay_rise.wape": 0.183269,
+        "after_shift.rent_rise.wape": 0.157883,
+        "after_shift_forecast.all.wape": 0.265806
       }
     }
   }
