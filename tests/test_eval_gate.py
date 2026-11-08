@@ -85,7 +85,8 @@ def test_a_results_file_edited_to_claim_better_numbers_fails_ci(
 
     path = tmp_path / "detectors.json"
     claimed = json.loads(detectors.RESULTS.read_text())
-    claimed["models"]["candidate"]["metrics"]["overall.recall"] = 1.0
+    # a metric below 1.0 (recall became 1.0 with #151)
+    claimed["models"]["candidate"]["metrics"]["overall.precision"] = 1.0
     path.write_text(json.dumps(claimed))
     run = gate.run("detectors", detectors.evaluate, path, detectors.lower_is_better, [])
     assert run == 1

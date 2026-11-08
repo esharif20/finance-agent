@@ -22,10 +22,11 @@ from 12, and "insufficient" before.
 import calendar
 import math
 import warnings
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Literal
+from decimal import Decimal
+from typing import Any, Literal, Protocol
 
 import numpy as np
 import pandas as pd
@@ -34,7 +35,7 @@ from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
 from finance_agent.categorise import normalise
 from finance_agent.categorise.recurring import CADENCES, Recurrence, detect_recurring
-from finance_agent.ledger import Ledger
+from finance_agent.ledger import Categorisation, Ledger
 
 LEVEL = 0.8  # the prediction interval's coverage
 SEASON = 12
@@ -98,9 +99,32 @@ class CashFlow:
     income: tuple[RecurringPayment, ...] = ()
 
 
+class Txn(Protocol):
+    """What the forecast reads of a Transaction (`ledger.Transaction` has it)."""
+
+    @property
+    def posted_on(self) -> date: ...
+    @property
+    def amount(self) -> Decimal: ...
+    @property
+    def description(self) -> str: ...
+    @property
+    def categorisation(self) -> Categorisation | None: ...
+
+
 def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
     """Forecast money out from `as_of`'s month for `horizon` months, using only
     complete months before it. Read-only: the Ledger and registry are only read.
+    See `project`."""
+    registry = {e.merchant_id: e.status for e in led.subscriptions()}
+    return project(led.transactions(), registry, as_of, horizon)
+
+
+def project(
+    txns: Iterable[Txn], registry: Mapping[int, str], as_of: date, horizon: int = 3
+) -> CashFlow:
+    """`cash_flow` over Transactions and the Subscription registry's status
+    per Merchant id, so a harness can run it without a Ledger.
 
     A Merchant with a recurring schedule (`categorise.recurring`) is projected
     from it while it is still running, unless the user said it is not a
@@ -108,12 +132,11 @@ def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
     Everything else is Spending per Category, forecast by `forecast_category`."""
     start = as_of.replace(day=1)
     months = [_add_months(start, k) for k in range(horizon + 1)]
-    registry = {e.merchant_id: e.status for e in led.subscriptions()}
     shares: list[tuple[int | None, date, tuple[str, str] | None, int]] = []
     names: dict[int, str] = {}
     by_merchant: dict[int, list[tuple[date, int]]] = {}
     by_payer: dict[str, list[tuple[date, int]]] = {}
-    for t in led.transactions():
+    for t in txns:
         c = t.categorisation
         if c is not None and c.kind == "Income" and t.posted_on < start:
             payer = normalise(t.description)
