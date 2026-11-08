@@ -4,6 +4,7 @@ here, where each one is rounded half-even to the penny once. Waste flags and
 free trials (#106) ride on each item; trial detection is partial."""
 
 from datetime import date
+from fractions import Fraction
 from typing import Literal
 
 from fastapi import APIRouter
@@ -18,6 +19,7 @@ from finance_agent.api.subscriptions import (
 from finance_agent.categorise.subscriptions import (
     Flag,
     FlagCode,
+    IntervalSource,
     costs,
     display,
 )
@@ -50,6 +52,9 @@ class CostOut(BaseModel):
     group: str
     status: str  # active, overdue, lapsed, cancelled or suggested
     interval: str | None
+    # registry or detected; estimated (loose fit) or catalogue (known service)
+    interval_source: IntervalSource | None
+    charge_count: int  # GBP charges seen: 1 explains an interval_needed
     last_charge_on: str | None  # ISO date
     monthly: Pence | None  # None with a cost_note
     cost_note: str | None  # rate_needed, interval_needed or no_charge
@@ -67,8 +72,14 @@ class GroupTotal(KindTotal):
     group: str
 
 
+class Total(BaseModel):  # every counted item, each period rounded once
+    monthly: Pence
+    annual: Pence
+
+
 class CostsOut(BaseModel):
     items: list[CostOut]
+    total: Total
     totals: list[KindTotal]  # per kind: the exact sum of its counted items
     groups: list[GroupTotal]
     rate_needed: int  # items left out of totals until an FX rate exists
@@ -94,7 +105,12 @@ def _flag(f: Flag) -> FlagOut:
 @router.get("/costs")
 def subscription_costs(led: Led) -> CostsOut:
     s = costs(led, date.today())
+    month = sum(s.kind_totals.values(), Fraction(0))
     return CostsOut(
+        total=Total(
+            monthly=Pence(minor=display(month)),
+            annual=Pence(minor=display(month * 12)),
+        ),
         items=[
             CostOut(
                 merchant_id=c.entry.merchant_id,
@@ -103,6 +119,8 @@ def subscription_costs(led: Led) -> CostsOut:
                 group=c.entry.group or "",
                 status=c.status,
                 interval=c.interval,
+                interval_source=c.interval_source,
+                charge_count=c.charge_count,
                 last_charge_on=c.last_charge_on and c.last_charge_on.isoformat(),
                 monthly=None if c.monthly is None else Pence(minor=display(c.monthly)),
                 cost_note=c.cost_note,

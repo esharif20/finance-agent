@@ -109,6 +109,10 @@ def known_service(merchant: str) -> tuple[str, str, str] | None:
     return (name, *KNOWN_SERVICES[name]) if name else None
 
 
+# The catalogue's billing interval: monthly unless named here (#210)
+CATALOGUE_INTERVAL: dict[str, str] = {"TV Licence": "annual"}
+
+
 # Descriptor patterns that ask "Is this a subscription?": (pattern, group)
 PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bMEMBERSHIP\b"), "Memberships"),
@@ -205,6 +209,8 @@ class Charge:
     account_id: int = 0
 
 
+IntervalSource = Literal["registry", "detected", "estimated", "catalogue"]
+
 FlagCode = Literal[
     "overlap", "duplicate", "charged_after_cancel", "trial_converted", "price_rise"
 ]
@@ -232,6 +238,8 @@ class SubscriptionCost:
     counted: bool  # in the totals
     flags: tuple[Flag, ...] = ()
     trial: "Trial | None" = None
+    interval_source: "IntervalSource | None" = None  # None when no interval
+    charge_count: int = 0  # GBP charges seen, so the UI can say "only one"
 
 
 @dataclass(frozen=True)
@@ -271,12 +279,41 @@ def _monthly(minor: int, interval: str) -> Fraction:
     return Fraction(minor, 12) if interval == "annual" else Fraction(minor)
 
 
+# Loose cadence fit (#210): the median gap between distinct charge days is
+# within a third of a nominal cadence (weekly 5-9, monthly 20-40, annual
+# 244-486 days). Amounts are ignored, so a drifting bill still gets one.
+NOMINAL_DAYS = {"weekly": 7, "monthly": 30, "annual": 365}
+
+
+def _loose_interval(days: list[date]) -> str | None:
+    ds = sorted(set(days))
+    gaps = sorted((b - a).days for a, b in zip(ds, ds[1:], strict=False))
+    if not gaps:
+        return None
+    g = gaps[len(gaps) // 2]  # upper median, as recurring's
+    return next((c for c, n in NOMINAL_DAYS.items() if abs(g - n) * 3 <= n), None)
+
+
+def _interval(
+    e: SubscriptionEntry, gbp: list[tuple[date, int]]
+) -> tuple[str, IntervalSource] | tuple[None, None]:
+    """registry -> detector -> loose fit on 2+ charges -> catalogue default."""
+    if e.interval:
+        return e.interval, "registry"
+    if rec := detect_recurring(gbp, min_charges=2):
+        return rec.interval, "detected"
+    if loose := _loose_interval([d for d, _ in gbp]):
+        return loose, "estimated"
+    if known := known_service(e.merchant):
+        return CATALOGUE_INTERVAL.get(known[0], "monthly"), "catalogue"
+    return None, None
+
+
 def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> SubscriptionCost:
     last = max(charges, key=lambda c: (c.posted_on, c.currency, c.minor), default=None)
     # only GBP amounts are comparable: a charge still needing a rate stays out
     gbp = sorted((c.posted_on, c.minor) for c in charges if c.currency == "GBP")
-    rec = detect_recurring(gbp, min_charges=2)
-    interval = e.interval or (rec.interval if rec else None)
+    interval, source = _interval(e, gbp)
     status = {"user_cancelled": "cancelled", "suggested": "suggested"}.get(
         e.status, "active"
     )
@@ -321,6 +358,8 @@ def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> Subscript
         status in COUNTED and monthly is not None,
         tuple(flags),
         trial,
+        source,
+        len(gbp),
     )
 
 

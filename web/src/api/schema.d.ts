@@ -1035,6 +1035,8 @@ export interface components {
         };
         /** CostOut */
         CostOut: {
+            /** Charge Count */
+            charge_count: number;
             /** Cost Note */
             cost_note: string | null;
             /** Counted */
@@ -1045,6 +1047,8 @@ export interface components {
             group: string;
             /** Interval */
             interval: string | null;
+            /** Interval Source */
+            interval_source: ("registry" | "detected" | "estimated" | "catalogue") | null;
             /** Kind */
             kind: string;
             /** Last Charge On */
@@ -1068,6 +1072,7 @@ export interface components {
             items: components["schemas"]["CostOut"][];
             /** Rate Needed */
             rate_needed: number;
+            total: components["schemas"]["Total"];
             /** Totals */
             totals: components["schemas"]["KindTotal"][];
             /**
@@ -1561,6 +1566,11 @@ export interface components {
             last_failure_at: string | null;
             /** Last Sync At */
             last_sync_at: string | null;
+        };
+        /** Total */
+        Total: {
+            annual: components["schemas"]["Pence"];
+            monthly: components["schemas"]["Pence"];
         };
         /** TransactionOut */
         TransactionOut: {

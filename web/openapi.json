@@ -664,6 +664,10 @@
       },
       "CostOut": {
         "properties": {
+          "charge_count": {
+            "title": "Charge Count",
+            "type": "integer"
+          },
           "cost_note": {
             "anyOf": [
               {
@@ -700,6 +704,23 @@
               }
             ],
             "title": "Interval"
+          },
+          "interval_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "registry",
+                  "detected",
+                  "estimated",
+                  "catalogue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Source"
           },
           "kind": {
             "title": "Kind",
@@ -756,6 +777,8 @@
           "group",
           "status",
           "interval",
+          "interval_source",
+          "charge_count",
           "last_charge_on",
           "monthly",
           "cost_note",
@@ -790,6 +813,9 @@
             "title": "Rate Needed",
             "type": "integer"
           },
+          "total": {
+            "$ref": "#/components/schemas/Total"
+          },
           "totals": {
             "items": {
               "$ref": "#/components/schemas/KindTotal"
@@ -806,6 +832,7 @@
         },
         "required": [
           "items",
+          "total",
           "totals",
           "groups",
           "rate_needed",
@@ -2272,6 +2299,22 @@
           "backup_warning"
         ],
         "title": "SyncStatusOut",
+        "type": "object"
+      },
+      "Total": {
+        "properties": {
+          "annual": {
+            "$ref": "#/components/schemas/Pence"
+          },
+          "monthly": {
+            "$ref": "#/components/schemas/Pence"
+          }
+        },
+        "required": [
+          "monthly",
+          "annual"
+        ],
+        "title": "Total",
         "type": "object"
       },
       "TransactionOut": {
