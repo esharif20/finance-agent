@@ -162,8 +162,10 @@ function Chapter({ group, wide }: { group: Group; wide: boolean }) {
 function PromptStrip() {
   const parts: [string, boolean][] = [
     ["System prefix", true],
+    ["Profile", true],
     ["Memories", true],
-    ["Last 3 turns", true],
+    ["Summary", false],
+    ["Last 3 turns", false],
     ["This turn's facts", false],
     ["Question", false],
   ];
@@ -176,7 +178,7 @@ function PromptStrip() {
           </li>
         ))}
       </ol>
-      <figcaption>The first three are reused from the KV cache; only the last two are new each turn.</figcaption>
+      <figcaption>The dark part is the stable prefix, reused from the KV cache; the rest follows in order.</figcaption>
     </figure>
   );
 }
