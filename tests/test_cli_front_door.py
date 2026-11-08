@@ -365,6 +365,15 @@ class FakeProc:
     def kill(self) -> None: ...
 
 
+@pytest.fixture(autouse=True)
+def _dist_demo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    dist = tmp_path / "dist-demo"
+    dist.mkdir()
+    (dist / "index.html").write_text("# synthetic")
+    monkeypatch.setattr(demo, "WEB", dist)
+    return dist
+
+
 def test_demo_runs_in_a_temp_dir_and_cleans_up(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -425,6 +434,128 @@ def test_demo_never_opens_the_keychain(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(keyring, "get_password", no)
     monkeypatch.setattr(keyring, "set_password", no)
     assert demo.run(None, _const(FakeProc(1)), lambda _u: None) == 1
+
+
+def _fake_build(argv: list[str], env: Mapping[str, str]) -> Any:
+    if argv[-1].endswith("build_demo_db.py"):
+        people = Path(env["FA_DEMO_DIR"]) / "personas"
+        people.mkdir(parents=True)
+        (people / "0.db").write_text("# synthetic")
+    return FakeProc()
+
+
+def test_demo_shows_the_banner_then_progress_then_opens_the_landing_page(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    order: list[str] = []
+
+    def shown(*_a: object, **_k: object) -> None:
+        order.append("banner")
+
+    monkeypatch.setattr(banner, "show", shown)
+    sleeps: list[float] = []
+    probes = iter([False, True])
+
+    def opened(url: str) -> None:
+        order.append("open")
+        assert url.startswith("http://127.0.0.1:") and url.endswith("/")
+
+    rc = demo.run(
+        None,
+        _fake_build,
+        opened,
+        probe=lambda _p: next(probes),
+        sleep=sleeps.append,
+    )
+    out = capsys.readouterr().out
+    assert rc == 0 and order == ["banner", "open"] and sleeps == [0.2]
+    assert (
+        out.index("Building 6 synthetic Personas")
+        < out.index("Serving on http://127.0.0.1:")
+        < out.index("Opening the landing page")
+    )
+
+
+def test_demo_no_open_never_opens(capsys: pytest.CaptureFixture[str]) -> None:
+    def boom(_u: str) -> None:
+        raise AssertionError("opened a browser")
+
+    assert (
+        demo.run(None, _fake_build, boom, probe=lambda _p: True, open_browser=False)
+        == 0
+    )
+    assert "Landing page: http://127.0.0.1:" in capsys.readouterr().out
+    assert main(["demo", "--no-open", "--list"]) == 0
+
+
+def test_demo_without_dist_demo_or_pnpm_uses_the_hosted_demo(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(demo, "WEB", tmp_path / "missing")
+    opened: list[str] = []
+
+    def no_spawn(*_a: object) -> Any:
+        raise AssertionError("spawned something")
+
+    assert demo.run(None, no_spawn, opened.append, which=lambda _n: None) == 0  # type: ignore[arg-type]
+    assert opened == [demo.HOSTED] and demo.HOSTED in capsys.readouterr().out
+    opened.clear()
+    assert (
+        demo.run(
+            None, no_spawn, opened.append, which=lambda _n: None, open_browser=False
+        )
+        == 0
+    )  # type: ignore[arg-type]
+    assert opened == []
+
+
+def test_demo_builds_dist_demo_once_with_pnpm(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dist = tmp_path / "missing"
+    monkeypatch.setattr(demo, "WEB", dist)
+    pnpm: list[list[str]] = []
+
+    def spawn(argv: list[str], env: Mapping[str, str]) -> Any:
+        if argv[0] == "pnpm":
+            pnpm.append(argv)
+            if argv[-1] == "build:demo":
+                dist.mkdir()
+                (dist / "index.html").write_text("# synthetic")
+            return FakeProc()
+        return _fake_build(argv, env)
+
+    assert (
+        demo.run(None, spawn, lambda _u: None, probe=lambda _p: True, which=lambda n: n)
+        == 0
+    )
+    assert pnpm[-1][-2:] == ["run", "build:demo"]
+
+
+def test_demo_process_is_isolated_and_never_touches_the_keychain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import keyring
+
+    def no(*_a: object, **_k: object) -> None:
+        raise AssertionError("the demo touched the Keychain")
+
+    for name in ("get_password", "set_password", "delete_password", "get_keyring"):
+        monkeypatch.setattr(keyring, name, no)
+    monkeypatch.setenv("FA_DB_PATH", "/real/ledger.db")
+    envs: list[dict[str, str]] = []
+
+    def spawn(argv: list[str], env: Mapping[str, str]) -> Any:
+        envs.append(dict(env))
+        return _fake_build(argv, env)
+
+    assert demo.run(None, spawn, lambda _u: None, probe=lambda _p: True) == 0
+    for env in envs:
+        assert env["FA_DEMO"] == "1" and "FA_DB_PATH" not in env
+        assert Path(env["FA_DEMO_DIR"]).name.startswith("fa-demo-")
+        assert not Path(env["FA_DEMO_DIR"]).is_relative_to(DEFAULT_DB.parent)
 
 
 # --- install.sh ---------------------------------------------------------------
