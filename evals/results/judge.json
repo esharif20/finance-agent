@@ -17,8 +17,8 @@
   ],
   "replies": {
     "gemini-flash-latest": {
-      "scored": 29,
-      "mean_score": 4.5862
+      "scored": 31,
+      "mean_score": 4.5484
     }
   },
   "models": {
@@ -29,7 +29,7 @@
         "kappa": 0.647059,
         "exact_agreement": 0.766667,
         "no_verdict_count": 0,
-        "cost_total_pence": 59
+        "cost_total_pence": 61
       }
     }
   }

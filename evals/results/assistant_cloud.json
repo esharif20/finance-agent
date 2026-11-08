@@ -1,10 +1,10 @@
 {
   "harness": "assistant_cloud",
   "dataset": "assistant_golden",
-  "dataset_version": 8,
-  "dataset_sha256": "5c83ea9aa43d6340af237f16aee5e4b6c4a5ee218178b80bd3bbde947ab91bc5",
+  "dataset_version": 10,
+  "dataset_sha256": "da49ca76535f3ba13560fe32eb29f8c5a8ac1f7ef5efc4ad9de9596753d5b78d",
   "prompt_sha256": "c506981690b66c7c452731e03b1684c1b2f24601fb72fdd3073402e4a5010c09",
-  "cases": 43,
+  "cases": 45,
   "refusal_cases": 7,
   "models": {
     "cloud:gemini-flash-latest": {
@@ -20,9 +20,9 @@
         "model_error_rate": 0.0,
         "fallback_rate": 0.0,
         "leak_count": 0,
-        "cloud_calls": 31,
-        "cost_total_pence": 31,
-        "cost_per_case_pence": 0.7209
+        "cloud_calls": 33,
+        "cost_total_pence": 33,
+        "cost_per_case_pence": 0.7333
       },
       "failures": {}
     }
