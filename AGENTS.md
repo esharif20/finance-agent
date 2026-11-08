@@ -38,7 +38,15 @@ Read `GLOSSARY.md` and the relevant `docs/adr/` before working. Design docs: `do
 - `model:sonnet`: well-specified endpoints, importers following an existing pattern, UI components, tests.
 - `model:haiku`: only tiny tasks such as docs, config and renames.
 
-When running `/implement-spec`, start each implementer subagent with the model on its ticket's label, in its own worktree. For `model:opus` tickets only, a fresh Opus verifier subagent (no access to the implementer's reasoning) runs `/code-review` and adds at least one adversarial test (a property test or a malicious input); the ticket merges only when the verifier approves and CI passes. `model:sonnet` and `model:haiku` tickets merge on CI. A ticket that fails review twice moves up one model.
+When running `/implement-spec`, start each implementer subagent with the model on its ticket's label, in its own worktree. Most tickets, `model:opus` included, merge on green CI after the orchestrator has read the diff.
+
+A separate verifier is the exception, not the rule. A fresh Opus verifier subagent (no access to the implementer's reasoning) runs `/code-review` and adds at least one adversarial test (a property test or a malicious input) only for:
+
+- security and privacy: egress, the privacy gateway, prompt injection, secrets, data exposure;
+- data loss: deleting or rewriting user data, and migrations that change existing rows;
+- money invariants: anything that could change a Ledger total.
+
+Those tickets merge only when the verifier approves and CI passes. During milestone work on an integration branch, one verifier reviews the whole wave's combined diff instead of one per ticket. A ticket that fails review twice moves up one model.
 
 ## Parallel work
 
