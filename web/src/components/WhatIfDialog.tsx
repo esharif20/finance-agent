@@ -165,7 +165,7 @@ export function WhatIfDialog({ onClose }: { onClose: () => void }) {
           <button type="button" onClick={onClose} className={`${btn} bg-active [@media(hover:hover)]:hover:bg-raised`}>
             Close
           </button>
-          <button type="submit" disabled={check.isPending || !on} className={`${btn} bg-primary text-primary-foreground`}>
+          <button type="submit" disabled={check.isPending || !on} data-magnetic className={`${btn} bg-primary text-primary-foreground`}>
             Check
           </button>
         </div>

@@ -110,12 +110,14 @@ export function AccountStack({
   selected,
   onSelect,
   onPreview,
+  onHot,
 }: {
   accounts: Account[];
   balances?: Balances; // GBP balances from /api/fx/balances, for a mixed-currency total
   selected?: number;
   onSelect: (id: number | undefined) => void;
   onPreview?: (id: number | undefined) => void; // a pointer is on a card: fetch its view early
+  onHot?: (id: number | undefined) => void; // a pointer or keyboard is on a card: light its share elsewhere
 }) {
   const reduce = useReducedMotion() ?? false;
   const all = useMemo(() => faces(accounts, balances), [accounts, balances]);
@@ -387,13 +389,25 @@ export function AccountStack({
                 if (swallow.current && e.detail !== 0) return;
                 choose(i);
               }}
-              onPointerEnter={() => onPreview?.(f.id)}
-              onPointerMove={point(i)}
-              onPointerLeave={() => setHover((h) => (h?.index === i ? null : h))}
-              onFocus={(e) => {
-                if (e.currentTarget.matches(":focus-visible")) setHover({ index: i, px: 0.5, py: 0.5 });
+              onPointerEnter={() => {
+                onPreview?.(f.id);
+                onHot?.(f.id);
               }}
-              onBlur={() => setHover((h) => (h?.index === i ? null : h))}
+              onPointerMove={point(i)}
+              onPointerLeave={() => {
+                setHover((h) => (h?.index === i ? null : h));
+                onHot?.(undefined);
+              }}
+              onFocus={(e) => {
+                if (e.currentTarget.matches(":focus-visible")) {
+                  setHover({ index: i, px: 0.5, py: 0.5 });
+                  onHot?.(f.id);
+                }
+              }}
+              onBlur={() => {
+                setHover((h) => (h?.index === i ? null : h));
+                onHot?.(undefined);
+              }}
               className="account-card text-left"
               data-front={pose.layer === all.length - 1}
               data-selected={on}
