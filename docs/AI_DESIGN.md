@@ -47,7 +47,29 @@ Rules:
 
 ## Models
 
-`ChatModel` interface with adapters: Ollama now, cloud later through the gateway. Model choice is benchmark-driven (see `ML_EVALUATIONS.md`). Candidates: `qwen3.5:9b` and one ~4B model. Note: community reports describe a qwen3.5 tool-call printing bug in some Ollama versions; the benchmark must catch it.
+`ChatModel` interface with adapters: Ollama now, cloud later through the gateway. Model choice is benchmark-driven (see `ML_EVALUATIONS.md`). Note: community reports describe a qwen3.5 tool-call printing bug in some Ollama versions; the benchmark must catch it.
+
+The default is **`qwen3.5:9b-q4_K_M`** (#144). `OllamaChatModel` sends `think: false`, `temperature` 0, `presence_penalty` 0 and `num_ctx` 8192 on every call, whatever the model's own defaults (qwen3.5 ships temperature 1 and presence_penalty 1.5).
+
+Benchmark on the M1 Pro 16 GB, Ollama 0.40.15, golden set v2 (25 cases, 6 refusals), 8k context, greedy, final prompts (`evals/results/assistant_local.json`):
+
+| Model | route | tools | grounding | refusal | printed | errors | p50 / p95 | peak |
+|---|---|---|---|---|---|---|---|---|
+| `qwen3.5:4b-q4_K_M` | 0.96 | 0.80 | 0.74 | 0.83 | 0 | 0 | 7.5 s / 21.1 s | 4.7 GB |
+| **`qwen3.5:9b-q4_K_M`** | 0.96 | 0.88 | 0.74 | 1.00 | 0 | 0 | 16.5 s / 36.1 s | 6.7 GB |
+| `gemma4:e4b-it-q4_K_M` | 0.96 | 0.76 | 0.42 | 0.83 | 0 | 0 | 4.5 s / 10.2 s | 6.5 GB |
+| `lfm2.5:8b-a1b-q4_K_M` | 0.44 | 0.48 | 0.00 | 1.00 | 0.08 | 0 | 23.3 s / 38.8 s | 5.1 GB |
+| `qwen3.5:4b` (nvfp4, MLX) | 0.96 | 0.76 | 0.68 | 1.00 | 0 | 0 | 5.3 s / 14.7 s | 11.8 GB |
+| `gemma4:e4b` (nvfp4, MLX) | 0.96 | 0.76 | 0.37 | 0.83 | 0 | 0 | 2.8 s / 10.7 s | 11.4 GB |
+
+Before the #144 fixes (thinking off, default sampling, old prompts), `qwen3.5:4b` scored route 0.56, tools 0.48, grounding 0.47, and `qwen3.5:9b` route 0.96, tools 0.48, grounding 0.53 at 15.2 GB.
+
+What the benchmark found:
+
+- **Memory.** The default `qwen3.5` and `gemma4` tags are nvfp4 builds on Ollama's MLX runner. Its memory grows over a session (its log shows a 4–5 GB peak after one question and about 12 GB after 25), so they fail the about-7 GB budget. The GGUF `q4_K_M` tags on the llama.cpp runner stay flat.
+- **Fixed in the prompts and tools.** Tool argument descriptions were code comments the model never saw, so it sent £50.00 as `amount_minor` 50 and guessed Category names. Each argument now has a schema description, `propose_correction` lists the taxonomy, the system prompt states today's date (models invented 2023 dates for `on`), `simulate_purchase` echoes its day, and the Router prompt has examples.
+- **Model errors left (grounding stays strict).** Both qwen sizes still write `£0` for £0.00, work out a Split's remainder (£9.99), or add a note to a Category change. Those replies fall back to the deterministic table. `qwen3.5:4b-q4_K_M` proposes "I spend about £92.34 a month on food" as a Memory, and the 9b is the smallest model that refuses all six unsafe asks.
+- **The golden set is ambiguous on transfers:** "Send £50.00" expects Ask and "Move £500.00" expects Plan, so both models lose one route either way.
 
 Routing per request: cache → local model → cloud only with per-conversation opt-in → deterministic tables. The UI always shows which path answered.
 

@@ -21,6 +21,8 @@ const item = (over: Partial<Item>): Item => withShown({
   choices: [],
   suggestions: [],
   skipped: false,
+  spend_minor: 0,
+  currency: "GBP",
   ...over,
 });
 const A = item({});
@@ -33,7 +35,7 @@ const C = item({
   choices: ["yes", "no"],
   transaction_ids: [],
 });
-const queue = (items: Item[]): Queue => ({ items, remaining: items.length, ledger_version: 1 });
+const queue = (items: Item[]): Queue => ({ items, remaining: items.length, ledger_version: 1, applied: 0 });
 const groups = [
   { name: "Food & Drink", subs: ["Groceries", "Coffee"] },
   { name: "Transport", subs: ["Taxi"] },

@@ -24,10 +24,11 @@ from finance_agent.assistant.chat_model import Message, Reply, ToolCall, ToolSpe
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_PORT = 11434
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
-DEFAULT_MODEL = (
-    "qwen3.5:4b"  # light footprint; the #143/#144 benchmark picks the final one
-)
+# the #144 benchmark: the smallest that refuses every unsafe ask, about 6.7 GB
+# peak at 8k. GGUF, not the default nvfp4 MLX build, which grew to about 12 GB.
+DEFAULT_MODEL = "qwen3.5:9b-q4_K_M"
 KEEP_ALIVE = "2m"
+NUM_CTX = 8192  # the context the #144 memory gate (about 7 GB) is measured at
 
 
 class OllamaHostRefused(ValueError):
@@ -145,11 +146,20 @@ class OllamaChatModel:
         *,
         keep_alive: str = KEEP_ALIVE,
         timeout: float = 120.0,
-        num_ctx: int | None = None,  # the context length; the #143 benchmark sets 8k
+        num_ctx: int = NUM_CTX,
+        seed: int | None = None,
         connect: Callable[[], _Connection] | None = None,
     ) -> None:
         self.model = model
-        self._num_ctx = num_ctx
+        # greedy whatever the model's defaults (qwen3.5: temperature 1,
+        # presence_penalty 1.5): tool calls and copied figures must repeat (#144)
+        self._options: dict[str, int] = {
+            "temperature": 0,
+            "presence_penalty": 0,
+            "num_ctx": num_ctx,
+        }
+        if seed is not None:
+            self._options["seed"] = seed
         self._host, self._port = _local_endpoint(base_url)
         self._keep_alive = keep_alive
         self._timeout = timeout
@@ -167,9 +177,9 @@ class OllamaChatModel:
             "messages": [_wire(m) for m in messages],
             "stream": stream,
             "keep_alive": self._keep_alive,
+            "think": False,  # qwen3.5 thinks by default: 10x slower, timeouts (#144)
+            "options": self._options,
         }
-        if self._num_ctx is not None:
-            body["options"] = {"num_ctx": self._num_ctx}
         if tools:
             body["tools"] = [
                 {

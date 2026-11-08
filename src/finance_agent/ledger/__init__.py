@@ -662,6 +662,21 @@ def _month_bounds(month: str) -> tuple[date, date]:
     return start, end
 
 
+@dataclass(frozen=True)
+class _Row:
+    """One registry row to write: the fields of `_registry` that travel together."""
+
+    merchant_id: int
+    source: str
+    kind: str | None
+    group: str | None
+    status: str
+    reason: str | None
+    evidence_on: date
+    charge_count: int | None = None
+    interval: str | None = None
+
+
 class Ledger:
     def __init__(self, conn: Connection, user_id: int) -> None:
         self._db = Scoped(conn, user_id)
@@ -823,6 +838,7 @@ class Ledger:
             transaction_id=transaction_id,
             created_at=datetime.now(UTC),
         )
+        self._link_transfers()  # its pair, if any, goes to the live twin now
         self._db.bump_ledger_version()
         log.info("duplicate merged")  # never the amount or the description
         return merge_id
@@ -837,6 +853,7 @@ class Ledger:
         )
         if res.rowcount != 1:
             raise UnknownTarget("no such active merge")
+        self._link_transfers()
         self._db.bump_ledger_version()
 
     def transaction(self, transaction_id: int) -> Transaction | None:
@@ -1509,6 +1526,7 @@ class Ledger:
             schema.transaction_source,
             schema.possible_duplicate,
             schema.note,
+            schema.transfer_rejection,  # the user's word stays with the row
         ):
             self._db.execute(
                 self._db.update(table)
@@ -2375,22 +2393,24 @@ class Ledger:
     def add_subscription(self, merchant_id: int, kind: str, group: str) -> None:
         """The user lists a Merchant as a Subscription or Bill."""
         self._registry(
-            merchant_id, "user", kind, group, "active", "user_added", date.today()
+            _Row(merchant_id, "user", kind, group, "active", "user_added", date.today())
         )
 
     def regroup_subscription(self, merchant_id: int, kind: str, group: str) -> None:
         """The user moves an entry to another kind or group; the rest is kept."""
         x = self._listed(merchant_id)
         self._registry(
-            merchant_id,
-            "user",
-            kind,
-            group,
-            x.status,
-            x.reason,
-            x.evidence_on,
-            x.charge_count,
-            x.interval,
+            _Row(
+                merchant_id,
+                "user",
+                kind,
+                group,
+                x.status,
+                x.reason,
+                x.evidence_on,
+                x.charge_count,
+                x.interval,
+            )
         )
 
     def confirm_subscription(
@@ -2402,15 +2422,19 @@ class Ledger:
         if x is None:
             raise UnknownTarget("no such registry entry")
         return self._registry(
-            merchant_id,
-            "user",
-            kind or x.kind,
-            group or x.group,
-            "active",
-            "user_confirmed",
-            date.today(),
-            x.charge_count,
-            x.interval,
+            _Row(
+                merchant_id,
+                "user",
+                kind or x.kind,
+                group or x.group,
+                "active",
+                "user_added"
+                if x.reason == "user_added"
+                else "user_confirmed",  # origin stays
+                date.today(),
+                x.charge_count,
+                x.interval,
+            )
         )
 
     def cancel_subscription(self, merchant_id: int) -> int:
@@ -2419,22 +2443,24 @@ class Ledger:
         Returns the registry row written."""
         x = self._listed(merchant_id)
         return self._registry(
-            merchant_id,
-            "user",
-            x.kind,
-            x.group,
-            USER_CANCELLED,
-            x.reason,
-            x.evidence_on,
-            x.charge_count,
-            x.interval,
+            _Row(
+                merchant_id,
+                "user",
+                x.kind,
+                x.group,
+                USER_CANCELLED,
+                x.reason,
+                x.evidence_on,
+                x.charge_count,
+                x.interval,
+            )
         )
 
     def not_a_subscription(self, merchant_id: int) -> int:
         """Remove or dismiss: remembered as "not a subscription", never deleted.
         Returns the registry row written."""
         return self._registry(
-            merchant_id, "user", None, None, NOT_SUBSCRIPTION, None, date.today()
+            _Row(merchant_id, "user", None, None, NOT_SUBSCRIPTION, None, date.today())
         )
 
     def revert_subscription_decision(self, entry_id: int) -> None:
@@ -2488,7 +2514,7 @@ class Ledger:
             x.interval,
         ):
             return False
-        self._registry(merchant_id, "detection", *same)
+        self._registry(_Row(merchant_id, "detection", *same))
         return True
 
     def _listed(self, merchant_id: int) -> SubscriptionEntry:
@@ -2497,37 +2523,27 @@ class Ledger:
             raise UnknownTarget("not in the registry")
         return x
 
-    def _registry(
-        self,
-        merchant_id: int,
-        source: str,
-        kind: str | None,
-        group: str | None,
-        status: str,
-        reason: str | None,
-        evidence_on: date,
-        charge_count: int | None = None,
-        interval: str | None = None,
-    ) -> int:
+    def _registry(self, r: _Row) -> int:
         m = schema.merchant
-        self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
-        if status != NOT_SUBSCRIPTION and (
-            kind not in REGISTRY_KINDS or group not in TAXONOMY[REGISTRY_KINDS[kind]]
+        self._exists(self._db.select(m, m.c.id).where(m.c.id == r.merchant_id))
+        if r.status != NOT_SUBSCRIPTION and (
+            r.kind not in REGISTRY_KINDS
+            or r.group not in TAXONOMY[REGISTRY_KINDS[r.kind]]
         ):
             raise InvalidEntry("kind and group must be a Subscriptions or Bills leaf")
-        if interval is not None and interval not in INTERVALS:
+        if r.interval is not None and r.interval not in INTERVALS:
             raise InvalidEntry("interval must be weekly, monthly or annual")
         entry_id = self._db.insert(
             schema.subscription_entry,
-            merchant_id=merchant_id,
-            source=source,
-            kind=kind,
-            group_name=group,
-            status=status,
-            reason=reason,
-            evidence_on=evidence_on,
-            charge_count=charge_count,
-            interval=interval,
+            merchant_id=r.merchant_id,
+            source=r.source,
+            kind=r.kind,
+            group_name=r.group,
+            status=r.status,
+            reason=r.reason,
+            evidence_on=r.evidence_on,
+            charge_count=r.charge_count,
+            interval=r.interval,
             created_at=datetime.now(UTC),
         )
         self._db.bump_ledger_version()
@@ -2914,16 +2930,58 @@ class Ledger:
             legs[a], legs[b] = b, a
         return legs
 
+    def _not_pairable(self) -> set[int]:
+        r = schema.transfer_rejection
+        rejected = self._db.execute(
+            self._db.select(r, r.c.transaction_id).where(r.c.reverted_at.is_(None))
+        ).scalars()
+        return self.merged_ids() | set(rejected)
+
+    def not_a_transfer(self, transaction_id: int) -> int:
+        """The user's word that this row is no Transfer leg: its pair, if any,
+        is undone and it never pairs again until reverted; the other leg may
+        pair afresh. Returns the rejection's id. Run `categorise.run`
+        afterwards, so both rows take their Kind again."""
+        t = schema.transaction
+        self._exists(self._db.select(t, t.c.id).where(t.c.id == transaction_id))
+        rid = self._db.insert(
+            schema.transfer_rejection,
+            transaction_id=transaction_id,
+            created_at=datetime.now(UTC),
+        )
+        self._link_transfers()
+        self._db.bump_ledger_version()
+        log.info("transfer rejected")  # never the amount or the description
+        return rid
+
+    def revert_not_a_transfer(self, rejection_id: int) -> None:
+        """Undo `not_a_transfer`; it stays in the history, marked reverted, and
+        the row may pair again. Run `categorise.run` afterwards."""
+        r = schema.transfer_rejection
+        res = self._db.execute(
+            self._db.update(r)
+            .where(r.c.id == rejection_id, r.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active rejection")
+        self._link_transfers()
+        self._db.bump_ledger_version()
+
     def _link_transfers(self) -> None:
         """Pair unlinked own-account Transfer legs: same amount and currency,
         opposite sign, another of this user's Accounts, dates within
         TRANSFER_DAYS. Among candidates, Type TFR on both legs, then identical
         descriptions, then the closest date win; each leg pairs at most once.
 
-        Uses raw Bank fields only.
+        Uses raw Bank fields only. Never pairs a merged Possible Duplicate
+        (#224) or a row the user said is no Transfer (#215 C). Links are
+        derived, so every run rebuilds them all: the pairing is a function of
+        the live rows alone, and an undo restores exactly the pairs it took.
         """
         t = schema.transaction
-        linked = self._transfer_legs()
+        off = self._not_pairable()
+        self._db.execute(self._db.delete(schema.transfer_link))
         rows = [
             r
             for r in self._db.execute(
@@ -2938,7 +2996,7 @@ class Ledger:
                     t.c.currency,
                 ).order_by(t.c.posted_on, t.c.id)
             )
-            if r.id not in linked
+            if r.id not in off
         ]
         incoming: dict[tuple[str, int], list[Any]] = {}
         for r in rows:

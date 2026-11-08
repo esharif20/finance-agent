@@ -25,6 +25,9 @@ from finance_agent.ledger.proposals import (
 
 _STRICT = ConfigDict(extra="forbid", frozen=True)
 Name = Annotated[str, Field(min_length=1, max_length=40)]
+CATEGORY = (
+    '[top-level, subcategory] from the tool\'s list, e.g. ["Food & Drink", "Groceries"]'
+)
 
 
 class Turn(BaseModel):
@@ -69,12 +72,17 @@ def _out(p: Proposal) -> ProposalOut:
 
 class ProposeMemoryIn(BaseModel):
     model_config = _STRICT
-    type: MemoryType
+    type: MemoryType = Field(
+        description="preference: what they like or avoid; goal: what they aim"
+        " for; constraint: a rule never to break, such as never cancelling something"
+    )
     text: str = Field(
-        min_length=1, max_length=MEMORY_MAX
-    )  # a preference, never a figure
+        min_length=1,
+        max_length=MEMORY_MAX,
+        description="the user's own words, never a figure or spending pattern",
+    )
     tags: list[Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{0,23}$")]] = Field(
-        default_factory=list[str], max_length=5
+        default_factory=list[str], max_length=5, description="lower-case-words"
     )
 
 
@@ -90,19 +98,33 @@ def propose_memory(st: Store, inp: ProposeMemoryIn, turn: Turn) -> ProposalOut:
 
 class PartIn(BaseModel):
     model_config = _STRICT
-    amount_minor: int | None = None  # signed as the Bank has it; last may be omitted
-    category: list[Name] = Field(min_length=2, max_length=2)  # [top, sub]
+    amount_minor: int | None = Field(
+        default=None,
+        description="pence, signed as the Transaction's amount (spending is"
+        " negative: -£10.00 is -1000); leave it out on the last part for the rest",
+    )
+    category: list[Name] = Field(min_length=2, max_length=2, description=CATEGORY)
 
 
 class ProposeCorrectionIn(BaseModel):
     """One of: a Category, a Split into parts, or a purpose note."""
 
     model_config = _STRICT
-    transaction_id: int = Field(ge=1, le=2**63 - 1)  # from a txn:<id> evidence ID
-    category: list[Name] | None = Field(default=None, min_length=2, max_length=2)
-    parts: list[PartIn] | None = Field(default=None, min_length=2, max_length=10)
-    note: str | None = Field(default=None, max_length=140)
-    part: int | None = Field(default=None, ge=0, le=9)  # the note's Split part
+    transaction_id: int = Field(
+        ge=1, le=2**63 - 1, description="the number in its txn:<id> evidence_id"
+    )
+    category: list[Name] | None = Field(
+        default=None, min_length=2, max_length=2, description=CATEGORY
+    )
+    parts: list[PartIn] | None = Field(
+        default=None, min_length=2, max_length=10, description="a Split's parts"
+    )
+    note: str | None = Field(
+        default=None, max_length=140, description="what it was for"
+    )
+    part: int | None = Field(
+        default=None, ge=0, le=9, description="which Split part the note is for"
+    )
 
     @model_validator(mode="after")
     def _one(self) -> "ProposeCorrectionIn":
@@ -139,7 +161,7 @@ def propose_correction(st: Store, inp: ProposeCorrectionIn, turn: Turn) -> Propo
 
 class ListMemoriesIn(BaseModel):
     model_config = _STRICT
-    type: MemoryType | None = None
+    type: MemoryType | None = Field(default=None, description="only this type")
 
 
 class MemoryRow(BaseModel):

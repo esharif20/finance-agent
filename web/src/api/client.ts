@@ -120,7 +120,14 @@ async function review(url: string, body?: object): Promise<ReviewQueueOut> {
   if (!res.ok) {
     const j: unknown = await res.json().catch(() => null);
     const detail = (j as { detail?: unknown } | null)?.detail;
-    throw new Error(typeof detail === "string" ? detail : "Couldn't save that. Try again.");
+    const stale = (detail as { stale_ids?: string[] } | null)?.stale_ids;
+    throw new Error(
+      typeof detail === "string"
+        ? detail
+        : stale
+          ? `${stale.length} of those changed since they were shown, so nothing was saved.`
+          : "Couldn't save that. Try again.",
+    );
   }
   return (await res.json()) as ReviewQueueOut;
 }
@@ -129,7 +136,14 @@ const itemUrl = (id: string, verb: string) => `/api/review-queue/${encodeURIComp
 export const answerReview = (item: ReviewItem, answer: ReviewAnswer) =>
   review(itemUrl(item.id, "answer"), { version: item.version, ...answer });
 export const skipReview = (item: ReviewItem) => review(itemUrl(item.id, "skip"), { version: item.version });
-export const undoReview = () => review("/api/review-queue/undo");
+/** `count` undoes a whole batch (the `applied` a batch answer returned). */
+export const undoReview = (count = 1) => review(count > 1 ? `/api/review-queue/undo?count=${count}` : "/api/review-queue/undo");
+
+/** All or nothing: a stale item refuses the batch and the error names how many changed. */
+export const answerReviewBatch = (items: ReviewItem[], category: [string, string]) =>
+  review("/api/review-queue/answers", {
+    answers: items.map((i) => ({ id: i.id, version: i.version, category })),
+  });
 
 // Splits, notes and "Always ask" (#122). A refusal throws the API's own reason; it never quotes a note.
 export type SplitOut = components["schemas"]["SplitOut"];
@@ -143,7 +157,14 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const j: unknown = await res.json().catch(() => null);
     const detail = (j as { detail?: unknown } | null)?.detail;
-    throw new Error(typeof detail === "string" ? detail : "Couldn't save that. Try again.");
+    const stale = (detail as { stale_ids?: string[] } | null)?.stale_ids;
+    throw new Error(
+      typeof detail === "string"
+        ? detail
+        : stale
+          ? `${stale.length} of those changed since they were shown, so nothing was saved.`
+          : "Couldn't save that. Try again.",
+    );
   }
   return (await res.json()) as T;
 }

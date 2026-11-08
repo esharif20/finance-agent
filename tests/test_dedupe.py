@@ -582,18 +582,37 @@ def test_import_against_5000_stored_rows_stays_fast(
     n = min(len(h.txns), 5200)
     assert n >= 5000
     ledger = ledger_for(1)
-    paths = [
-        write_export(render_export(h, s, min(n, s + MAX_ROWS)).text)
-        for s in range(0, n, MAX_ROWS - 10)
-    ]
-    ledger.import_files(paths)
 
-    t0 = time.perf_counter()
-    report = ledger.import_files([write_export(render_export(h, 2500, 2650).text)])
-    elapsed = time.perf_counter() - t0
+    def load(lo: int, hi: int) -> None:
+        ledger.import_files(
+            [
+                write_export(render_export(h, s, min(hi, s + MAX_ROWS)).text)
+                for s in range(lo, hi, MAX_ROWS - 10)
+            ]
+        )
 
-    assert report.added == 0
-    assert elapsed < 0.5, elapsed
+    def reimport_seconds(at: int) -> float:
+        # best of 3 of CPU time: wall-clock noise from parallel xdist workers
+        # (#222) is dropped, a real slowdown is not
+        best = float("inf")
+        for i in range(3):
+            # a fresh window each time: identical bytes skip as a repeat file
+            path = write_export(render_export(h, at + i, at + 150 + i).text)
+            t0 = time.process_time()
+            report = ledger.import_files([path])
+            best = min(best, time.process_time() - t0)
+            assert report.added == 0
+        return best
+
+    load(0, 500)
+    small = reimport_seconds(100)
+    load(490, n)
+    large = reimport_seconds(2500)
+
+    # 10x the stored rows should cost about the same (measured ~1.5x); an O(n^2)
+    # scan of the stored rows measured ~8x. The 2s ceiling is a backstop.
+    assert large / max(small, 1e-3) < 4, (small, large)
+    assert large < 2.0, large
 
 
 def _reversed(description: str) -> str:

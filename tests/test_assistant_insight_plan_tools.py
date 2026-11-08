@@ -237,6 +237,16 @@ def test_simulate_purchase_says_insufficient_and_refuses_the_past(
     out = call(engine, "plan", "simulate_purchase", amount_minor=100)
     assert out.status == "insufficient" and out.minimum is None
     assert out.have is not None and out.need is not None and out.have < out.need
+    # the purchase day is echoed, like its amount, so "today" or "on 25
+    # January" in a reply grounds against it (#144)
+    assert out.on == date.today()
+    later = date.today() + timedelta(days=5)
+    assert (
+        call(
+            engine, "plan", "simulate_purchase", amount_minor=100, on=later.isoformat()
+        ).on
+        == later
+    )
     past = (date.today() - timedelta(days=1)).isoformat()
     with pytest.raises(NoData):
         call(engine, "plan", "simulate_purchase", amount_minor=100, on=past)

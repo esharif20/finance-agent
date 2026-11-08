@@ -6,11 +6,14 @@ every rule (ADR 0001); ML comes later, after rules.
 
 import logging
 import re
+import tomllib
+from collections import Counter
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
+from pathlib import Path
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, func
 
 from finance_agent.categorise import subscriptions
 from finance_agent.ledger import UNCATEGORISED as _NONE
@@ -24,16 +27,73 @@ log = logging.getLogger(__name__)  # counts only
 
 UNCATEGORISED = (_NONE, _NONE)
 
-# Merchant -> (descriptor pattern, default Category). Matched against the raw
-# upper-case Bank description; first match wins.
-MERCHANTS: dict[str, tuple[re.Pattern[str], tuple[str, str]]] = {
-    "Tesco": (re.compile(r"^TESCO\b"), ("Food & Drink", "Groceries")),
-    "Pret A Manger": (re.compile(r"^PRET\b"), ("Food & Drink", "Coffee")),
-    "Deliveroo": (re.compile(r"^DELIVEROO\b"), ("Food & Drink", "Takeaway")),
-    "Amazon": (re.compile(r"^(AMZN|AMAZON|AMZ\*)"), ("Shopping", "Online")),
-    "Spotify": (re.compile(r"\bSPOTIFY\b"), ("Subscriptions", "Streaming")),
-    "TfL": (re.compile(r"^TFL\b"), ("Transport", "Public transport")),
-}
+type Category = tuple[str, str]
+
+
+def _token(token: str) -> str:
+    """One `match` token of merchants_uk.toml as a regex over `_squash`ed text:
+    "^X" only at the start, "X$" only at the end, "X*" no word boundary after,
+    else whole words."""
+    token = token.strip()
+    if token.endswith("$"):
+        return _token(token[:-1]).removesuffix(r"(?![A-Z0-9])") + "$"
+    start = token.startswith("^")
+    open_end = token.endswith("*")
+    words = token.removeprefix("^").removesuffix("*").split()
+    body = r"\s+".join(re.escape(w) for w in words)
+    return (
+        ("^" if start else r"(?<![A-Z0-9])")
+        + body
+        + ("" if open_end else r"(?![A-Z0-9])")
+    )
+
+
+# What may follow a `whole` Merchant's name: web suffix, company or place
+# words, reference numbers. "NETFLIX FAN SHOP" is not Netflix (see
+# subscriptions.known_service), so the rest of the descriptor must be noise.
+_TAIL = (
+    r"(?:\.COM|\.CO\.UK|\.COM/BILL| (?:LTD|LIMITED|PLC|UK|GB|GBR|LONDON|CD)"
+    r"| [A-Z]{0,3}\d[A-Z0-9-]*)*$"
+)
+
+
+def _category(path: str) -> Category:
+    top, sub = path.split("/", 1)
+    return top, sub
+
+
+def _load_base() -> tuple[
+    dict[str, tuple[re.Pattern[str], Category]],
+    tuple[tuple[str, re.Pattern[str], Category], ...],
+]:
+    """merchants_uk.toml (#215): Merchants in precedence order, sub-brand
+    groups before base groups, and the extra keyword rules."""
+    data = tomllib.loads(_BASE_FILE.read_text(encoding="utf-8"))
+    merchants: dict[str, tuple[re.Pattern[str], Category]] = {}
+    for group in (*data["sub_brand"], *data["base"]):
+        for m in group["merchants"]:
+            tokens = m.get("match") or [m["name"].upper()]
+            if m.get("whole"):  # the descriptor is the name and nothing else
+                names = "|".join(
+                    _token(t).removesuffix(r"(?![A-Z0-9])") for t in tokens
+                )
+                pattern = re.compile(f"^(?:PAYPAL )?(?:{names}){_TAIL}")
+            else:
+                pattern = re.compile("|".join(_token(t) for t in tokens))
+            category = _category(m.get("category", group["category"]))
+            merchants[m["name"]] = (pattern, category)
+    rules = tuple(
+        (r["id"], re.compile(r["pattern"]), _category(r["category"]))
+        for r in data["rule"]
+    )
+    return merchants, rules
+
+
+_BASE_FILE = Path(__file__).with_name("merchants_uk.toml")
+# Merchant -> (descriptor pattern, default Category), matched against the
+# `_squash`ed upper-case Bank description; first match wins, so the order is
+# the precedence: sub-brands (TESCO PFS) before the retailer (TESCO).
+MERCHANTS, _BASE_RULES = _load_base()
 
 
 def _upper(description: str) -> str:
@@ -42,9 +102,20 @@ def _upper(description: str) -> str:
     return "".join(ch.upper() if ch.isascii() else ch for ch in description)
 
 
+_PROCESSOR = re.compile(r"^(SQ|SUMUP|ZTL|IZ) (?=\S)")
+
+
+def _squash(upper: str) -> str:
+    """Matching form: `*` and apostrophes dropped, spaces collapsed, so
+    "SAINSBURY'S S/MKTS" and "AMAZON PRIME*AB12" meet one pattern."""
+    plain = upper.replace("'", "").replace("\u2019", "").replace("*", " ")
+    # card-processor prefixes hide the start of the descriptor
+    return _PROCESSOR.sub("", " ".join(plain.split()))
+
+
 def merchant_for(description: str) -> str | None:
     """The seeded Merchant a raw Bank descriptor is an alias of, if any."""
-    d = _upper(description)
+    d = _squash(_upper(description))
     return next((m for m, (p, _) in MERCHANTS.items() if p.search(d)), None)
 
 
@@ -81,6 +152,7 @@ RULES: tuple[tuple[str, re.Pattern[str], tuple[str, str]], ...] = (
         ("Bills", "Council tax"),
     ),
     ("gym", re.compile(r"\b(GYM|FITNESS)\b"), ("Health", "Fitness")),
+    *_BASE_RULES,
 )
 FEE_TYPES = frozenset({"FEE", "CHG"})  # Lloyds Transaction Types for bank charges
 REFUND = re.compile(r"\bREFUND\b")
@@ -160,6 +232,81 @@ def seed_taxonomy(
     return {(names[r.parent_id], r.name): r.id for r in rows if r.parent_id}
 
 
+def _decided(db: Scoped) -> set[int]:
+    """Merchant ids holding a decision keyed by `merchant_id`: an active
+    Merchant-wide Correction, "Always ask", or any registry entry."""
+    k, m, e = schema.correction, schema.merchant, schema.subscription_entry
+    return {
+        *db.execute(
+            db.select(k, k.c.merchant_id).where(
+                k.c.merchant_id.is_not(None), k.c.reverted_at.is_(None)
+            )
+        ).scalars(),
+        *db.execute(db.select(m, m.c.id).where(m.c.always_ask.is_not(None))).scalars(),
+        *db.execute(db.select(e, e.c.merchant_id)).scalars(),
+    }
+
+
+def _keep_merchants(
+    db: Scoped,
+    names: Mapping[int, str],
+    merchant_ids: dict[str, int],
+    ids: Mapping[Category, int],
+) -> dict[int, str]:
+    """Keep Merchant ids when a base change renames a descriptor family
+    (#215: NETFLIX.COM is now Netflix), so decisions keyed by `merchant_id`
+    stay in force. `names` is each Transaction's new Merchant name.
+
+    A Merchant no Transaction is named after any more is renamed (same row)
+    to the new name most of its Transactions take, if that name is free.
+    A decided Merchant that cannot be renamed keeps its Transactions, and a
+    new name only it gave up is an alias of it, so later imports join it too.
+    Returns the Merchant name for each Transaction that keeps another one."""
+    c, m = schema.categorisation, schema.merchant
+    prior: dict[int, int] = {
+        r.transaction_id: r.merchant_id
+        for r in db.execute(
+            db.select(c, c.c.transaction_id, c.c.merchant_id).where(
+                c.c.merchant_id.is_not(None)
+            )
+        )
+    }
+    name_of = {i: n for n, i in merchant_ids.items()}
+    decided = _decided(db)
+    moves: dict[int, Counter[str]] = {}
+    for tid, new in names.items():
+        if (was := prior.get(tid)) is not None and new != name_of[was]:
+            moves.setdefault(was, Counter())[new] += 1
+    wanted = set(names.values())
+    for p in sorted(moves, key=lambda p: (p not in decided, p)):  # decided first
+        new = min(moves[p], key=lambda n: (-moves[p][n], n))
+        if name_of[p] in wanted or new in merchant_ids:
+            continue
+        default = m.c.default_category_id
+        if new in MERCHANTS:  # the seeded default; a Correction still beats it
+            default = func.coalesce(default, ids[MERCHANTS[new][1]])
+        db.execute(
+            db.update(m)
+            .where(m.c.id == p)
+            .values(name=new, default_category_id=default)
+        )
+        merchant_ids[new] = merchant_ids.pop(name_of[p])
+        name_of[p] = new
+    alias: dict[str, str] = {}
+    for p in sorted(decided & moves.keys()):
+        for new in sorted(moves[p]):
+            if new not in merchant_ids:
+                alias.setdefault(new, name_of[p])
+    keep: dict[int, str] = {}
+    for tid, new in names.items():
+        was = prior.get(tid)
+        if was is not None and was in decided and new != name_of[was]:
+            keep[tid] = name_of[was]
+        elif new in alias:
+            keep[tid] = alias[new]
+    return keep
+
+
 def run(conn: Connection, user_id: int) -> int:
     """(Re)categorise every Transaction of this user; returns how many.
 
@@ -171,10 +318,26 @@ def run(conn: Connection, user_id: int) -> int:
     ledger = Ledger(conn, user_id)
     ids = seed_taxonomy(conn, user_id)
     merchant_ids = {m.name: m.id for m in ledger.merchants()}
-    for name, (_, category) in MERCHANTS.items():
+    txns = ledger.transactions(merged=True)  # an undone merge needs its row ready
+    names = {
+        t.id: m
+        for t in txns
+        if (
+            m := classify(
+                t.description,
+                t.amount,
+                t.bank_type,
+                transfer=t.transfer_with is not None,
+            ).merchant
+        )
+    }
+    keep = _keep_merchants(db, names, merchant_ids, ids)
+    # seed only the base Merchants that appear: not all of them, so the
+    # Merchant list stays the user's own
+    for name in sorted({keep.get(i, m) for i, m in names.items()} & MERCHANTS.keys()):
         if name not in merchant_ids:
             merchant_ids[name] = db.insert(
-                schema.merchant, name=name, default_category_id=ids[category]
+                schema.merchant, name=name, default_category_id=ids[MERCHANTS[name][1]]
             )
     # the merchant table is the source of defaults; the Ledger gives them in
     # today's names, so one set on an older taxonomy version still applies
@@ -187,16 +350,22 @@ def run(conn: Connection, user_id: int) -> int:
     # never learn from them
     ask = {m.name for m in ledger.merchants() if m.always_ask}
     db.execute(db.delete(schema.categorisation))
-    txns = ledger.transactions(merged=True)  # an undone merge needs its row ready
     for t in txns:
+        kept = keep.get(t.id)
         c = classify(
             t.description,
             t.amount,
             t.bank_type,
             transfer=t.transfer_with is not None,
             defaults=defaults,
-            ask=ask,
+            ask=() if kept else ask,
         )
+        if kept:  # the decided Merchant's row, with the base's Category
+            c = (
+                Classification(c.kind, kept, None, "always_ask")
+                if kept in ask
+                else replace(c, merchant=kept)
+            )
         if c.merchant and c.merchant not in merchant_ids:
             merchant_ids[c.merchant] = db.insert(schema.merchant, name=c.merchant)
         db.insert(

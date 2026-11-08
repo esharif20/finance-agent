@@ -335,6 +335,57 @@
         "title": "BalancesOut",
         "type": "object"
       },
+      "BatchAnswerIn": {
+        "properties": {
+          "category": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Category",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "id",
+          "category"
+        ],
+        "title": "BatchAnswerIn",
+        "type": "object"
+      },
+      "BatchIn": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/BatchAnswerIn"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Answers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "title": "BatchIn",
+        "type": "object"
+      },
       "BriefingOut": {
         "properties": {
           "forecast": {
@@ -1293,6 +1344,10 @@
             "title": "Choices",
             "type": "array"
           },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -1315,6 +1370,10 @@
           "skipped": {
             "title": "Skipped",
             "type": "boolean"
+          },
+          "spend_minor": {
+            "title": "Spend Minor",
+            "type": "integer"
           },
           "suggestions": {
             "items": {
@@ -1368,7 +1427,9 @@
           "transaction_ids",
           "choices",
           "suggestions",
-          "skipped"
+          "skipped",
+          "spend_minor",
+          "currency"
         ],
         "title": "ItemOut",
         "type": "object"
@@ -1991,6 +2052,11 @@
       },
       "QueueOut": {
         "properties": {
+          "applied": {
+            "default": 0,
+            "title": "Applied",
+            "type": "integer"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ItemOut"
@@ -2534,6 +2600,27 @@
           "ledger_version"
         ],
         "title": "SplitOut",
+        "type": "object"
+      },
+      "StaleOut": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "stale_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stale Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "message",
+          "stale_ids"
+        ],
+        "title": "StaleOut",
         "type": "object"
       },
       "SubscriptionOut": {
@@ -4644,10 +4731,20 @@
         "summary": "Queue"
       }
     },
-    "/api/review-queue/undo": {
+    "/api/review-queue/answers": {
       "post": {
-        "description": "Undo the latest answer or skip.",
-        "operationId": "undo_api_review_queue_undo_post",
+        "description": "Answer many Category items in one transaction: each exactly as the\nsingle answer would, all or none. A stale or missing item refuses the lot\nwith 409 and its ids. Replaying a batch finds its items gone and applies\nnothing.",
+        "operationId": "answers_api_review_queue_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchIn"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -4658,6 +4755,69 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaleOut"
+                }
+              }
+            },
+            "description": "nothing was applied"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answers"
+      }
+    },
+    "/api/review-queue/undo": {
+      "post": {
+        "description": "Undo the latest answer or skip; `count` undoes a whole batch.",
+        "operationId": "undo_api_review_queue_undo_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Count",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Undo"
