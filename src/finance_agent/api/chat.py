@@ -33,7 +33,7 @@ from sqlalchemy import Connection, Engine
 from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
 from finance_agent.assistant.cloud_route import CloudRoute
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
-from finance_agent.assistant.ollama import DEFAULT_CHOICE, MODELS
+from finance_agent.assistant.ollama import DEFAULT_CHOICE, MODELS, WARM_KEEP_ALIVE
 from finance_agent.gateway.cloud import CloudChatModel, CloudError
 from finance_agent.identity import current_user
 from finance_agent.ledger.conversation import Conversations
@@ -216,7 +216,7 @@ def chat(
     return _sse(
         engine,
         lambda a: ask(a, message, thread, cloud),
-        lambda conn: Assistant(model, conn, day, cloud=gateway),
+        lambda conn: Assistant(model, conn, day, cloud=gateway, prefetch=True),
     )
 
 
@@ -248,6 +248,10 @@ def set_model(request: Request, body: Body) -> dict[str, Choice]:
 def warm(model: Model) -> dict[str, bool]:
     """Load the model while the chat screen opens, so the first turn doesn't
     wait for it. An empty chat only loads; it stays for the keep_alive."""
+    # the turns' options (same num_ctx, so no reload); WARM_KEEP_ALIVE until
+    # the first turn shortens it to KEEP_ALIVE
+    if isinstance(model, OllamaChatModel):
+        model = OllamaChatModel(model.model, keep_alive=WARM_KEEP_ALIVE)
     try:
         model.chat([])
     except (OllamaError, OSError):

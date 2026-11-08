@@ -17,7 +17,11 @@
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
         "printed_tool_call_rate": 0.0,
-        "model_error_rate": 0.0
+        "model_error_rate": 0.0,
+        "llm_calls_per_turn": 2.377778,
+        "prompt_tokens_per_turn": 3956.3,
+        "planner_cases": 3,
+        "planner_llm_calls": 0
       },
       "failures": {}
     },
@@ -26,16 +30,19 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.177778,
-        "grounding_pass_rate": 0.026316,
+        "tool_call_accuracy": 0.244444,
+        "grounding_pass_rate": 0.105263,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.822222,
-        "model_error_rate": 0.0
+        "printed_tool_call_rate": 0.755556,
+        "model_error_rate": 0.0,
+        "llm_calls_per_turn": 2.311111,
+        "prompt_tokens_per_turn": 2490.3,
+        "planner_cases": 3,
+        "planner_llm_calls": 0
       },
       "failures": {
         "tool_calls": [
-          "ask-spent-january",
           "ask-in-and-out",
           "ask-net",
           "ask-refunds-fees",
@@ -49,11 +56,9 @@
           "ask-insights",
           "ask-guidance",
           "ask-why-subscription-card",
-          "ask-fuel-last-month",
           "ask-petrol-word",
           "ask-transport-breakdown",
           "ask-top-fuel-merchant",
-          "ask-transport-last-month",
           "ask-followup-fuel",
           "ask-car-december",
           "ask-car-followup-shell",
@@ -74,7 +79,6 @@
           "correct-split"
         ],
         "grounding": [
-          "ask-spent-january",
           "ask-in-and-out",
           "ask-net",
           "ask-refunds-fees",
@@ -88,11 +92,9 @@
           "ask-insights",
           "ask-guidance",
           "ask-why-subscription-card",
-          "ask-fuel-last-month",
           "ask-petrol-word",
           "ask-transport-breakdown",
           "ask-top-fuel-merchant",
-          "ask-transport-last-month",
           "ask-followup-fuel",
           "ask-car-december",
           "ask-car-followup-shell",
@@ -113,7 +115,6 @@
           "correct-split"
         ],
         "printed": [
-          "ask-spent-january",
           "ask-in-and-out",
           "ask-net",
           "ask-refunds-fees",
@@ -127,11 +128,9 @@
           "ask-insights",
           "ask-guidance",
           "ask-why-subscription-card",
-          "ask-fuel-last-month",
           "ask-petrol-word",
           "ask-transport-breakdown",
           "ask-top-fuel-merchant",
-          "ask-transport-last-month",
           "ask-followup-fuel",
           "ask-car-december",
           "ask-car-followup-shell",
@@ -150,6 +149,71 @@
           "correct-category",
           "correct-note",
           "correct-split"
+        ]
+      }
+    },
+    "fake_from_context": {
+      "model": "FakeChatModel answering from context",
+      "model_version": "1",
+      "metrics": {
+        "route_accuracy": 1.0,
+        "tool_call_accuracy": 0.244444,
+        "grounding_pass_rate": 0.789474,
+        "refusal_correctness": 1.0,
+        "refusal_no_proposal": 1.0,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "llm_calls_per_turn": 1.733333,
+        "prompt_tokens_per_turn": 2158.2,
+        "planner_cases": 3,
+        "planner_llm_calls": 0
+      },
+      "failures": {
+        "tool_calls": [
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual",
+          "ask-search",
+          "ask-your-story-january",
+          "ask-your-months-compared",
+          "ask-subscriptions",
+          "ask-bills",
+          "ask-insights",
+          "ask-guidance",
+          "ask-why-subscription-card",
+          "ask-petrol-word",
+          "ask-transport-breakdown",
+          "ask-top-fuel-merchant",
+          "ask-followup-fuel",
+          "ask-car-december",
+          "ask-car-followup-shell",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
+          "plan-split-pay",
+          "plan-split-pay-constraint",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "memory-values",
+          "memory-tone",
+          "memory-goal-fields",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ],
+        "grounding": [
+          "ask-your-months-compared",
+          "ask-petrol-word",
+          "ask-followup-fuel",
+          "ask-car-december",
+          "ask-car-followup-shell",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast"
         ]
       }
     }

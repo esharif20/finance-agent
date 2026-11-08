@@ -70,9 +70,16 @@ def test_the_oracle_scores_full_marks(results: dict[str, Any]) -> None:
     assert oracle["metrics"]["printed_tool_call_rate"] == 0.0
 
 
+def test_planner_cases_take_no_model_call(results: dict[str, Any]) -> None:
+    for model in results["models"].values():
+        assert model["metrics"]["planner_cases"] >= 3
+        assert model["metrics"]["planner_llm_calls"] == 0
+
+
 def test_a_model_that_prints_its_tool_calls_is_caught(results: dict[str, Any]) -> None:
     bug = results["models"]["fake_prints_tool_calls"]
-    tool_cases = {c.id for c in golden.CASES if c.calls}
+    # the fast path answers planner cases with no model, so nothing is printed
+    tool_cases = {c.id for c in golden.CASES if c.calls and not bench.planned(c)}
     assert set(bug["failures"]["printed"]) == tool_cases
     assert set(bug["failures"]["tool_calls"]) == tool_cases
     assert bug["metrics"]["tool_call_accuracy"] < 0.5
