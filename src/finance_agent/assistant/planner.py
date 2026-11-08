@@ -315,9 +315,19 @@ def _summary(src: Source, month: str) -> SpendingSummaryOut:
 def _spend(src: Source, plan: Plan, since: date, until: date) -> BaseModel:
     if plan.kind == "income":
         return _income(src, plan, since, until)
+    qp = _qp(plan, since, until)
     if not (plan.categories or plan.merchant_ids):
-        return _summary(src, f"{since:%Y-%m}")
-    return spend(src, _qp(plan, since, until))
+        if not plan.group:
+            return _summary(src, f"{since:%Y-%m}")
+        # "by merchant" on all spending: every top-level Category, for the rows
+        led = Ledger(src.conn, src.user_id)
+        tops = {
+            t.name
+            for m in qp.months()
+            for t in led.spending_by_category(m, qp.account_id)
+        }
+        qp = qp.model_copy(update={"categories": tuple(sorted(tops))})
+    return spend(src, qp)
 
 
 def _income(src: Source, plan: Plan, since: date, until: date) -> IncomeOut:
