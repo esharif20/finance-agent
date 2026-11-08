@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Inbox, MessageCircle, LayoutDashboard, ListOrdered, Repeat } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { Ambient } from "@/components/Ambient";
+import { MotionFx } from "@/components/MotionFx";
 import { BackupStatus } from "@/components/BackupStatus";
 import { NavTabs } from "@/components/NavTabs";
 import { TopBar } from "@/components/TopBar";
@@ -39,6 +40,7 @@ function Shell() {
   return (
     <>
       <Ambient />
+      <MotionFx />
       <div className="mx-auto w-full max-w-[1120px] px-4 pt-3 pb-28 sm:px-9 sm:pb-16">
         <TopBar tabs={TABS} tab={tab} settings={route.name === "settings"} />
         <motion.main

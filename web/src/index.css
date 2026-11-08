@@ -34,6 +34,17 @@
   --card-glass: rgb(255 255 255 / 0.78);
   --card-edge: rgb(27 29 31 / 0.07);
   --card-highlight: rgb(255 255 255 / 0.9);
+  /* Card material (#312): a rim lit from the top left, a faint top sheen, a soft resting
+     depth, a deeper one when lifted, and the pointer's light (hue 200, never 235-290). */
+  --rim-hi: rgb(255 255 255 / 0.95);
+  --rim-lo: rgb(27 29 31 / 0.05);
+  --card-sheen: rgb(255 255 255 / 0.5);
+  --card-depth: 0 1px 2px rgb(27 29 31 / 0.04), 0 14px 32px -20px rgb(27 29 31 / 0.18);
+  --card-lift: 0 2px 4px rgb(27 29 31 / 0.05), 0 22px 44px -22px rgb(27 29 31 / 0.28);
+  --glow-on: rgb(14 111 138 / 0.07);
+  --rich-sheen: rgb(14 150 170 / 0.07);
+  --rich-rim: rgb(14 111 138 / 0.4);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --grain: 0.035;
   --radius: 20px;
   color-scheme: light;
@@ -68,6 +79,14 @@
     --card-glass: rgb(17 17 17 / 0.6); /* worst: --accent at 4.85:1 */
     --card-edge: rgb(255 255 255 / 0.08);
     --card-highlight: rgb(255 255 255 / 0.1);
+    --rim-hi: rgb(255 255 255 / 0.22);
+    --rim-lo: rgb(255 255 255 / 0.03);
+    --card-sheen: rgb(255 255 255 / 0.035);
+    --card-depth: 0 1px 1px rgb(0 0 0 / 0.5), 0 18px 40px -22px rgb(0 0 0 / 0.9);
+    --card-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 28px 56px -24px rgb(0 0 0 / 0.95), 0 0 0 1px rgb(92 195 220 / 0.1);
+    --glow-on: rgb(120 205 230 / 0.075);
+    --rich-sheen: rgb(60 175 205 / 0.11);
+    --rich-rim: rgb(120 210 230 / 0.5);
     --grain: 0.05;
     color-scheme: dark;
   }
@@ -245,14 +264,82 @@
   color: var(--muted-foreground);
 }
 
+@property --mx {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 30%;
+}
+@property --my {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@property --glow {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+
 /* Frosted content cards (Card). Layered so a utility on one Card can still override it. The
    hairline and top highlight are inset shadows, so the box keeps today's size. */
 @layer components {
   .card-glass {
+    position: relative;
     background: var(--card-glass);
+    /* Layers over the glass: the pointer's light (MotionFx sets --mx/--my on this card only;
+       registered as non-inherited, so a move never restyles the card's rows) and a top sheen. */
+    background-image:
+      radial-gradient(420px circle at var(--mx) var(--my), var(--glow), transparent 70%),
+      linear-gradient(180deg, var(--card-sheen), transparent 120px);
     -webkit-backdrop-filter: blur(16px) saturate(1.4);
     backdrop-filter: blur(16px) saturate(1.4);
-    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-depth);
+    transition:
+      transform 280ms var(--ease-out),
+      box-shadow 280ms var(--ease-out),
+      --glow 320ms ease,
+      opacity 420ms var(--ease-out),
+      translate 560ms var(--ease-out);
+  }
+  /* The rim: a 1px gradient border that catches the light at the top left. */
+  .card-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(150deg, var(--rim-hi), var(--rim-lo) 34%, transparent 60%, var(--rim-lo));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.75;
+    transition: opacity 280ms ease;
+  }
+  /* Hover (a real pointer only) and keyboard focus inside the card share one lifted state. */
+  @media (hover: hover) and (pointer: fine) {
+    .card-glass:hover {
+      --glow: var(--glow-on);
+    }
+    .card-glass:not([data-still]):hover {
+      transform: translateY(-2px);
+      box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-lift);
+    }
+    .card-glass:hover::before {
+      opacity: 1;
+    }
+  }
+  .card-glass:not([data-still]):has(:focus-visible) {
+    transform: translateY(-2px);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-lift);
+  }
+  .card-glass:has(:focus-visible)::before {
+    opacity: 1;
+  }
+  /* Scroll reveal (MotionFx): a card below the fold rises in once as it enters. */
+  .card-glass[data-reveal="pending"] {
+    opacity: 0;
+    translate: 0 14px;
   }
   /* backdrop-filter makes each card a stacking context; lift the one in use so its open
      category menu paints over the cards after it. */
@@ -318,6 +405,114 @@
 .month-bar[data-partial][data-selected] {
   background: repeating-linear-gradient(135deg, var(--bar) 0 3px, color-mix(in oklab, var(--bar) 35%, var(--card)) 3px 6px);
   box-shadow: none;
+}
+
+/* A bar under the pointer or keyboard brightens and shows its figure. */
+.month-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px) scale(0.97);
+  transform-origin: 50% 100%;
+  transition: opacity 150ms ease-out, transform 180ms var(--ease-out);
+}
+.month-tip .money-minor {
+  color: inherit;
+  opacity: 0.7;
+}
+.month-tip[data-edge="start"] {
+  left: 0;
+  transform: translate(0, 4px) scale(0.97);
+  transform-origin: 0 100%;
+}
+.month-tip[data-edge="end"] {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px) scale(0.97);
+  transform-origin: 100% 100%;
+}
+.group:focus-visible .month-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.group:focus-visible .month-tip[data-edge] {
+  transform: none;
+}
+.group:focus-visible .month-bar {
+  filter: brightness(1.15);
+}
+@media (hover: hover) and (pointer: fine) {
+  .group:hover .month-tip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  .group:hover .month-tip[data-edge] {
+    transform: none;
+  }
+  .group:hover .month-bar {
+    filter: brightness(1.15);
+  }
+}
+
+/* A Transaction row: its secondary action (details) slides in on hover or keyboard focus.
+   Touch and coarse pointers always see it. */
+.txn-row {
+  transition: background-color 160ms ease;
+}
+.txn-row:has(:focus-visible) {
+  background: var(--raised);
+}
+@media (hover: hover) and (pointer: fine) {
+  .txn-row .row-action {
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 160ms ease-out, transform 220ms var(--ease-out), background-color 160ms ease;
+  }
+  .txn-row:hover .row-action,
+  .txn-row:focus-within .row-action,
+  .txn-row .row-action[aria-expanded="true"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The Transactions filters stay under the top bar while the list scrolls (wider screens only:
+   on a phone they wrap to three rows and would cover the list). */
+@media (min-width: 640px) {
+  .filter-bar {
+    position: sticky;
+    top: 80px;
+    z-index: 10;
+    padding: 6px;
+    border-radius: 28px;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    box-shadow: inset 0 0 0 1px var(--card-edge);
+  }
+}
+
+/* Primary actions: MotionFx pulls them a few px toward the pointer; a soft lift on hover and focus. */
+[data-magnetic] {
+  transition: box-shadow 200ms var(--ease-out), scale 150ms ease-out;
+}
+[data-magnetic]:focus-visible {
+  box-shadow: 0 8px 20px -8px rgb(0 0 0 / 0.45);
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-magnetic]:not(:disabled):hover {
+    box-shadow: 0 8px 20px -8px rgb(0 0 0 / 0.45);
+  }
 }
 
 /* Privacy mode (H): blur every amount; text can't be selected or copied out. */
@@ -583,6 +778,45 @@ html[data-private] .money {
 .share-bar > span {
   flex-basis: 0;
   min-width: 4px;
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+/* An Account under the pointer or keyboard (its card or its row) lights its share; the rest step back. */
+.share-bar > span[data-lit="off"] {
+  opacity: 0.3;
+}
+.share-bar > span[data-lit="on"] {
+  filter: brightness(1.18) saturate(1.1);
+}
+.share-row {
+  transition: opacity 200ms ease;
+}
+.share-row[data-lit="off"] {
+  opacity: 0.55;
+}
+
+/* The multi-account parts get the richest material: a hue-lit rim and a corner sheen. */
+.card-rich.card-glass {
+  background-image:
+    radial-gradient(420px circle at var(--mx) var(--my), var(--glow), transparent 70%),
+    radial-gradient(120% 90% at 0% 0%, var(--rich-sheen), transparent 62%),
+    linear-gradient(180deg, var(--card-sheen), transparent 120px);
+}
+.card-rich.card-glass::before {
+  background: linear-gradient(150deg, var(--rich-rim), var(--rim-lo) 36%, transparent 60%, color-mix(in oklab, var(--rich-rim) 45%, transparent));
+}
+.card-rich.card-glass[data-lit]::before {
+  opacity: 1;
+}
+
+/* Transfers between Accounts: their own layered strip inside the month card. */
+.transfers {
+  background: color-mix(in oklab, var(--data) 9%, var(--raised));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--data) 20%, transparent);
+}
+.transfers-icon {
+  display: inline-flex;
+  margin-top: 2px;
+  color: var(--data);
 }
 .share-key {
   flex: none;

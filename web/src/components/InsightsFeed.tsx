@@ -110,7 +110,7 @@ export function InsightsFeed() {
   if (!Array.isArray(raw)) return null; // loading, or offline: the Overview says so elsewhere
   const data = raw.filter((i) => typeof i?.explanation === "string"); // an older server may answer otherwise
   return (
-    <Card aria-labelledby="insights-title">
+    <Card data-still aria-labelledby="insights-title">
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <h2 id="insights-title" className="text-heading">
           Insights

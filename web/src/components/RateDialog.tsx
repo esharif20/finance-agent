@@ -118,7 +118,7 @@ export function RateDialog({ currency, month, onClose }: { currency: string; mon
           <button type="button" onClick={onClose} className={`${btn} bg-active [@media(hover:hover)]:hover:bg-raised`}>
             Cancel
           </button>
-          <button type="submit" disabled={save.isPending || !on} className={`${btn} bg-primary text-primary-foreground`}>
+          <button type="submit" disabled={save.isPending || !on} data-magnetic className={`${btn} bg-primary text-primary-foreground`}>
             Save rate
           </button>
         </div>
