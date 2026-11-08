@@ -15,7 +15,7 @@ from finance_agent.assistant.tools.registry import (
     run,
     specs,
 )
-from finance_agent.assistant.tools.sanitise import MAX_TEXT, sanitise
+from finance_agent.sanitise import MAX_TEXT, sanitise
 
 __all__ = [
     "ALLOWLIST",

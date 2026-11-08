@@ -287,7 +287,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Corrections
+         * @description `category`: "Top/Sub" (taxonomy ids), to list one Category's only.
+         */
+        get: operations["list_corrections_api_corrections_get"];
         put?: never;
         /** Correct */
         post: operations["correct_api_corrections_post"];
@@ -1404,6 +1408,38 @@ export interface components {
             id: number;
             /** Ledger Version */
             ledger_version: number;
+        };
+        /** CorrectionVsModelOut */
+        CorrectionVsModelOut: {
+            /** Base */
+            base: [
+                string,
+                string
+            ] | null;
+            /** Category */
+            category: [
+                string,
+                string
+            ];
+            /** Id */
+            id: number;
+            /** Merchant Id */
+            merchant_id: number;
+            /** Model */
+            model: [
+                string,
+                string
+            ] | null;
+            /** Rules */
+            rules: [
+                string,
+                string
+            ] | null;
+        };
+        /** CorrectionsVsModelOut */
+        CorrectionsVsModelOut: {
+            /** Corrections */
+            corrections: components["schemas"]["CorrectionVsModelOut"][];
         };
         /** CostOut */
         CostOut: {
@@ -2658,6 +2694,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_corrections_api_corrections_get: {
+        parameters: {
+            query?: {
+                category?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionsVsModelOut"];
                 };
             };
             /** @description Validation Error */

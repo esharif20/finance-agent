@@ -1,10 +1,11 @@
-"""Confident auto-apply right after sync (#215 B, ADR 0005 as amended).
+"""Model guesses filed right after sync (#215 B/F, ADR 0005 as amended).
 
-After rules and the UK merchant base, a Category Review item's embedding
-guess is applied as source `auto:<model version>` when its score is at or
-above THRESHOLDS[model name], the lowest similarity that keeps >= 95%
-precision on the synthetic #112 eval (evals/results/categoriser_*.json,
-"calibration"). A model without a calibrated threshold never auto-applies.
+After rules and the UK merchant base, a Category Review item's kNN or LLM
+guess is filed `auto-low:<model version>` (silent, undoable, monitored),
+except the REVIEW_CAP Merchants worth asking. The confident `auto:` path
+exists only for a version in THRESHOLDS, which is empty: held out, no model
+kept 95% precision (#287), so confident rows come from rules, the base and
+Corrections alone.
 
 Every guess is logged per model version (`embedding.stored_model`: name and
 digest), and the user's Merchant-wide answer is recorded against it: a live
@@ -18,11 +19,14 @@ for good. Corrections are an overlay on read, so they always win.
 """
 
 import logging
+from collections import Counter
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from decimal import Decimal
 
-from sqlalchemy import Connection, Engine, func
+from sqlalchemy import Connection, Engine, func, or_
 
-from finance_agent.categorise import embedding
+from finance_agent.categorise import embedding, llm
 from finance_agent.ledger import CATEGORISED_KINDS
 from finance_agent.ledger import UNCATEGORISED as _NONE
 from finance_agent.ledger.review import CategoryItems, ReviewQueue
@@ -30,12 +34,25 @@ from finance_agent.storage import Scoped, schema
 
 log = logging.getLogger(__name__)  # counts only
 
-# model name -> threshold in similarity thousandths, copied from the committed
-# synthetic calibration (a test keeps them equal)
-THRESHOLDS: dict[str, int] = {"nomic-embed-text": 861, "hashed-trigrams-v1": 817}
+# Model version name -> confident (`auto:`) threshold in similarity thousandths.
+# Empty by decision (#287): held out on the synthetic set, no model setting
+# (kNN alone, kNN+LLM agreement, LLM alone) kept 95% precision on enough rows,
+# so the confident tier is rules, the UK base and Corrections only, and every
+# model guess files as `auto-low:`. A version listed here would apply
+# confidently again; it needs a held-out calibration first.
+THRESHOLDS: dict[str, int] = {}
 MIN_DECISIONS = 50
 PRECISION = 95  # percent
 SOURCE = "auto:"
+LOW = "auto-low:"  # a best guess the gate is not sure of (#215 F)
+LOW_MODEL = "low:"  # its log rows: "low:<the version that guessed>"
+REVIEW_CAP = 10  # at most this many Merchants per sync are asked about
+LOW_FLOOR = 50  # percent: a low-tier version under this (eval: 57-64) is stopped
+# The low tier, from the committed synthetic gate results (a test keeps them
+# equal): which guess to file on a disagreement, and how often each kind of
+# low guess is right (percent), for spend x (1 - confidence).
+LOW_PREFERS = "llm"
+LOW_CONFIDENCE: dict[str, int] = {"agree": 78, "knn": 0, "llm": 66}
 
 type Category = tuple[str, str]
 UNCATEGORISED = (_NONE, _NONE)
@@ -47,14 +64,16 @@ def _ids(conn: Connection, user_id: int) -> dict[Category, int]:
     return seed_taxonomy(conn, user_id)
 
 
-def _suspended(db: Scoped, model: str, threshold: int) -> bool:
+def _suspended(db: Scoped, model: str, threshold: int | None) -> bool:
     """The live accuracy monitor (#215 G): once the user has answered at least
     MIN_DECISIONS of `model`'s guesses at or above the threshold and fewer
     than PRECISION% agree, the version stops auto-applying, for good. It only
     measures until then; it never holds anything back."""
     p, ms = schema.category_prediction, schema.model_suspension
     if db.execute(db.select(ms, ms.c.id).where(ms.c.model == model)).first():
-        return True
+        return True  # a stopped version stays stopped, threshold or not
+    if threshold is None:
+        return False
     judged = db.execute(
         db.select(p, p.c.category_id, p.c.decided_category_id).where(
             p.c.model == model,
@@ -68,6 +87,40 @@ def _suspended(db: Scoped, model: str, threshold: int) -> bool:
     db.insert(ms, model=model, decisions=len(judged), suspended_at=datetime.now(UTC))
     log.info("auto-apply suspended decisions=%d", len(judged))
     return True
+
+
+def _low_suspended(db: Scoped, model: str) -> bool:
+    """The monitor for a low-tier version ("low:<version>"): its filed guesses
+    are judged by overrides, an untouched row counting as accepted. Once it
+    has filed MIN_DECISIONS and fewer than LOW_FLOOR% stand, it files no more
+    and its rows go back to Review, for good."""
+    p, ms = schema.category_prediction, schema.model_suspension
+    if db.execute(db.select(ms, ms.c.id).where(ms.c.model == model)).first():
+        return True
+    filed = db.execute(
+        db.select(p, p.c.category_id, p.c.decided_category_id).where(
+            p.c.model == model, p.c.batch.is_not(None)
+        )
+    ).all()
+    wrong = sum(
+        r.decided_category_id is not None and r.decided_category_id != r.category_id
+        for r in filed
+    )
+    n = len(filed)
+    if n < MIN_DECISIONS or (n - wrong) * 100 >= LOW_FLOOR * n:
+        return False
+    db.insert(ms, model=model, decisions=n, suspended_at=datetime.now(UTC))
+    log.info("auto-low suspended decisions=%d", n)
+    return True
+
+
+def _parts(version: str) -> list[str]:
+    """The versions a guess rests on: a gate version is its embedder's and
+    its LLM's ("<emb>+<llm>" -> emb, "llm:<llm>"), each alone otherwise."""
+    if "+" not in version:
+        return [version]
+    emb, chat = version.split("+", 1)
+    return [version, emb, llm.PREFIX + chat]
 
 
 def _set(db: Scoped, merchant_id: int, category_id: int, source: str) -> int:
@@ -114,33 +167,113 @@ def _record_decisions(db: Scoped) -> None:
             )
 
 
-def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
-    """Re-apply live auto rows, log or apply the current guesses; returns
-    how many rows it categorised. `ids`: this user's current Category ids.
-    Run right after the rule chain (`categorise.run`) and after new vectors."""
+def _name(version: str) -> str:
+    """A version without its digests: "nomic-embed-text+qwen3.5:4b-q4_K_M"."""
+    return "+".join(part.split("@")[0] for part in version.split("+"))
+
+
+def threshold(version: str) -> int | None:
+    return THRESHOLDS.get(_name(version))
+
+
+def ids(conn: Connection, user_id: int) -> dict[Category, int]:
+    """This user's current Category ids."""
+    return _ids(conn, user_id)
+
+
+def _answers(
+    db: Scoped, ids: Mapping[Category, int]
+) -> tuple[str | None, dict[int, Category]]:
+    """The LLM version with the most cached answers, and its named Categories
+    by Merchant ("unsure" rows carry the Uncategorised id and are left out)."""
+    p = schema.category_prediction
+    rows = db.execute(
+        db.select(p, p.c.model, p.c.merchant_id, p.c.category_id).where(
+            p.c.model.startswith(llm.PREFIX)
+        )
+    ).all()
+    if not rows:
+        return None, {}
+    counts = Counter(r.model for r in rows)
+    version = max(counts, key=lambda m: (counts[m], m))
+    name = {i: c for c, i in ids.items()}
+    return version, {
+        r.merchant_id: name[r.category_id]
+        for r in rows
+        if r.model == version
+        and r.category_id in name
+        and name[r.category_id] != UNCATEGORISED
+    }
+
+
+def apply(
+    conn: Connection, user_id: int, ids: dict[Category, int], *, final: bool = False
+) -> int:
+    """Re-apply live auto rows, then decide each Category Review item (#215 F):
+
+    - confident (`auto:`): only for a version with a THRESHOLDS entry (none
+      today): the kNN alone, the kNN and the LLM agreeing, or the LLM alone;
+    - `final` only (the pass after the LLM has answered): every other
+      Merchant with a guess is filed `auto-low:`, except the REVIEW_CAP
+      Merchants with the most expected impact (spend x (1 - confidence)),
+      which stay in the Review Queue to ask.
+
+    Returns how many rows it categorised. `ids`: this user's current Category
+    ids. Run after the rule chain (`categorise.run`) and after new vectors."""
     db = Scoped(conn, user_id)
     p = schema.category_prediction
     _record_decisions(db)
     suspended = {
         m
         for m in db.execute(db.select(p, p.c.model).distinct()).scalars()
-        if (t := THRESHOLDS.get(m.split("@")[0])) is not None and _suspended(db, m, t)
+        if (
+            _low_suspended(db, m)
+            if m.startswith(LOW_MODEL)
+            else _suspended(db, m, threshold(m))
+        )
     }
+
+    def blocked(version: str, low: bool = False) -> bool:
+        return any(v in suspended for v in _parts(version)) or (
+            low and LOW_MODEL + version in suspended
+        )
+
+    # rows a now-stopped version filed earlier go back to Review at once,
+    # not only on the next full recompute
+    c = schema.categorisation
+    for src in db.execute(db.select(c, c.c.source).distinct()).scalars():
+        low = src.startswith(LOW)
+        if (low or src.startswith(SOURCE)) and blocked(
+            src.removeprefix(LOW if low else SOURCE), low
+        ):
+            db.execute(
+                db.update(c)
+                .where(c.c.source == src)
+                .values(source="default", category_id=ids[UNCATEGORISED])
+            )
     done = 0
     for r in db.execute(
         db.select(p, p.c.merchant_id, p.c.category_id, p.c.model).where(
             p.c.batch.is_not(None), p.c.undone_at.is_(None)
         )
     ):
-        if r.model not in suspended:  # a stopped version's rows go back to Review
-            done += _set(db, r.merchant_id, r.category_id, SOURCE + r.model)
+        low = r.model.startswith(LOW_MODEL)
+        version = r.model.removeprefix(LOW_MODEL)
+        if not blocked(version, low):  # a stopped version's rows go back to Review
+            source = (LOW if low else SOURCE) + version
+            done += _set(db, r.merchant_id, r.category_id, source)
     found: dict[str, list[tuple[int, Category]]] = {}
     model: list[str | None] = [None]
 
     def scored(
         targets: dict[str, int], labelled: dict[int, set[Category]]
     ) -> dict[str, list[Category]]:
-        model[0], hits = embedding.ranked(conn, user_id, targets, labelled)
+        # the kNN sees the base Merchants too, not only Corrections: every
+        # Category has examples, so one big corrected Category (a bulk accept
+        # of Groceries) no longer claims every near miss
+        model[0], hits = embedding.ranked(
+            conn, user_id, targets, {**llm.labelled(conn, user_id), **labelled}
+        )
         found.update(hits)
         return {}
 
@@ -149,21 +282,25 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
         for i in ReviewQueue(conn, user_id, suggester=scored).items()
         if i.type == CategoryItems.name and i.merchant_id is not None
     ]
-    version = model[0]
-    if version is None:
+    emb = model[0]
+    lv, answers = _answers(db, ids)
+    if emb is None and lv is None:
         return done
-    threshold = THRESHOLDS.get(version.split("@")[0])
-    live = threshold is not None and version not in suspended
+    gate = f"{emb}+{lv.removeprefix(llm.PREFIX)}" if emb and lv else None
+
+    def live(version: str | None) -> int | None:
+        if version is None or blocked(version):
+            return None
+        return threshold(version)
+
     undone = set(
         db.execute(
             db.select(p, p.c.merchant_id).where(p.c.undone_at.is_not(None))
         ).scalars()
     )
     logged = {
-        r.merchant_id: r.id
-        for r in db.execute(
-            db.select(p, p.c.id, p.c.merchant_id).where(p.c.model == version)
-        )
+        (r.model, r.merchant_id): r.id
+        for r in db.execute(db.select(p, p.c.id, p.c.model, p.c.merchant_id))
     }
     # One sync is one batch: a pass joins the latest batch when nothing else
     # changed the ledger since that batch's own bump (its id is the version it
@@ -172,29 +309,72 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
     latest = db.execute(
         db.select(p, func.max(p.c.batch)).where(p.c.undone_at.is_(None))
     ).scalar()
+
+    def place(version: str, m: int, cat: Category, score: int, source: str) -> int:
+        values = {"category_id": ids[cat], "score": score, "batch": -1}
+        if (version, m) in logged:
+            db.execute(
+                db.update(p).where(p.c.id == logged[version, m]).values(**values)
+            )
+        else:
+            db.insert(
+                p, model=version, merchant_id=m, created_at=datetime.now(UTC), **values
+            )
+        return _set(db, m, ids[cat], source)
+
     new = 0
+    ask: list[tuple[Decimal, str, int, Category | None, str]] = []
     for i in sorted(items, key=lambda i: i.key):
         m = i.merchant_id
-        if i.key not in found or m is None or m in undone:
+        if m is None or m in undone:
             continue
-        score, cat = found[i.key][0]
-        if cat not in ids:
-            continue
-        if live and threshold is not None and score >= threshold:
-            values = {"category_id": ids[cat], "score": score, "batch": -1}
-            if m in logged:
-                db.execute(db.update(p).where(p.c.id == logged[m]).values(**values))
-            else:
+        hit = found.get(i.key)
+        knn = hit[0] if emb and hit and hit[0][1] in ids else None
+        said = answers.get(m)
+        said = said if said in ids else None
+        if knn and emb:
+            score, cat = knn
+            t = live(emb)
+            if t is not None and score >= t:
+                new += place(emb, m, cat, score, SOURCE + emb)
+                continue
+            t = live(gate)
+            if gate and said == cat and t is not None and score >= t:
+                new += place(gate, m, cat, score, SOURCE + gate)
+                continue
+            if (emb, m) not in logged:  # below the threshold: log the guess only
                 db.insert(
-                    p, model=version, merchant_id=m, created_at=datetime.now(UTC),
-                    **values,
+                    p, model=emb, merchant_id=m, category_id=ids[cat], score=score,
+                    created_at=datetime.now(UTC),
                 )  # fmt: skip
-            new += _set(db, m, ids[cat], SOURCE + version)
-        elif m not in logged:  # below the threshold: log the guess only
-            db.insert(
-                p, model=version, merchant_id=m, category_id=ids[cat], score=score,
-                created_at=datetime.now(UTC),
-            )  # fmt: skip
+                logged[emb, m] = -1
+        t = live(lv)
+        if said and lv and t is not None and llm.ANSWERED >= t:
+            new += place(lv, m, said, llm.ANSWERED, SOURCE + lv)
+            continue
+        # the low tier's best guess, and how often the eval says it is right
+        if gate and knn and said == knn[1]:
+            kind, guess, version = "agree", said, gate
+        elif said and lv and (LOW_PREFERS == "llm" or not knn):
+            kind, guess, version = "llm", said, lv
+        elif knn and emb:
+            kind, guess, version = "knn", knn[1], emb
+        else:
+            kind, guess, version = "none", None, ""
+        if guess is not None and blocked(version, low=True):
+            kind, guess, version = "none", None, ""  # a stopped version guesses nothing
+        sure = LOW_CONFIDENCE.get(kind, 0)
+        ask.append((i.spend * (100 - sure), i.key, m, guess, version))
+    if final:
+        # Merchants with no guess stay in Review whatever happens, so they take
+        # their places in the cap first; the rest go to the most expected impact
+        guessed = sorted(
+            (a for a in ask if a[3] is not None), key=lambda a: (-a[0], a[1])
+        )
+        room = max(0, REVIEW_CAP - (len(ask) - len(guessed)))
+        for _, _, m, guess, version in guessed[room:]:
+            if guess is not None:
+                new += place(LOW_MODEL + version, m, guess, 0, LOW + version)
     pending = (p.c.batch == -1,)  # placed this pass, before it has an id
     if db.execute(db.select(p, p.c.id).where(*pending).limit(1)).first():
         db.bump_ledger_version()  # categories changed: caches keyed on it go stale
@@ -203,7 +383,7 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
         if latest == now:
             db.execute(db.update(p).where(*joined).values(batch=batch))
         db.execute(db.update(p).where(*pending).values(batch=batch))
-    log.info("auto-apply rows=%d live=%s", done + new, live)
+    log.info("auto-apply rows=%d asked=%d", done + new, min(len(ask), REVIEW_CAP))
     return done + new
 
 
@@ -243,7 +423,10 @@ def undo(conn: Connection, user_id: int) -> int:
     )
     db.execute(
         db.update(c)
-        .where(c.c.merchant_id.in_(merchants), c.c.source.startswith(SOURCE))
+        .where(
+            c.c.merchant_id.in_(merchants),
+            or_(c.c.source.startswith(SOURCE), c.c.source.startswith(LOW)),
+        )
         .values(source="default", category_id=_ids(conn, user_id)[UNCATEGORISED])
     )
     db.bump_ledger_version()
@@ -260,3 +443,4 @@ def refresh_quietly(engine: Engine, user_id: int) -> None:
             apply(conn, user_id, _ids(conn, user_id))
     except Exception as e:  # noqa: BLE001
         log.warning("auto-apply failed: %s", type(e).__name__)
+    llm.start(engine, user_id)  # the LLM, then the final pass, in the background

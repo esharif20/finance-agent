@@ -23,6 +23,7 @@ from finance_agent.api import (
     card_art,
     cash_flow,
     chat,
+    corrections,
     fx,
     guidance,
     insights,
@@ -624,6 +625,7 @@ def create_app(
     app.include_router(subscriptions.router)
     app.include_router(subscription_costs.router)
     app.include_router(review_queue.router)
+    app.include_router(corrections.router)
     app.include_router(splits.router)
     app.include_router(notes.router)
     app.include_router(merchants.router)

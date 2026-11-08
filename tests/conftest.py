@@ -30,6 +30,15 @@ def _no_real_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
     from finance_agent.categorise import embedding
 
     monkeypatch.setattr(embedding, "OllamaEmbedder", _LocalModelOff)
+    from finance_agent.categorise import llm
+
+    class _ChatOff(llm.OllamaClassifier):
+        def digest(self) -> None:
+            return None
+
+    monkeypatch.setattr(llm, "OllamaClassifier", _ChatOff)
+    # the post-sync LLM pass runs inline in tests: no thread races the test
+    monkeypatch.setattr(llm, "start", llm.refresh_quietly)
 
 
 @pytest.fixture(autouse=True)

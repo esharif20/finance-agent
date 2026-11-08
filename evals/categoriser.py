@@ -38,7 +38,8 @@ from finance_agent.ledger import taxonomy
 from metrics import expected_calibration_error, macro_f1, per_category
 
 SEED = 112
-DATASET_VERSION = 3  # v2 (#113): 136 more corrected Merchants; v3 (#215): UK base
+DATASET_VERSION = 4  # v2 (#113): 136 more corrected Merchants; v3 (#215): UK base;
+# v4 (#215 F): the long tail (independents, vague payees, look-alikes)
 LABEL_TAXONOMY_VERSION = 1  # the taxonomy the gold labels are named in
 HERE = Path(__file__).parent
 DATASET = HERE / "datasets" / f"categoriser_v{DATASET_VERSION}.csv"
@@ -524,6 +525,80 @@ UK_LOOKALIKES: tuple[tuple[str, Category], ...] = (
     ("ARGOSY BOOKS", (E, "Hobbies")),
     ("BPM FITNESS STUDIO", (HE, "Fitness")),
 )
+# v4 (#215 F): the long tail a real sync is mostly made of. Fictional payees
+# with no Correction, no base entry and (mostly) no keyword: independents,
+# vague processor payees and look-alikes of another Category.
+LONG_TAIL: tuple[tuple[str, Category], ...] = (
+    ("THE RUSTY ANCHOR", (F, "Eating out")),
+    ("LITTLE SAIGON", (F, "Eating out")),
+    ("CASA ROSSI", (F, "Eating out")),
+    ("THE DAILY GRIND", (F, "Coffee")),
+    ("FLAT WHITE CORNER", (F, "Coffee")),
+    ("THE BEANERY", (F, "Coffee")),
+    ("GOLDEN WOK", (F, "Takeaway")),
+    ("PIZZA PRONTO", (F, "Takeaway")),
+    ("SPICE HUT", (F, "Takeaway")),
+    ("PATELS MINI MARKET", (F, "Groceries")),
+    ("FRESHWAY FOODS", (F, "Groceries")),
+    ("OAKLEY NEWS AND BOOZE", (F, "Groceries")),
+    ("SPEEDY MINICABS", (T, "Taxi")),
+    ("STARLINE PRIVATE HIRE", (T, "Taxi")),
+    ("RIDGEWAY GARAGE PFS", (T, "Fuel")),
+    ("KINGSWAY PETROL STATION", (T, "Fuel")),
+    ("CITYHOPPER BUS", (T, "Public transport")),
+    ("LOOP TRAMWAY", (T, "Public transport")),
+    ("MARKET SQ CAR PARK", (T, "Parking")),
+    ("TOWN HALL PAY AND DISPLAY", (T, "Parking")),
+    ("THREADBARE VINTAGE", (S, "Clothing")),
+    ("SOLE STREET SHOES", (S, "Clothing")),
+    ("CHIPFIX PHONE REPAIRS", (S, "Electronics")),
+    ("HOMEBITS", (S, "Household")),
+    ("PARCELPOINT MARKETPLACE", (S, "Online")),
+    ("SUNRAY POWER", (B, "Energy")),
+    ("AQUAFLOW", (B, "Water")),
+    ("SIGNALBOX MOBILE", (B, "Phone & internet")),
+    ("NOTEWISE", (SUB, "Software")),
+    ("TUNEBOX", (SUB, "Streaming")),
+    ("RIVERSIDE ALLOTMENT SOCIETY", (SUB, "Memberships")),
+    ("FIXITALL HOME REPAIRS", (H, "Maintenance")),
+    ("CLEARVIEW EYECARE", (HE, "Medical")),
+    ("PEAK BOULDERING", (HE, "Fitness")),
+    ("FLOW YOGA", (HE, "Fitness")),
+    ("GREENCROSS CHEMIST", (HE, "Pharmacy")),
+    ("STAGEDOOR TICKETS", (E, "Events")),
+    ("STRIKE ZONE BOWLING", (E, "Events")),
+    ("CRITICAL HIT GAMES", (E, "Games")),
+    ("WOOL AND WHIMSY", (E, "Hobbies")),
+    ("AEROLINK", (TR, "Flights")),
+    ("SEASHELL COTTAGES", (TR, "Holidays")),
+    ("THE BAY ROOMS", (TR, "Hotels")),
+    ("FADE MASTERS", (P, "Hair & beauty")),
+    ("SOAP AND SUDS", (P, "Toiletries")),
+)
+# One row each: the payee says little, often only a processor and a first name
+VAGUE: tuple[tuple[str, Category], ...] = (
+    ("SQ *THE KITCHEN", (F, "Eating out")),
+    ("SUMUP *BREW CART", (F, "Coffee")),
+    ("ZTL*STALL 12 MARKET", (F, "Groceries")),
+    ("IZ *HAIR BY SAM", (P, "Hair & beauty")),
+    ("SQ *JO FIT", (HE, "Fitness")),
+    ("PAYPAL *GAMEVAULT", (E, "Games")),
+    ("SQ *TICKETS ON THE DOOR", (E, "Events")),
+    ("SUMUP *RIDE HOME", (T, "Taxi")),
+    ("CARD PAYMENT KJ SERVICES", (H, "Maintenance")),
+    ("PAYPAL *AB TRADING", (S, "Online")),
+)
+# Payees that name another Category's word or brand
+TAIL_LOOKALIKES: tuple[tuple[str, Category], ...] = (
+    ("SHELLEYS PANTRY", (F, "Eating out")),
+    ("PETROLHEAD MONTHLY", (SUB, "Memberships")),
+    ("PERSONAL TRAINER JO", (HE, "Fitness")),
+    ("GREEN TRAIN MODELS", (E, "Hobbies")),
+    ("HYDE PARK WINTER FAIR", (E, "Events")),
+    ("TUBE AND TYRE BIKES", (E, "Hobbies")),
+    ("STATION ROAD NOODLES", (F, "Takeaway")),
+    ("ESSENCE PERFUMERY", (P, "Toiletries")),
+)
 # v3 (#215): the v2-only Categories the UK base adds to the gold labels also
 # need >= 5 corrected Merchants each (ADR 0015). Corrections only again.
 UK_CORRECTED: dict[Category, tuple[str, ...]] = {
@@ -616,6 +691,12 @@ def generate(seed: int) -> str:
         rows.append(("test", "uk_base", d, spend(), cat))
         rows.append(("test", "uk_base", noisy(d), spend(), cat))
     rows += [("test", "uk_lookalike", d, spend(), cat) for d, cat in UK_LOOKALIKES]
+    # v4 (#215 F): last again, so every v3 row keeps its id, descriptor, amount
+    for d, cat in LONG_TAIL:
+        rows.append(("test", "long_tail", d, spend(), cat))
+        rows.append(("test", "long_tail", noisy(d), spend(), cat))
+    rows += [("test", "vague", d, spend(), cat) for d, cat in VAGUE]
+    rows += [("test", "tail_lookalike", d, spend(), cat) for d, cat in TAIL_LOOKALIKES]
 
     out = io.StringIO()
     out.write(
@@ -681,6 +762,22 @@ def baseline(rows: Sequence[Row]) -> list[Prediction]:
     return out
 
 
+def known(rows: Sequence[Row]) -> dict[str, Category]:
+    """The labelled Merchants, as the app has them (#215 F): the base
+    Merchants that appear in the data, with their base default, then the
+    Correction Merchants, which win."""
+    out: dict[str, Category] = {}
+    for r in rows:
+        c = categorise.classify(r.descriptor, r.amount, "DEB", transfer=False)
+        if c.merchant and c.source.startswith("merchant:") and c.category:
+            out.setdefault(c.merchant, c.category)
+    for r in rows:
+        c = categorise.classify(r.descriptor, r.amount, "DEB", transfer=False)
+        if r.split == "correction" and c.merchant:
+            out[c.merchant] = resolve(r.category)
+    return out
+
+
 def nearest_neighbour(
     rows: Sequence[Row], embedder: embedding.Embedder
 ) -> list[Prediction]:
@@ -694,13 +791,7 @@ def nearest_neighbour(
         c = categorise.classify(r.descriptor, r.amount, "DEB", transfer=False)
         return c.merchant
 
-    labelled = sorted(
-        {
-            m: resolve(r.category)
-            for r in rows
-            if r.split == "correction" and (m := merchant(r))
-        }.items()
-    )
+    labelled = sorted(known(rows).items())
     test = [r for r in rows if r.split == "test"]
     need = {
         m
@@ -871,7 +962,7 @@ def main(argv: Sequence[str]) -> int:
         return gate.run(
             "categoriser", lambda: evaluate(load(), e), RESULTS, lower_is_better, argv
         )
-    ollama = embedding.OllamaEmbedder()
+    ollama = embedding.OllamaEmbedder(keep_alive="0s")  # unload at once: shared Mac
     digest = ollama.digest()
     if digest is None:
         print("categoriser eval: nomic-embed-text is not on Ollama", file=sys.stderr)
