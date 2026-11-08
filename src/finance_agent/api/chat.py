@@ -189,9 +189,9 @@ def set_model(request: Request, body: Body) -> dict[str, Choice]:
 @router.post("/warm")
 def warm(model: Model) -> dict[str, bool]:
     """Load the model while the chat screen opens, so the first turn doesn't
-    wait for it. An empty chat only loads, with the turns' options (so the
-    same num_ctx: no reload), and stays WARM_KEEP_ALIVE; each turn then
-    shortens that to KEEP_ALIVE."""
+    wait for it. An empty chat only loads; it stays for the keep_alive."""
+    # the turns' options (same num_ctx, so no reload); WARM_KEEP_ALIVE until
+    # the first turn shortens it to KEEP_ALIVE
     if isinstance(model, OllamaChatModel):
         model = OllamaChatModel(model.model, keep_alive=WARM_KEEP_ALIVE)
     try:
