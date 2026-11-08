@@ -1886,3 +1886,277 @@
     transform: none;
   }
 }
+
+/* ===== the hero's capability row: six verbs, each with one line on hover, tap or focus ===== */
+.lp-caps {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+}
+.lp-caps li {
+  position: relative;
+  outline: none;
+}
+.lp-cap-name {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: default;
+  transition: background-color 180ms ease, color 180ms ease, translate 220ms var(--lp-ease-out);
+}
+.lp-cap-tip {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  top: calc(100% + 8px);
+  width: max-content;
+  max-width: min(18rem, 80vw);
+  padding: 10px 14px;
+  border-radius: var(--lp-r-md);
+  background: var(--lp-elev);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    0 20px 40px -16px rgb(0 0 0 / 0.7);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 0.9);
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none;
+  transition: opacity 160ms ease, translate 200ms var(--lp-ease-out);
+}
+.lp-caps li:nth-child(n + 4) .lp-cap-tip {
+  left: auto;
+  right: 0;
+}
+.lp-caps li:focus-visible .lp-cap-name {
+  background: var(--lp-white);
+  color: var(--lp-black);
+  outline: 3px solid var(--lp-white);
+  outline-offset: 2px;
+}
+.lp-caps li:focus-within .lp-cap-tip {
+  opacity: 1;
+  translate: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-caps li:hover .lp-cap-name {
+    background: var(--lp-white);
+    color: var(--lp-black);
+    translate: 0 -2px;
+  }
+  .lp-caps li:hover .lp-cap-tip {
+    opacity: 1;
+    translate: none;
+  }
+}
+@media (max-width: 719.98px) {
+  .lp-cap-name {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-cap-name,
+  .lp-cap-tip {
+    transition: none;
+    translate: none;
+  }
+}
+
+/* ===== what it does: tiles hug their content, each with a small live visual ===== */
+.lp-brand {
+  white-space: nowrap;
+}
+@media (max-width: 1099.98px) {
+  .lp-nav-links {
+    display: none;
+  }
+  .lp-nav .lp-pill {
+    margin-left: auto;
+  }
+}
+.lp-mosaic {
+  grid-auto-rows: auto;
+}
+@media (min-width: 720px) {
+  .lp-mosaic {
+    grid-template-areas:
+      "h h h h h h r r r f f f"
+      "i i i i i a a a a a a a"
+      "n n n n n n n n n n n n";
+  }
+}
+.lp-tile-note {
+  font-size: 0.875rem;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.lp-sync {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 16px;
+}
+.lp-sync-banks {
+  display: grid;
+  gap: 6px;
+}
+.lp-sync-banks i {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.1);
+  font-size: 0.8125rem;
+  font-style: normal;
+  font-weight: 700;
+}
+.lp-sync-banks i::after {
+  content: "";
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.5;
+  transform-origin: 0 50%;
+  animation: lp-feed 1.8s var(--lp-ease-in-out) infinite;
+}
+.lp-sync-banks i:nth-child(2)::after {
+  animation-delay: 0.3s;
+}
+.lp-sync-banks i:nth-child(3)::after {
+  animation-delay: 0.6s;
+}
+@keyframes lp-feed {
+  0%,
+  100% {
+    transform: scaleX(0.2);
+  }
+  50% {
+    transform: scaleX(1);
+  }
+}
+.lp-sync-ledger {
+  justify-self: start;
+  padding: 12px 16px;
+  border-radius: var(--lp-r-md);
+  background: var(--lp-black);
+  color: var(--lp-white);
+  font-family: var(--lp-display);
+  font-weight: 720;
+}
+.lp-sync-badges {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lp-sync-badges b {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.6);
+  font-size: 0.8125rem;
+  transition: translate 220ms var(--lp-ease-out);
+}
+.lp-mini-chat {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+.lp-mini-q {
+  justify-self: end;
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 18px 18px 6px 18px;
+  background: var(--lp-blue);
+  color: var(--lp-white);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.lp-mini-a {
+  justify-self: start;
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 6px;
+  background: rgb(255 255 255 / 0.1);
+  font-size: 0.9375rem;
+}
+.lp-mini-ev {
+  justify-self: start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--lp-cyan);
+  color: var(--lp-black);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: translate 220ms var(--lp-ease-out);
+}
+.lp-tile-insights .lp-insight-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.9375rem;
+}
+.lp-insight-cards li {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--lp-r-md);
+  background: rgb(255 255 255 / 0.55);
+  font-weight: 700;
+  line-height: 1.3;
+  transition: translate 220ms var(--lp-ease-out);
+}
+.lp-insight-cards svg {
+  width: 60px;
+  height: 20px;
+  overflow: visible;
+}
+.lp-insight-cards polyline {
+  fill: none;
+  stroke: var(--lp-black);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+@media (max-width: 719.98px) {
+  .lp-tile-insights .lp-insight-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+/* one hover each: the badges, the evidence strip and the Insight cards rise */
+@media (hover: hover) and (pointer: fine) {
+  .lp-tile-import:hover .lp-sync-badges b {
+    translate: 0 -3px;
+  }
+  .lp-tile-assistant:hover .lp-mini-ev {
+    translate: 4px 0;
+  }
+  .lp-insight-cards li:hover {
+    translate: 0 -4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-sync-banks i::after {
+    animation: none;
+    transform: none;
+  }
+  .lp-sync-badges b,
+  .lp-mini-ev,
+  .lp-insight-cards li {
+    transition: none;
+  }
+}
+
+.lp-tile-head {
+  background: transparent;
+}

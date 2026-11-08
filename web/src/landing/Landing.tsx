@@ -10,7 +10,7 @@ import { Preloader } from "./Preloader";
 import { Promises } from "./Promises";
 import { Story } from "./story/Story";
 import { Terminal } from "./terminal/Terminal";
-import { OVERVIEW } from "./story/story.fixture";
+import { ANSWER, OVERVIEW } from "./story/story.fixture";
 import "./landing.css";
 import "./motion.css";
 
@@ -18,8 +18,7 @@ const GITHUB = "https://github.com/esharif20/finance-agent";
 const NAME = "Finance Agent";
 
 const FEATURES = {
-  import:
-    "Bring in the CSV exports your bank already gives you, or connect a read-only feed. Duplicates are caught and transfers between your own accounts are paired, so nothing is counted twice.",
+  import: "A read-only bank feed through Lunch Flow brings every account into one ledger. Transfers between them are paired and duplicates caught, so nothing counts twice.",
   review:
     "Every transaction gets a category. The ones it is unsure about wait in one short queue for you to confirm, and each answer teaches it for next time.",
   insights: [
@@ -31,6 +30,9 @@ const FEATURES = {
   assistant:
     "Ask anything about your spending. Every number in its reply comes from a calculation it ran on your ledger, and it says so when it cannot answer.",
 };
+
+// decorative shapes only, no figures: rising, running ahead, a forecast band, a week
+const SPARKS = ["0,16 15,15 30,15 45,6 60,5", "0,15 15,12 30,10 45,6 60,3", "0,12 15,11 30,10 45,9 60,8", "0,10 10,14 20,8 30,12 40,6 50,9 60,7"];
 
 function Mark() {
   return (
@@ -122,8 +124,21 @@ export default function Landing() {
             </Rise>
             <Rise still={still} delay={0.06} className="lp-slot lp-tile-import">
               <Material className="lp-tile">
-                <h3 className="lp-h3">Import</h3>
-                <p className="lp-tile-big">{FEATURES.import}</p>
+                <h3 className="lp-h3">Connect your banks</h3>
+                <p>{FEATURES.import}</p>
+                <div className="lp-sync" aria-hidden="true">
+                  <span className="lp-sync-banks">
+                    <i>Bank A</i>
+                    <i>Bank B</i>
+                    <i>Bank C</i>
+                  </span>
+                  <span className="lp-sync-ledger">One ledger</span>
+                  <span className="lp-sync-badges">
+                    <b>Transfer paired</b>
+                    <b>Duplicate caught</b>
+                  </span>
+                </div>
+                <p className="lp-tile-note">Or drop in a CSV export.</p>
               </Material>
             </Rise>
             <Rise still={still} delay={0.12} className="lp-slot lp-tile-review">
@@ -144,15 +159,27 @@ export default function Landing() {
             <Rise still={still} delay={0.24} className="lp-slot lp-tile-assistant">
               <Material className="lp-tile">
                 <h3 className="lp-h3">An Assistant that never invents a figure</h3>
-                <p className="lp-tile-big">{FEATURES.assistant}</p>
+                <p>{FEATURES.assistant}</p>
+                <div className="lp-mini-chat" aria-hidden="true">
+                  <span className="lp-mini-q">How much did I spend on eating out in {OVERVIEW.month}?</span>
+                  <span className="lp-mini-a">
+                    <Money value={ANSWER.total} /> across {ANSWER.count} payments.
+                  </span>
+                  <span className="lp-mini-ev">Checked against {ANSWER.count} transactions · No AI call</span>
+                </div>
               </Material>
             </Rise>
             <Rise still={still} delay={0.3} className="lp-slot lp-tile-insights">
               <Material className="lp-tile">
                 <h3 className="lp-h3">Insights</h3>
-                <ul>
-                  {FEATURES.insights.map((l) => (
-                    <li key={l}>{l}</li>
+                <ul className="lp-insight-cards">
+                  {FEATURES.insights.map((l, i) => (
+                    <li key={l}>
+                      <svg viewBox="0 0 60 20" aria-hidden="true">
+                        <polyline points={SPARKS[i]} />
+                      </svg>
+                      {l}
+                    </li>
                   ))}
                 </ul>
               </Material>

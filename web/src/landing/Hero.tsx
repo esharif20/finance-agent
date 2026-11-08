@@ -10,10 +10,20 @@ import { Field, finePointer, Flex, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
 import { OVERVIEW, REVIEW } from "./story/story.fixture";
 
-export const HEADLINE = "All your accounts, in one place.";
-export const HEADLINE_LINES = ["All your accounts,", "in one place."];
+export const HEADLINE = "An AI agent for your money, on your own Mac.";
+export const HEADLINE_LINES = ["An AI agent for your money,", "on your own Mac."];
 const LINE =
-  "Every account in one place, worked out on your own Mac. It checks every figure against your ledger, learns from what you accept, and sends nothing anywhere unless you say so.";
+  "It watches every account, spots what changed, answers with figures it has checked, and learns what you care about. It suggests; you decide. Nothing leaves your Mac unless you say so.";
+
+// What makes it an agent; every line is something the app does today
+const CAPS = [
+  { name: "Watches", tip: "Syncs in the background and spots a new subscription from its first charge." },
+  { name: "Plans", tip: "Works out which lookups a question needs before any model is asked." },
+  { name: "Checks", tip: "Every figure in a reply must match your ledger, or it isn’t shown." },
+  { name: "Remembers", tip: "Keeps what you tell it to remember, where you can read and delete it." },
+  { name: "Learns", tip: "Ranks Insights by what you mark useful, not by what you click." },
+  { name: "Suggests", tip: "Proposes a change and waits for you to press Confirm. It never moves money." },
+];
 
 const gbp = (minor: number) => ({ minor, currency: "GBP" });
 // Generic faces in the app's hues (oklch), none between 235 and 290
@@ -280,6 +290,14 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: delay + 0.55 }}
           >
             <p className="lp-lede">{LINE}</p>
+            <ul className="lp-caps" aria-label="What it does on its own">
+              {CAPS.map((c) => (
+                <li key={c.name} tabIndex={0}>
+                  <span className="lp-cap-name">{c.name}</span>
+                  <span className="lp-cap-tip">{c.tip}</span>
+                </li>
+              ))}
+            </ul>
             <div className="lp-actions">
               <Magnetic href="/app" className="lp-pill lp-pill-primary">
                 <Roll text="Open the demo" />
