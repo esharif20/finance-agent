@@ -50,6 +50,38 @@ UNEXPECTED = (
 )
 
 
+def _brief(command: str) -> int:
+    from datetime import date
+
+    from finance_agent.cli import brief
+    from finance_agent.gateway.cloud import CloudChatModel, CloudError
+    from finance_agent.storage import default_db_path, keychain
+
+    try:
+        if command == "install":
+            print(f"Installed {brief.install()}")
+            return 0
+        if command == "remove":
+            brief.remove()
+            print("Removed")
+            return 0
+        try:
+            cloud = CloudChatModel(keychain.gemini_key() or "")
+        except CloudError as e:
+            print(f"fa: {e}; run `fa keys set gemini`", file=sys.stderr)
+            return 1
+        engine = open_db(create=False)
+        try:
+            return brief.refresh(
+                LOCAL_USER, engine, default_db_path(), cloud, date.today()
+            )
+        finally:
+            engine.dispose()
+    except (OSError, ValueError) as e:
+        print(f"fa: {e}", file=sys.stderr)  # messages never carry the key
+        return 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         return _main(argv)
@@ -66,6 +98,7 @@ GROUPS = (
         "Data",
         (
             "sync",
+            "brief",
             "import",
             "watch",
             "connect",
@@ -286,6 +319,11 @@ def _main(argv: Sequence[str] | None) -> int:
     mode.add_argument("--install", action="store_true", help="run daily (launchd)")
     mode.add_argument("--uninstall", action="store_true", help="stop the daily run")
     mode.add_argument("--notify", action="store_true", help="alert on trouble")
+    br = sub.add_parser("brief", help="the daily news briefing on your topics")
+    brsub = br.add_subparsers(dest="brief_command", required=True)
+    brsub.add_parser("refresh", help="fetch today's items (launchd calls this)")
+    brsub.add_parser("install", help="run it daily (launchd)")
+    brsub.add_parser("remove", help="stop the daily run")
     bk = sub.add_parser(
         "backup",
         help="back up to the registered external drive",
@@ -405,6 +443,8 @@ def _main(argv: Sequence[str] | None) -> int:
             print(f"fa: {e}", file=sys.stderr)
             return 1
         return 0
+    if args.command == "brief":
+        return _brief(args.brief_command)
     if args.command == "watch":
         from finance_agent.cli import watch
 

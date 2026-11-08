@@ -38,6 +38,13 @@ def test_spend_reports_each_bucket(engine: Engine) -> None:
             "reserved_pence": 0,
             "state": "warn",
         },
+        {
+            "bucket": "briefing",
+            "cap_pence": 100,
+            "spent_pence": 0,
+            "reserved_pence": 0,
+            "state": "ok",
+        },
     ]
 
 

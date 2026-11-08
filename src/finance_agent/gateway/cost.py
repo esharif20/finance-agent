@@ -12,8 +12,13 @@ from typing import Literal
 
 from finance_agent.gateway.cloud import Usage
 
-Bucket = Literal["synthetic_judge", "gateway_chat"]
-CAPS: dict[str, int] = {"synthetic_judge": 150, "gateway_chat": 100}  # pence
+Bucket = Literal["synthetic_judge", "gateway_chat", "briefing"]
+# pence; briefing (#309) takes the 1 pound ADR 0013 kept for a demo domain
+CAPS: dict[str, int] = {"synthetic_judge": 150, "gateway_chat": 100, "briefing": 100}
+# Search grounding bills per search query on top of tokens. shortcut: a flat
+# charge per call, assuming the paid tier's free grounding allowance covers
+# most queries; check it against the bill after the first live month.
+PER_CALL_PENCE: dict[str, int] = {"briefing": 2}
 WARN_AT = Decimal("0.8")
 
 # Checked against https://ai.google.dev/gemini-api/docs/pricing (paid tier).
@@ -114,7 +119,8 @@ def reserve(
         raise ValueError("unknown bucket")
     if max_in > MAX_INPUT.get(ALIASES.get(model, model), max_in):
         raise UnknownModel("this prompt size has no checked price")
-    r = Reservation(bucket, model, month_of(now), pence(model, max_in, max_out))
+    held = pence(model, max_in, max_out) + PER_CALL_PENCE.get(bucket, 0)
+    r = Reservation(bucket, model, month_of(now), held)
     after = committed + r.pence
     if after > cap:
         return Denied(bucket)
@@ -128,7 +134,7 @@ def settle(reservation: Reservation, usage: Usage) -> int:
     cost = pence(reservation.model, usage.input_tokens, out)
     if ALIASES.get(usage.model_version, usage.model_version) in PRICES:
         cost = max(cost, pence(usage.model_version, usage.input_tokens, out))
-    return cost
+    return cost + PER_CALL_PENCE.get(reservation.bucket, 0)
 
 
 def month_status(spent: dict[str, int], reserved: dict[str, int]) -> list[BucketStatus]:

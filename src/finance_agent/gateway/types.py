@@ -175,6 +175,31 @@ class GatewayPayload(BaseModel):
         return v
 
 
+# A briefing topic (#309): words only, never a digit, so no amount can ride on one.
+# shortcut: a service named with a digit ("Microsoft 365") cannot be a topic;
+# allow digits only with a closed list of such names if one is ever needed.
+TOPIC = r"^[A-Za-z][A-Za-z &+'-]{1,39}$"
+MAX_TOPICS = 12  # 8 from spending or added, plus up to 3 decoys and a spare
+
+
+class BriefPayload(BaseModel):
+    """Everything the daily briefing sends (#309): public topic names, sorted
+    so their order says nothing about how much was spent. Build it with
+    `gateway.brief.payload`, which mixes in the decoys."""
+
+    model_config = _STRICT
+    topics: tuple[str, ...] = Field(min_length=1, max_length=MAX_TOPICS)
+
+    @field_validator("topics")
+    @classmethod
+    def _topics(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not re.fullmatch(TOPIC, t) for t in v):
+            raise ValueError("a topic is words only")
+        if list(v) != sorted({t.lower(): t for t in v}.values(), key=str.lower):
+            raise ValueError("topics are unique and sorted")
+        return v
+
+
 # ---- what stays -------------------------------------------------------------
 
 
