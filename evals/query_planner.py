@@ -148,6 +148,7 @@ def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], lis
     read when code resolved the question with no model call (#317)."""
     rows: list[dict[str, Any]] = []
     outs: list[SpendForQueryOut] = []
+    planned: list[SpendForQueryOut] = []
     real_run = registry.run
     real_spend = planner.spend
 
@@ -159,12 +160,15 @@ def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], lis
 
     def spend_spy(*a: Any, **k: Any) -> Any:
         out = real_spend(*a, **k)
-        outs.append(out)
+        if not planned:  # the asked period: later reads are the one before
+            planned.append(out)
+            outs.append(out)
         return out
 
     for case in qp.CASES:
         rec = Recorder(factory(case))
         outs.clear()
+        planned.clear()
         setattr(graph, "run", spy)  # noqa: B010 (the module global the graph calls)
         setattr(planner, "spend", spend_spy)  # noqa: B010
         with s.engine.connect() as conn:
@@ -175,6 +179,7 @@ def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], lis
                     first = qp.BY_ID[case.after].question
                     thread = ask(Assistant(rec, conn, qp.TODAY), first).thread_id
                     outs.clear()
+                    planned.clear()
                 a = ask(Assistant(rec, conn, qp.TODAY), case.question, thread)
             finally:
                 tx.rollback()

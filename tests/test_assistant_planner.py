@@ -182,10 +182,11 @@ def test_figure_questions_and_their_follow_ups_take_no_model_call(
     )
     assert model.calls == []
     assert [t.path for t in turns] == ["planner"] * 6
-    assert (
-        turns[0].reply == "You spent £62.49 on Groceries + Eating out in January 2026."
+    assert turns[0].reply == (
+        "You spent £62.49 on Groceries + Eating out in January 2026."
+        " There was none in December 2025."
     )
-    assert turns[1].reply.endswith("in December 2025.")
+    assert "in December 2025." in turns[1].reply
     assert "£36.00" in turns[2].reply and "Tesco" in turns[2].reply
     assert "Most went to Tesco Fuel (£36.00)" in turns[3].reply
     assert "November 2025" in turns[5].reply
@@ -340,3 +341,38 @@ def test_the_writer_reads_the_profile_right_after_the_system_prefix(
     assert messages[0].content.startswith("You are a careful")
     assert messages[1].role == "system" and messages[1].content == text
     assert a.path == "local_model"  # a profile figure is grounded
+
+
+def test_every_reply_offers_chips_the_planner_answers_with_no_call(
+    seeded: Engine,
+) -> None:
+    [first], _ = run(seeded, [], "How much did I spend on food in January 2026?")
+    assert first.chips == ("And the month before?", "Compared to usual?", "By merchant")
+    for chip in first.chips:
+        turns, model = run(
+            seeded, [], "How much did I spend on food in January 2026?", chip
+        )
+        assert model.calls == [] and turns[1].path == "planner", chip
+    [open_], _ = run(seeded, ["You spent £92.34 this month."], "Where can I save?")
+    assert open_.chips and "Where can I save?" not in open_.chips
+
+
+def test_by_merchant_on_all_spending_names_where_it_went(
+    engine: Engine, tmp_path: Path
+) -> None:
+    seed(engine, ME, tmp_path, DECEMBER + ROWS)
+    with engine.begin() as conn:
+        first = ask(
+            Assistant(FakeChatModel([]), conn, TODAY, prefetch=True),
+            "How much did I spend in December 2025?",
+        )
+        assert "By merchant" in first.chips
+        a = ask(
+            Assistant(FakeChatModel([]), conn, TODAY, prefetch=True),
+            "By merchant",
+            first.thread_id,
+        )
+    assert a.path == "planner", a.reply
+    assert "£112.80" in first.reply and "£112.80" in a.reply
+    assert "Most went to" in a.reply
+    assert "By merchant" not in a.chips

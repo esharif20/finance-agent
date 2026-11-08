@@ -993,6 +993,13 @@ def _timing(a: Assistant, started: float) -> dict[str, Any]:
     }
 
 
+def _chips(out: dict[str, Any], pending: bool) -> list[str]:
+    """Every reply's follow-ups, from this turn's Plan; none on a Proposal."""
+    if pending or out.get("proposal_id") is not None:
+        return []
+    return planner.chips(_turn_plan(cast(State, out)), out.get("message", ""))
+
+
 def _answer(
     assistant: Assistant, thread: str, out: dict[str, Any], started: float
 ) -> Answer:
@@ -1010,7 +1017,7 @@ def _answer(
         payload_id=out.get("payload_id"),
         counted=tuple(assistant.counted[e] for e in evidence if e in assistant.counted),
         resolved=tuple(out.get("resolved") or ()),
-        chips=tuple(out.get("chips") or ()),
+        chips=tuple(out.get("chips") or _chips(out, bool(pending))),
         timing=_timing(assistant, started),
     )
 

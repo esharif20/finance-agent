@@ -259,6 +259,15 @@ class Median(BaseModel):
     median: ToolMoney  # the middle of the three months' totals
 
 
+class Change(BaseModel):
+    """This period against the one before, worked out by code (#317)."""
+
+    model_config = _STRICT
+    evidence_id: str
+    by: ToolMoney  # the size of the change, never negative
+    direction: Literal["more", "less", "same"]
+
+
 class Converted(BaseModel):
     model_config = _STRICT
     evidence_id: str
@@ -306,9 +315,19 @@ def _summary(src: Source, month: str) -> SpendingSummaryOut:
 def _spend(src: Source, plan: Plan, since: date, until: date) -> BaseModel:
     if plan.kind == "income":
         return _income(src, plan, since, until)
+    qp = _qp(plan, since, until)
     if not (plan.categories or plan.merchant_ids):
-        return _summary(src, f"{since:%Y-%m}")
-    return spend(src, _qp(plan, since, until))
+        if not plan.group:
+            return _summary(src, f"{since:%Y-%m}")
+        # "by merchant" on all spending: every top-level Category, for the rows
+        led = Ledger(src.conn, src.user_id)
+        tops = {
+            t.name
+            for m in qp.months()
+            for t in led.spending_by_category(m, qp.account_id)
+        }
+        qp = qp.model_copy(update={"categories": tuple(sorted(tops))})
+    return spend(src, qp)
 
 
 def _income(src: Source, plan: Plan, since: date, until: date) -> IncomeOut:
@@ -391,6 +410,23 @@ def execute(plan: Plan, src: Source) -> list[Fetched]:
                 ),
             )
         )
+    elif plan.compare is None and plan.currency is None:
+        # richer by default: the period before, and the change, worked out here
+        other = _spend(
+            src, plan, _months_back(plan.since, span), _months_back(plan.until, span)
+        )
+        diff = _total(base) - _total(other)
+        out.append(Fetched(_name(other), other))
+        out.append(
+            Fetched(
+                "change",
+                Change(
+                    evidence_id=f"change:{plan.since:%Y-%m}",
+                    by=ToolMoney(minor=abs(diff), currency=CURRENCY),
+                    direction="more" if diff > 0 else "less" if diff < 0 else "same",
+                ),
+            )
+        )
     if plan.currency and (c := _convert(src, _total(base), plan.currency, plan.until)):
         out.append(Fetched("fx", c))
     return out[:MAX_FETCHES]
@@ -469,18 +505,35 @@ def render(plan: Plan, fetched: Sequence[Fetched]) -> str | None:
     )
     if plan.note:
         text += f" {plan.note}"
+    change = next((f.out for f in fetched if isinstance(f.out, Change)), None)
     for f in fetched[1:]:
-        if isinstance(f.out, Median):
-            text += f" Your 3-month median is {_money(f.out.median)}."
+        if isinstance(f.out, Change):
+            continue
+        if change is not None:  # the period before, said once with the change
+            when = _period_of(f.out, plan).removeprefix("in ")
+            was = _money(_amount(f.out))
+            if change.direction == "same" and _amount(f.out).minor == 0:
+                text += f" There was none {_period_of(f.out, plan)} either."
+            elif change.direction == "same":
+                text += f" That's the same as {when}."
+            elif _amount(f.out).minor == 0:
+                text += f" There was none {_period_of(f.out, plan)}."
+            else:
+                text += (
+                    f" That's {_money(change.by)} {change.direction} than {when}"
+                    f" ({was})."
+                )
+        elif isinstance(f.out, Median):
+            # "3-month" would not ground: the hyphen reads as a sign
+            text += f" Your median over the last 3 months is {_money(f.out.median)}."
         elif isinstance(f.out, Converted):
             on = format_figure(f.out.rate_on)
             text += f" That's {_money(f.out.amount)} at the rate of {on}."
         else:
             text += f" It was {_money(_amount(f.out))} {_period_of(f.out, plan)}."
-    if (
-        plan.group == "merchant"
-        and isinstance(first, SpendForQueryOut)
-        and first.merchants
+    if isinstance(first, SpendForQueryOut) and (
+        (plan.group == "merchant" and first.merchants)
+        or (len(first.merchants) > 1 and not plan.merchant_ids)
     ):
         rows = first.merchants[:TOP]
         parts = [f"{r.merchant.data} ({_money(r.amount)})" for r in rows]
@@ -516,6 +569,28 @@ def open_plan(
 
 
 ADVICE_ROWS = 3
+GENERAL = (
+    "How much did I spend last month?",
+    "What's my balance?",
+    "Where can I save?",
+)
+
+
+def chips(plan: Plan | None, asked: str) -> list[str]:
+    """Up to 3 follow-ups the planner answers with no model call (#317):
+    each matches `follow_up` or a Plan of its own. Never the question asked."""
+    if plan is not None and plan.kind in ("figure", "income"):
+        out = ["And the month before?"]
+        if plan.compare != "median3":
+            out.append("Compared to usual?")
+        if plan.group != "merchant" and plan.kind == "figure":
+            out.append("By merchant")
+    elif plan is not None and plan.kind == "big":
+        out = ["And the month before?", *GENERAL[:2]]
+    else:
+        out = list(GENERAL)
+    said = asked.casefold().strip(" ?!.")
+    return [c for c in out if c.casefold().strip(" ?!.") != said][:3]
 
 
 def advice(outs: Sequence[object]) -> tuple[str, list[str]] | None:
