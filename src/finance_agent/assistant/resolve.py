@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Literal
 
+from finance_agent.assistant import semantic
 from finance_agent.assistant.grounding import Money, Month, Percent, ToolValue
 from finance_agent.assistant.grounding import format_figure as fig
 from finance_agent.categorise.display_names import display_name
@@ -70,6 +71,8 @@ class Resolution:
     labels: list[str] = field(default_factory=list[str])
     values: list[ToolValue] = field(default_factory=list[ToolValue])
     question: str | None = None  # asked once when a choice changes the figure
+    note: str = ""  # Merchants counted from elsewhere, said with the answer
+    read: frozenset[str] = frozenset()  # words the semantic index read
 
     def value(self, label: str, v: Money | Month | Percent | date | int) -> None:
         self.values.append(ToolValue(evidence_id=EVIDENCE, label=label, value=v))
@@ -160,6 +163,20 @@ def period(text: str, today: date) -> Period | None:
                 else Period(this, today, period_label(this, today))
             )
     return None
+
+
+_MENTION = re.compile(
+    rf"\b(?:(?:this|last|past) (?:month|week|year|\d{{1,2}} months|"
+    rf"one|two|three|four|six|twelve)|month before|tax year|\d{{4}}-\d{{2}}|"
+    rf"{_MON.replace('(?P<mon>', '(?:')})"
+)
+
+
+def one_period(text: str, today: date) -> Period | None:
+    """The period when the message names exactly one ("this year"); None
+    for a list or a correction ("October, November and December", "last
+    month? I mean March"), which the model reads from the words."""
+    return period(text, today) if len(_MENTION.findall(_norm(text))) == 1 else None
 
 
 def _named(m: re.Match[str], today: date) -> date:
@@ -413,6 +430,11 @@ def resolve(
         if ids:
             r.merchant_ids, r.merchant_label = ids, mlabel
             r.labels.append(mlabel)
+        else:
+            if not r.categories:
+                _semantic_term(text, r, led)
+            if r.categories:
+                _filed_elsewhere(r, led)
     aid, alabel, q = account(text, led)
     if q:
         r.question = q
@@ -450,6 +472,45 @@ _FILLER = frozenset(
 )
 
 
+def _semantic_term(text: str, r: Resolution, led: Ledger) -> None:
+    """Words no resolver read, read by meaning: "forecourt" is Fuel."""
+    left = unresolved(text, r)
+    if not left:
+        return
+    phrase = " ".join(w for w in _norm(text).split() if w in left)
+    found = semantic.term(led, phrase)
+    if found is None or found.category is None:
+        return  # shortcut: a term's Merchants alone aren't used yet, only its Category
+    path = " > ".join(found.category)
+    r.categories = (path,)
+    r.labels.append(f"{found.category[1]} (for “{phrase}”)")
+    r.read = frozenset(left)
+
+
+def _filed_elsewhere(r: Resolution, led: Ledger) -> None:
+    """The Category's own Merchants plus those filed elsewhere whose name sits
+    nearest its description (calibrated: evals/semantic_resolution.py)."""
+    idx = semantic.index(led)
+    th = idx and semantic.thresholds(idx.model)
+    if idx is None or th is None:
+        return
+    extra: dict[int, tuple[str, tuple[str, str] | None]] = {}
+    for c in r.categories:
+        top, _, sub = c.partition(" > ")
+        if sub:
+            for mid, name, own in idx.filed_elsewhere((top, sub), th):
+                extra[mid] = (name, own)
+    if not extra:
+        return
+    r.merchant_ids = tuple(sorted(extra))
+    parts = [
+        f"{display_name(n)} (filed under {' › '.join(own) if own else 'Uncategorised'})"
+        for n, own in sorted(extra.values(), key=lambda x: x[0])
+    ]
+    r.note = "That includes " + ", ".join(parts) + "."
+    r.labels.append("plus " + ", ".join(parts))
+
+
 def unresolved(text: str, r: Resolution) -> set[str]:
     """Content words no resolver accounted for. The planner answers only
     when this is empty; anything else goes to the model, which may ask."""
@@ -463,6 +524,6 @@ def unresolved(text: str, r: Resolution) -> set[str]:
     words = set(re.findall(r"[a-z][a-z']*", t))
     return {
         w
-        for w in words - _STOP - _PERIOD_WORDS - _FILLER
+        for w in words - _STOP - _PERIOD_WORDS - _FILLER - r.read
         if len(w) > 2 and w.rstrip("s") not in _FILLER
     }

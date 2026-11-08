@@ -416,6 +416,17 @@ def ranked(
 ) -> tuple[str | None, dict[str, list[tuple[int, tuple[str, str]]]]]:
     """`suggest` with each Category's similarity (thousandths), and the stored
     model version the vectors came from (None when there are none)."""
+    found = stored_vectors(conn, user_id)
+    if found is None:
+        return None, {}
+    model, vecs = found
+    return model, rank_all(vecs, targets, labelled)
+
+
+def stored_vectors(
+    conn: Connection, user_id: int
+) -> tuple[str, dict[int, Vector]] | None:
+    """The Merchant vectors of the model version most of them come from."""
     me = schema.merchant_embedding
     db = Scoped(conn, user_id)
     rows = db.execute(db.select(me, me.c.merchant_id, me.c.model, me.c.vector)).all()
@@ -423,9 +434,8 @@ def ranked(
     for r in rows:
         by_model.setdefault(r.model, {})[r.merchant_id] = _unpack(r.vector)
     if not by_model:
-        return None, {}
-    model, vecs = max(by_model.items(), key=lambda kv: (len(kv[1]), kv[0]))
-    return model, rank_all(vecs, targets, labelled)
+        return None
+    return max(by_model.items(), key=lambda kv: (len(kv[1]), kv[0]))
 
 
 # below this norm the integer pre-filter's bound loosens; such vectors (never a

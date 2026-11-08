@@ -694,6 +694,14 @@ class Ledger:
     def __init__(self, conn: Connection, user_id: int) -> None:
         self._db = Scoped(conn, user_id)
 
+    @property
+    def conn(self) -> Connection:
+        return self._db.conn
+
+    @property
+    def user_id(self) -> int:
+        return self._db.user_id
+
     def import_files(self, paths: Sequence[Path]) -> ImportReport:
         added = known = ambiguous = files = skipped = 0
         stored = False

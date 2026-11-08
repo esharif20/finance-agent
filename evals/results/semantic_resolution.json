@@ -1,0 +1,38 @@
+{
+  "harness": "semantic_resolution",
+  "dataset_version": 1,
+  "dataset_sha256": "85d833db1d3ccdc16a04756ae8de515170af91ff98bdf62fc4253acea0f9ef39",
+  "merchants": 43,
+  "terms": 18,
+  "thresholds": {
+    "nomic-embed-text": {
+      "filed": 450,
+      "filed_margin": 45,
+      "term": 450,
+      "term_margin": 70,
+      "merchant": 590
+    }
+  },
+  "models": {
+    "names_only": {
+      "metrics": {
+        "filed_precision": 1.0,
+        "filed_recall": 0.0,
+        "term_accuracy": 0.277778,
+        "term_false_category": 0.0,
+        "term_merchants_precision": 0.9,
+        "term_merchants_recall": 0.204545
+      }
+    },
+    "nomic-embed-text": {
+      "metrics": {
+        "filed_precision": 1.0,
+        "filed_recall": 0.833333,
+        "term_accuracy": 1.0,
+        "term_false_category": 0.0,
+        "term_merchants_precision": 0.909091,
+        "term_merchants_recall": 0.454545
+      }
+    }
+  }
+}
