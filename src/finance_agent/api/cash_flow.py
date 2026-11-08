@@ -43,6 +43,9 @@ def simulate_purchase(
     when = on or today
     if when < today:
         raise HTTPException(422, "A purchase cannot be in the past.")
+    # Every GBP account is pooled, a card's debt included: the projection
+    # ignores Transfers (a card bill, a savings sweep) and counts card Spending,
+    # which is only consistent over the pool. Accounts carry no kind yet.
     balances = [
         a.bank_balance if a.bank_balance is not None else a.ledger_balance
         for a in led.accounts()
