@@ -1,0 +1,107 @@
+{
+  "harness": "review_suggestions",
+  "dataset": "categoriser_v4.csv + PAYEES",
+  "dataset_version": 1,
+  "dataset_sha256": "36ece1254fe1f602fdf195923b422cdc9e52bbe78bb9952fac406521fe251239",
+  "signals": "categoriser_gate_qwen3_5_4b_q4_k_m.json",
+  "labels": {
+    "corrections": 6,
+    "base": 130,
+    "diverse": true
+  },
+  "calibration": {
+    "knn_floor": 611,
+    "zero_shot_margin": null,
+    "zero_shot_target_precision": 0.9
+  },
+  "person_detector": {
+    "precision": 1.0,
+    "recall": 0.916667,
+    "businesses_flagged": 0
+  },
+  "cascade": {
+    "merchants": 339,
+    "coverage": 0.99705,
+    "accuracy_assigned": 0.89645,
+    "auto_precision": 0.985981,
+    "auto_coverage": 0.631268,
+    "low_accuracy": 0.741935,
+    "llm_calls_per_100_unbatched": 23.00885,
+    "llm_calls_per_100_batched": 1.179941,
+    "note": "kNN floor 720 was calibrated on this test split (categoriser_ollama)"
+  },
+  "models": {
+    "old": {
+      "model": "knn over Corrections only, no floor",
+      "metrics": {
+        "targets": 156,
+        "coverage": 1.0,
+        "accuracy": 0.083333,
+        "wrong_rate": 0.916667,
+        "false_groceries": 0.916667,
+        "person_suggested": 1.0
+      },
+      "model_version": "hashed-trigrams-v1"
+    },
+    "new": {
+      "model": "payee rules, zero-shot, floored knn, stored LLM",
+      "metrics": {
+        "targets": 156,
+        "coverage": 0.916667,
+        "accuracy": 0.769231,
+        "wrong_rate": 0.211538,
+        "false_groceries": 0.00641,
+        "person_suggested": 0.0
+      },
+      "model_version": "hashed-trigrams-v1"
+    },
+    "new_few_labels": {
+      "model": "the new chain, Groceries Corrections the only labels",
+      "metrics": {
+        "targets": 156,
+        "coverage": 0.916667,
+        "accuracy": 0.769231,
+        "wrong_rate": 0.211538,
+        "false_groceries": 0.00641,
+        "person_suggested": 0.0
+      },
+      "model_version": "hashed-trigrams-v1"
+    },
+    "lexicon": {
+      "model": "payee-type and lexicon rules alone",
+      "metrics": {
+        "targets": 125,
+        "coverage": 0.064,
+        "accuracy": 0.875,
+        "wrong_rate": 0.008,
+        "false_groceries": 0.0,
+        "person_suggested": 0.0
+      },
+      "model_version": "hashed-trigrams-v1"
+    },
+    "zero_shot": {
+      "model": "zero-shot nearest description",
+      "metrics": {
+        "targets": 125,
+        "coverage": 0.0,
+        "accuracy": 0.0,
+        "wrong_rate": 0.0,
+        "false_groceries": 0.0,
+        "person_suggested": 0.0
+      },
+      "model_version": "hashed-trigrams-v1"
+    },
+    "new_nomic": {
+      "model": "the new chain on nomic signals",
+      "metrics": {
+        "targets": 125,
+        "coverage": 0.992,
+        "accuracy": 0.741935,
+        "wrong_rate": 0.256,
+        "false_groceries": 0.008,
+        "person_suggested": 0.0
+      },
+      "model_version": "hashed-trigrams-v1"
+    }
+  }
+}
