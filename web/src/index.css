@@ -993,6 +993,7 @@ html[data-private] .money {
   padding: 4px 16px 8px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  contain: inline-size; /* its cards never widen the Overview column */
   scroll-padding-inline: 16px;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
