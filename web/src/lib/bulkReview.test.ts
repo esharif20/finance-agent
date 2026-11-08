@@ -60,6 +60,12 @@ describe("default ticks and the cap", () => {
     expect(selected(g!, new Set()).map((i) => i.id)).toEqual(["category:4", "category:3"]);
   });
 
+  it("unticks by spend, not by how torn the model is", () => {
+    const torn = mk("1", 100, [FOOD, CAR, ["Shopping", "Gifts"]]); // score 300, spend lowest
+    const [g] = groupBySuggestion([torn, mk("2", 200, [FOOD]), mk("3", 250, [FOOD])]);
+    expect([...g!.off]).toEqual(["category:1"]); // median spend 200
+  });
+
   it("ticks the whole group when the scores are level, and a lone Merchant", () => {
     const [g] = groupBySuggestion([mk("1", 100, [FOOD]), mk("2", 100, [FOOD])]);
     expect(g!.off.size).toBe(0);

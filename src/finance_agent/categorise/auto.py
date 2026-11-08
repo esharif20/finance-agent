@@ -20,14 +20,14 @@ for good. Corrections are an overlay on read, so they always win.
 
 import logging
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import Connection, Engine, func, or_
 
-from finance_agent.categorise import embedding, llm
-from finance_agent.ledger import CATEGORISED_KINDS
+from finance_agent.categorise import embedding, llm, payees, zero_shot
+from finance_agent.ledger import CATEGORISED_KINDS, Ledger
 from finance_agent.ledger import UNCATEGORISED as _NONE
 from finance_agent.ledger.review import CategoryItems, ReviewQueue
 from finance_agent.storage import Scoped, schema
@@ -204,6 +204,68 @@ def _answers(
         and r.category_id in name
         and name[r.category_id] != UNCATEGORISED
     }
+
+
+# Review suggestions (the 461-as-Groceries fix). Embedder name -> the lowest
+# kNN similarity (thousandths) that may suggest: each model's 95%-precision
+# threshold from the committed categoriser eval (a test keeps them equal). A
+# model without one never suggests from kNN alone.
+FLOORS: dict[str, int] = {"hashed-trigrams-v1": 611, "nomic-embed-text": 720}
+# The labels must cover at least MIN_CATEGORIES Categories, none holding more
+# than MAX_SHARE% of them, or the kNN suggests nothing: with ten Groceries
+# Corrections every Merchant's nearest label is a grocer.
+MIN_CATEGORIES = 5
+MAX_SHARE = 50  # percent
+
+
+def diverse(labelled: Mapping[int, set[Category]]) -> bool:
+    counts = Counter(c for cats in labelled.values() for c in cats)
+    n = sum(counts.values())
+    return len(counts) >= MIN_CATEGORIES and max(counts.values()) * 100 <= MAX_SHARE * n
+
+
+def choose(
+    name: str,
+    hits: Sequence[tuple[int, Category]],
+    floor: int | None,
+    zero: Category | None = None,
+    guess: Category | None = None,
+) -> list[Category]:
+    """A Review item's suggestions, best first: none for a person's name;
+    else a payee-type or lexicon rule, the zero-shot guess, kNN hits at or
+    above the floor, then the stored LLM guess. At most SUGGESTIONS."""
+    if payees.person(name):
+        return []
+    strong = [c for s, c in hits if floor is not None and s >= floor]
+    out: list[Category] = []
+    for c in (payees.rule(name), zero, *strong, guess):
+        if c is not None and c != UNCATEGORISED and c not in out:
+            out.append(c)
+    return out[: embedding.SUGGESTIONS]
+
+
+def suggest(
+    conn: Connection,
+    user_id: int,
+    targets: Mapping[str, int],
+    labelled: Mapping[int, set[Category]],
+) -> dict[str, list[Category]]:
+    """The Review Queue's suggester: `choose` for each target (key -> Merchant
+    id). `labelled` (the queue's confident rows) gains the base Merchants and
+    Corrections. Reads stored vectors and LLM answers only: no model call."""
+    labels = {**labelled, **llm.labelled(conn, user_id)}
+    model, hits = embedding.ranked(conn, user_id, targets, labels)
+    floor = FLOORS.get(model.split("@")[0]) if model and diverse(labels) else None
+    vecs = embedding.vectors(conn, user_id, model) if model else {}
+    _, said = _answers(Scoped(conn, user_id), _ids(conn, user_id))
+    names = {m.id: m.name for m in Ledger(conn, user_id).merchants()}
+    out: dict[str, list[Category]] = {}
+    for key, m in targets.items():
+        zero = zero_shot.guess(model, vecs.get(m))
+        found = choose(names.get(m, ""), hits.get(key, []), floor, zero, said.get(m))
+        if found:
+            out[key] = found
+    return out
 
 
 def apply(
@@ -438,6 +500,12 @@ def refresh_quietly(engine: Engine, user_id: int) -> None:
     """After import or sync: embed new Merchants, then apply or log their
     guesses. Never raises; the rules carry on alone."""
     embedding.refresh_quietly(engine, user_id)
+    try:
+        e = embedding.OllamaEmbedder()
+        if (model := embedding.stored_model(e)) is not None:
+            zero_shot.prime(model, e)  # once per model version, at sync time
+    except Exception as err:  # noqa: BLE001
+        log.warning("zero-shot labels failed: %s", type(err).__name__)
     try:
         with engine.begin() as conn:
             apply(conn, user_id, _ids(conn, user_id))
