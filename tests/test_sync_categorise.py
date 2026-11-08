@@ -105,7 +105,11 @@ def test_a_sync_with_no_new_rows_still_files_waiting_merchants(
     from finance_agent.categorise import auto
 
     calls: list[int] = []
-    monkeypatch.setattr(auto, "refresh_quietly", lambda e, u: calls.append(u))
+
+    def spy(_engine: Engine, user_id: int) -> None:
+        calls.append(user_id)
+
+    monkeypatch.setattr(auto, "refresh_quietly", spy)
     with TestClient(api.create_app(engine)) as c:
         c.post("/api/sync")
         assert c.post("/api/sync").json()["added"] == 0
