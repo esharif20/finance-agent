@@ -300,6 +300,19 @@ class Transaction:
 
 
 @dataclass(frozen=True)
+class SpendPart:
+    """One Transaction's share of a Subcategory's spending (a Split has one
+    per part); `spend_minor` is positive for spending, negative for a Refund."""
+
+    transaction_id: int
+    top: str
+    sub: str
+    merchant_id: int | None
+    merchant: str  # raw Merchant name, "Unknown" when none
+    spend_minor: int
+
+
+@dataclass(frozen=True)
 class TransactionPage:
     items: list[Transaction]
     total: int  # every match, before limit and offset
@@ -1670,20 +1683,34 @@ class Ledger:
             out[account_id] = (bk, b1 + self._moved(account_id, t1, tk), t1, tk)
         return out
 
+    def spending_parts(
+        self, month: str, account_id: int | None = None
+    ) -> list[SpendPart]:
+        """What each Spending or Refund Transaction of `month` adds to
+        `spending_by_category`, in GBP minor units: every total there is a sum
+        of these, so a list of them always adds up to the total."""
+        amounts = self._in_gbp(month, account_id)
+        out: list[SpendPart] = []
+        for txn_id, c in self._categorisations().items():
+            if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
+                own, gbp = amounts[txn_id]
+                for (top, sub), minor in shares_in_gbp(_shares(c, own), own, gbp):
+                    merchant = c.merchant or "Unknown"
+                    out.append(
+                        SpendPart(txn_id, top, sub, c.merchant_id, merchant, -minor)
+                    )
+        return out
+
     def spending_by_category(
         self, month: str, account_id: int | None = None
     ) -> list[Spend]:
         """Spending minus Refunds received in `month` (ADR 0004), by Category,
         then Subcategory, then Merchant ("Unknown" when none), largest first."""
-        amounts = self._in_gbp(month, account_id)
         tree: dict[str, dict[str, dict[tuple[int | None, str], int]]] = {}
-        for txn_id, c in self._categorisations().items():
-            if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
-                own, gbp = amounts[txn_id]
-                for (top, sub), minor in shares_in_gbp(_shares(c, own), own, gbp):
-                    merchants = tree.setdefault(top, {}).setdefault(sub, {})
-                    key = (c.merchant_id, c.merchant or "Unknown")
-                    merchants[key] = merchants.get(key, 0) - minor
+        for p in self.spending_parts(month, account_id):
+            merchants = tree.setdefault(p.top, {}).setdefault(p.sub, {})
+            key = (p.merchant_id, p.merchant)
+            merchants[key] = merchants.get(key, 0) + p.spend_minor
 
         def level(nodes: dict[Any, Any]) -> tuple[Spend, ...]:
             out: list[Spend] = []

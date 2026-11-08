@@ -3,19 +3,23 @@ server-sent events, for `current_user` only.
 
 The reply streams only after the grounding check has passed (or the
 deterministic table has replaced it), so no unchecked figure ever reaches the
-screen. Events: `meta` (thread, which path answered, any confirm card), then
-`delta` chunks of the reply, then `done`. Bodies are parsed here rather than
+screen. Events: `stage` (progress words while the turn runs, never data),
+`meta` (thread, which path answered, any confirm card, the Transactions
+behind each spending total), then `delta` chunks of the reply, then `done`;
+`error` if the turn failed. Bodies are parsed here rather than
 by FastAPI, so a refusal never echoes the user's text (#169)."""
 
 import json
+import queue
 import re
-from collections.abc import Iterator
+import threading
+from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import Connection
+from sqlalchemy import Connection, Engine
 
 from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
@@ -78,20 +82,74 @@ def _thread(value: object) -> str:
     return value
 
 
-def _sse(a: Answer) -> StreamingResponse:
+def _meta(a: Answer) -> dict[str, Any]:
+    return {
+        "thread_id": a.thread_id,
+        "turn_id": a.turn_id,
+        "route": a.route,
+        "path": a.path,
+        "evidence": list(a.evidence),
+        "proposal_id": a.proposal_id,
+        "counted": [
+            {
+                "evidence_id": e.evidence_id,
+                "total_minor": e.total_minor,
+                "transactions": [
+                    {
+                        "id": t.transaction_id,
+                        "posted_on": t.posted_on.isoformat(),
+                        "merchant": t.merchant,
+                        "amount_minor": t.amount_minor,
+                    }
+                    for t in e.transactions
+                ],
+            }
+            for e in a.counted
+        ],
+    }
+
+
+def _event(name: str, data: object) -> str:
+    return f"event: {name}\ndata: {json.dumps(data)}\n\n"
+
+
+def _sse(
+    engine: Engine,
+    work: Callable[[Assistant], Answer],
+    make: Callable[[Connection], Assistant],
+) -> StreamingResponse:
+    """Run the turn on its own thread and stream its stages, then the reply.
+    The turn finishes and commits even if the client goes away, so a
+    reloaded screen can still find the conversation."""
+    q: queue.Queue[tuple[str, object]] = queue.Queue()
+
+    def run() -> None:
+        try:
+            with engine.begin() as conn:
+                assistant = make(conn)
+                assistant.on_stage = lambda words: q.put(("stage", words))
+                q.put(("answer", work(assistant)))
+        # anything at all, so the stream never waits forever; its text could
+        # quote data, so it is never logged
+        except BaseException:  # noqa: BLE001
+            q.put(("error", None))
+
+    threading.Thread(target=run, daemon=True).start()
+
     def events() -> Iterator[str]:
-        meta = {
-            "thread_id": a.thread_id,
-            "turn_id": a.turn_id,
-            "route": a.route,
-            "path": a.path,
-            "evidence": list(a.evidence),
-            "proposal_id": a.proposal_id,
-        }
-        yield f"event: meta\ndata: {json.dumps(meta)}\n\n"
-        for chunk in _WORD.findall(a.reply):
-            yield f"event: delta\ndata: {json.dumps({'text': chunk})}\n\n"
-        yield "event: done\ndata: {}\n\n"
+        while True:
+            kind, item = q.get()
+            if kind == "stage":
+                yield _event("stage", {"text": item})
+            elif kind == "error":
+                yield _event("error", {})
+                return
+            elif isinstance(item, Answer):
+                yield _event("meta", _meta(item))
+                for chunk in _WORD.findall(item.reply):
+                    yield _event("delta", {"text": chunk})
+                yield _event("done", {})
+                return
 
     return StreamingResponse(events(), media_type="text/event-stream")
 
@@ -105,14 +163,18 @@ def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingRes
         raise HTTPException(422, f"message is text of 1 to {MESSAGE_MAX} characters")
     if set(body) - {"message", "thread_id"}:
         raise HTTPException(422, "only message and thread_id are accepted")
-    with request.app.state.engine.begin() as conn:
+    engine: Engine = request.app.state.engine
+    with engine.begin() as conn:
         convo = Conversations(conn, current_user())
         convo.purge_idle(datetime.now(UTC) - IDLE)
         thread = body.get("thread_id")
         if thread is not None and not convo.has_thread(_thread(thread)):
             raise HTTPException(404, "no such conversation")
-        answer = ask(Assistant(model, conn, day), message, thread)
-    return _sse(answer)
+    return _sse(
+        engine,
+        lambda a: ask(a, message, thread),
+        lambda conn: Assistant(model, conn, day),
+    )
 
 
 @router.get("/model")
@@ -159,14 +221,17 @@ def decide(
     if decision not in ("confirm", "reject") or set(body) != {"decision"}:
         raise HTTPException(422, "decision is confirm or reject")
     thread = _thread(thread_id)
-    with request.app.state.engine.begin() as conn:
+    engine: Engine = request.app.state.engine
+    with engine.begin() as conn:
         if not Conversations(conn, current_user()).has_thread(thread):
             raise HTTPException(404, "no such conversation")
-        assistant = Assistant(model, conn, day)
-        if waiting_for(assistant, thread) is None:
+        if waiting_for(Assistant(model, conn, day), thread) is None:
             raise HTTPException(409, "nothing is waiting for confirmation")
-        answer = resume(assistant, thread, decision)
-    return _sse(answer)
+    return _sse(
+        engine,
+        lambda a: resume(a, thread, decision),
+        lambda conn: Assistant(model, conn, day),
+    )
 
 
 @router.delete("/{thread_id}")
