@@ -96,11 +96,49 @@ function faces(accounts: Account[], balances?: Balances): Face[] {
   ];
 }
 
+/** Whether the bank balance matches the Ledger, as the card says it. */
+const statusOf = (f: Face) => (
+  <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
+    {f.rateNeeded?.length ? (
+      `Total unknown: rate needed for ${f.rateNeeded.join(", ")}`
+    ) : f.matches === null ? (
+      f.id === undefined ? "Total unknown: a bank gives no balance" : "No balance from bank"
+    ) : f.matches ? (
+      <>
+        <Check className="size-3.5" aria-hidden="true" />
+        Matches ledger
+      </>
+    ) : (
+      <span className="rounded-full bg-warning px-3 py-1 text-warning-foreground">
+        Find it
+      </span>
+    )}
+  </span>
+);
+
 /** The page colour behind the stack, which each card's back fades towards (#93). */
 const pageColour = () =>
   getComputedStyle(document.documentElement).getPropertyValue("--background").trim() || "#f3f5f7";
 
 const webgl = () => typeof WebGLRenderingContext !== "undefined";
+const PHONE = "(max-width: 639px)";
+// Touch screens and narrow windows never get a WebGL context: iOS Safari kills the tab when the
+// card scene's context and textures push it past its memory limit. The CSS faces stand in.
+const NO_GL = "(pointer: coarse), (max-width: 899px)";
+/** Phones get a flat, snap-scrolling row of mini cards instead of the 3D stack: a stack of ID-1
+    cards at phone width is several screens tall. */
+function useMedia(q: string) {
+  const query = () => typeof matchMedia === "function" && matchMedia(q).matches;
+  const [on, setOn] = useState(query);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia(q);
+    const change = () => setOn(mq.matches);
+    mq.addEventListener?.("change", change);
+    return () => mq.removeEventListener?.("change", change);
+  }, [q]);
+  return on;
+}
 const transform = (p: Pose) =>
   `translate3d(${p.x}px, ${p.y}px, ${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg) scale(${p.s})`;
 
@@ -120,6 +158,8 @@ export function AccountStack({
   onHot?: (id: number | undefined) => void; // a pointer or keyboard is on a card: light its share elsewhere
 }) {
   const reduce = useReducedMotion() ?? false;
+  const phone = useMedia(PHONE);
+  const noGl = useMedia(NO_GL);
   const all = useMemo(() => faces(accounts, balances), [accounts, balances]);
   const [hover, setHover] = useState<Hover | null>(null);
   const [rising, setRising] = useState<number | null>(null);
@@ -213,10 +253,10 @@ export function AccountStack({
     const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e?.contentRect.width ?? 0)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [phone]);
 
   // WebGL: one lazy-loaded canvas for the whole stack, never under reduced motion.
-  const wantGl = !reduce && webgl() && width > 0;
+  const wantGl = !reduce && !noGl && webgl() && width > 0;
   const allH = layout.allH;
   const sceneFaces = useMemo<SceneFace[]>(
     () =>
@@ -281,7 +321,7 @@ export function AccountStack({
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
-  }, [accounts.length === 0]); // the stack mounts with the first account; the handler reads refs
+  }, [accounts.length === 0, phone]); // the stack mounts with the first account; the handler reads refs
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     swallow.current = false;
     if (e.button !== 0 || press.current) return; // one pointer at a time
@@ -350,6 +390,47 @@ export function AccountStack({
         <CardTitle id="accounts-title">Accounts</CardTitle>
         <CardDescription>Choose one to filter the Overview</CardDescription>
       </CardHeader>
+      {phone ? (
+        <div role="group" aria-label="Accounts" className="account-rail">
+          {all.map((f, i) => {
+            const on = f === current;
+            const image = f.art ? cssArt[f.art] : undefined;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onSelect(f.id)}
+                className="account-card account-mini text-left"
+                data-selected={on}
+                data-all={f.id === undefined}
+                data-art={Boolean(image)}
+                style={
+                  {
+                    "--i": i,
+                    ...(f.hue === null ? {} : { "--h": f.hue }),
+                    ...(image ? { backgroundImage: image } : {}),
+                  } as CSSProperties
+                }
+              >
+                <span data-slot="title" className="truncate text-label font-semibold">
+                  {f.title}
+                </span>
+                {f.id !== undefined && !image ? (
+                  <svg data-slot="nfc" viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 opacity-80">
+                    <path d="M5 4a6 6 0 0 1 0 8M8 2.5a9 9 0 0 1 0 11M11 1a12 12 0 0 1 0 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                ) : null}
+                {f.balance ? <Money value={f.balance} className="account-balance font-semibold" /> : null}
+                {f.masked ? <span data-slot="masked" className="text-label opacity-80">{f.masked.slice(-6)}</span> : null}
+                {/* the status and full number stay in the card's name; only a mismatch shows */}
+                {f.masked ? <span className="sr-only">{f.masked}</span> : null}
+                <span className={f.matches === false ? "account-mini-warn" : "sr-only"}>{statusOf(f)}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
       <div
         ref={stack}
         role="group"
@@ -444,26 +525,12 @@ export function AccountStack({
               {f.balance ? (
                 <Money value={f.balance} odometer={f.key} className="account-balance text-row font-semibold" />
               ) : null}
-              <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
-                {f.rateNeeded?.length ? (
-                  `Total unknown: rate needed for ${f.rateNeeded.join(", ")}`
-                ) : f.matches === null ? (
-                  f.id === undefined ? "Total unknown: a bank gives no balance" : "No balance from bank"
-                ) : f.matches ? (
-                  <>
-                    <Check className="size-3.5" aria-hidden="true" />
-                    Matches ledger
-                  </>
-                ) : (
-                  <span className="rounded-full bg-warning px-3 py-1 text-warning-foreground">
-                    Find it
-                  </span>
-                )}
-              </span>
+              {statusOf(f)}
             </button>
           );
         })}
       </div>
+      )}
       <p role="status" className="sr-only">
         Showing {current.masked ? `${current.title} ${current.masked}` : current.title}
       </p>

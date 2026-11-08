@@ -74,8 +74,8 @@ try {
     await page.waitForTimeout(1200);
 
     if (!(await page.getByText("Synthetic data. Nothing here is real.").isVisible())) fail(`${scheme}: no banner`);
-    // privacy mode is on by default in the demo
-    if (!(await page.evaluate(() => document.documentElement.hasAttribute("data-private")))) fail(`${scheme}: privacy mode is off`);
+    // the demo starts with values shown; the figures below are checked against the API
+    if (await page.evaluate(() => document.documentElement.hasAttribute("data-private"))) fail(`${scheme}: values start hidden`);
 
     // the page's cookie is this visitor's: the API answers for the same ledger
     const api = async (path: string) => (await page.request.get(`${base}${path}`)).json();
