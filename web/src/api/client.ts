@@ -241,7 +241,9 @@ export const cancelSubscription = (merchant: number) =>
 // Insights (#150) and the what-if check (#151). A refusal throws the API's own reason.
 export type Insight = components["schemas"]["InsightOut"];
 export type Simulation = components["schemas"]["SimulationOut"];
-export const fetchInsights = () => get<Insight[]>("/api/insights?limit=5");
+export type GuidanceCardData = components["schemas"]["CardOut"];
+export const fetchGuidance = () => get<GuidanceCardData[]>("/api/guidance");
+export const fetchInsights =() => get<Insight[]>("/api/insights?limit=5");
 
 async function post(url: string, body?: object): Promise<void> {
   const res = await fetch(url, {
