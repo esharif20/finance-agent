@@ -29,6 +29,7 @@ from finance_agent.api import (
     subscription_costs,
     subscriptions,
 )
+from finance_agent.categorise import embedding
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -495,6 +496,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
             if any(r.added for r in reports):  # same as `fa import`
                 with engine.begin() as conn:
                     categorise.run(conn, current_user())
+                embedding.refresh_quietly(engine, current_user())
         except Busy:
             raise HTTPException(409, "A sync is already running.") from None
         except NotConnected:
