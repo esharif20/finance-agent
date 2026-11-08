@@ -22,7 +22,6 @@ import hashlib
 import http.client
 import json
 import math
-import re
 import subprocess
 import sys
 import tempfile
@@ -48,6 +47,7 @@ from finance_agent.assistant import (
     ToolSpec,
     context,
 )
+from finance_agent.assistant.chat_model import printed_tool_call
 from finance_agent.assistant.graph import Assistant, ask
 from finance_agent.assistant.ollama import OLLAMA_PORT
 from finance_agent.assistant.tools.registry import TOOLS
@@ -65,35 +65,6 @@ GB = 1024**3
 
 type Ids = dict[str, int]
 type Factory = Callable[[golden.Case, Ids], ChatModel]
-
-# --- the qwen tool-call printing bug ----------------------------------------
-
-_MARKERS = re.compile(r"<\|?tool_call\|?>|<function=|<\|python_tag\|>")
-
-
-def _json_objects(text: str) -> Iterator[Any]:
-    decoder = json.JSONDecoder()
-    for m in re.finditer(r"\{", text):
-        try:
-            yield decoder.raw_decode(text, m.start())[0]
-        except ValueError:
-            continue
-
-
-def printed_tool_call(content: str, names: set[str] | frozenset[str]) -> bool:
-    """Whether a reply's text holds a tool call the model should have made as a
-    structured call: a tool-call marker, a {"name": <tool>, "arguments": ...}
-    object, or <tool>(...)."""
-    if _MARKERS.search(content):
-        return True
-    for obj in _json_objects(content):
-        if (
-            isinstance(obj, dict)
-            and obj.get("name") in names  # pyright: ignore[reportUnknownMemberType]
-            and ({"arguments", "parameters"} & obj.keys())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-        ):
-            return True
-    return any(re.search(rf"\b{re.escape(n)}\s*\(", content) for n in names)
 
 
 class Recorder:

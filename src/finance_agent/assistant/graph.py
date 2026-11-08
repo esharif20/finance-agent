@@ -8,6 +8,7 @@ encrypted database (`LedgerSaver`).
 The checkpointed state holds the turn's message, reply and route, never tool
 results. Nothing here logs message, reply or tool text."""
 
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,7 +25,12 @@ from pydantic import ValidationError
 from sqlalchemy import Connection
 
 from finance_agent.assistant import context
-from finance_agent.assistant.chat_model import ChatModel, Message, Reply
+from finance_agent.assistant.chat_model import (
+    ChatModel,
+    Message,
+    Reply,
+    printed_tool_call,
+)
 from finance_agent.assistant.checkpoints import LedgerSaver
 from finance_agent.assistant.grounding import (
     ToolValue,
@@ -32,7 +38,14 @@ from finance_agent.assistant.grounding import (
     render_fallback,
 )
 from finance_agent.assistant.ollama import OllamaError
-from finance_agent.assistant.tools import NoData, ToolNotAllowed, Turn, run, specs
+from finance_agent.assistant.tools import (
+    TOOLS,
+    NoData,
+    ToolNotAllowed,
+    Turn,
+    run,
+    specs,
+)
 from finance_agent.assistant.tools.propose import ProposalOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
@@ -53,8 +66,23 @@ MODEL_DOWN = "The local model isn't answering, so I can't help with that right n
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
 REGENERATE = (
     "Some figures in that reply are not in this turn's tool results. Rewrite it"
-    " using only figures copied exactly from the tool results, or none."
+    " using only figures copied exactly from the tool results, or none, and"
+    " with no links."
 )
+# A link, image or address in a reply could carry the user's data off the device
+# when rendered or followed (#142), so such a reply is never shown or cached.
+_LINK = re.compile(
+    r"\b[a-z][a-z0-9+.-]*://|//|\bwww\.|\]\(|</?[a-z]+[\s>/]"
+    r"|\b(?:mailto|javascript|file)\s*:|\bdata:\s*[a-z]+/"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}[/?]",
+    re.IGNORECASE,
+)
+
+
+def _shown(reply: str) -> bool:
+    """A reply may reach the user only with no link and no tool call printed as
+    text (a failed generation, #143), whatever its figures."""
+    return not _LINK.search(reply) and not printed_tool_call(reply, frozenset(TOOLS))
 
 
 def _keep_last(
@@ -232,7 +260,8 @@ class Assistant:
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)
-        if not d.failed and not res.grounded:
+        ok = res.grounded and _shown(d.reply)
+        if not d.failed and not ok:
             try:
                 again: Reply = self.model.chat(
                     [
@@ -243,9 +272,10 @@ class Assistant:
                 )
                 d.reply = again.content
                 res = check_grounding(d.reply, d.values, today=self.today)
+                ok = res.grounded and _shown(d.reply)
             except (OllamaError, OSError):
                 d.failed = True
-        if d.failed or not res.grounded:
+        if d.failed or not ok:
             return {
                 "reply": render_fallback(d.values),
                 "path": "deterministic",

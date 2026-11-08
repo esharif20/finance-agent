@@ -26,7 +26,7 @@
       "metrics": {
         "route_accuracy": 1.0,
         "tool_call_accuracy": 0.24,
-        "grounding_pass_rate": 0.526316,
+        "grounding_pass_rate": 0.0,
         "refusal_correctness": 1.0,
         "printed_tool_call_rate": 0.76,
         "model_error_rate": 0.0
@@ -60,9 +60,19 @@
           "ask-refunds-fees",
           "ask-food-trend",
           "ask-food-vs-usual",
+          "ask-subscriptions",
+          "ask-bills",
+          "ask-insights",
           "plan-afford",
           "plan-buffer",
-          "plan-forecast"
+          "plan-forecast",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split"
         ],
         "printed": [
           "ask-spent-january",
