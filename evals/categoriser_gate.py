@@ -52,7 +52,9 @@ type Pick = Callable[[Mapping[str, Any]], tuple[Any, str] | None]
 
 def results_path(model: str) -> Path:
     return (
-        HERE / "results" / f"categoriser_gate_{re.sub(r'[^a-z0-9]+', '_', model)}.json"
+        HERE
+        / "results"
+        / f"categoriser_gate_{re.sub(r'[^a-z0-9]+', '_', model.lower())}.json"
     )
 
 
@@ -419,7 +421,7 @@ def main(argv: Sequence[str]) -> int:
             file=sys.stderr,
         )
         header = {
-            "model_version": f"{e_version}+{l_version}",
+            "model_version": f"{e_version}+{l_version.removeprefix(llm.PREFIX)}",
             "embedder": e_version,
             "llm": l_version,
         }

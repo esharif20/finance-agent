@@ -38,6 +38,7 @@ log = logging.getLogger(__name__)  # counts only
 THRESHOLDS: dict[str, int] = {
     "nomic-embed-text": 720,
     "hashed-trigrams-v1": 611,
+    "nomic-embed-text+qwen3.5:4b-q4_K_M": 681,  # kNN and LLM agree
 }
 MIN_DECISIONS = 50
 PRECISION = 95  # percent
@@ -49,7 +50,7 @@ REVIEW_CAP = 10  # at most this many Merchants per sync are asked about
 # equal): which guess to file on a disagreement, and how often each kind of
 # low guess is right (percent), for spend x (1 - confidence).
 LOW_PREFERS = "llm"
-LOW_CONFIDENCE: dict[str, int] = {"agree": 0, "llm": 0, "knn": 0}
+LOW_CONFIDENCE: dict[str, int] = {"agree": 64, "llm": 57}  # no kNN-only low guess: 0
 
 type Category = tuple[str, str]
 UNCATEGORISED = (_NONE, _NONE)

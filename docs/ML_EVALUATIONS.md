@@ -46,13 +46,35 @@ Status: draft for review.
 
 Gated metrics, per model: macro F1, accuracy, coverage, ECE, ECE on assigned rows, and every Category's precision and recall, so one Category cannot collapse behind a steady macro F1. Plain ECE scores an abstention as confidence 0 and wrong, so a model that abstains a lot looks well calibrated; read `ece_assigned` beside `coverage`.
 
+Dataset v4, 326 test rows:
+
 | Model | Macro F1 | Accuracy | Coverage | ECE | ECE (assigned) |
 | --- | --- | --- | --- | --- | --- |
-| Corrections + rules | 0.775 | 0.656 | 0.676 | 0.019 | 0.029 |
-| + nearest neighbour, trigrams (CI) | 0.815 | 0.807 | 0.992 | 0.079 | 0.080 |
-| + nearest neighbour, nomic-embed-text (local) | 0.838 | 0.830 | 0.992 | 0.081 | 0.082 |
+| Corrections + rules | 0.840 | 0.745 | 0.750 | 0.005 | 0.006 |
+| + nearest neighbour, trigrams (CI) | 0.819 | 0.844 | 0.997 | 0.050 | 0.050 |
+| + nearest neighbour, nomic-embed-text (local) | 0.860 | 0.879 | 0.997 | 0.047 | 0.048 |
 
 Nearest neighbours fill noisy descriptors almost perfectly (noise accuracy 0.76 → 0.99) and help on unseen Merchants (0.25 → 0.50 with nomic), but raw similarity is a poor confidence: ECE quadruples. It does not beat the baseline on calibration, so it stays a suggester until #115 calibrates a threshold. Lookalikes stay at 0: a rule or a seeded alias decides them before any neighbour is asked.
+
+**Dataset v4 (#215 F)** adds the long tail a real sync is mostly made of: 45 fictional independents (clean and noisy), 10 vague processor payees ("SQ *THE KITCHEN") and 8 look-alikes of another Category ("PETROLHEAD MONTHLY", "GREEN TRAIN MODELS"). The kNN and the few-shot now label the base Merchants that appear, as the app does, not only Corrections. Recalibrated thresholds: nomic-embed-text 720 (was 861 on v3), trigrams 611.
+
+### The agreement gate (#215 F)
+
+`evals/categoriser_gate.py` scores, per Merchant, what Corrections, rules and the UK base leave on dataset v4 (125 Merchants, 163 rows): the nomic-embed-text kNN, the local LLM with retrieval few-shot (`categorise/llm.py`, qwen3.5:4b-q4_K_M, the 5 nearest labelled Merchants as examples) and the gate. The local run (`--collect`) stores each Merchant's signals (kNN top score and Category, LLM answer) in the results file. CI recomputes every metric from those committed signals plus the rules, so a rule change that moves the residual set fails until it is re-run locally. Rows weight each Merchant; precision is over assigned rows, coverage over all 326 test rows.
+
+| Stage | Precision | Coverage |
+| --- | --- | --- |
+| Corrections + rules + base | 0.994 | 0.750 |
+| + kNN at its threshold (720) | 0.991 | 0.822 |
+| + LLM alone, every answer | 0.925 | 0.997 |
+| Gate, confident tier (`auto`) | 0.991 | 0.830 |
+| Gate, both tiers (`auto` + `auto-low`) | 0.926 | 0.997 |
+
+- **Confident tier.** The kNN alone at 720, or the kNN and the LLM agreeing at 681 or above. The LLM alone is 0.72 precise on the residual Merchants (90 of 125), below 95%, so it never applies by itself. Agreement adds little coverage here (0.822 to 0.830): where the kNN is unsure, the two rarely agree. Per sub-Category, 32 of the 37 the tier assigns are at 1.00 and the lowest is Travel › Flights at 0.92.
+- **Low tier.** Every other Merchant gets the LLM's guess on a disagreement (it beats the kNN there) and its accuracy is 0.61. This is what the user sees without reviewing. By kind: agreement below the threshold is right 64% of the time, the LLM alone 57%. These are `LOW_CONFIDENCE` in the app. The LLM never answered "unsure", so every Merchant has a guess (0 with no signal). The weakest sub-Categories in both tiers are Cloud storage (0.40), Maintenance (0.50) and Hobbies (0.60).
+- **Review load.** At most `REVIEW_CAP` = 10 Merchants per sync, chosen by spend × (1 − confidence). With no Merchant lacking a signal, a sync of about 4,000 rows from 575 Merchants asks about 10.
+- **Groceries lean.** Groceries is 7.2% of the gold residual and 10.1% of the low guesses: a mild lean, not the heavy one seen in real suggestions. That one came mostly from one bulk accept that filed 471 Merchants as Groceries, which turned every Groceries Correction into a near neighbour. Labelling the base Merchants gives every Category examples. Real-data numbers are never committed.
+- **Cost.** 1.8 s per Merchant on the 16 GB M1 Pro with nothing else loaded, so about 17.5 minutes for 575 Merchants on a first sync. That runs in the background and once per Merchant; later syncs ask only about new ones. The eval has no dates, so its cadence words say "irregular, any day" for everyone; the app passes real dates. Thresholds are calibrated and scored on the same synthetic Merchants (as in #115), so they are optimistic.
 
 ### Recurring detection (#104)
 
