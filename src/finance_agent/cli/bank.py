@@ -6,6 +6,7 @@ ingest client, and never printed, logged or put in an error message."""
 import getpass
 import logging
 import sys
+from collections.abc import Callable
 from datetime import datetime
 
 from keyring.errors import KeyringError
@@ -107,9 +108,12 @@ def _link(ledger: Ledger, accounts: list[simplefin.SyncedAccount]) -> None:
             print(f"  Linked to {choice}")
 
 
-def connect(user_id: int, renewed: bool = False, link: bool = False) -> int:
+def connect(
+    user_id: int, renewed: bool = False, link: bool = False, token: str | None = None
+) -> int:
     """Connect once; `link` instead links synced Accounts to CSV Accounts
-    imported since (ADR 0014)."""
+    imported since (ADR 0014). `token`: a setup token already read through a
+    hidden prompt or stdin (`fa bank`, `fa setup`); never from argv."""
     engine = _encrypted_db()
     try:
         today = datetime.now(simplefin.LONDON).date()
@@ -127,7 +131,9 @@ def connect(user_id: int, renewed: bool = False, link: bool = False) -> int:
                 return _err("already connected; run `fa disconnect` first")
             access = _adopt_spike_item()
             if access is None:
-                token = getpass.getpass("SimpleFIN setup token (input hidden): ")
+                token = token or getpass.getpass(
+                    "Lunch Flow setup token (input hidden): "
+                )
                 access = simplefin.claim(token, simplefin.transport)
                 _store(access)
             print("Connected. The access URL is stored in the Keychain only.")
@@ -230,4 +236,151 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
         print("fa: another sync is running; this one skipped")
     finally:
         engine.dispose()
+    return 0
+
+
+# --- `fa bank`: the guided Lunch Flow journey (#311) ------------------------------
+# The one page we know is the pinned host's own (ADR 0013, spike #26): no deeper
+# Lunch Flow URL is guessed, so each step names the page to find there. The site
+# and its payments are never automated; they stay in the user's browser.
+LUNCH_FLOW_URL = f"https://{simplefin.HOST}/"
+INTRO = (
+    "fa gets your transactions from Lunch Flow, which connects to your banks "
+    "through UK open banking. It is read-only: it can never move money. Lunch "
+    "Flow is a paid subscription, billed by Lunch Flow, not by us; see the "
+    "current price on its sign-up page."
+)
+DESTINATION = (
+    "In Lunch Flow, add a destination and choose SimpleFIN. Copy the setup token "
+    "it shows."
+)
+Opener = Callable[[str], object]
+Ask = Callable[[str], str]
+
+
+def _yes(ask: Ask, prompt: str) -> bool:
+    return ask(f"{prompt} [Y/n] ").strip().lower() in ("", "y", "yes")
+
+
+def _open(open_url: Opener, ask: Ask, what: str) -> None:
+    if _yes(ask, f"Open {LUNCH_FLOW_URL} ({what}) in your browser?"):
+        open_url(LUNCH_FLOW_URL)
+
+
+def found(access: str | None = None) -> dict[str, int]:
+    """Bank name -> account count, from one read of the provider."""
+    access = access or keychain.get_text(SERVICE)
+    if access is None:
+        return {}
+    today = datetime.now(simplefin.LONDON).date()
+    accounts = simplefin.parse(
+        simplefin.fetch(access, today, today, simplefin.transport)
+    ).accounts
+    banks: dict[str, int] = {}
+    for a in accounts:
+        banks[a.org] = banks.get(a.org, 0) + 1
+    return banks
+
+
+def _summary(banks: dict[str, int], expected: int | None) -> bool:
+    for org, n in sorted(banks.items()):
+        print(f"  {org}: {n} account{'s' if n != 1 else ''}")
+    if expected is not None and len(banks) < expected:
+        print(
+            f"{len(banks)} of the {expected} banks you expected arrived. Some banks "
+            "take a few minutes to appear in Lunch Flow; sync again shortly."
+        )
+        return False
+    return True
+
+
+def guide(
+    user_id: int,
+    open_url: Opener,
+    ask: Ask = input,
+    token: str | None = None,
+    read: Ask | None = None,
+) -> int:
+    """The three-step journey, then connect, first sync and a check that every
+    bank the user connected arrived."""
+    if keychain.get_text(SERVICE) is not None:
+        print("Already connected. `fa bank add` adds a bank; `fa bank status` checks.")
+        return 0
+    print(f"1. {INTRO}")
+    _open(open_url, ask, "sign up and subscribe")
+    ask("   Press Enter when your Lunch Flow account is ready. ")
+    print("2. In Lunch Flow, connect each bank you want. You can add more later.")
+    raw = ask("   How many banks did you connect? ").strip()
+    expected = int(raw) if raw.isdigit() and int(raw) > 0 else None
+    print(f"3. {DESTINATION}")
+    _open(open_url, ask, "add the SimpleFIN destination")
+    if token is None:
+        from finance_agent.cli.keys import read_secret
+
+        token = (read or read_secret)("   Lunch Flow setup token (input hidden): ")
+    rc = connect(user_id, token=token)
+    if rc:
+        return rc
+    sync(user_id)
+    while not _summary(found(), expected):
+        if not _yes(ask, "Sync again now?"):
+            break
+        sync(user_id)
+    return 0
+
+
+def add(user_id: int, open_url: Opener, ask: Ask = input) -> int:
+    if keychain.get_text(SERVICE) is None:
+        return _err("not connected; run `fa bank` first")
+    before = found()
+    print(
+        "Connect the new bank in Lunch Flow. No new token is needed: the SimpleFIN "
+        "destination covers every bank you connect there."
+    )
+    _open(open_url, ask, "connect a bank")
+    ask("Press Enter when the bank shows as connected in Lunch Flow. ")
+    sync(user_id)
+    after = found()
+    new = {k: v for k, v in after.items() if v > before.get(k, 0)}
+    if new:
+        print("New:")
+        _summary(new, None)
+    else:
+        print("No new accounts yet; banks can take a few minutes. Try `fa bank sync`.")
+    return 0
+
+
+def manage(open_url: Opener, ask: Ask = input) -> int:
+    print(
+        "Lunch Flow's account and billing pages are where you remove a bank, "
+        "reconnect an expired one or cancel the subscription."
+    )
+    _open(open_url, ask, "account and billing")
+    return 0
+
+
+def status(user_id: int) -> int:
+    """Connected or not, last sync, account count, and connections the provider
+    says need attention (its messages are counted, never shown or kept)."""
+    access = keychain.get_text(SERVICE)
+    if access is None:
+        print("Not connected. Run `fa bank` to set up Lunch Flow.")
+        return 1
+    engine = open_db(create=False)
+    try:
+        with engine.begin() as conn:
+            st = Ledger(conn, user_id).sync_status()
+    finally:
+        engine.dispose()
+    last = f"{st.last_sync_at:%Y-%m-%d %H:%M} UTC" if st.last_sync_at else "never"
+    today = datetime.now(simplefin.LONDON).date()
+    resp = simplefin.parse(simplefin.fetch(access, today, today, simplefin.transport))
+    print(f"Connected to Lunch Flow · last sync {last} · {len(resp.accounts)} accounts")
+    if resp.errors:
+        print(
+            f"Warning: Lunch Flow reports {resp.errors} connection problems; a bank "
+            "may need re-authorising there (`fa bank manage`)."
+        )
+    if st.consent_warning:
+        print("Warning: bank consent is near or past expiry; renew it in Lunch Flow.")
     return 0
