@@ -271,6 +271,7 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
             led = Ledger(conn, 1)
             m = merchant(led, "SYNTH SERVICE")
             live: list[tuple[int, Any]] = []  # (entry id, entry it made)
+            raced: dict[int, str] = {}  # detection row id -> its status
             for kind, action, group, ((k, g), *rest) in steps:
                 if kind == "revert":
                     if live:
@@ -278,7 +279,10 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
                         led.revert_subscription_decision(eid)
                     continue
                 if kind == "raced":  # a detection that checked before the user
-                    led._registry(_Row(m, "detection", k, g, *rest))  # pyright: ignore[reportPrivateUsage]
+                    reason, status, *tail = rest  # _Row takes status first
+                    row = _Row(m, "detection", k, g, status, reason, *tail)
+                    rid = led._registry(row)  # pyright: ignore[reportPrivateUsage]
+                    raced[rid] = status
                     continue
                 x = led.subscription(m)
                 if action in ("regroup", "confirm") and (
@@ -311,13 +315,28 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
             if live:
                 e = led.subscription(m)
                 assert e is not None and e.source == "user"
-                # status_since is history-derived: reverting an earlier entry
-                # legitimately moves where this status began, so it is not
-                # part of "the latest live decision" (not a clock issue)
-                want = replace(
+                # created_at and status_since come from the history left after
+                # the reverts, so the snapshot taken when live[-1] was written
+                # can be stale (a revert of the row where the status began moves
+                # it to a later row, microseconds on). Check them against that
+                # history instead: the effective rows are the raced detections
+                # before the first live decision, then the live decisions.
+                first_user = live[0][0]
+                seq = [(i, s) for i, s in sorted(raced.items()) if i < first_user]
+                seq += [(i, x.status) for i, x in live]
+                start = len(seq) - 1
+                while start and seq[start - 1][1] == seq[-1][1]:
+                    start -= 1
+                ent = schema.subscription_entry
+                at = {
+                    r.id: r.created_at
+                    for r in conn.execute(sa.select(ent.c.id, ent.c.created_at))
+                }
+                assert e.created_at == at[seq[0][0]]
+                assert e.status_since == at[seq[start][0]]
+                assert e == replace(
                     live[-1][1], created_at=e.created_at, status_since=e.status_since
                 )
-                assert e == want
         engine.dispose()
 
 
