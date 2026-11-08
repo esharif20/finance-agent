@@ -26,14 +26,6 @@ def snapshot(led: Ledger) -> list[tuple[Any, ...]]:
     return [(t.posted_on, t.description, t.amount) for t in led.transactions()]
 
 
-def same_day_repeats(led: Ledger) -> list[frozenset[int]]:
-    """The history's deliberate same-day repeats (ADR 0006): ADR 0014 (a) groups."""
-    groups: dict[tuple[Any, ...], set[int]] = {}
-    for t in led.transactions():
-        groups.setdefault((t.posted_on, t.amount, t.description), set()).add(t.id)
-    return [frozenset(g) for g in groups.values() if len(g) > 1]
-
-
 def edit(raw: bytes, **fields: Any) -> bytes:
     """Change the first row of the first account."""
     doc = json.loads(raw)
@@ -86,7 +78,7 @@ def test_one_id_with_differing_rows_rejects_that_accounts_sync(
     assert (r.added, r.rejected_accounts) == (0, 1)
 
 
-def test_same_purchase_under_distinct_ids_is_kept_and_flagged(
+def test_same_purchase_under_distinct_ids_is_kept_and_not_flagged(
     ledger_for: LedgerFor,
 ) -> None:
     doc = json.loads(response(H, 0, 1))
@@ -94,11 +86,11 @@ def test_same_purchase_under_distinct_ids_is_kept_and_flagged(
     doc["accounts"][0]["transactions"] += [row | {"id": "7"}, row | {"id": "007"}]
     led = ledger_for(1)
     r = led.apply_sync(json.dumps(doc).encode())
-    assert (r.added, r.provider_duplicates) == (3, 3)
-    # ADR 0014 (a): surfaced as one Possible Duplicate, and it persists
-    assert led.possible_duplicates() == [frozenset(t.id for t in led.transactions())]
+    # the bank lists three IDs, so three purchases: kept, nothing to review
+    assert (r.added, r.provider_duplicates) == (3, 0)
+    assert led.possible_duplicates() == []
     led.apply_sync(json.dumps(doc).encode() + b" ")  # same rows, other bytes
-    assert len(led.possible_duplicates()) == 1
+    assert led.possible_duplicates() == [] and len(led.transactions()) == 3
 
 
 def test_first_sync_anchors_and_a_missing_row_opens_a_gap(
@@ -282,7 +274,7 @@ def test_a_row_aged_out_of_the_feed_is_never_a_duplicate_or_deleted(
     led.apply_sync(response(H, 0, 20))
     r = led.apply_sync(response(H, 10, 30))  # rows 0-9 retained no longer
     assert len(led.transactions()) == 30 and r.gaps == []
-    assert set(led.possible_duplicates()) == set(same_day_repeats(led))
+    assert led.possible_duplicates() == []  # the bank lists repeats apart
 
 
 def test_a_pending_row_posting_under_a_new_id_counts_once(
@@ -300,7 +292,7 @@ def test_a_pending_row_posting_under_a_new_id_counts_once(
     r = led.apply_sync(response(H, 0, 10))
     assert (r.added, r.gaps) == (1, [])
     assert len(led.transactions()) == 10
-    assert set(led.possible_duplicates()) == set(same_day_repeats(led))
+    assert led.possible_duplicates() == []  # the bank lists repeats apart
 
 
 Step = tuple[str, int, int]  # ("csv", first, end) rows, or ("sync", from, to) days
@@ -484,7 +476,7 @@ def test_another_users_sync_never_reaches_this_users_views(
     assert (r.added, r.already_known, r.gaps) == (10, 0, [])
     assert len(b.transactions()) == 10
     assert b.sync_gaps() == []
-    assert b.possible_duplicates() == same_day_repeats(b)
+    assert b.possible_duplicates() == []
     assert {t.id for t in a.transactions()}.isdisjoint(t.id for t in b.transactions())
 
 

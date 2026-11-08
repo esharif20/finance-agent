@@ -226,11 +226,10 @@ def test_a_merged_duplicate_is_never_paired_and_its_live_twin_is(
     """#224 verifier note: a merged synced copy must not hold the pair."""
     led: Ledger = ledger_for(1)
     rows = [(0, 5, -1250), (1, 5, 1250)]
+    led.apply_sync(payload(rows))
     body = json.loads(payload(rows))
-    out = body["accounts"][0]["transactions"]
-    out.append(out[0] | {"id": "T0-twin"})  # the provider sent A twice
-    raw = json.dumps(body).encode()
-    led.apply_sync(raw)
+    body["accounts"][0]["transactions"][0]["id"] = "T0-twin"  # A re-issued
+    led.apply_sync(json.dumps(body).encode())  # ADR 0014 (b)
     (group,) = led.possible_duplicates()
     leg = next(t for t in led.transactions() if t.amount > 0)
     paired = leg.transfer_with

@@ -1191,11 +1191,37 @@ class Ledger:
         out = self.ambiguous_matches()
         pd = schema.possible_duplicate
         groups: dict[int, set[int]] = defaultdict(set)
+        raised_by: dict[int, int] = {}
         for r in self._db.execute(
-            self._db.select(pd, pd.c.group_id, pd.c.transaction_id)
+            self._db.select(
+                pd, pd.c.group_id, pd.c.transaction_id, pd.c.statement_import_id
+            )
         ):
             groups[int(r.group_id)].add(int(r.transaction_id))
-        return out + [frozenset(g) for _, g in sorted(groups.items())]
+            raised_by[int(r.group_id)] = int(r.statement_import_id)
+        # groups the old rule (a) stored, which the bank lists apart, are left
+        # out here: they leave the queue with no migration, and the rows stay
+        return out + [
+            frozenset(g)
+            for k, g in sorted(groups.items())
+            if not self._listed_apart(g, raised_by[k])
+        ]
+
+    def _listed_apart(self, group: set[int], import_id: int) -> bool:
+        """Every row is a synced Transaction the same sync listed under its own
+        provider ID: the bank says they are separate purchases (ADR 0014,
+        amendment "the bank's own IDs")."""
+        t, s = schema.transaction, schema.transaction_source
+        listed = self._db.execute(
+            self._db.select(t, t.c.id)
+            .join(s, self._db.on(s, s.c.transaction_id == t.c.id))
+            .where(
+                t.c.id.in_(group),
+                t.c.origin == "simplefin",
+                s.c.statement_import_id == import_id,
+            )
+        ).scalars()
+        return set(listed) == group
 
     def sync_gaps(self) -> list[SyncGap]:
         g, a = schema.sync_gap, schema.account
@@ -1331,9 +1357,11 @@ class Ledger:
     ) -> int:
         """ADR 0014 Possible Duplicates for rows new in this response, kept and
         surfaced, never merged: (a) same date, amount and raw text under distinct
-        IDs in this response; (b) same amount and text within MATCH_DAYS of a
-        known row whose ID is absent although this response covers its date
-        (a re-issued ID). Call after `_match`, so ids are final. Returns rows."""
+        IDs in this response, unless every row is a synced Transaction this
+        response lists (the bank says they are separate); (b) same amount and
+        text within MATCH_DAYS of a known row whose ID is absent although this
+        response covers its date (a re-issued ID). Call after `_match`, so ids
+        are final. Returns rows."""
         if not new or not acc.rows:
             return 0
         k = schema.synced_key
@@ -1385,6 +1413,8 @@ class Ledger:
         for g in groups:
             if len(g) < 2:
                 continue  # both rows matched into one CSV Transaction
+            if self._listed_apart(g, import_id):
+                continue
             group_id = 1 + int(
                 self._db.execute(
                     self._db.select(pd, func.coalesce(func.max(pd.c.group_id), 0))
