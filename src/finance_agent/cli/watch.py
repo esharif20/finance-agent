@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from finance_agent import categorise
-from finance_agent.categorise import embedding, subscription_alerts
+from finance_agent.categorise import auto, subscription_alerts
 from finance_agent.cli import LOCAL_USER
 from finance_agent.ledger import Ledger
 from finance_agent.notify import TITLE as TITLE
@@ -51,7 +51,7 @@ def run(folder: Path, notify: Notifier = osascript) -> int:
         with engine.begin() as conn:
             r = Ledger(conn, LOCAL_USER).import_files(files)
             categorise.run(conn, LOCAL_USER)  # same as `fa import`
-        embedding.refresh_quietly(engine, LOCAL_USER)  # no transaction held
+        auto.refresh_quietly(engine, LOCAL_USER)  # no transaction held
         subscription_alerts.run(engine, LOCAL_USER, notify)  # never raises
     except (OSError, ValueError, LookupError):
         notify(TITLE, "Import failed")

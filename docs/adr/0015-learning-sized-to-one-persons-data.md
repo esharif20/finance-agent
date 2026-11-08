@@ -20,3 +20,7 @@ Every learned component needs three things:
 3. **Shadow mode before promotion.**
 
 Bandit rewards are acceptances and acted-on outcomes, never clicks or engagement. Exposure is capped. Every shown item logs its propensity from day one, so later policies can be evaluated off-policy.
+
+## Amendment (#215 B): the categoriser's gate and shadow mode
+
+For the embedding categoriser, the minimum-data gate is the shadow run itself: at least 50 of the user's own Merchant-wide answers to items the version guessed at or above its calibrated threshold, with at least 95% agreeing. The user's decisions are the holdout (#215 E). The separate gate of 200 Corrections and 5 per Category from #115 is dropped. The baseline is still the #112 evaluation, and shadow mode starts again for every new model version. See ADR 0005.

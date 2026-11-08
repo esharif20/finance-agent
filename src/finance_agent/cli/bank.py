@@ -12,7 +12,7 @@ from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
 from finance_agent import categorise
-from finance_agent.categorise import embedding, subscription_alerts
+from finance_agent.categorise import auto, subscription_alerts
 from finance_agent.cli import gbp
 from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
@@ -221,7 +221,7 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
         if any(r.added for r in reports):  # same as `fa import`
             with engine.begin() as conn:
                 categorise.run(conn, user_id)
-            embedding.refresh_quietly(engine, user_id)
+            auto.refresh_quietly(engine, user_id)
         # every sync, so a trial converting soon is announced in time
         subscription_alerts.run(engine, user_id, notify or printed)
     except NotConnected as e:

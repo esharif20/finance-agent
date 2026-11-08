@@ -747,6 +747,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review-queue/undo-auto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Auto
+         * @description Take back the latest batch the model auto-applied (#215 B): its
+         *     Merchants come back as items. `applied` is how many Merchants.
+         */
+        post: operations["undo_auto_api_review_queue_undo_auto_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review-queue/{item_id}/answer": {
         parameters: {
             query?: never;
@@ -3251,6 +3272,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_auto_api_review_queue_undo_auto_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
                 };
             };
         };

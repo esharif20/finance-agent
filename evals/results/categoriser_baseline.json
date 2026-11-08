@@ -249,6 +249,13 @@
         "Travel / Hotels.precision": 0.882353,
         "Travel / Hotels.recall": 1.0
       },
+      "calibration": {
+        "target_precision": 0.95,
+        "threshold": 817,
+        "precision": 0.961538,
+        "coverage": 0.4,
+        "rows": 65
+      },
       "by_case": {
         "clean": {
           "rows": 37,

@@ -225,3 +225,28 @@ def test_a_real_category_collapse_fails_the_gate_while_macro_f1_rises() -> None:
         results(after), results(before), categoriser.lower_is_better
     )
     assert any(f"{victim[0]} / {victim[1]}.recall" in p for p in problems), problems
+
+
+def test_calibrate_picks_the_lowest_threshold_holding_95_percent_above_it() -> None:
+    # 20 correct at 900, one wrong at 800, 19 correct at 700, wrong ones below
+    scored = [(900, True)] * 20 + [(800, False)] + [(700, True)] * 19
+    scored += [(500, False)] * 5
+    # at 700: 39 of 40 = 97.5%; at 500: 39 of 45 < 95%
+    assert categoriser.calibrate(scored) == 700
+
+
+def test_calibrate_never_lets_a_higher_band_fall_below_the_target() -> None:
+    # at 600 overall precision is fine, but at 900 alone it is 1 of 2
+    scored = [(900, True), (900, False)] + [(600, True)] * 50
+    assert categoriser.calibrate(scored) == embedding.SIMILARITY + 1
+
+
+def test_calibrate_with_nothing_scored_assigns_nothing() -> None:
+    assert categoriser.calibrate([]) == embedding.SIMILARITY + 1
+
+
+def test_committed_results_carry_the_auto_apply_calibration() -> None:
+    nn = categoriser.read_results()["models"]["nn"]
+    cal = nn["calibration"]
+    assert cal["target_precision"] == 0.95
+    assert cal["precision"] >= 0.95 or cal["threshold"] > embedding.SIMILARITY

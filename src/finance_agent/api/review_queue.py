@@ -6,8 +6,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import Connection
 
-from finance_agent.categorise import embedding
+from finance_agent.categorise import auto, embedding
 from finance_agent.categorise.display_names import display_name
 from finance_agent.identity import current_user
 from finance_agent.ledger import UnknownTarget
@@ -76,16 +77,19 @@ class StaleOut(BaseModel):
     stale_ids: list[str]
 
 
+def _make(conn: Connection, user: int) -> ReviewQueue:
+    return ReviewQueue(
+        conn,
+        user,
+        suggester=lambda targets, labelled: embedding.suggest(
+            conn, user, targets, labelled
+        ),
+    )
+
+
 def _queue(request: Request) -> Iterator[ReviewQueue]:
     with request.app.state.engine.begin() as conn:
-        user = current_user()
-        yield ReviewQueue(
-            conn,
-            user,
-            suggester=lambda targets, labelled: embedding.suggest(
-                conn, user, targets, labelled
-            ),
-        )
+        yield _make(conn, current_user())
 
 
 Queue = Annotated[ReviewQueue, Depends(_queue)]
@@ -136,6 +140,19 @@ def queue(q: Queue) -> QueueOut:
 def undo(q: Queue, count: Annotated[int, Query(ge=1, le=MAX_BATCH)] = 1) -> QueueOut:
     """Undo the latest answer or skip; `count` undoes a whole batch."""
     return _out(q, lambda: q.undo(count))
+
+
+@router.post("/undo-auto")
+def undo_auto(request: Request) -> QueueOut:
+    """Take back the latest batch the model auto-applied (#215 B): its
+    Merchants come back as items. `applied` is how many Merchants."""
+    with request.app.state.engine.begin() as conn:
+        user = current_user()
+        n = auto.undo(conn, user)
+        out = _out(_make(conn, user))
+    return out.model_copy(
+        update={"applied": n, "message": None if n else "Nothing to undo."}
+    )
 
 
 @router.post(

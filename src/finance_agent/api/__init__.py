@@ -35,7 +35,7 @@ from finance_agent.api import (
     subscription_costs,
     subscriptions,
 )
-from finance_agent.categorise import embedding, subscription_alerts
+from finance_agent.categorise import auto, subscription_alerts
 from finance_agent.categorise.display_names import display_name
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
@@ -517,7 +517,7 @@ def create_app(
             if any(r.added for r in reports):  # same as `fa import`
                 with engine.begin() as conn:
                     categorise.run(conn, current_user())
-                embedding.refresh_quietly(engine, current_user())
+                auto.refresh_quietly(engine, current_user())
             notify = request.app.state.notify or notifications.osascript
             subscription_alerts.run(engine, current_user(), notify)
         except Busy:

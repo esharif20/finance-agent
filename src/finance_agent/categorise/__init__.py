@@ -1,7 +1,7 @@
 """Categorisation: the versioned taxonomy, Merchant normalisation and the
 rule chain of ADR 0005 (Merchant default Category -> descriptor rules ->
 Uncategorised). Corrections are a Ledger overlay applied on read, in front of
-every rule (ADR 0001); ML comes later, after rules.
+every rule (ADR 0001); the embedding model comes last, gated (`auto`).
 """
 
 import logging
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, func
 
-from finance_agent.categorise import subscriptions
+from finance_agent.categorise import auto, subscriptions
 from finance_agent.ledger import UNCATEGORISED as _NONE
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.taxonomy import TAXONOMIES
@@ -378,5 +378,6 @@ def run(conn: Connection, user_id: int) -> int:
             taxonomy_version=TAXONOMY_VERSION,
         )
     log.info("categorise transactions=%d", len(txns))
+    auto.apply(conn, user_id, ids)  # #215 B: the model, last and gated
     subscriptions.recognise(ledger)  # #104: needs the Merchants just assigned
     return len(txns)

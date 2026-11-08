@@ -101,7 +101,7 @@ class Categorisation:
     merchant: str | None
     category: tuple[str, str] | None  # (top level, subcategory)
     # "correction", "split", "split_refund", "merchant:<name>", "rule:<id>" or
-    # "default"
+    # "auto:<model version>" (#215 B) or "default"
     source: str
     taxonomy_version: int
     merchant_id: int | None = None
