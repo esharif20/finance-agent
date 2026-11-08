@@ -311,7 +311,13 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
             if live:
                 e = led.subscription(m)
                 assert e is not None and e.source == "user"
-                assert e == replace(live[-1][1], created_at=e.created_at)
+                # status_since is history-derived: reverting an earlier entry
+                # legitimately moves where this status began, so it is not
+                # part of "the latest live decision" (not a clock issue)
+                want = replace(
+                    live[-1][1], created_at=e.created_at, status_since=e.status_since
+                )
+                assert e == want
         engine.dispose()
 
 
