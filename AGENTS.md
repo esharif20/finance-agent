@@ -8,7 +8,7 @@ Read `GLOSSARY.md` and the relevant `docs/adr/` before working. Design docs: `do
 - **Money is `Decimal` or integer minor units.** Never `float` in `ledger`, `engine` or `api`.
 - **The LLM never computes a figure.** Every figure in an Assistant reply comes from a tool result (ADR 0007).
 - **No write paths for the Assistant** except Proposals that the user confirms.
-- **No network egress** except `localhost` Ollama, the privacy gateway when the user opts in, and one pinned, read-only SimpleFIN aggregator host reached only by the `ingest` SimpleFIN client (ADR 0013). No LangSmith or third-party tracing.
+- **No network egress** except `localhost` Ollama, the privacy gateway when the user opts in (Gemini at `generativelanguage.googleapis.com` only, paid-tier key only, ADR 0016), and one pinned, read-only SimpleFIN aggregator host reached only by the `ingest` SimpleFIN client (ADR 0013). No LangSmith or third-party tracing.
 - **Logs never contain** amounts, descriptions, account fields or Memory text.
 - **No payments or transfers**, ever.
 - Respect module boundaries in `docs/ARCHITECTURE.md`; the import-linter contract enforces them.

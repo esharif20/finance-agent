@@ -1,0 +1,402 @@
+# synthetic
+# cloud_synth prompt v1, seed 302
+{"amount_minor": -8639, "descriptor": "PIXELPLA", "id": 1, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -388, "descriptor": "DICE AND DRAGONS JAN *8013", "id": 2, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -3330, "descriptor": "CASTLE KEEP INN *510", "id": 3, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -6597, "descriptor": "SUMUP *FIXRI", "id": 4, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -4444, "descriptor": "SEEDLING", "id": 5, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -7601, "descriptor": "KINGSMERE BOROUGH COUNCIL *4307", "id": 6, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -184, "descriptor": "CARD PAYMENT TO CLOUDNOTE APP 7311", "id": 7, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -5897, "descriptor": "FIXITALL HOME", "id": 8, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -7477, "descriptor": "CARD PAYMENT TO REDBRICK LANDLORDS CD 20", "id": 9, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -1709, "descriptor": "KINGSMERE BOROUGH COUNCIL LONDON GB *515", "id": 10, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -5036, "descriptor": "WANDERLU", "id": 11, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -512, "descriptor": "CARD PAYMENT TO CASTLEGATE CAR PARK CD 4", "id": 12, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -8466, "descriptor": "CARD PAYMENT TO CHIPFIX PHONE REPAIRS 92", "id": 13, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -7071, "descriptor": "NATIONAL EXPRESS LEEDS *8201", "id": 14, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -3033, "descriptor": "MORRIS", "id": 15, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -4472, "descriptor": "CARD PAYMENT TO PIXELPLAY ARCADE 4758", "id": 16, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -4126, "descriptor": "FIXRIGHT", "id": 17, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -5680, "descriptor": "WOKWAY KITC", "id": 18, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -4228, "descriptor": "CLOUDHO", "id": 19, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -8433, "descriptor": "MICRO", "id": 20, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -4989, "descriptor": "CARD PAYMENT TO SKYLOCKER STORAGE 6866", "id": 21, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -5314, "descriptor": "SKYWIN", "id": 22, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -4667, "descriptor": "CARD PAYMENT TO HALDEN COUNCIL TAX JUN 6", "id": 23, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -4668, "descriptor": "CARD PAYMENT TO WANDERLUST TOURS 6823", "id": 24, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -5296, "descriptor": "CARD PAYMENT TO PIXELFORGE SOFTWARE 7290", "id": 25, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -4909, "descriptor": "SQ *SKYWING AIR *1527", "id": 26, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -574, "descriptor": "AQUAFLOW UTILITIES *3406", "id": 27, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -7027, "descriptor": "MEADOW PHARMACY *6808", "id": 28, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -767, "descriptor": "PROMPTW", "id": 29, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -4267, "descriptor": "CARD PAYMENT TO GRAND ARENA TICKETS 3093", "id": 30, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -8416, "descriptor": "CARD PAYMENT TO SEVERN TRENT WATER 9402", "id": 31, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -6471, "descriptor": "CLOUDNOTE APP *6045", "id": 32, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -1420, "descriptor": "CARD PAYMENT TO ZIPLINE BUS CO 8158", "id": 33, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -3179, "descriptor": "CARD PAYMENT TO HILLWALKERS CIR 2127", "id": 34, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -7734, "descriptor": "CARD PAYMENT TO SCOTTISH POWER 8648", "id": 35, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -8385, "descriptor": "NEURALNEST AI *5919", "id": 36, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -7226, "descriptor": "VAULTLY *8661", "id": 37, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -7506, "descriptor": "TESCOMBE GARDEN CENTRE *3040", "id": 38, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -8693, "descriptor": "CARD PAYMENT TO CASA ROSSI 7837", "id": 39, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -3570, "descriptor": "GRAND ARE", "id": 40, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -2922, "descriptor": "LNER TICKETS *3641", "id": 41, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -7804, "descriptor": "IKEA", "id": 42, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -8910, "descriptor": "CARD PAYMENT TO MAPLE LETTINGS RENT CD 9", "id": 43, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -3396, "descriptor": "SKYLOCKER STORAGE *6548", "id": 44, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -5535, "descriptor": "ORCHARD BOOK CLUB CD *9870", "id": 45, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -7455, "descriptor": "CARD PAYMENT TO CLOUDATTIC 7415", "id": 46, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -5066, "descriptor": "THREADBARE V", "id": 47, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -8149, "descriptor": "SOUND", "id": 48, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -3739, "descriptor": "CARD PAYMENT TO SOAP AND SUDS 1130", "id": 49, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -7773, "descriptor": "CARD PAYMENT TO WILLOW SPA 4975", "id": 50, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -3182, "descriptor": "ZTL*MORNI", "id": 51, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -1138, "descriptor": "CARD PAYMENT TO CLEARVIEW EYECARE 9740", "id": 52, "sub": "Medical", "top": "Health"}
+{"amount_minor": -6675, "descriptor": "CARD PAYMENT TO HMRC SELF ASSESSMENT 927", "id": 53, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -808, "descriptor": "CARD PAYMENT TO SKYWING AIR 9026", "id": 54, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -3977, "descriptor": "CARD PAYMENT TO FIXRIGHT PLUMBING 867", "id": 55, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -5208, "descriptor": "CARD PAYMENT TO MARKET SQ CAR PARK GBR 7", "id": 56, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -1568, "descriptor": "VAUL", "id": 57, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -3294, "descriptor": "SUMUP *KI", "id": 58, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -1880, "descriptor": "CARD PAYMENT TO QUESTLINE GAMES 690", "id": 59, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -4811, "descriptor": "AXA INSURANC", "id": 60, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -335, "descriptor": "CARD PAYMENT TO DAVID LLOYD CLUBS 3120", "id": 61, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -7124, "descriptor": "PIXELPLAY ARCADE *3692", "id": 62, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -3686, "descriptor": "CARD PAYMENT TO RIDGEWAY GARAGE PFS CD 8", "id": 63, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -2953, "descriptor": "CARD PAYMENT TO UBER TRIP LONDON GB 643", "id": 64, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -7295, "descriptor": "CARD PAYMENT TO UBER EATS 5959", "id": 65, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -7670, "descriptor": "CITYHOP CHA", "id": 66, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -6469, "descriptor": "CLEARSPRI", "id": 67, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -1432, "descriptor": "LINEN AN", "id": 68, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -2142, "descriptor": "CARD PAYMENT TO MARLOWE ARMS 8353", "id": 69, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -6939, "descriptor": "CARD PAYMENT TO HERITAGE TRUST MEMBERSHI", "id": 70, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -8676, "descriptor": "CRAFTERS", "id": 71, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -4052, "descriptor": "CARD PAYMENT TO NEURALNEST AI 9049", "id": 72, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -4469, "descriptor": "NATIONAL", "id": 73, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -7263, "descriptor": "SUMUP *BEAN THERE COFFEE *1320", "id": 74, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -1851, "descriptor": "CARD PAYMENT TO MORRISONS CD 5349", "id": 75, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -6392, "descriptor": "BRAMBLEDOWN", "id": 76, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -6669, "descriptor": "QUAYSIDE", "id": 77, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -2487, "descriptor": "CASA ROSSI JAN *6536", "id": 78, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -7054, "descriptor": "CARD PAYMENT TO CLEARSPRING WATER 1866", "id": 79, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -339, "descriptor": "TESCO PF", "id": 80, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -8161, "descriptor": "CARD PAYMENT TO CITYHOP CHAUFFEURS 8487", "id": 81, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -1733, "descriptor": "RIVERBANK LOAN *2542", "id": 82, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -430, "descriptor": "CASA R", "id": 83, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -3896, "descriptor": "SEASHELL", "id": 84, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -3365, "descriptor": "CARD PAYMENT TO LINEN AND LAMP 1621", "id": 85, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -8099, "descriptor": "STREAMLI", "id": 86, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -7633, "descriptor": "NEURAL", "id": 87, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -2335, "descriptor": "OLDGATE PERM", "id": 88, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -3935, "descriptor": "CARD PAYMENT TO THE DAILY GRIND 2544", "id": 89, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -926, "descriptor": "SUMUP *U", "id": 90, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -498, "descriptor": "MORRISONS CD *1852", "id": 91, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -3831, "descriptor": "CARD PAYMENT TO STATIONSIDE PARKING 7637", "id": 92, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -7589, "descriptor": "CARD PAYMENT TO VODAFONE LTD 2556", "id": 93, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -3350, "descriptor": "ASOS", "id": 94, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -5112, "descriptor": "CARD PAYMENT TO PEAK BOULDERING 550", "id": 95, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -2657, "descriptor": "LV= INSURANCE *8510", "id": 96, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -6766, "descriptor": "STREAM", "id": 97, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -6936, "descriptor": "CARD PAYMENT TO ORCHARD BOOK CLUB NOV 94", "id": 98, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -7549, "descriptor": "TESCO PFS LONDON *3929", "id": 99, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -2269, "descriptor": "CARD PAYMENT TO CLEARSPRING WAT 8993", "id": 100, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -5713, "descriptor": "CARD PAYMENT TO ZTL*MORNING GRIND 2787", "id": 101, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -7253, "descriptor": "STREAMLINE BIKES *7868", "id": 102, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -6718, "descriptor": "CARD PAYMENT TO MCDONALDS 4855", "id": 103, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -5398, "descriptor": "CARD PAYMENT TO GREENCROSS CHEMIST 7199", "id": 104, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -3264, "descriptor": "CARD PAYMENT TO BRITISH GAS CD 5615", "id": 105, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -5165, "descriptor": "FENWICK FARM S", "id": 106, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -4991, "descriptor": "SEVERN TRE", "id": 107, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -6395, "descriptor": "CLEARSPRING WATER *6312", "id": 108, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -822, "descriptor": "HEARTHSTONE ENERGY NOV *4224", "id": 109, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -7638, "descriptor": "THE COPP", "id": 110, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -250, "descriptor": "CARD PAYMENT TO SQ *SNIP AND STYLE 9671", "id": 111, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -5388, "descriptor": "CARD PAYMENT TO VOLTSPARK ELECTRONICS RE", "id": 112, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -3698, "descriptor": "CARD PAYMENT TO AMAZON PRIME*ABCD BRISTO", "id": 113, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -2035, "descriptor": "VOLTSPARK EL", "id": 114, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -4788, "descriptor": "STAGEDOO", "id": 115, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -7472, "descriptor": "CLOUDNO", "id": 116, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -5027, "descriptor": "CARD PAYMENT TO HAVEN HOMES LETTINGS 589", "id": 117, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -5700, "descriptor": "CARD PAYMENT TO STEADYSTEP PHYSIO 1576", "id": 118, "sub": "Medical", "top": "Health"}
+{"amount_minor": -4920, "descriptor": "CARD PAYMENT TO SHELL CAMBRIDGE CD 3493", "id": 119, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -6708, "descriptor": "GREENLEAF D", "id": 120, "sub": "Medical", "top": "Health"}
+{"amount_minor": -7553, "descriptor": "CARD PAYMENT TO HILLTOP CINEMA REFUND 17", "id": 121, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -4157, "descriptor": "DICE AND D", "id": 122, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -4248, "descriptor": "CARD PAYMENT TO SOAP AND SUDS 8137", "id": 123, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -6035, "descriptor": "THE COPPER KETT *8431", "id": 124, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -7553, "descriptor": "SUNSEEKER", "id": 125, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -1921, "descriptor": "SKYWING AIR *3867", "id": 126, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -3078, "descriptor": "AQUAFLOW", "id": 127, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -6123, "descriptor": "SEVERN TRENT WATER *4784", "id": 128, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -6329, "descriptor": "MCDONALDS *3802", "id": 129, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -990, "descriptor": "STATIONSIDE PARKING *4960", "id": 130, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -5808, "descriptor": "SOAP AN", "id": 131, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -3082, "descriptor": "CARD PAYMENT TO EDF ENERGY CD 4906", "id": 132, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -4026, "descriptor": "MAPLE LETTI", "id": 133, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -7040, "descriptor": "CARD PAYMENT TO CASA ROSSI JAN 7646", "id": 134, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -8024, "descriptor": "CARD PAYMENT TO SEASHELL COTTAGES 5871", "id": 135, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -7846, "descriptor": "CARD PAYMENT TO TESCOMBE GARDEN CENTRE 6", "id": 136, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -7832, "descriptor": "FIXRIGHT PLUMBING *5776", "id": 137, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -6888, "descriptor": "SOUNDSPHERE *4200", "id": 138, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -2907, "descriptor": "VOLTSPARK ELECTRONICS REFUND *5304", "id": 139, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -7337, "descriptor": "CARD PAYMENT TO RENTOKIL PEST CONTROL 50", "id": 140, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -6306, "descriptor": "SQ *PATELS MINI MARKET *5847", "id": 141, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -296, "descriptor": "BASKETBAY ONLINE *5599", "id": 142, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -1867, "descriptor": "HMRC SELF AS", "id": 143, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -5457, "descriptor": "CARD PAYMENT TO MEADOW PHARMACY 5029", "id": 144, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -1469, "descriptor": "VOLTSPARK ELECT", "id": 145, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -6303, "descriptor": "CLOUDATTIC *190", "id": 146, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -6552, "descriptor": "ORCHARD BOO", "id": 147, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -6550, "descriptor": "NATIONAL EXP", "id": 148, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -7185, "descriptor": "SPIC", "id": 149, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -6033, "descriptor": "CARD PAYMENT TO FADE MASTERS BARBERS 280", "id": 150, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -8570, "descriptor": "SQ *SKYW", "id": 151, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -5482, "descriptor": "AMAZON PRI", "id": 152, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -7674, "descriptor": "AMAZON PRIME*A", "id": 153, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -5609, "descriptor": "CARD PAYMENT TO ASOS.COM 451", "id": 154, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -1689, "descriptor": "HALDEN COUNCI", "id": 155, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -1534, "descriptor": "DAVID LLOYD CLUBS *5806", "id": 156, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -2487, "descriptor": "MCDO", "id": 157, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -5180, "descriptor": "UBER EATS *2428", "id": 158, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -3771, "descriptor": "HILLTOP CINEM", "id": 159, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -8290, "descriptor": "BASKETBA", "id": 160, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -5570, "descriptor": "CARD PAYMENT TO GADGETRY STORE JAN 8321", "id": 161, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -4977, "descriptor": "MERIDIAN POSTAL SERVICE *8030", "id": 162, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -1679, "descriptor": "AXA INSURANCE LONDON GB *4453", "id": 163, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -6112, "descriptor": "ADMIRAL IN", "id": 164, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -2399, "descriptor": "MINTLEAF OR", "id": 165, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -7219, "descriptor": "CARD PAYMENT TO GIFFGAFF 6122", "id": 166, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -7283, "descriptor": "HAVEN HOME", "id": 167, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -3234, "descriptor": "FLOWSTATE YOGA *4585", "id": 168, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -6606, "descriptor": "CARD PAYMENT TO SIGNALBOX MOBILE 1867", "id": 169, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -7641, "descriptor": "STARLIGHT", "id": 170, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -2937, "descriptor": "TESCOMBE GAR", "id": 171, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -4485, "descriptor": "CARD PAYMENT TO PRIMARK 4661", "id": 172, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -8306, "descriptor": "HILLTOP CINEMA *4585", "id": 173, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -2244, "descriptor": "BACKUP", "id": 174, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -4084, "descriptor": "IRONCLAD BO", "id": 175, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -1213, "descriptor": "SUMUP *SIGNA", "id": 176, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -2095, "descriptor": "RENTOKIL PE", "id": 177, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -5884, "descriptor": "CARD PAYMENT TO CORTEXPILOT 582", "id": 178, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -4972, "descriptor": "CARD PAYMENT TO SUMUP *SIGNALPEAK MOBILE", "id": 179, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -600, "descriptor": "CARD PAYMENT TO PAPERTRAIL DIGEST GBR 54", "id": 180, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -2874, "descriptor": "CARD PAYMENT TO SUMUP *KITCHENKIND 5011", "id": 181, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -5866, "descriptor": "MINTLEAF ORAL CARE JUN *7759", "id": 182, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -3193, "descriptor": "GADGETRY ST", "id": 183, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -947, "descriptor": "CASTLE KE", "id": 184, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -8685, "descriptor": "NEXT", "id": 185, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -6217, "descriptor": "BRAMBLEDOWN COUNCIL TAX *9477", "id": 186, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -7209, "descriptor": "MICROSOFT* *6303", "id": 187, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -5772, "descriptor": "MARLOW", "id": 188, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -3883, "descriptor": "HILLWALKE", "id": 189, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -3743, "descriptor": "SERENITY NAIL BAR *5749", "id": 190, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -6946, "descriptor": "AMAZON.CO", "id": 191, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -7206, "descriptor": "FADE MASTERS BARBERS *1490", "id": 192, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -7468, "descriptor": "CARD PAYMENT TO MICROSOFT* 3863", "id": 193, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -1493, "descriptor": "CARD PAYMENT TO IRONCLAD BOXING CD 941", "id": 194, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -762, "descriptor": "CARD PAYMENT TO LV= INSURANCE 5908", "id": 195, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -2563, "descriptor": "CARD PAYMENT TO BACKUPBARN 3132", "id": 196, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -5222, "descriptor": "PINEWOO", "id": 197, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -3737, "descriptor": "MOONBEAM ROASTERS *9361", "id": 198, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -2957, "descriptor": "CARD PAYMENT TO SUNSEEKER BREAKS 4207", "id": 199, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -6566, "descriptor": "CARD PAYMENT TO NEXTDOOR GARDENS 9756", "id": 200, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -4859, "descriptor": "HELLOFRESH NOV *3096", "id": 201, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -3722, "descriptor": "CARD PAYMENT TO PAYPAL *AB TRADING 2386", "id": 202, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -1486, "descriptor": "AMAZON.CO.UK JUN *3316", "id": 203, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -8283, "descriptor": "ZTL*MORNING GRIND *2326", "id": 204, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -2952, "descriptor": "CLEARSPR", "id": 205, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -5657, "descriptor": "REDBRICK LA", "id": 206, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -8723, "descriptor": "CARD PAYMENT TO AQUAFLOW UTILITIES 4769", "id": 207, "sub": "Water", "top": "Bills & Utilities"}
+{"amount_minor": -1871, "descriptor": "PEAK BOULDERING *6723", "id": 208, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -6095, "descriptor": "CARD PAYMENT TO SPICE HUT 629", "id": 209, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -6337, "descriptor": "UBER TRIP L", "id": 210, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -3362, "descriptor": "CARD PAYMENT TO QUAYSIDE PARKING 2987", "id": 211, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -8322, "descriptor": "CASA RO", "id": 212, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -4639, "descriptor": "SQ *PATELS", "id": 213, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -8083, "descriptor": "BRITISH GAS CD *135", "id": 214, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -469, "descriptor": "HAVEN HOMES LETTINGS *7546", "id": 215, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -8858, "descriptor": "CARD PAYMENT TO TESCO PFS LONDON 519", "id": 216, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -7446, "descriptor": "PUREGLOW TOILE", "id": 217, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -7250, "descriptor": "FADE MASTE", "id": 218, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -1071, "descriptor": "SUMUP *KITCHENKIND *4667", "id": 219, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -6447, "descriptor": "CARD PAYMENT TO WOKWAY KITCHEN JAN 6225", "id": 220, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -2887, "descriptor": "CARD PAYMENT TO RIVERBANK LOAN 6808", "id": 221, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -8626, "descriptor": "CORTEXPILOT *588", "id": 222, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -2762, "descriptor": "CARD PAYMENT TO SUMUP *FIXRIGHT PLUMBING", "id": 223, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -6632, "descriptor": "RYAN", "id": 224, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -4871, "descriptor": "CARD PAYMENT TO SEEDLING SUBSCR 512", "id": 225, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -3823, "descriptor": "GREENLEAF DENTAL NOV *195", "id": 226, "sub": "Medical", "top": "Health"}
+{"amount_minor": -2728, "descriptor": "SKYLOCKER", "id": 227, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -3735, "descriptor": "CARD PAYMENT TO REDBRICK LANDLORDS 2747", "id": 228, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -8853, "descriptor": "GREENCROS", "id": 229, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -4139, "descriptor": "PRIM", "id": 230, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -8701, "descriptor": "LNER T", "id": 231, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -8643, "descriptor": "SUMUP *FIXRIGHT PLUMBING *3253", "id": 232, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -947, "descriptor": "STEADYSTEP PHYSIO *2551", "id": 233, "sub": "Medical", "top": "Health"}
+{"amount_minor": -7771, "descriptor": "NEXTDOOR GARDENS *2888", "id": 234, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -5253, "descriptor": "CARD PAYMENT TO GREENLEAF DENTAL 6276", "id": 235, "sub": "Medical", "top": "Health"}
+{"amount_minor": -1931, "descriptor": "CARD PAYMENT TO MOONBEAM ROASTERS 7329", "id": 236, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -7112, "descriptor": "CARD PAYMENT TO MONTHLY MUNCH CLUB 9063", "id": 237, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -2662, "descriptor": "RIVERSIDE PET", "id": 238, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -687, "descriptor": "GIFFGAFF *8130", "id": 239, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -1164, "descriptor": "CARD PAYMENT TO FLOWSTATE YOGA 8788", "id": 240, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -1597, "descriptor": "RIDGEWAY GARAGE PFS CD *5515", "id": 241, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -6349, "descriptor": "CARD PAYMENT TO ADMIRAL INSURANCE CD 479", "id": 242, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -6425, "descriptor": "EDF ENERGY CD *5992", "id": 243, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -2660, "descriptor": "CARD PAYMENT TO ORCHARD BOOK CLUB CD 632", "id": 244, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -7997, "descriptor": "AMAZON PRIME*ABCD BRISTOL *8714", "id": 245, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -5165, "descriptor": "CARD PAYMENT TO MERIDIAN POSTAL SERVICE", "id": 246, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -8354, "descriptor": "CARD PAYMENT TO NEXT RETAIL 9370", "id": 247, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -1234, "descriptor": "MARKET SQ CAR", "id": 248, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -1107, "descriptor": "GREENCROSS CHEMIST *6634", "id": 249, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -5580, "descriptor": "EDF ENE", "id": 250, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -6412, "descriptor": "ZTL*SUNTRAIL HOLIDAYS *5871", "id": 251, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -4464, "descriptor": "GIFF", "id": 252, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -1549, "descriptor": "CARD PAYMENT TO SYNAPSE CHAT 5492", "id": 253, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -4366, "descriptor": "VODAFO", "id": 254, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -1623, "descriptor": "IKEA LTD *6855", "id": 255, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -6677, "descriptor": "GREENLEAF DENTAL *9294", "id": 256, "sub": "Medical", "top": "Health"}
+{"amount_minor": -8369, "descriptor": "CARD PAYMENT TO RYANAIR 1609", "id": 257, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -6076, "descriptor": "MODELWORKS", "id": 258, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -381, "descriptor": "GITHUB", "id": 259, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -373, "descriptor": "CARD PAYMENT TO MINTLEAF ORAL CARE JUN 3", "id": 260, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -3961, "descriptor": "PAPERTRAIL DIGEST GBR *485", "id": 261, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -1539, "descriptor": "PEAK BOU", "id": 262, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -8095, "descriptor": "RENTOKIL PEST CONTROL *1681", "id": 263, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -6395, "descriptor": "CARD PAYMENT TO HEARTHSTONE ENERGY NOV 6", "id": 264, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -4751, "descriptor": "CARD PAYMENT TO THREADBARE VINTAGE GBR 7", "id": 265, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -923, "descriptor": "MEADOW P", "id": 266, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -2477, "descriptor": "ADMIRAL INSURANCE CD *522", "id": 267, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -5060, "descriptor": "SEEDLING SUBSCR *5440", "id": 268, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -8202, "descriptor": "STAGEDOOR TICKE *6301", "id": 269, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -2999, "descriptor": "MARLOWE ARMS *5215", "id": 270, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -5502, "descriptor": "RIVERBA", "id": 271, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -8504, "descriptor": "CARD PAYMENT TO HILLTOP CINEMA 3399", "id": 272, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -3475, "descriptor": "CARD PAYMENT TO VOLTSPARK ELECTRONICS 80", "id": 273, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -1564, "descriptor": "ORCHARD BOOK CLUB NOV *8452", "id": 274, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -5616, "descriptor": "PRIMARK *8016", "id": 275, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -6613, "descriptor": "STATIONSID", "id": 276, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -953, "descriptor": "QUESTLIN", "id": 277, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -4739, "descriptor": "SUMUP *UBER TRIP *4646", "id": 278, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -846, "descriptor": "CARD PAYMENT TO SQ *SKYWING AIR 5044", "id": 279, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -8076, "descriptor": "MERIDIAN PO", "id": 280, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -6227, "descriptor": "CARD PAYMENT TO IKEA LTD 5631", "id": 281, "sub": "Household", "top": "Shopping"}
+{"amount_minor": -758, "descriptor": "DAVID LLO", "id": 282, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -2675, "descriptor": "SQ *SNIP AN", "id": 283, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -3892, "descriptor": "CLEARVIEW", "id": 284, "sub": "Medical", "top": "Health"}
+{"amount_minor": -4488, "descriptor": "REDBRICK LANDLORDS CD *3678", "id": 285, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -2037, "descriptor": "CARD PAYMENT TO AMAZON.CO.UK JUN 4644", "id": 286, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -4891, "descriptor": "KINGSMERE BORO", "id": 287, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -6891, "descriptor": "CORTEX", "id": 288, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -3847, "descriptor": "PAYPAL *AB TRADING *5323", "id": 289, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -7537, "descriptor": "CASTLEGATE C", "id": 290, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -726, "descriptor": "CARD PAYMENT TO FENWICK FARM SHOP LEEDS", "id": 291, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -887, "descriptor": "GREENLEA", "id": 292, "sub": "Medical", "top": "Health"}
+{"amount_minor": -1540, "descriptor": "SUMUP *BEAN", "id": 293, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -3397, "descriptor": "QUAYSIDE PARKING *3309", "id": 294, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -1894, "descriptor": "HELLOFRE", "id": 295, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -7413, "descriptor": "NATIONAL EXPRESS *3556", "id": 296, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -8934, "descriptor": "AMAZON.CO.U", "id": 297, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -8516, "descriptor": "STREAMLY JAN *5566", "id": 298, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -1968, "descriptor": "ORCHARD BO", "id": 299, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -5250, "descriptor": "HERITAGE TRUST MEMBERSHIP *3851", "id": 300, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -1086, "descriptor": "CLOUD", "id": 301, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -1473, "descriptor": "HARBOUR VIEW", "id": 302, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -1764, "descriptor": "PAPERTRAIL", "id": 303, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -750, "descriptor": "UBER TRIP LONDON GB *1599", "id": 304, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -6366, "descriptor": "CHIPFIX PHONE REPAIRS *4800", "id": 305, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -8424, "descriptor": "CARD PAYMENT TO STREAMLINE BIKES 5084", "id": 306, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -1741, "descriptor": "SIGNALBOX", "id": 307, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -4370, "descriptor": "QUESTLINE GAMES *5386", "id": 308, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -4841, "descriptor": "ZIPLINE", "id": 309, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -6570, "descriptor": "ZTL*SUNTRAIL", "id": 310, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -6178, "descriptor": "CARD PAYMENT TO CASTLE KEEP INN 5725", "id": 311, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -1312, "descriptor": "CARD PAYMENT TO BRAMBLEDOWN COUNCIL TAX", "id": 312, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -6743, "descriptor": "CARD PAYMENT TO BASKETBAY ONLINE 1119", "id": 313, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -7130, "descriptor": "SUMUP *SIGNALPEAK MOBILE *8636", "id": 314, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -2181, "descriptor": "GITHUB, INC. *3903", "id": 315, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -1182, "descriptor": "SYNAPSE", "id": 316, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -6149, "descriptor": "CARD PAYMENT TO VAULTLY 228", "id": 317, "sub": "Cloud storage", "top": "Subscriptions"}
+{"amount_minor": -5912, "descriptor": "CASTLE", "id": 318, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -1340, "descriptor": "CARD PAYMENT TO PROMPTWORKS CD 7880", "id": 319, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -2667, "descriptor": "CARD PAYMENT TO CRAFTERS CORNER 2375", "id": 320, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -8672, "descriptor": "GREENCROSS", "id": 321, "sub": "Pharmacy", "top": "Health"}
+{"amount_minor": -7541, "descriptor": "HERITAGE TRUST", "id": 322, "sub": "Memberships", "top": "Subscriptions"}
+{"amount_minor": -6882, "descriptor": "CARD PAYMENT TO HELLOFRESH NOV 654", "id": 323, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -3735, "descriptor": "CARD PAYMENT TO STARLIGHT RIDES CD 1225", "id": 324, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -6034, "descriptor": "CARD PAYMENT TO AXA INSURANCE LONDON GB", "id": 325, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -8803, "descriptor": "CARD PAYMENT TO LEVEL UP GAMES NOV 3945", "id": 326, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -4676, "descriptor": "CARD PAYMENT TO STREAMLY JAN 2405", "id": 327, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -7785, "descriptor": "RIDGEWAY GA", "id": 328, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -4221, "descriptor": "MONTHLY MUN", "id": 329, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -8242, "descriptor": "WANDERLUST TOURS *8426", "id": 330, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -6985, "descriptor": "CARD PAYMENT TO CLOUDHOPPER AIR 8904", "id": 331, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -7780, "descriptor": "CASTLEGATE CAR PARK CD *2937", "id": 332, "sub": "Parking", "top": "Transport"}
+{"amount_minor": -4850, "descriptor": "SHELL CAMB", "id": 333, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -5315, "descriptor": "PROMPTWORKS CD *6794", "id": 334, "sub": "AI tools", "top": "Subscriptions"}
+{"amount_minor": -6833, "descriptor": "CARD PAYMENT TO SQ *PATELS MINI MARKET 5", "id": 335, "sub": "Groceries", "top": "Food & Drink"}
+{"amount_minor": -6658, "descriptor": "CARD PAYMENT TO KINGSMERE BOROUGH COUNCI", "id": 336, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -1226, "descriptor": "CARD PAYMENT TO NATIONAL EXPRESS 5514", "id": 337, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -6650, "descriptor": "CARD PAYMENT TO OLDGATE PERMITS LEEDS 54", "id": 338, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -1619, "descriptor": "CARD PAYMENT TO PINEWOOD LODGE 4493", "id": 339, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -7569, "descriptor": "CARD PAYMENT TO RIVERSIDE PETROL LEEDS 8", "id": 340, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -1870, "descriptor": "WILLO", "id": 341, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -4439, "descriptor": "CARD PAYMENT TO AMAZON PRIME*ABCD 1926", "id": 342, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -6235, "descriptor": "VOLTSPARK ELECTRONICS *3182", "id": 343, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -4127, "descriptor": "UMBRELLA IN", "id": 344, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -7226, "descriptor": "CARD PAYMENT TO SOUNDSPHERE 6828", "id": 345, "sub": "Streaming", "top": "Subscriptions"}
+{"amount_minor": -7928, "descriptor": "APPLE.C", "id": 346, "sub": "Other subscriptions", "top": "Subscriptions"}
+{"amount_minor": -3466, "descriptor": "CARD PAYMENT TO DICE AND DRAGONS JAN 921", "id": 347, "sub": "Games", "top": "Entertainment"}
+{"amount_minor": -8390, "descriptor": "NEXTDOOR", "id": 348, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -3811, "descriptor": "LV= INS", "id": 349, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -1184, "descriptor": "CLOUDHOPPER AIR *2346", "id": 350, "sub": "Flights", "top": "Travel"}
+{"amount_minor": -8373, "descriptor": "STARLIGHT RIDES CD *7473", "id": 351, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -1974, "descriptor": "HARBOUR VIEW HOTEL GBR *8322", "id": 352, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -8325, "descriptor": "SCOTTISH", "id": 353, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -6901, "descriptor": "FLOWSTA", "id": 354, "sub": "Fitness", "top": "Health"}
+{"amount_minor": -8362, "descriptor": "SEASHELL COTTAGES *4826", "id": 355, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -5100, "descriptor": "CARD PAYMENT TO SERENITY NAIL BAR 6063", "id": 356, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -6233, "descriptor": "CARD PAYMENT TO SUMUP *BEAN THERE COFFEE", "id": 357, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -156, "descriptor": "SOAP AND SUDS *3334", "id": 358, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -1378, "descriptor": "CARD PAYMENT TO HARBOUR VIEW HOTEL GBR 9", "id": 359, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -1009, "descriptor": "CARD PAYMENT TO GREENLEAF DENTAL NOV 691", "id": 360, "sub": "Medical", "top": "Health"}
+{"amount_minor": -7027, "descriptor": "BRITISH", "id": 361, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -7057, "descriptor": "CARD PAYMENT TO LNER TICKETS 2528", "id": 362, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -8072, "descriptor": "CARD PAYMENT TO GITHUB, INC. 8543", "id": 363, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -6053, "descriptor": "THE DAILY", "id": 364, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -3963, "descriptor": "CARD PAYMENT TO THE COPPER KETT 7197", "id": 365, "sub": "Eating out", "top": "Food & Drink"}
+{"amount_minor": -7985, "descriptor": "CARD PAYMENT TO CASTLE KEEP INN 8487", "id": 366, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -1769, "descriptor": "CARD PAYMENT TO STAGEDOOR TICKE 5500", "id": 367, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -240, "descriptor": "CARD PAYMENT TO NATIONAL EXPRESS LEEDS 6", "id": 368, "sub": "Public transport", "top": "Transport"}
+{"amount_minor": -3756, "descriptor": "UBER", "id": 369, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -4750, "descriptor": "MOONBEAM", "id": 370, "sub": "Coffee", "top": "Food & Drink"}
+{"amount_minor": -5476, "descriptor": "CARD PAYMENT TO PUREGLOW TOILETRIES NOV", "id": 371, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -1505, "descriptor": "PIXELFORGE", "id": 372, "sub": "Software", "top": "Subscriptions"}
+{"amount_minor": -3100, "descriptor": "CARD PAYMENT TO SUMUP *UBER TRIP 9832", "id": 373, "sub": "Taxi", "top": "Transport"}
+{"amount_minor": -3502, "descriptor": "HEARTHSTONE", "id": 374, "sub": "Energy", "top": "Bills & Utilities"}
+{"amount_minor": -8965, "descriptor": "GRAND ARENA TICKETS *5987", "id": 375, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -3471, "descriptor": "SERENITY", "id": 376, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -5952, "descriptor": "SOAP A", "id": 377, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -3292, "descriptor": "MAPLE LETTINGS RENT CD *5101", "id": 378, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -5730, "descriptor": "REDBRICK LAN", "id": 379, "sub": "Rent", "top": "Housing"}
+{"amount_minor": -7807, "descriptor": "SPICE HUT *2760", "id": 380, "sub": "Takeaway", "top": "Food & Drink"}
+{"amount_minor": -1317, "descriptor": "PINEWOOD LODGE *7945", "id": 381, "sub": "Hotels", "top": "Travel"}
+{"amount_minor": -7881, "descriptor": "CARD PAYMENT TO ZTL*SUNTRAIL HOLIDAYS 98", "id": 382, "sub": "Holidays", "top": "Travel"}
+{"amount_minor": -8093, "descriptor": "HILLTOP", "id": 383, "sub": "Events", "top": "Entertainment"}
+{"amount_minor": -8575, "descriptor": "CARD PAYMENT TO AMAZON.CO.UK REFUND 7002", "id": 384, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -4188, "descriptor": "SOAP AND SUDS *7298", "id": 385, "sub": "Toiletries", "top": "Personal care"}
+{"amount_minor": -7031, "descriptor": "CHIPFIX PH", "id": 386, "sub": "Electronics", "top": "Shopping"}
+{"amount_minor": -8805, "descriptor": "CARD PAYMENT TO FIXITALL HOME REPAIRS 69", "id": 387, "sub": "Maintenance", "top": "Housing"}
+{"amount_minor": -8127, "descriptor": "CARD PAYMENT TO UMBRELLA INDEMNITY 9895", "id": 388, "sub": "Insurance", "top": "Bills"}
+{"amount_minor": -4007, "descriptor": "STEADYST", "id": 389, "sub": "Medical", "top": "Health"}
+{"amount_minor": -1505, "descriptor": "NEXT RETAIL *2795", "id": 390, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -7564, "descriptor": "PAYPAL *A", "id": 391, "sub": "Online", "top": "Shopping"}
+{"amount_minor": -1562, "descriptor": "KINGSMERE BOROUGH", "id": 392, "sub": "Council tax", "top": "Bills & Utilities"}
+{"amount_minor": -8531, "descriptor": "OLDGATE PERMITS LEEDS *5806", "id": 393, "sub": "Other bills", "top": "Bills"}
+{"amount_minor": -7566, "descriptor": "MODELWORKS HOBBIES CD *7071", "id": 394, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -5735, "descriptor": "WILLOW SPA *2140", "id": 395, "sub": "Hair & beauty", "top": "Personal care"}
+{"amount_minor": -3278, "descriptor": "SHELL CAMBRIDGE CD *6514", "id": 396, "sub": "Fuel", "top": "Transport"}
+{"amount_minor": -8672, "descriptor": "CARD PAYMENT TO MODELWORKS HOBBIES CD 24", "id": 397, "sub": "Hobbies", "top": "Entertainment"}
+{"amount_minor": -5390, "descriptor": "THREADBARE VINTAGE GBR *6553", "id": 398, "sub": "Clothing", "top": "Shopping"}
+{"amount_minor": -6030, "descriptor": "VODAFONE LTD *1749", "id": 399, "sub": "Phone & internet", "top": "Bills & Utilities"}
+{"amount_minor": -368, "descriptor": "LEVEL UP GA", "id": 400, "sub": "Games", "top": "Entertainment"}

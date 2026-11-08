@@ -3,7 +3,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { ArrowUp, Check, ChevronDown, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
+import { CloudToggle } from "@/components/CloudToggle";
 import { Money } from "@/components/Money";
+import { PayloadViewer } from "@/components/PayloadViewer";
 import { Card } from "@/components/ui/card";
 import { type Block, type Counted, type Decision, type Message, friendlyLabel, parseBlocks, pathLabel } from "@/lib/chat";
 import { decide, send as sendMessage, useChat } from "@/lib/chatStore";
@@ -181,7 +183,7 @@ function ProposalCard({
   );
 }
 
-function Bubble({ m, decision, busy, onDecide }: { m: Message; decision?: Decision; busy: boolean; onDecide: (id: number, d: Decision) => void }) {
+function Bubble({ m, decision, busy, onDecide, thread, cloudIndex }: { m: Message; decision?: Decision; busy: boolean; onDecide: (id: number, d: Decision) => void; thread: string | null; cloudIndex: number }) {
   const reduce = useReducedMotion();
   const mine = m.role === "user";
   return (
@@ -208,6 +210,7 @@ function Bubble({ m, decision, busy, onDecide }: { m: Message; decision?: Decisi
             {m.proposalId != null && !m.streaming && (
               <ProposalCard id={m.proposalId} decision={decision} disabled={busy} onDecide={(d) => onDecide(m.proposalId as number, d)} />
             )}
+            {m.path === "cloud" && !m.streaming && thread && <PayloadViewer conversation={thread} index={cloudIndex} cost={m.costPence} />}
             {m.path && !m.streaming && (
               <p className="mt-2 text-meta text-muted-foreground" data-testid="path">
                 Answered by: {pathLabel(m.path, m.text)}
@@ -220,29 +223,54 @@ function Bubble({ m, decision, busy, onDecide }: { m: Message; decision?: Decisi
   );
 }
 
+// the public demo answers on the deterministic path only: no local model, no cloud
+const DEMO = import.meta.env.VITE_DEMO === "1";
+
 export function Assistant() {
   const chat = useChat(); // lives above the router: a turn in flight survives a tab change
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
+  const [cloud, setCloud] = useState(false);
+  const spend = useQuery({
+    queryKey: ["spend"],
+    enabled: !DEMO,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/spend");
+      if (!res.ok) throw new Error(String(res.status));
+      return (await res.json()) as components["schemas"]["BucketOut"][];
+    },
+  });
+  const capped = spend.data?.some((b) => b.bucket === "gateway_chat" && b.state === "capped") ?? false;
 
   // load the local model while the user types, so the first turn skips the load;
   // a beacon, not fetch: nothing waits on it and nothing is shown
   useEffect(() => {
-    navigator.sendBeacon?.("/api/chat/warm");
+    if (!DEMO) navigator.sendBeacon?.("/api/chat/warm"); // the demo has no model to warm
   }, []);
 
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
   }, [chat.messages, reduceMotion]);
 
+  // a 404 resets the conversation, and a new thread starts local
+  useEffect(() => {
+    if (chat.thread === null) setCloud(false);
+  }, [chat.thread]);
+
   function send(e: React.FormEvent) {
     e.preventDefault();
-    if (sendMessage(draft.trim())) setDraft("");
+    // cloud rides along only once the toggle is on; switching off a thread that used it sends false
+    const optIn = cloud && !capped ? true : chat.messages.some((m) => m.path === "cloud") ? false : undefined;
+    if (sendMessage(draft.trim(), optIn)) setDraft("");
   }
 
   return (
     <Card className="flex min-h-[60dvh] flex-col p-0 sm:p-0">
+      {DEMO && (
+        <p className="px-4 pt-4 text-label text-muted-foreground sm:px-6 sm:pt-5">Answered from tables (demo)</p>
+      )}
       <ol aria-label="Conversation" aria-live="polite" aria-busy={chat.busy} className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
         {chat.messages.length === 0 && (
           <li className="m-auto max-w-sm py-16 text-center">
@@ -252,10 +280,11 @@ export function Assistant() {
             </p>
           </li>
         )}
-        {chat.messages.map((m) => (
-          <Bubble key={m.id} m={m} busy={chat.busy} decision={m.proposalId != null ? chat.decisions[m.proposalId] : undefined} onDecide={decide} />
+        {chat.messages.map((m, i) => (
+          <Bubble key={m.id} m={m} thread={chat.thread} cloudIndex={chat.messages.slice(0, i).filter((x) => x.path === "cloud").length} busy={chat.busy} decision={m.proposalId != null ? chat.decisions[m.proposalId] : undefined} onDecide={decide} />
         ))}
       </ol>
+      {!DEMO && <CloudToggle on={cloud} capped={capped} disabled={chat.busy} onChange={setCloud} />}
       <div ref={end} className="scroll-mb-40 sm:scroll-mb-24" />
       <form onSubmit={send} className="sticky bottom-24 flex items-end gap-2 rounded-b-card border-t border-border bg-card p-3 sm:bottom-0">
         <label htmlFor="chat-input" className="sr-only">

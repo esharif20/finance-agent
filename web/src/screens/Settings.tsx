@@ -3,6 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { type AssistantModel, fetchAssistantModel, fetchMerchants, setAlwaysAsk, setAssistantModel } from "@/api/client";
 import { MERCHANTS_KEY, Switch } from "@/components/AlwaysAskToggle";
+import { NewsTopics } from "@/components/NewsBriefing";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -16,6 +17,9 @@ const MODELS: { value: AssistantModel; label: string; hint: string }[] = [
 ];
 
 /** Which local model the Assistant runs. Changing it unloads the old one. */
+// the public demo has no model to choose: its Assistant answers from tables
+const DEMO = import.meta.env.VITE_DEMO === "1";
+
 function AssistantCard() {
   const client = useQueryClient();
   const model = useQuery({ queryKey: MODEL_KEY, queryFn: fetchAssistantModel });
@@ -82,7 +86,8 @@ export function Settings() {
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-      <AssistantCard />
+      {!DEMO && <AssistantCard />}
+      {!DEMO && <NewsTopics />}
       <Card aria-labelledby="always-ask-title" className="flex flex-col gap-5">
         <CardHeader className="mb-0">
           <CardTitle id="always-ask-title">Always ask</CardTitle>

@@ -4,7 +4,21 @@ module can reach the network by accident. An AST scan of every source file."""
 import ast
 from pathlib import Path
 
-NETWORK = {"urllib", "http", "socket", "ssl", "requests", "httpx", "aiohttp", "urllib3"}
+# Provider SDKs too: none is allowed anywhere; gateway.cloud uses urllib (#298).
+NETWORK = {
+    "urllib",
+    "http",
+    "socket",
+    "ssl",
+    "requests",
+    "httpx",
+    "aiohttp",
+    "urllib3",
+} | {
+    "google",
+    "anthropic",
+    "openai",
+}
 # this checkout's source, not whichever `finance_agent` sys.path finds first
 SRC = Path(__file__).resolve().parents[1] / "src" / "finance_agent"
 ALLOWED = {
@@ -12,6 +26,12 @@ ALLOWED = {
     "cli/launcher.py": "probes our own server's /api/health on 127.0.0.1 only",
     "assistant/ollama.py": "the local model on localhost:11434 only (#135)",
     "categorise/embedding.py": "local embeddings on localhost:11434 only (#113)",
+    "gateway/cloud.py": "the one pinned Gemini host only (ADR 0016, #298)",
+    "gateway/brief.py": "urllib.parse only, to check cited sources are https (#309)",
+    "demo/app.py": "urllib.parse only, for the same-origin check (#296)",
+    "cli/models.py": "local Ollama on localhost:11434 only (#311)",
+    "cli/doctor.py": "urllib.parse only, to compare the bank host pin (#311)",
+    "cli/demo.py": "socket binds 127.0.0.1:0 once to find a free port (#311)",
 }
 
 
@@ -80,6 +100,21 @@ def test_the_embedding_adapter_only_talks_to_localhost() -> None:
     assert "HTTPSConnection" not in text and "urllib.request" not in text
 
 
+def test_the_cloud_client_only_talks_to_the_pinned_gemini_host() -> None:
+    text = (SRC / "gateway/cloud.py").read_text()
+    assert network_imports(text) == {"ssl", "urllib"}
+    assert 'HOST = "generativelanguage.googleapis.com"' in text
+    assert "urllib.request.ProxyHandler({})" in text and "_NoRedirect" in text
+    assert "http.client" not in text and "socket" not in text
+
+
+def test_the_demo_app_only_parses_urls() -> None:
+    text = (SRC / "demo/app.py").read_text()
+    assert network_imports(text) == {"urllib"}
+    assert "from urllib.parse import urlsplit" in text
+    assert "urllib.request" not in text and "http.client" not in text
+
+
 def test_the_scan_catches_every_import_form() -> None:
     for src in (
         "import socket",
@@ -91,6 +126,8 @@ def test_the_scan_catches_every_import_form() -> None:
         'import_module("http.client")',
         '__import__("ssl")',
         "__import__(name)",  # a computed name cannot be checked: refused
+        "from google import genai",
+        "import anthropic",
     ):
         assert network_imports(src), src
     assert network_imports("from . import socket") == set()  # a sibling module

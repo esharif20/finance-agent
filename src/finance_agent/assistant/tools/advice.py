@@ -9,7 +9,9 @@ here; cancelling is the user's, through the Manage link and the registry.
 
 shortcut: preference strengths (#262) and worth-it answers on Subscriptions are
 not stored yet, so those signals stay empty; fill `Sub.strength`/`worth_it`
-once they are. Briefing news (#309) fills `Sub.news` the same way."""
+once they are. Briefing news (#309) fills `Sub.news`: the service's own items
+and its group's topic ("AI assistants"), newest `NEWS_PER_SUB` first, none
+stale. Their text is web text, quoted as `Data` and never obeyed."""
 
 import re
 from datetime import date
@@ -21,6 +23,7 @@ from finance_agent.assistant.tools.read import Data, Money, Source
 from finance_agent.categorise.display_names import display_name
 from finance_agent.categorise.subscriptions import COUNTED, SUB, costs, known_service
 from finance_agent.engine import subscription_budget as sb
+from finance_agent.engine import topics
 from finance_agent.ledger import CURRENCY, Ledger
 from finance_agent.ledger.proposals import Memory, Proposals
 from finance_agent.ledger.taxonomy import TAXONOMY
@@ -36,6 +39,7 @@ Group = Literal[
     "Other subscriptions",
 ]
 _GENERIC = {"tool", "other", "subscription"}
+NEWS_PER_SUB = 3
 
 
 def _words(text: str) -> set[str]:
@@ -116,14 +120,26 @@ def _subs(src: Source, group: str) -> tuple[list[sb.Sub], int]:
     counted ones have none yet (rate or interval needed)."""
     subs: list[sb.Sub] = []
     unpriced = 0
-    for x in costs(Ledger(src.conn, src.user_id), src.today).items:
-        if x.entry.kind != SUB or x.entry.group != group or x.status not in COUNTED:
-            continue
+    rows = [
+        x
+        for x in costs(Ledger(src.conn, src.user_id), src.today).items
+        if x.entry.kind == SUB and x.entry.group == group and x.status in COUNTED
+    ]
+    group_topic = topics.GROUP_TOPIC.get(group, "")
+    services = [k[0] for x in rows if (k := known_service(x.entry.merchant))]
+    news = topics.news_for(src.conn, src.user_id, src.today, [group_topic, *services])
+    for x in rows:
         if x.monthly is None:
             unpriced += 1
             continue
         known = known_service(x.entry.merchant)
         codes = {f.code for f in x.flags}
+        mine = news.get(known[0].lower(), ()) if known else ()
+        items = sorted(
+            (*mine, *news.get(group_topic.lower(), ())),
+            key=lambda n: n.on,
+            reverse=True,
+        )
         subs.append(
             sb.Sub(
                 merchant_id=x.entry.merchant_id,
@@ -134,6 +150,7 @@ def _subs(src: Source, group: str) -> tuple[list[sb.Sub], int]:
                 price_rise="price_rise" in codes,
                 inactive=x.status == "overdue",
                 trial_converted="trial_converted" in codes,
+                news=tuple(items[:NEWS_PER_SUB]),
             )
         )
     return subs, unpriced

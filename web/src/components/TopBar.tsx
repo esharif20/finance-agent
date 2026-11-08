@@ -7,6 +7,9 @@ import { SearchBox } from "@/components/SearchBox";
 import { iconButton, SyncNow } from "@/components/SyncNow";
 import { usePrivacy } from "@/lib/privacy";
 
+// the public demo has no bank to sync
+const DEMO = import.meta.env.VITE_DEMO === "1";
+
 function Mark() {
   // three bars of decreasing length: money being sorted
   return (
@@ -140,7 +143,7 @@ export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: str
       />
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
         <SearchBox />
-        <SyncNow />
+        {!DEMO && <SyncNow />}
         <a
           href="#settings"
           aria-label="Settings"

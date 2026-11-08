@@ -13,6 +13,7 @@ export const refusal = (status: number) =>
   status === 404 ? "That conversation has ended. Ask again to start a new one."
   : status === 409 ? "Nothing is waiting for confirmation."
   : status === 422 ? "That message can't be sent. Keep it under 2,000 characters."
+  : import.meta.env.VITE_DEMO === "1" ? "The Assistant isn't available right now. Try again in a moment."
   : "The Assistant isn't available right now. Check that the local model is running.";
 
 function load(): Chat {
@@ -78,11 +79,13 @@ async function turn(url: string, body: object) {
 }
 
 /** Send a message; false when it can't be sent now. The fetch outlives the screen. */
-export function send(text: string): boolean {
+export function send(text: string, cloud?: boolean): boolean {
   if (!text || state.busy) return false;
   const thread = state.thread;
   dispatch({ type: "send", text });
-  void turn("/api/chat", thread ? { message: text, thread_id: thread } : { message: text });
+  const body: Record<string, unknown> = thread ? { message: text, thread_id: thread } : { message: text };
+  if (cloud !== undefined) body.cloud = cloud;
+  void turn("/api/chat", body);
   return true;
 }
 

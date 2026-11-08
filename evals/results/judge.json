@@ -1,0 +1,36 @@
+{
+  "harness": "judge",
+  "dataset": "judge_labels",
+  "dataset_version": 1,
+  "dataset_sha256": "2f961279b6a4f2b0a89ebdf64f2274aa93b8d32f526793bb462892db3d54d7a7",
+  "rubric_sha256": "96bfcd58d449aafadf73796dd967ce59c4b8d271a52f11d92b362d7eee285aaa",
+  "kappa_min": 0.6,
+  "status": "calibrated",
+  "disagreements": [
+    "L03",
+    "L08",
+    "L15",
+    "L19",
+    "L23",
+    "L24",
+    "L29"
+  ],
+  "replies": {
+    "gemini-flash-latest": {
+      "scored": 31,
+      "mean_score": 4.5484
+    }
+  },
+  "models": {
+    "judge:gemini-pro-latest": {
+      "model": "gemini-pro-latest",
+      "model_version": "offline-standin",
+      "metrics": {
+        "kappa": 0.647059,
+        "exact_agreement": 0.766667,
+        "no_verdict_count": 0,
+        "cost_total_pence": 61
+      }
+    }
+  }
+}

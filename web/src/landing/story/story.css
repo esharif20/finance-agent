@@ -1,0 +1,332 @@
+/* #300 scroll story. Tokens from landing.css; transform and opacity only, except the focus list's
+   weight axis, which #76 asks for. No glow, no gradient, no hue between 235 and 290. */
+
+.st {
+  --st-card: #ffffff;
+  --st-card-ink: #1b1d1f;
+  --st-card-soft: #5c6166;
+  --st-token: #0b66c3;
+  --st-token-bg: #e3eefa;
+}
+@media (prefers-color-scheme: dark) {
+  .st {
+    --st-card: #1c1e20;
+    --st-card-ink: #f4f5f6;
+    --st-card-soft: #a9aeb4;
+    --st-token: #9cc9f7;
+    --st-token-bg: #0a3a6b;
+  }
+}
+
+/* chapter 1: the sticky pile */
+.st-pile {
+  padding-block: clamp(96px, 14vw, 200px) clamp(64px, 10vw, 140px);
+}
+.st-pile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(32px, 5vw, 96px);
+  align-items: start;
+}
+.st-pile-title {
+  position: sticky;
+  top: 18vh;
+}
+.st-slot {
+  position: sticky;
+  top: 16vh;
+  margin-bottom: 36vh;
+}
+.st-slot:last-child {
+  margin-bottom: 0;
+}
+.st-card {
+  /* the app's chips mix with --card */
+  --card: var(--st-card);
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 440px;
+  padding: clamp(24px, 3vw, 36px);
+  border-radius: 28px;
+  background: var(--st-card);
+  color: var(--st-card-ink);
+  transform-origin: 50% 0;
+  will-change: transform;
+}
+.st-card-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--lp-ground);
+  pointer-events: none;
+}
+.st-card-title {
+  margin-bottom: 8px;
+}
+.st-card-kicker,
+.st-card-note,
+.st-source {
+  color: var(--st-card-soft);
+  font-size: 0.9375rem;
+}
+.st-card-figure {
+  font-size: clamp(2.5rem, 1.6rem + 2.4vw, 3.5rem);
+  font-weight: 720;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.st-bars,
+.st-rows {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  margin-top: 6px;
+}
+.st-bars li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  font-weight: 600;
+}
+.st-bars i {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--lp-card);
+  transform: scaleX(var(--share));
+  transform-origin: 0 50%;
+}
+.st-rows li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+}
+.st-row-name {
+  font-weight: 650;
+  min-width: 0;
+}
+.st-row-amount {
+  min-width: 5.5em;
+  text-align: right;
+  font-weight: 600;
+}
+.st-ask {
+  justify-self: end;
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 20px 20px 6px 20px;
+  background: var(--lp-field);
+  color: var(--lp-field-ink);
+  font-weight: 600;
+}
+.st-reply {
+  font-size: 1.25rem;
+  line-height: 1.45;
+}
+.st-reply .money {
+  font-weight: 720;
+}
+
+/* chapter 2: the gateway, the peak */
+.st-gate {
+  /* the gateway is night in both themes */
+  --st-token: #8cc2f8;
+  position: relative;
+  padding-top: clamp(96px, 12vw, 180px);
+  background: var(--lp-night);
+  color: var(--lp-night-ink);
+}
+.st-gate-track {
+  height: 260vh;
+}
+.st-gate-stage {
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(32px, 6vw, 112px);
+  min-height: 100vh;
+}
+.st-gate-still {
+  position: static;
+  min-height: 0;
+  padding-block: 64px 160px;
+}
+.st-gate-copy {
+  display: grid;
+  gap: 16px;
+}
+.st-gate-label {
+  display: grid;
+  color: var(--lp-night-soft);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.st-gate-label > span {
+  grid-area: 1 / 1;
+}
+.st-gate-line {
+  font-size: clamp(2.25rem, 0.9rem + 4.6vw, 5rem);
+  font-weight: 720;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.st-gate-still .st-gate-line + .st-gate-label {
+  margin-top: 16px;
+}
+.st-token,
+.st-flip-token {
+  color: var(--st-token);
+}
+.st-gate-lead {
+  max-width: 44ch;
+  margin-top: 16px;
+  color: var(--lp-night-soft);
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+.st-flip {
+  display: inline-grid;
+}
+/* the amount sits right, so "{P1} at" closes up when the shorter token shows */
+.st-flip:first-child {
+  justify-items: end;
+}
+.st-flip > span {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+/* the #76 coin */
+.st-coin-stage {
+  perspective: 900px;
+}
+.st-coin {
+  position: relative;
+  width: clamp(120px, 16vw, 240px);
+  aspect-ratio: 1;
+  transform-style: preserve-3d;
+}
+.st-coin-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 10px solid var(--lp-card-low);
+  background: var(--lp-card);
+  color: #ffffff;
+  font-size: clamp(3rem, 6vw, 6rem);
+  font-weight: 760;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  /* WebKit honours backface-visibility only on faces with their own 3D transform */
+  transform: translateZ(1px);
+}
+.st-coin-back {
+  transform: rotateY(180deg) translateZ(1px);
+  font-size: clamp(2rem, 4vw, 4rem);
+}
+
+/* the one wave wipe, at the cut into the principles */
+.st-wave {
+  height: clamp(64px, 9vw, 128px);
+  margin-top: -1px;
+  transform-origin: 50% 100%;
+  color: var(--lp-ground);
+}
+.st-wave svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+/* chapter 3: the focus list */
+.st-principles {
+  padding-block: clamp(64px, 8vw, 120px) clamp(96px, 12vw, 180px);
+}
+.st-principles-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: clamp(32px, 5vw, 96px);
+  align-items: start;
+}
+.st-principles-grid .lp-h2 {
+  position: sticky;
+  top: 40vh;
+}
+.st-principle-list {
+  display: grid;
+  gap: clamp(32px, 6vh, 64px);
+  list-style: none;
+  padding-block: 12vh;
+}
+.st-principle {
+  font-size: clamp(1.75rem, 1rem + 2.4vw, 3rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+@media (max-width: 900px) {
+  .st-pile-grid,
+  .st-principles-grid {
+    grid-template-columns: 1fr;
+  }
+  .st-pile-title,
+  .st-principles-grid .lp-h2 {
+    position: static;
+  }
+  .st-slot {
+    top: 12vh;
+    margin-bottom: 24vh;
+  }
+  .st-card {
+    min-height: 0;
+  }
+  .st-rows li {
+    grid-template-columns: 1fr auto;
+  }
+  .st-rows li .st-row-amount {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .st-rows li > span:has(> button) {
+    grid-column: 1 / -1;
+  }
+  .st-gate-track {
+    height: 220vh;
+  }
+  .st-gate-stage {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 32px;
+  }
+  .st-coin {
+    width: 112px;
+  }
+  .st-coin-face {
+    border-width: 6px;
+    font-size: 3rem;
+  }
+  .st-coin-back {
+    font-size: 1.75rem;
+  }
+}
+
+/* reduced motion: every chapter flat in its final state */
+.st[data-still] .st-slot,
+.st[data-still] .st-pile-title,
+.st[data-still] .st-principles-grid .lp-h2 {
+  position: static;
+  margin-bottom: 24px;
+}
+.st[data-still] .st-card {
+  will-change: auto;
+}

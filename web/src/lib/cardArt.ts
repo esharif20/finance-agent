@@ -10,7 +10,9 @@ export const FRONT_SCRIM = 1;
 export const BACK_SCRIM = 0.72;
 
 // Generic face hue per art key; none in the violet band 235-290 (DIRECTIONS.md).
-export const FACE_HUE: Record<string, number> = { lloyds: 158, hsbc: 18, revolut: 345 };
+// The public demo (VITE_DEMO=1) ships neither these names nor the art route: its accounts are generic.
+const DEMO = import.meta.env.VITE_DEMO === "1";
+export const FACE_HUE: Record<string, number> = DEMO ? {} : { lloyds: 158, hsbc: 18, revolut: 345 };
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -47,6 +49,7 @@ export function loadArt(key: string): Promise<HTMLCanvasElement | null> {
 }
 
 async function fetchArt(key: string): Promise<HTMLCanvasElement | null> {
+  if (DEMO) return null;
   const res = await fetch(`/api/card-art/${encodeURIComponent(key)}`);
   if (!res.ok || typeof createImageBitmap !== "function") return null;
   const img = await createImageBitmap(await res.blob());
