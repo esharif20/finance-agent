@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+import sqlalchemy as sa
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from sqlalchemy import Connection
@@ -17,6 +18,7 @@ from sqlalchemy import Connection
 from finance_agent import categorise
 from finance_agent.categorise.manage_links import MANAGE_LINKS
 from finance_agent.ledger import Categorisation, Ledger
+from finance_agent.storage import schema
 from test_review_queue import export, ledger_with
 
 GROCERIES = ("Food & Drink", "Groceries")
@@ -112,6 +114,49 @@ def test_decisions_on_old_merchant_rows_survive_the_new_base(
 
         categorise.run(conn, 1)  # idempotent
         assert by_description(led) == after
+
+
+def test_registry_history_survives_the_rename(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # migration 0021 deletes a Merchant's registry rows with the Merchant, so
+    # run() must rename rows in place, never delete or replace them
+    with old_base_ledger(monkeypatch) as (conn, led):
+        trigger = "subscription_entry_merchant_gone"
+        assert conn.execute(
+            sa.text("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=:n"),
+            {"n": trigger},
+        ).scalar()
+        mid = {d: c.merchant_id or 0 for d, c in by_description(led).items()}
+        confirmed, cancelled, dismissed = (
+            mid["DISNEY PLUS"],
+            mid["SAINSBURYS S/MKTS 0412"],
+            mid["NETFLIX.COM"],
+        )
+        led.add_subscription(confirmed, "subscription", "Streaming")
+        led.confirm_subscription(confirmed)
+        led.add_subscription(cancelled, "subscription", "Streaming")
+        led.cancel_subscription(cancelled)
+        led.not_a_subscription(dismissed)
+        e = schema.subscription_entry
+        history = sa.select(e).order_by(e.c.id)
+        rows = conn.execute(history).all()
+        status = {s.merchant_id: s.status for s in led.subscriptions()}
+
+        categorise.run(conn, 1)  # renames all three to their clean names
+        names = {m.id: m.name for m in led.merchants()}
+        assert (names[confirmed], names[cancelled], names[dismissed]) == (
+            "Disney Plus",
+            "Sainsbury's",
+            "Netflix",
+        )
+        assert conn.execute(history).all() == rows  # every row, untouched
+        assert {s.merchant_id: s.status for s in led.subscriptions()} == status
+        assert (status[confirmed], status[cancelled], status[dismissed]) == (
+            "active",
+            "user_cancelled",
+            "not_subscription",
+        )
 
 
 def test_a_fresh_ledger_still_gets_the_sub_brand_split(
