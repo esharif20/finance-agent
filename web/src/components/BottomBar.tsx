@@ -2,8 +2,6 @@ import {
   BookOpen,
   CalendarRange,
   Ellipsis,
-  Eye,
-  EyeOff,
   Newspaper,
   Repeat,
   Settings as SettingsIcon,
@@ -12,9 +10,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
-import { IconSwap } from "@/components/IconSwap";
 import type { Tab } from "@/components/NavTabs";
-import { usePrivacy } from "@/lib/privacy";
 
 const MORE = [
   { id: "subscriptions", label: "Subscriptions", icon: Repeat },
@@ -31,14 +27,13 @@ const row =
 const item =
   "relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[14px] pt-1 text-[11px] leading-tight font-semibold transition-[color,scale] duration-150 ease-out active:scale-[0.96]";
 
-/** More: the less-used destinations and Hide amounts, in a sheet above the bar. */
+/** More: the less-used destinations, in a sheet above the bar. */
 function More({ current }: { current: string }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const id = useId();
   const reduced = useReducedMotion();
-  const { hidden, toggle } = usePrivacy();
   const on = MORE.some((m) => m.id === current);
 
   useEffect(() => {
@@ -96,10 +91,6 @@ function More({ current }: { current: string }) {
                 {label}
               </a>
             ))}
-            <button type="button" aria-pressed={hidden} onClick={toggle} className={row}>
-              <IconSwap on={hidden} a={<Eye className="size-[18px]" />} b={<EyeOff className="size-[18px]" />} />
-              Hide amounts
-            </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -25,21 +25,25 @@ const eye = (hidden: boolean) => (
   <IconSwap on={hidden} a={<Eye className="size-[18px]" />} b={<EyeOff className="size-[18px]" />} />
 );
 
-/** Eye toggle for privacy mode; `H` does the same anywhere (PrivacyProvider). */
-function HideAmounts({ className = "" }: { className?: string }) {
+/** Privacy mode, labelled so it is easy to find: blurs or shows every amount. `H` does the same
+    anywhere (PrivacyProvider). The words say what a press does, so it needs no aria-pressed. */
+function HideAmounts() {
   const { hidden, toggle } = usePrivacy();
+  const verb = hidden ? "Show" : "Hide";
   return (
     <button
       type="button"
-      aria-label="Hide amounts"
-      aria-pressed={hidden}
       aria-keyshortcuts="H"
-      data-tip={`${hidden ? "Show" : "Hide"} amounts · H`}
+      data-tip={`${verb} values · H`}
       data-tip-align="end"
       onClick={toggle}
-      className={`${iconButton} ${className}`}
+      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] [@media(hover:hover)]:hover:bg-active"
     >
       {eye(hidden)}
+      <span>
+        {verb}{" "}
+        <span className="max-sm:sr-only">values</span>
+      </span>
     </button>
   );
 }
@@ -105,7 +109,7 @@ export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: str
         >
           <SettingsIcon className="size-[18px]" aria-hidden="true" />
         </a>
-        <HideAmounts className="max-sm:hidden" />
+        <HideAmounts />
       </div>
     </header>
   );

@@ -122,19 +122,22 @@ const pageColour = () =>
 
 const webgl = () => typeof WebGLRenderingContext !== "undefined";
 const PHONE = "(max-width: 639px)";
-/** Phones get a flat, snap-scrolling carousel instead of the 3D stack: a stack of ID-1 cards at
-    phone width is several screens tall, and WebGL costs frames there. */
-function usePhone() {
-  const query = () => typeof matchMedia === "function" && matchMedia(PHONE).matches;
-  const [phone, setPhone] = useState(query);
+// Touch screens and narrow windows never get a WebGL context: iOS Safari kills the tab when the
+// card scene's context and textures push it past its memory limit. The CSS faces stand in.
+const NO_GL = "(pointer: coarse), (max-width: 899px)";
+/** Phones get a flat, snap-scrolling row of mini cards instead of the 3D stack: a stack of ID-1
+    cards at phone width is several screens tall. */
+function useMedia(q: string) {
+  const query = () => typeof matchMedia === "function" && matchMedia(q).matches;
+  const [on, setOn] = useState(query);
   useEffect(() => {
     if (typeof matchMedia !== "function") return;
-    const mq = matchMedia(PHONE);
-    const change = () => setPhone(mq.matches);
+    const mq = matchMedia(q);
+    const change = () => setOn(mq.matches);
     mq.addEventListener?.("change", change);
     return () => mq.removeEventListener?.("change", change);
-  }, []);
-  return phone;
+  }, [q]);
+  return on;
 }
 const transform = (p: Pose) =>
   `translate3d(${p.x}px, ${p.y}px, ${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg) scale(${p.s})`;
@@ -155,7 +158,8 @@ export function AccountStack({
   onHot?: (id: number | undefined) => void; // a pointer or keyboard is on a card: light its share elsewhere
 }) {
   const reduce = useReducedMotion() ?? false;
-  const phone = usePhone();
+  const phone = useMedia(PHONE);
+  const noGl = useMedia(NO_GL);
   const all = useMemo(() => faces(accounts, balances), [accounts, balances]);
   const [hover, setHover] = useState<Hover | null>(null);
   const [rising, setRising] = useState<number | null>(null);
@@ -252,7 +256,7 @@ export function AccountStack({
   }, [phone]);
 
   // WebGL: one lazy-loaded canvas for the whole stack, never under reduced motion.
-  const wantGl = !reduce && !phone && webgl() && width > 0;
+  const wantGl = !reduce && !noGl && webgl() && width > 0;
   const allH = layout.allH;
   const sceneFaces = useMemo<SceneFace[]>(
     () =>

@@ -1114,3 +1114,11 @@ html[data-private] .money {
 html[data-scrolling] .ambient i {
   animation-play-state: paused;
 }
+
+/* Touch screens: no will-change layers (each is GPU memory iOS Safari counts against the tab). */
+@media (pointer: coarse) {
+  .account-card,
+  .ambient i {
+    will-change: auto;
+  }
+}

@@ -49,17 +49,18 @@ describe("privacy mode", () => {
     render(<PrivacyProvider>x</PrivacyProvider>);
   };
 
-  it("is on by default in the demo", async () => {
+  it("starts with values shown in the demo, even after the old private default was saved", async () => {
     vi.stubEnv("VITE_DEMO", "1");
+    localStorage.setItem("fa-private", "1");
     await mount();
-    expect(document.documentElement).toHaveAttribute("data-private");
+    expect(document.documentElement).not.toHaveAttribute("data-private");
   });
 
   it("keeps a demo visitor's own choice", async () => {
     vi.stubEnv("VITE_DEMO", "1");
-    localStorage.setItem("fa-private", "0");
+    localStorage.setItem("fa-private-demo", "1");
     await mount();
-    expect(document.documentElement).not.toHaveAttribute("data-private");
+    expect(document.documentElement).toHaveAttribute("data-private");
   });
 
   it("stays off by default in the local app", async () => {
