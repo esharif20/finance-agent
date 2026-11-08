@@ -184,7 +184,9 @@ def test_default_model_and_keep_alive() -> None:
     method, path, sent = opened[0].requests[0]
     assert (method, path) == ("POST", "/api/chat")
     assert sent["model"] == "qwen3.5:9b-q4_K_M"
-    assert sent["keep_alive"] == "5m"  # warm through a chat session, then unloaded
+    assert sent["keep_alive"] == "30m"  # warm while the chat is open (#317)
+    assert sent["options"]["num_predict"] == 400  # the in-depth cap
+    assert sent["options"]["num_ctx"] == 8192  # the same on every call
     assert sent["stream"] is False
     assert sent["messages"] == [
         {"role": "user", "content": "What did I spend on eating out in May?"}
@@ -206,6 +208,7 @@ def test_default_model_and_keep_alive() -> None:
         "temperature": 0,
         "presence_penalty": 0,
         "num_ctx": 8192,
+        "num_predict": 400,
     }
 
 
@@ -223,6 +226,7 @@ def test_num_ctx_and_seed_set_what_the_benchmark_measures_at() -> None:
         "presence_penalty": 0,
         "num_ctx": 4096,
         "seed": 7,
+        "num_predict": 400,
     }
 
 
