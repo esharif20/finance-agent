@@ -355,3 +355,24 @@ def test_every_reply_offers_chips_the_planner_answers_with_no_call(
         assert model.calls == [] and turns[1].path == "planner", chip
     [open_], _ = run(seeded, ["You spent £92.34 this month."], "Where can I save?")
     assert open_.chips and "Where can I save?" not in open_.chips
+
+
+def test_by_merchant_on_all_spending_names_where_it_went(
+    engine: Engine, tmp_path: Path
+) -> None:
+    seed(engine, ME, tmp_path, DECEMBER + ROWS)
+    with engine.begin() as conn:
+        first = ask(
+            Assistant(FakeChatModel([]), conn, TODAY, prefetch=True),
+            "How much did I spend in December 2025?",
+        )
+        assert "By merchant" in first.chips
+        a = ask(
+            Assistant(FakeChatModel([]), conn, TODAY, prefetch=True),
+            "By merchant",
+            first.thread_id,
+        )
+    assert a.path == "planner", a.reply
+    assert "£112.80" in first.reply and "£112.80" in a.reply
+    assert "Most went to" in a.reply
+    assert "By merchant" not in a.chips
