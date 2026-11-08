@@ -335,6 +335,114 @@
         "title": "BalancesOut",
         "type": "object"
       },
+      "BandOut": {
+        "properties": {
+          "left_out": {
+            "title": "Left Out",
+            "type": "integer"
+          },
+          "lower_minor": {
+            "title": "Lower Minor",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "point_minor": {
+            "title": "Point Minor",
+            "type": "integer"
+          },
+          "recurring_minor": {
+            "title": "Recurring Minor",
+            "type": "integer"
+          },
+          "upper_minor": {
+            "title": "Upper Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "point_minor",
+          "lower_minor",
+          "upper_minor",
+          "recurring_minor",
+          "left_out"
+        ],
+        "title": "BandOut",
+        "type": "object"
+      },
+      "BriefingOut": {
+        "properties": {
+          "forecast": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BandOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/InsightOut"
+            },
+            "title": "Insights",
+            "type": "array"
+          },
+          "insufficient": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Insufficient",
+            "type": "array"
+          },
+          "next_payday": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Payday"
+          },
+          "regret": {
+            "items": {
+              "$ref": "#/components/schemas/RegretItemOut"
+            },
+            "title": "Regret",
+            "type": "array"
+          },
+          "renewals": {
+            "items": {
+              "$ref": "#/components/schemas/RenewalOut"
+            },
+            "title": "Renewals",
+            "type": "array"
+          },
+          "week": {
+            "format": "date",
+            "title": "Week",
+            "type": "string"
+          }
+        },
+        "required": [
+          "week",
+          "insights",
+          "forecast",
+          "next_payday",
+          "renewals",
+          "regret",
+          "insufficient"
+        ],
+        "title": "BriefingOut",
+        "type": "object"
+      },
       "CategoryDetailOut": {
         "properties": {
           "currency": {
@@ -2001,6 +2109,89 @@
         "title": "RateUsedOut",
         "type": "object"
       },
+      "RegretAnswerIn": {
+        "properties": {
+          "worth_it": {
+            "title": "Worth It",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "worth_it"
+        ],
+        "title": "RegretAnswerIn",
+        "type": "object"
+      },
+      "RegretAnswerOut": {
+        "properties": {
+          "transaction_id": {
+            "title": "Transaction Id",
+            "type": "integer"
+          },
+          "worth_it": {
+            "title": "Worth It",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "transaction_id",
+          "worth_it"
+        ],
+        "title": "RegretAnswerOut",
+        "type": "object"
+      },
+      "RegretItemOut": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "posted_on": {
+            "format": "date",
+            "title": "Posted On",
+            "type": "string"
+          },
+          "transaction_id": {
+            "title": "Transaction Id",
+            "type": "integer"
+          },
+          "worth_it": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worth It"
+          }
+        },
+        "required": [
+          "transaction_id",
+          "posted_on",
+          "description",
+          "merchant",
+          "amount",
+          "worth_it"
+        ],
+        "title": "RegretItemOut",
+        "type": "object"
+      },
       "RelevanceOut": {
         "properties": {
           "disliked": {
@@ -2019,6 +2210,35 @@
         "title": "RelevanceOut",
         "type": "object"
       },
+      "RenewalOut": {
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "insight_id": {
+            "title": "Insight Id",
+            "type": "integer"
+          },
+          "merchant": {
+            "title": "Merchant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "insight_id",
+          "merchant",
+          "due_on",
+          "amount_minor"
+        ],
+        "title": "RenewalOut",
+        "type": "object"
+      },
       "RevertOut": {
         "properties": {
           "id": {
@@ -2035,6 +2255,112 @@
           "ledger_version"
         ],
         "title": "RevertOut",
+        "type": "object"
+      },
+      "Risk": {
+        "enum": [
+          "none",
+          "below_buffer",
+          "below_zero"
+        ],
+        "type": "string"
+      },
+      "SimulationOut": {
+        "properties": {
+          "floor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "have": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Have"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "need": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Need"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          },
+          "payday": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payday"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Risk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "payday",
+          "minimum",
+          "on",
+          "risk",
+          "floor",
+          "have",
+          "need"
+        ],
+        "title": "SimulationOut",
         "type": "object"
       },
       "SpendingOut": {
@@ -2677,6 +3003,142 @@
         "summary": "Accounts"
       }
     },
+    "/api/briefing": {
+      "get": {
+        "description": "The briefing for the week holding `on` (today by default).",
+        "operationId": "weekly_api_briefing_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Weekly"
+      }
+    },
+    "/api/briefing/regret": {
+      "delete": {
+        "description": "Wipe every regret answer.",
+        "operationId": "forget_answers_api_briefing_regret_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget Answers"
+      }
+    },
+    "/api/briefing/regret/{transaction_id}": {
+      "post": {
+        "description": "Answer \"worth it?\" on one of the week's regret items; a later answer\nreplaces it. Anything else, including another user's, is not found.",
+        "operationId": "answer_api_briefing_regret__transaction_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegretAnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegretAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer"
+      }
+    },
     "/api/card-art/{key}": {
       "get": {
         "description": "The user's local card image, or 404 so the app draws the generic face.",
@@ -2720,6 +3182,76 @@
           }
         },
         "summary": "Card Image"
+      }
+    },
+    "/api/cash-flow/simulate-purchase": {
+      "get": {
+        "operationId": "simulate_purchase_api_cash_flow_simulate_purchase_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "amount_minor",
+            "required": true,
+            "schema": {
+              "maximum": 10000000000000,
+              "minimum": 1,
+              "title": "Amount Minor",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          },
+          {
+            "in": "query",
+            "name": "buffer_minor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000000000000,
+              "minimum": 0,
+              "title": "Buffer Minor",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Simulate Purchase"
       }
     },
     "/api/categories": {

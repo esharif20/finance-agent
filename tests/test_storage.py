@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0018"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0019"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -563,4 +563,23 @@ def test_migration_0018_adds_insights_and_keeps_rows_that_reference_them(
     eng = round_trip(tmp_path, "0017", "0018", added, rows)
     with eng.begin() as conn, pytest.raises(Exception, match="FOREIGN KEY"):
         conn.execute(text("DELETE FROM insight WHERE id = 1"))
+    eng.dispose()
+
+
+def test_migration_0019_adds_regret_answers_which_go_with_their_transaction(
+    tmp_path: Path,
+) -> None:
+    """0019 (#152) adds regret_answer, nothing rebuilt; an answer points at its
+    Transaction and is deleted with it (as when a synced copy merges)."""
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT INTO regret_answer (user_id, transaction_id, week, worth_it,"
+        " created_at) VALUES (1, 9, '2026-01-05', 1, '2026-01-05')",
+    )
+    eng = round_trip(tmp_path, "0018", "0019", {"regret_answer"}, rows)
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM note"))
+        conn.execute(text('DELETE FROM "transaction" WHERE id = 9'))
+        assert conn.execute(text("SELECT * FROM regret_answer")).all() == []
     eng.dispose()
