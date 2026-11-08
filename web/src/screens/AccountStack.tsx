@@ -390,32 +390,24 @@ export function AccountStack({
         <div role="group" aria-label="Accounts" className="account-rail">
           {all.map((f, i) => {
             const on = f === current;
-            const image = f.art ? cssArt[f.art] : undefined;
             return (
               <button
                 key={f.key}
                 type="button"
                 aria-pressed={on}
                 onClick={() => onSelect(f.id)}
-                className="account-card account-slide text-left"
-                data-front="true"
+                className="account-chip text-left"
                 data-selected={on}
-                data-all={f.id === undefined}
-                data-art={Boolean(image)}
-                style={
-                  {
-                    "--i": i,
-                    ...(f.hue === null ? {} : { "--h": f.hue }),
-                    ...(image ? { backgroundImage: image } : {}),
-                  } as CSSProperties
-                }
+                style={{ "--i": i, ...(f.hue === null ? {} : { "--h": f.hue }) } as CSSProperties}
               >
-                <span data-slot="title" className="min-w-0">
-                  <span className="block truncate text-row font-semibold">{f.title}</span>
-                  {f.masked ? <span className="block text-label opacity-80">{f.masked}</span> : null}
+                <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold">
+                  <span aria-hidden="true" className="account-chip-dot" data-all={f.id === undefined} />
+                  <span className="truncate">{f.title}</span>
+                  {f.masked ? <span className="shrink-0 opacity-70">{f.masked}</span> : null}
                 </span>
-                {f.balance ? <Money value={f.balance} className="account-balance font-semibold" /> : null}
-                {statusOf(f)}
+                {f.balance ? <Money value={f.balance} className="text-row font-semibold" /> : <span className="text-row">–</span>}
+                {/* the status stays in the button's name; only a mismatch shows */}
+                <span className={f.matches === false ? "account-chip-warn" : "sr-only"}>{statusOf(f)}</span>
               </button>
             );
           })}

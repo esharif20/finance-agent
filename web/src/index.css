@@ -985,15 +985,16 @@ html[data-private] .money {
 }
 
 
-/* Phones: the accounts as one row of short cards that snap, the next one peeking (#phone). */
+/* Phones: the accounts as one slim row of chips, a segmented control that filters the
+   Overview; "All accounts" first. The 3D stack is for wider screens. */
 .account-rail {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-inline: -16px;
-  padding: 4px 16px 8px;
+  padding: 2px 16px 6px;
   overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  contain: inline-size; /* its cards never widen the Overview column */
+  scroll-snap-type: x proximity;
+  contain: inline-size; /* its chips never widen the Overview column */
   scroll-padding-inline: 16px;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -1001,40 +1002,62 @@ html[data-private] .money {
 .account-rail::-webkit-scrollbar {
   display: none;
 }
-.account-card.account-slide {
+.account-chip {
+  --h: 200;
   position: relative;
-  flex: 0 0 72%;
-  height: 168px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 9.5rem;
+  max-width: 12rem;
+  min-height: 72px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
   scroll-snap-align: start;
-  will-change: auto;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
-  transition: scale 160ms cubic-bezier(0.23, 1, 0.32, 1), outline-color 160ms ease-out;
-  outline: 2px solid transparent;
-  outline-offset: 2px;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+  transition: scale 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease-out, color 160ms ease-out;
 }
-.account-card.account-slide[data-art="true"] {
-  padding-top: 14px;
+.account-chip[data-selected="true"] {
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: none;
 }
-.account-card.account-slide .account-balance {
-  font-size: 1.625rem;
-  line-height: 1.1;
-}
-.account-card.account-slide[data-selected="true"] {
-  outline-color: var(--foreground);
-}
-.account-card.account-slide:active {
+.account-chip:active {
   scale: 0.98;
 }
+.account-chip-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: oklch(0.55 0.12 var(--h));
+}
+.account-chip-dot[data-all="true"] {
+  background: currentColor;
+  opacity: 0.6;
+}
+.account-chip .money-minor {
+  color: inherit;
+  opacity: 0.7;
+}
+.account-chip-warn > span > span {
+  padding: 0 8px; /* the "Find it" pill, small enough for a chip */
+}
 @media (prefers-reduced-motion: no-preference) {
-  .account-slide {
-    animation: slide-rise 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
-    animation-delay: calc(min(var(--i, 0), 4) * 50ms);
+  .account-chip {
+    animation: chip-rise 360ms cubic-bezier(0.23, 1, 0.32, 1) both;
+    animation-delay: calc(min(var(--i, 0), 4) * 40ms);
   }
 }
-@keyframes slide-rise {
+@keyframes chip-rise {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
 }
 
