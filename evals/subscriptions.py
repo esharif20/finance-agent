@@ -37,7 +37,9 @@ class Case:
     name: str
     gold: bool  # the target rows are a real Subscription
     # (descriptor, posted, minor units out, expected Merchant or None)
-    rows: list[tuple[str, date, int, str | None]] = field(default_factory=list)
+    rows: list[tuple[str, date, int, str | None]] = field(
+        default_factory=list[tuple[str, date, int, str | None]]
+    )
     target: str = ""  # a descriptor of the Subscription's rows, when gold
     charges: int = 0  # paid target charges, for recall at k
 
@@ -107,7 +109,9 @@ def generate(seed: int = SEED) -> list[Case]:
             ["SYNTHFIT PREMIUM", "ACMECLOUD MONTHLY", "SYNTHNEWS RENEWAL",
              "BRIGHTAPP PRO", "QUILLNOTE PLUS"]
         )  # fmt: skip
-        return series(Case("subscription_words", True), desc, n, rnd.randint(299, 999), None)
+        return series(
+            Case("subscription_words", True), desc, n, rnd.randint(299, 999), None
+        )
 
     @case("wallet_tagged")
     def _(n: int) -> Case:
@@ -115,13 +119,17 @@ def generate(seed: int = SEED) -> list[Case]:
             [("CRV*SPOTIFY", "Spotify"), ("WL *NETFLIX.COM", "Netflix"),
              ("CURVE*DISNEY PLUS", "Disney Plus")]
         )  # fmt: skip
-        return series(Case("wallet_tagged", True), desc, n, rnd.randint(599, 1299), want)
+        return series(
+            Case("wallet_tagged", True), desc, n, rnd.randint(599, 1299), want
+        )
 
     @case("trial_then_paid")
     def _(n: int) -> Case:
         c = series(Case("trial_then_paid", True), "SYNTHSTREAM LTD", n, 899, None)
         first = c.rows[0][1]
-        c.rows.append(("SYNTHSTREAM LTD", first - timedelta(7), rnd.choice([0, 100]), None))
+        c.rows.append(
+            ("SYNTHSTREAM LTD", first - timedelta(7), rnd.choice([0, 100]), None)
+        )
         return c
 
     @case("unknown_plain")
@@ -185,7 +193,9 @@ def _judged(rows: list[tuple[str, date, int, str | None]]) -> dict[str, bool]:
     for m, rs in by.items():
         seed = MERCHANTS.get(m)
         out[m] = (
-            judge(m, [d for d, _, _ in rs], [(o, a) for _, o, a in rs], seed and seed[1])
+            judge(
+                m, [d for d, _, _ in rs], [(o, a) for _, o, a in rs], seed and seed[1]
+            )
             is not None
         )
     return out
@@ -247,7 +257,9 @@ def regressions(fresh: dict[str, Any], committed: dict[str, Any]) -> list[str]:
 
 def main(argv: Sequence[str]) -> int:
     fresh = evaluate()
-    committed = json.loads(RESULTS.read_text()) if RESULTS.exists() else {}
+    committed: dict[str, Any] = (
+        json.loads(RESULTS.read_text()) if RESULTS.exists() else {}
+    )
     if "--baseline" in argv or "--write" in argv:
         key = "baseline" if "--baseline" in argv else "detector"
         RESULTS.write_text(json.dumps({**committed, key: fresh}, indent=2) + "\n")

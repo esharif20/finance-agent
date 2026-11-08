@@ -222,7 +222,7 @@ def split_parts(total_minor: int, amounts: Sequence[int | None]) -> list[int]:
 # Subscription registry (#103). kind -> the top-level Category its groups come from
 REGISTRY_KINDS = {"subscription": "Subscriptions", "bill": "Bills"}
 DETECTED_REASONS = ("known_service", "pattern")  # user_confirmed, user_added: user only
-DETECTED_STATUSES = ("suggested", "active")  # suggested: ask "Is this a subscription?"
+DETECTED_STATUSES = ("suggested", "likely", "active")  # suggested: ask; likely: #310
 INTERVALS = ("weekly", "monthly", "annual")
 NOT_SUBSCRIPTION = "not_subscription"  # a negative entry
 USER_CANCELLED = "user_cancelled"  # the user cancelled it; a further charge is a flag

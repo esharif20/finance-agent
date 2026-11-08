@@ -52,23 +52,23 @@
   "models": {
     "rules": {
       "model": "corrections+rules",
-      "model_version": "rules-30039f8f0065",
+      "model_version": "rules-ae78f5ad0e85",
       "metrics": {
-        "macro_f1": 0.918959,
+        "macro_f1": 0.935609,
         "ece": 0.005515,
-        "ece_assigned": 0.006263,
-        "accuracy": 0.875,
-        "coverage": 0.880515,
+        "ece_assigned": 0.006148,
+        "accuracy": 0.891544,
+        "coverage": 0.897059,
         "Bills / Council tax.precision": 1.0,
         "Bills / Council tax.recall": 1.0,
         "Bills / Energy.precision": 1.0,
-        "Bills / Energy.recall": 0.75,
+        "Bills / Energy.recall": 0.85,
         "Bills / Insurance.precision": 1.0,
         "Bills / Insurance.recall": 1.0,
         "Bills / Other bills.precision": 1.0,
         "Bills / Other bills.recall": 1.0,
         "Bills / Phone & broadband.precision": 1.0,
-        "Bills / Phone & broadband.recall": 0.928571,
+        "Bills / Phone & broadband.recall": 0.964286,
         "Bills / Rent or mortgage.precision": 1.0,
         "Bills / Rent or mortgage.recall": 1.0,
         "Bills / Water.precision": 1.0,
@@ -82,7 +82,7 @@
         "Food & Drink / Coffee.precision": 1.0,
         "Food & Drink / Coffee.recall": 0.842105,
         "Food & Drink / Eating out.precision": 1.0,
-        "Food & Drink / Eating out.recall": 0.714286,
+        "Food & Drink / Eating out.recall": 0.761905,
         "Food & Drink / Groceries.precision": 1.0,
         "Food & Drink / Groceries.recall": 0.911111,
         "Food & Drink / Takeaway.precision": 1.0,
@@ -96,9 +96,9 @@
         "Housing / Maintenance.precision": 1.0,
         "Housing / Maintenance.recall": 0.714286,
         "Personal care / Hair & beauty.precision": 1.0,
-        "Personal care / Hair & beauty.recall": 0.6,
+        "Personal care / Hair & beauty.recall": 0.7,
         "Personal care / Toiletries.precision": 1.0,
-        "Personal care / Toiletries.recall": 0.6,
+        "Personal care / Toiletries.recall": 0.8,
         "Shopping / Clothing.precision": 1.0,
         "Shopping / Clothing.recall": 0.708333,
         "Shopping / Electronics.precision": 1.0,
@@ -112,7 +112,7 @@
         "Subscriptions / Cloud storage.precision": 1.0,
         "Subscriptions / Cloud storage.recall": 1.0,
         "Subscriptions / Memberships.precision": 1.0,
-        "Subscriptions / Memberships.recall": 0.6,
+        "Subscriptions / Memberships.recall": 0.8,
         "Subscriptions / Other subscriptions.precision": 1.0,
         "Subscriptions / Other subscriptions.recall": 1.0,
         "Subscriptions / Software.precision": 1.0,
@@ -128,9 +128,9 @@
         "Transport / Taxi.precision": 1.0,
         "Transport / Taxi.recall": 1.0,
         "Travel / Flights.precision": 1.0,
-        "Travel / Flights.recall": 0.916667,
+        "Travel / Flights.recall": 1.0,
         "Travel / Holidays.precision": 1.0,
-        "Travel / Holidays.recall": 0.666667,
+        "Travel / Holidays.recall": 0.833333,
         "Travel / Hotels.precision": 1.0,
         "Travel / Hotels.recall": 0.933333
       },
@@ -145,7 +145,7 @@
         },
         "noise": {
           "rows": 148,
-          "accuracy": 0.824324
+          "accuracy": 0.885135
         },
         "refund": {
           "rows": 12,
@@ -169,10 +169,10 @@
       "model": "corrections+rules+nearest-neighbour",
       "model_version": "hashed-trigrams-v1",
       "metrics": {
-        "macro_f1": 0.904158,
-        "ece": 0.025336,
-        "ece_assigned": 0.02543,
-        "accuracy": 0.926471,
+        "macro_f1": 0.900699,
+        "ece": 0.02964,
+        "ece_assigned": 0.029749,
+        "accuracy": 0.920956,
         "coverage": 0.996324,
         "Bills / Council tax.precision": 0.733333,
         "Bills / Council tax.recall": 1.0,
@@ -239,8 +239,8 @@
         "Transport / Parking.precision": 0.857143,
         "Transport / Parking.recall": 1.0,
         "Transport / Public transport.precision": 1.0,
-        "Transport / Public transport.recall": 1.0,
-        "Transport / Taxi.precision": 1.0,
+        "Transport / Public transport.recall": 0.918919,
+        "Transport / Taxi.precision": 0.842105,
         "Transport / Taxi.recall": 1.0,
         "Travel / Flights.precision": 0.75,
         "Travel / Flights.recall": 1.0,
@@ -251,10 +251,10 @@
       },
       "calibration": {
         "target_precision": 0.95,
-        "threshold": 817,
-        "precision": 0.961538,
-        "coverage": 0.4,
-        "rows": 65
+        "threshold": 856,
+        "precision": 1.0,
+        "coverage": 0.267857,
+        "rows": 56
       },
       "by_case": {
         "clean": {
@@ -283,7 +283,7 @@
         },
         "unseen": {
           "rows": 48,
-          "accuracy": 0.583333
+          "accuracy": 0.520833
         }
       }
     }

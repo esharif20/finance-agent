@@ -14,14 +14,16 @@ import re
 from bisect import insort
 from collections import Counter
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from fractions import Fraction
 from typing import Literal
 
 from finance_agent.categorise.recurring import (
     CADENCES,
+    MIN_CHARGES,
     TOLERANCE_PCT,
+    Recurrence,
     detect_recurring,
 )
 from finance_agent.ledger import (
@@ -77,6 +79,8 @@ KNOWN_SERVICES: dict[str, tuple[str, str]] = {
     "OpenAI": (SUB, "AI tools"),
     "Anthropic": (SUB, "AI tools"),
     "Midjourney": (SUB, "AI tools"),
+    "Google AI Pro": (SUB, "AI tools"),
+    "Google Colab": (SUB, "AI tools"),
     "PureGym": (SUB, "Memberships"),
     "The Gym Group": (SUB, "Memberships"),
     "The Economist": (SUB, "Memberships"),
@@ -187,23 +191,76 @@ class Detection:
     interval: str | None
 
 
+# Plan words (#310), after a name only: "BRIGHTAPP PRO" is a plan, "PRO
+# CYCLES" a shop. MEMBERSHIP and SUBSCRIPTION are in PATTERNS.
+TIER = re.compile(r"(?<=\S) (?:PREMIUM|PLUS|PRO|MONTHLY|RENEWAL)\b")
+TRIAL_FOLLOW_DAYS = 45  # a £0-£1 authorisation, then a full charge this soon
+
+
+def _bands(paid: list[tuple[date, int]]) -> list[list[tuple[date, int]]]:
+    """Charges split into amount bands, each within the detector's ±5% of its
+    smallest charge, so a one-off never breaks a series at another price."""
+    out: list[list[tuple[date, int]]] = []
+    for d, a in sorted(paid, key=lambda x: (x[1], x[0])):
+        if out and _close(a, out[-1][0][1]):
+            out[-1].append((d, a))
+        else:
+            out.append([(d, a)])
+    return out
+
+
+def _series(
+    histories: Iterable[list[tuple[date, int]]], min_charges: int
+) -> Recurrence | None:
+    """The latest series in any amount band of any history, or in a history
+    as a whole (a price step spans two bands)."""
+    found = [
+        r
+        for h in histories
+        for b in (*_bands(h), h)
+        if (r := detect_recurring(b, min_charges=min_charges))
+    ]
+    return max(found, key=lambda r: (r.last_on, r.charge_count), default=None)
+
+
+def _trial_then_paid(charges: list[tuple[date, int]]) -> bool:
+    small = [d for d, a in charges if 0 <= a <= TRIAL_MAX_MINOR]
+    full = [d for d, a in charges if a > TRIAL_MAX_MINOR]
+    return any(0 < (f - s).days <= TRIAL_FOLLOW_DAYS for s in small for f in full)
+
+
 def judge(
     merchant: str,
     descriptions: Iterable[str],
     charges: Iterable[tuple[date, int]],
     category: tuple[str, str] | None = None,
+    accounts: Iterable[Iterable[tuple[date, int]]] = (),
 ) -> Detection | None:
     """Pure recognition for one Merchant: its name, its rows' raw descriptors,
-    its GBP charges (posted date, minor units, money out) and its Category."""
-    rec = detect_recurring(charges)
+    its charges in one currency (posted date, minor units out; £0
+    authorisations included), its Category, and the same charges split by
+    Account, so one service paid from two cards still forms a series.
+
+    A first-charge signal (a known service, a subscription word, a trial
+    authorisation then a charge) makes it likely; a second charge in the same
+    amount band at a cadence makes it active (#310). Without a signal, three
+    charges in a series suggest it (the ADR 0015 gate)."""
+    charges = list(charges)
+    paid = [(d, a) for d, a in charges if a > 0]
+    histories = [paid, *([(d, a) for d, a in h if a > 0] for h in accounts)]
+    descriptions = [d.upper() for d in descriptions if d.isascii()]
     known = known_service(merchant)
     group = next((g for d in descriptions if (g := pattern_group(d))), None)
-    if known:
-        _, kind, group = known
-        reason, status = "known_service", "active"
-    elif group:
-        kind, reason, status = SUB, "pattern", "suggested"
-    elif rec:
+    if group is None and any(TIER.search(d) for d in descriptions):
+        group = "Other subscriptions"
+    if known or group or _trial_then_paid(charges):
+        rec = _series(histories, 2)
+        kind, group = (
+            (known[1], known[2]) if known else (SUB, group or "Other subscriptions")
+        )
+        reason = "known_service" if known else "pattern"
+        status = "active" if rec else "likely"
+    elif rec := _series(histories, MIN_CHARGES):
         top, leaf = category or ("", "")
         kind = _KIND_OF_TOP.get(top, SUB)
         group = leaf if top in _KIND_OF_TOP else "Other subscriptions"
@@ -224,20 +281,27 @@ def recognise(led: Ledger) -> int:
     """Record a detection for every Merchant whose Spending is recognised;
     returns how many registry entries were written."""
     by_merchant = _merchant_spending(led)
-    gbp: dict[int, list[tuple[date, int]]] = {}
-    for ch in _charges(led):  # a charge still needing a rate is not comparable
-        if ch.currency == "GBP":
-            gbp.setdefault(ch.merchant_id, []).append((ch.posted_on, ch.minor))
+    charges: dict[int, list[Charge]] = {}
+    for ch in _charges(led):
+        charges.setdefault(ch.merchant_id, []).append(ch)
     written = 0
     for merchant_id, ts in sorted(by_merchant.items()):
         c = ts[0].categorisation
         if c is None or c.merchant is None:  # filtered above; for the type checker
             continue
+        # a charge still needing a rate is not comparable (#187)
+        same = [x for x in charges.get(merchant_id, []) if x.currency == "GBP"]
+        by_account: dict[int, list[tuple[date, int]]] = {}
+        for x in same:
+            by_account.setdefault(x.account_id, []).append((x.posted_on, x.minor))
         d = judge(
             c.merchant,
             [t.description for t in ts],
-            gbp.get(merchant_id, []),
+            # £0 card authorisations count for the trial signal only
+            [(x.posted_on, x.minor) for x in same]
+            + [(t.posted_on, 0) for t in ts if t.amount == 0 and t.currency == "GBP"],
             c.category,
+            by_account.values() if len(by_account) > 1 else (),
         )
         if d is None:
             continue
@@ -258,7 +322,7 @@ def recognise(led: Ledger) -> int:
 # --- Status and monthly cost (#105) ------------------------------------------
 
 GRACE_DAYS = {"weekly": 2, "monthly": 5, "annual": 15}
-COUNTED = ("active", "overdue")  # lapsed, cancelled and suggested never count
+COUNTED = ("active", "overdue")  # lapsed, cancelled, suggested, likely never count
 RECENT_DAYS = 365  # a price rise or trial conversion older than this is no flag
 TRIAL_MAX_MINOR = 100  # a first charge of £1 or less from a trial service
 # shortcut: usual free-trial days of the known services that run one, from
@@ -330,6 +394,11 @@ class CostSummary:
     kind_totals: dict[str, Fraction]  # kind -> exact pence a month
     group_totals: dict[tuple[str, str], Fraction]  # (kind, group) -> exact pence
     rate_needed: int  # listed items left out of totals for want of an FX rate
+    # likely (#310) items' exact pence a month, never in the totals above
+    likely_monthly: Fraction = Fraction(0)
+    platforms: dict[int, str] = field(
+        default_factory=dict[int, str]
+    )  # Merchant id -> platform
 
 
 def display(pence: Fraction) -> int:
@@ -379,6 +448,8 @@ def _interval(
         return loose, "estimated"
     if known := known_service(e.merchant):
         return CATALOGUE_INTERVAL.get(known[0], "monthly"), "catalogue"
+    if e.status == "likely":  # a first-charge guess: most plans are monthly
+        return "monthly", "estimated"
     return None, None
 
 
@@ -387,14 +458,16 @@ def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> Subscript
     # only GBP amounts are comparable: a charge still needing a rate stays out
     gbp = sorted((c.posted_on, c.minor) for c in charges if c.currency == "GBP")
     interval, source = _interval(e, gbp)
-    status = {"user_cancelled": "cancelled", "suggested": "suggested"}.get(
-        e.status, "active"
-    )
-    if status == "active" and last and interval:
+    status = {
+        "user_cancelled": "cancelled",
+        "suggested": "suggested",
+        "likely": "likely",
+    }.get(e.status, "active")
+    if status in ("active", "likely") and last and interval:
         grace = timedelta(GRACE_DAYS[interval])
         if today > _due(last.posted_on, interval, 2) + grace:
-            status = "lapsed"
-        elif today > _due(last.posted_on, interval, 1) + grace:
+            status = "lapsed"  # a likely guess never charged again is no longer new
+        elif status == "active" and today > _due(last.posted_on, interval, 1) + grace:
             status = "overdue"
     monthly, note = None, None
     if last is None:
@@ -505,7 +578,11 @@ def subscription_costs(
             groups[g] = groups.get(g, Fraction(0)) + x.monthly
     items = _shared_flags(items, by_merchant)
     rate_needed = sum(x.cost_note == "rate_needed" for x in items)
-    return CostSummary(items, kinds, groups, rate_needed)
+    likely = sum(
+        (x.monthly for x in items if x.status == "likely" and x.monthly is not None),
+        Fraction(0),
+    )
+    return CostSummary(items, kinds, groups, rate_needed, likely)
 
 
 def _shared_flags(
@@ -565,8 +642,23 @@ def _charges(led: Ledger) -> list[Charge]:
 
 
 def costs(led: Ledger, today: date) -> CostSummary:
-    """`subscription_costs` over the Ledger's registry and Spending charges."""
+    """`subscription_costs` over the Ledger's registry and Spending charges,
+    with the platform each Merchant's latest charge went through."""
+    from finance_agent.categorise import platform  # the package imports us
+
     s = subscription_costs(led.subscriptions(), _charges(led), today)
+    latest = {
+        m: max(ts, key=lambda t: t.posted_on).description
+        for m, ts in _merchant_spending(led).items()
+    }
+    s = replace(
+        s,
+        platforms={
+            x.entry.merchant_id: p
+            for x in s.items
+            if (p := platform(latest.get(x.entry.merchant_id, "")))
+        },
+    )
     counted = sum(x.counted for x in s.items)
     flagged = sum(bool(x.flags) for x in s.items)
     log.info(
