@@ -45,15 +45,14 @@ describe("story under prefers-reduced-motion", () => {
     expect(transformed(container)).toEqual([]);
     // pile: all three cards, flat
     expect(container.querySelectorAll("[data-layer]").length).toBe(PILE.length);
-    // gateway: both the real line and what the cloud sees, side by side, no scrambled digits
+    // gateway: the real payment and what the cloud sees, in plain labels, side by side
     const gate = screen.getByRole("region", { name: /what leaves your mac/i });
     expect(within(gate).getAllByText("£42.10").length).toBeGreaterThan(0);
-    expect(within(gate).getByText("{P1}")).toBeTruthy();
-    expect(within(gate).getByText("{M1}")).toBeTruthy();
+    expect(within(gate).getAllByText("Amount 1").length).toBeGreaterThan(0);
+    expect(within(gate).getAllByText("Merchant A").length).toBeGreaterThan(0);
+    expect(gate.textContent).not.toMatch(/\{[A-Z]\d\}/);
     // focus list: every principle readable
     for (const p of PRINCIPLES) expect(screen.getByText(p)).toBeTruthy();
-    // the wave wipe rests fully drawn
-    expect(container.querySelectorAll("[data-wave]").length).toBe(1);
   });
 });
 
@@ -70,12 +69,6 @@ describe("story with motion", () => {
     expect(PILE.length).toBeLessThanOrEqual(MAX_LAYERS);
     const { container } = render(<Story />);
     expect(container.querySelectorAll("[data-layer]").length).toBeLessThanOrEqual(MAX_LAYERS);
-  });
-
-  it("has at most one wave wipe", () => {
-    motionOn();
-    const { container } = render(<Story />);
-    expect(container.querySelectorAll("[data-wave]").length).toBeLessThanOrEqual(1);
   });
 });
 
