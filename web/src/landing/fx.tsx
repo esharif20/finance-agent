@@ -13,6 +13,12 @@ export function finePointer() {
   return typeof window.matchMedia === "function" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
+/** Phones and tablets get no WebGL on the landing page: the CSS cards stand in, and the GPU
+    memory a WebGL context holds is what made iOS kill the tab on fast scrolls. */
+export function liteDevice() {
+  return typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse), (max-width: 899.98px)").matches;
+}
+
 export const useStill = () => useState(prefersReducedMotion)[0];
 
 /** Letters that roll up to a copy of themselves on hover or focus (CSS only). */

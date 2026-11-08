@@ -6,7 +6,7 @@ import type { Pose } from "@/lib/cardPoses";
 import { formatMoney } from "@/lib/money";
 import type { CardScene } from "@/three/cardScene";
 import { ACCOUNTS } from "./accounts.fixture";
-import { Field, finePointer, Flex, Magnetic, Roll, useStill } from "./fx";
+import { Field, finePointer, Flex, liteDevice, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
 import { OVERVIEW, REVIEW } from "./story/story.fixture";
 import "./hero.css";
@@ -68,7 +68,9 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
 function webgl() {
   try {
     const c = document.createElement("canvas");
-    return Boolean(c.getContext("webgl2") ?? c.getContext("webgl"));
+    const gl = c.getContext("webgl2") ?? c.getContext("webgl");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext(); // the probe gives its context back at once
+    return Boolean(gl);
   } catch {
     return false;
   }
@@ -298,7 +300,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const offP = p.on("change", kick);
     window.addEventListener("pointermove", move);
     window.addEventListener("resize", resize);
-    if (canvas.current && webgl()) {
+    if (canvas.current && !liteDevice() && webgl()) {
       import("@/three/cardScene")
         .then(({ createCardScene }) => {
           if (!alive || !canvas.current) return;
