@@ -704,6 +704,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review-queue/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answers
+         * @description Answer many Category items in one transaction: each exactly as the
+         *     single answer would, all or none. A stale or missing item refuses the lot
+         *     with 409 and its ids. Replaying a batch finds its items gone and applies
+         *     nothing.
+         */
+        post: operations["answers_api_review_queue_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review-queue/undo": {
         parameters: {
             query?: never;
@@ -715,7 +738,7 @@ export interface paths {
         put?: never;
         /**
          * Undo
-         * @description Undo the latest answer or skip.
+         * @description Undo the latest answer or skip; `count` undoes a whole batch.
          */
         post: operations["undo_api_review_queue_undo_post"];
         delete?: never;
@@ -1125,6 +1148,23 @@ export interface components {
             accounts: components["schemas"]["AccountGbpOut"][];
             total: components["schemas"]["Money"] | null;
         };
+        /** BatchAnswerIn */
+        BatchAnswerIn: {
+            /** Category */
+            category: [
+                string,
+                string
+            ];
+            /** Id */
+            id: string;
+            /** Version */
+            version: string;
+        };
+        /** BatchIn */
+        BatchIn: {
+            /** Answers */
+            answers: components["schemas"]["BatchAnswerIn"][];
+        };
         /** BriefingOut */
         BriefingOut: {
             forecast: components["schemas"]["finance_agent__api__briefing__BandOut"] | null;
@@ -1402,12 +1442,16 @@ export interface components {
         ItemOut: {
             /** Choices */
             choices: string[];
+            /** Currency */
+            currency: string;
             /** Id */
             id: string;
             /** Merchant Id */
             merchant_id: number | null;
             /** Skipped */
             skipped: boolean;
+            /** Spend Minor */
+            spend_minor: number;
             /** Suggestions */
             suggestions: [
                 string,
@@ -1638,6 +1682,11 @@ export interface components {
         };
         /** QueueOut */
         QueueOut: {
+            /**
+             * Applied
+             * @default 0
+             */
+            applied: number;
             /** Items */
             items: components["schemas"]["ItemOut"][];
             /** Ledger Version */
@@ -1813,6 +1862,13 @@ export interface components {
             parts: components["schemas"]["PartOut"][];
             /** Transaction Id */
             transaction_id: number;
+        };
+        /** StaleOut */
+        StaleOut: {
+            /** Message */
+            message: string;
+            /** Stale Ids */
+            stale_ids: string[];
         };
         /** SubscriptionOut */
         SubscriptionOut: {
@@ -3112,9 +3168,53 @@ export interface operations {
             };
         };
     };
-    undo_api_review_queue_undo_post: {
+    answers_api_review_queue_answers_post: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description nothing was applied */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_api_review_queue_undo_post: {
+        parameters: {
+            query?: {
+                count?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3128,6 +3228,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
