@@ -144,6 +144,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const rows = useRef<HTMLUListElement>(null);
+  const spotEl = useRef<HTMLSpanElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
   const [three, setThree] = useState(false);
@@ -183,6 +184,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
+    // render on demand: the loop runs only while something moves, and sleeps when the scroll,
+    // the pointer tilt and the deal have all settled
+    let lastP = -1;
+    let drawn = false;
+    let spot = "";
     const sizeScene = () => {
       dims = size();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
@@ -192,6 +198,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (!alive || !visible) return;
       tilt.x += (aim.x - tilt.x) * 0.08;
       tilt.y += (aim.y - tilt.y) * 0.08;
+      const settling = Math.abs(aim.x - tilt.x) + Math.abs(aim.y - tilt.y) > 0.0005;
       const { w, narrow } = dims;
       const now = performance.now();
       if (playing.current && !dealt) dealt = now;
@@ -204,8 +211,12 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const pv = p.get();
       // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
       if (rows.current) rows.current.style.transform = `translate3d(${tilt.x * -40}px, ${-pv * 22 + tilt.y * -24}vh, ${-260 - pv * 200}px)`;
-      el.style.setProperty("--sx", `${((aim.x + 0.5) * 100).toFixed(1)}%`);
-      el.style.setProperty("--sy", `${((aim.y + 0.5) * 100).toFixed(1)}%`);
+      // the spotlight's position goes on the spot alone, so a pointer move restyles one element
+      const at = `${((aim.x + 0.5) * 100).toFixed(1)}% ${((aim.y + 0.5) * 100).toFixed(1)}%`;
+      if (at !== spot && spotEl.current) {
+        spot = at;
+        spotEl.current.style.setProperty("--sxy", at);
+      }
       const sweep = clamp01((since - 700) / 1500);
       const sweeping = sweep > 0 && sweep < 1;
       poses.forEach((q, i) => {
@@ -229,8 +240,15 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           poses.map(() => null),
         );
         scene.render();
+        if (!drawn) {
+          drawn = true;
+          el.dataset.drawn = ""; // the canvas fades in over the CSS cards only once it has a frame
+        }
       }
-      raf = requestAnimationFrame(frame);
+      const dealing = !dealt || since < 200 + 2 * 140 + 1500 + 700;
+      const moving = Math.abs(pv - lastP) > 0.00005;
+      lastP = pv;
+      if (dealing || moving || settling || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
       if (!raf) raf = requestAnimationFrame(frame);
@@ -244,8 +262,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (e.pointerType !== "mouse") return;
       aim.x = e.clientX / window.innerWidth - 0.5;
       aim.y = e.clientY / window.innerHeight - 0.5;
+      kick();
     };
-    const resize = () => sizeScene();
+    const resize = () => {
+      sizeScene();
+      kick();
+    };
+    const offP = p.on("change", kick);
     window.addEventListener("pointermove", move);
     window.addEventListener("resize", resize);
     if (canvas.current && webgl()) {
@@ -259,12 +282,14 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
             "#000000",
           );
           setThree(true);
+          kick();
         })
         .catch(() => setThree(false)); // the CSS cards stay
     }
     kick();
     return () => {
       alive = false;
+      offP();
       cancelAnimationFrame(raf);
       io.disconnect();
       window.removeEventListener("pointermove", move);
@@ -321,7 +346,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
               ))}
             </ul>
             <canvas ref={canvas} className="lp-stage-canvas" />
-            <span className="lp-spot" aria-hidden="true" />
+            <span ref={spotEl} className="lp-spot" aria-hidden="true" />
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot">
                 <CardFace i={i} name={a.name} />
