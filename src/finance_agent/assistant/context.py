@@ -286,13 +286,17 @@ def writer(
     history: Sequence[dict[str, str]],
     today: date,
     topics: Sequence[str] = (),
+    profile: str = "",
 ) -> list[Message]:
-    """The writer call's prompt, append-only: the stable prefix (system, then
-    Memories), the summary, the last turns, then the question. The facts go in
+    """The writer call's prompt, append-only: the stable prefix (system, the
+    financial profile of #327, then Memories), the summary, the last turns,
+    then the question. The facts go in
     just before the question (graph.py), so everything before them is reused
     from Ollama's KV cache."""
     system = f"{SYSTEM['common']} {WRITER} Today is {today.isoformat()}."
     msgs = [Message(role="system", content=system)]
+    if profile:  # rebuilt after each sync, so stable across a conversation
+        msgs.append(Message(role="system", content=profile))
     if (m := memories_slot(relevant(memories, message))) is not None:
         msgs.append(m)
     older = topics[: max(len(topics) - TURNS, 0)]

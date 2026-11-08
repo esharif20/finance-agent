@@ -1,0 +1,82 @@
+{
+  "harness": "assistant_conversations",
+  "dataset_version": 1,
+  "dataset_sha256": "a80c118c4cce851f26f2a86fa1b966caff8efbeb561e82ccafb8d359507762f2",
+  "conversations": 4,
+  "turns": 20,
+  "prompt_sha256": "6419f08196342447ad5572e24b63b4982c988b196840c0f52c2947b414574497",
+  "models": {
+    "fake_writer": {
+      "classes": {
+        "balance": {
+          "turns": 2,
+          "llm_calls_per_question": 0.0,
+          "pass_rate": 1.0
+        },
+        "clarify": {
+          "turns": 1,
+          "llm_calls_per_question": 0.0,
+          "pass_rate": 1.0
+        },
+        "figure": {
+          "turns": 4,
+          "llm_calls_per_question": 0.0,
+          "pass_rate": 1.0
+        },
+        "follow_up": {
+          "turns": 6,
+          "llm_calls_per_question": 0.0,
+          "pass_rate": 1.0
+        },
+        "in_depth": {
+          "turns": 2,
+          "llm_calls_per_question": 1.0,
+          "pass_rate": 1.0
+        },
+        "miss": {
+          "turns": 1,
+          "llm_calls_per_question": 3.0,
+          "pass_rate": 1.0
+        },
+        "near_miss": {
+          "turns": 1,
+          "llm_calls_per_question": 2.0,
+          "pass_rate": 1.0
+        },
+        "open": {
+          "turns": 3,
+          "llm_calls_per_question": 1.0,
+          "pass_rate": 1.0
+        }
+      },
+      "metrics": {
+        "pass_rate": 1.0,
+        "writer_prompt_growth": 1.518,
+        "misses": 2,
+        "map_proxy_with_map": 1,
+        "map_proxy_without_map": 0,
+        "writer_prompt_tokens_turn_0": 488.0,
+        "writer_prompt_tokens_turn_1": 504.0,
+        "writer_prompt_tokens_turn_2": 567.0,
+        "writer_prompt_tokens_turn_4": 744.5,
+        "balance_llm_calls_per_question": 0.0,
+        "balance_pass_rate": 1.0,
+        "clarify_llm_calls_per_question": 0.0,
+        "clarify_pass_rate": 1.0,
+        "figure_llm_calls_per_question": 0.0,
+        "figure_pass_rate": 1.0,
+        "follow_up_llm_calls_per_question": 0.0,
+        "follow_up_pass_rate": 1.0,
+        "in_depth_llm_calls_per_question": 1.0,
+        "in_depth_pass_rate": 1.0,
+        "miss_llm_calls_per_question": 3.0,
+        "miss_pass_rate": 1.0,
+        "near_miss_llm_calls_per_question": 2.0,
+        "near_miss_pass_rate": 1.0,
+        "open_llm_calls_per_question": 1.0,
+        "open_pass_rate": 1.0
+      },
+      "failures": []
+    }
+  }
+}

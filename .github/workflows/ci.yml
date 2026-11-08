@@ -70,7 +70,9 @@ jobs:
           uv run python evals/changepoint.py
           uv run python evals/search.py
       - name: assistant benchmark on FakeChatModel (results reproduce)
-        run: uv run python evals/assistant_bench.py
+        run: |
+          uv run python evals/assistant_bench.py
+          uv run python evals/assistant_conversations.py
 
   web:
     name: web

@@ -34,6 +34,7 @@ from finance_agent.assistant.grounding import (
 )
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut, spend
 from finance_agent.assistant.tools.read import (
+    Data,
     FindTransactionsOut,
     Source,
     SpendingSummaryIn,
@@ -49,7 +50,8 @@ MAX_FETCHES = 3  # one parallel round for an open or in-depth question
 TOP = 3  # merchants named in a breakdown
 _STRICT = ConfigDict(extra="forbid", frozen=True)
 
-type Kind = Literal["figure", "income", "big", "open", "in_depth"]
+type Kind = Literal["figure", "income", "big", "balances", "open", "in_depth"]
+type Ask = Literal["overdraft", "savings", "net", "balance"]
 
 
 class Plan(BaseModel):
@@ -66,6 +68,7 @@ class Plan(BaseModel):
     compare: rs.Compare | None = None
     group: Literal["merchant"] | None = None
     currency: str | None = None
+    asks: Ask | None = None  # a balances Plan: which question about them
     labels: tuple[str, ...] = ()  # every resolution, shown with the answer
 
     @property
@@ -161,15 +164,19 @@ def figure(
         return None
     kind: Kind
     if _INCOME.search(m):
+        body = _INCOME.sub("", m)
         r, kind = rs.resolve(m, today, led, memories), "income"
         r.income = True
     elif fm := _FIGURE.match(m):
-        r = rs.resolve(f"{fm['what'] or ''} {fm['rest']}", today, led, memories)
+        body = f"{fm['what'] or ''} {fm['rest']}"
+        r = rs.resolve(body, today, led, memories)
         kind = "income" if r.income else "big" if r.threshold_minor else "figure"
     else:
         return None
     if r.question:
         return Clarify(r.question)
+    if rs.unresolved(body, r):
+        return None  # a word no resolver read: the model, which may ask
     one_month = r.period is not None and len(set(r.period.months())) == 1
     if kind == "figure" and not (r.categories or r.merchant_ids or one_month):
         return None  # a total over several months: the model
@@ -529,3 +536,140 @@ def values(plan: Plan, led: Ledger) -> list[ToolValue]:
     if plan.compare == "median3":
         r.value("months", 3)
     return r.values
+
+
+# --- balances (0 calls) --------------------------------------------------------
+
+_BALANCE = re.compile(
+    r"\b(?P<over>overdraft|overdrawn|in the red|in debt on my (?:current )?account)\b"
+    r"|\b(?P<net>net worth)\b"
+    r"|\bhow much (?:is|have i got|do i have) in my (?P<sav>savings?)\b"
+    r"|\b(?:my )?(?P<sav2>savings?) balance\b"
+    r"|\bwhat(?:'s| is| are) my (?:account )?balances?\b|\bmy balances?\b"
+    r"|\bhow much (?:money )?(?:do i have|have i got)\b",
+    re.I,
+)
+
+
+def balances_plan(message: str, today: date) -> Plan | None:
+    """'how much overdraft am I in', 'what's my balance', 'am I in the red',
+    'how much is in my savings', 'net worth': the Accounts' Bank balances."""
+    m = _BALANCE.search(" ".join(message.split()))
+    if m is None or _WRITE.search(message):
+        return None
+    asks: Ask = (
+        "overdraft"
+        if m["over"]
+        else "net"
+        if m["net"]
+        else "savings"
+        if m["sav"] or m["sav2"]
+        else "balance"
+    )
+    return Plan(kind="balances", since=today, until=today, asks=asks)
+
+
+class BalanceRow(BaseModel):
+    model_config = _STRICT
+    evidence_id: str
+    account: Data  # the Bank and the Account's own name: user text
+    kind: str
+    balance: ToolMoney | None  # the Bank's last running balance
+    overdrawn_by: ToolMoney | None  # positive, when the balance is below zero
+    as_of: date | None  # the newest statement or sync that holds it
+
+
+class BalancesOut(BaseModel):
+    model_config = _STRICT
+    evidence_id: str
+    rows: list[BalanceRow]
+    overdrawn: ToolMoney  # the overdrawn Accounts' total, in GBP
+    total: ToolMoney | None  # every GBP balance, when all are known
+
+
+def balances(src: Source) -> BalancesOut:
+    """Each Account's Bank balance, as /api/accounts shows it. No overdraft
+    limit is in the data, so none is ever stated."""
+    led = Ledger(src.conn, src.user_id)
+    synced = led.sync_status().last_sync_at
+    rows: list[BalanceRow] = []
+    for a in led.accounts():
+        bal = None if a.bank_balance is None else int(a.bank_balance.scaleb(2))
+        seen = a.last_import or synced
+        rows.append(
+            BalanceRow(
+                evidence_id=f"account:{a.id}",
+                account=Data(data=_account_name(a.bank, a.name, a.kind)),
+                kind=a.kind,
+                balance=None
+                if bal is None
+                else ToolMoney(minor=bal, currency=a.currency),
+                overdrawn_by=ToolMoney(minor=-bal, currency=a.currency)
+                if bal is not None and bal < 0
+                else None,
+                as_of=seen.date() if seen else None,
+            )
+        )
+    gbp = [r for r in rows if r.balance and r.balance.currency == CURRENCY]
+    over = sum(r.overdrawn_by.minor for r in gbp if r.overdrawn_by)
+    whole = len(gbp) == len(rows) and all(r.balance for r in rows)
+    total = sum(r.balance.minor for r in gbp if r.balance)
+    return BalancesOut(
+        evidence_id="balances",
+        rows=rows,
+        overdrawn=ToolMoney(minor=over, currency=CURRENCY),
+        total=ToolMoney(minor=total, currency=CURRENCY) if whole and rows else None,
+    )
+
+
+def _as_of(r: BalanceRow) -> str:
+    return f" (balance as of {format_figure(r.as_of)})" if r.as_of else ""
+
+
+NO_LIMIT = "I don't know your overdraft limit, so I can't say how much of it is left."
+
+
+def render_balances(plan: Plan, out: BalancesOut) -> str:
+    known = [r for r in out.rows if r.balance is not None]
+    if not known:
+        return "None of your Banks' exports gives a balance, so I can't see one."
+    if plan.asks == "overdraft":
+        over = [r for r in known if r.overdrawn_by]
+        if not over:
+            listed = "; ".join(
+                f"{r.account.data} {_money(r.balance)}{_as_of(r)}"  # pyright: ignore[reportArgumentType]
+                for r in known
+            )
+            return f"None of your accounts is overdrawn: {listed}."
+        lines = [
+            f"Your {r.account.data} is {_money(r.overdrawn_by)} overdrawn{_as_of(r)}."  # pyright: ignore[reportArgumentType]
+            for r in over
+        ]
+        if len(over) > 1:
+            lines.append(f"In all you're {_money(out.overdrawn)} overdrawn.")
+        return " ".join([*lines, NO_LIMIT])
+    if plan.asks == "savings":
+        known = [r for r in known if "saving" in r.kind.casefold()]
+        if not known:
+            return "I can't see a savings account in your data."
+    lines = [f"{r.account.data}: {_money(r.balance)}{_as_of(r)}." for r in known]  # pyright: ignore[reportArgumentType]
+    if plan.asks == "net":
+        if out.total is None:
+            return " ".join(
+                [*lines, "I can't total them: one has no balance or another currency."]
+            )
+        return (
+            f"Across your accounts you have {_money(out.total)}. That's your account"
+            " balances only: I don't hold investments, pensions or loans."
+        )
+    if len(known) > 1 and out.total is not None and plan.asks == "balance":
+        lines.append(f"In all: {_money(out.total)}.")
+    return " ".join(lines)
+
+
+def _account_name(bank: str, name: str, kind: str) -> str:
+    """The Bank and the Account's own name; a name holding its masked number
+    ("Account ••••0001") becomes its kind, as its digits are no figure."""
+    if any(ch.isdigit() for ch in name):
+        name = f"{kind.replace('_', ' ')} account"
+    return " ".join(f"{bank} {name}".split())

@@ -124,6 +124,8 @@ def _meta(a: Answer) -> dict[str, Any]:
         "cost_pence": a.cost_pence,
         "payload_id": a.payload_id,
         "resolved": list(a.resolved),
+        "chips": list(a.chips),
+        "timing": a.timing,
         "counted": [
             {
                 "evidence_id": e.evidence_id,

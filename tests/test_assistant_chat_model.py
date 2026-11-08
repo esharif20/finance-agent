@@ -208,6 +208,7 @@ def test_default_model_and_keep_alive() -> None:
         "temperature": 0,
         "presence_penalty": 0,
         "num_ctx": 8192,
+        "num_predict": 400,
     }
 
 
@@ -225,6 +226,7 @@ def test_num_ctx_and_seed_set_what_the_benchmark_measures_at() -> None:
         "presence_penalty": 0,
         "num_ctx": 4096,
         "seed": 7,
+        "num_predict": 400,
     }
 
 

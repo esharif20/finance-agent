@@ -322,16 +322,26 @@ def income(text: str, led: Ledger) -> tuple[tuple[int, ...], str] | None:
     if not re.search(r"\b(salary|income|pay ?check|wages)\b", t):
         return None
     counts: dict[int, int] = {}
+    payers: dict[str, int] = {}  # an Income with no Merchant: by its payer text
     for x in led.transactions():
         c = x.categorisation
-        if c and c.kind == "Income" and c.merchant_id is not None:
-            counts[c.merchant_id] = counts.get(c.merchant_id, 0) + 1
+        if c and c.kind == "Income":
+            if c.merchant_id is not None:
+                counts[c.merchant_id] = counts.get(c.merchant_id, 0) + 1
+            name = display_name(c.merchant or x.description)
+            payers[name] = payers.get(name, 0) + 1
+    salary = "salary" in t or "wages" in t
     if not counts:
+        if salary and payers:
+            # shortcut: no Merchant to select, so every Income counts; give
+            # the payer an id if a second regular income turns up
+            top = max(payers, key=lambda k: (payers[k], k))
+            return (), f"Salary ({top})"
         return (), "Income"
     names = {m.id: display_name(m.name) for m in led.merchants()}
-    if "salary" in t or "wages" in t:
-        top = max(counts, key=lambda k: (counts[k], -k))
-        return (top,), f"Salary ({names.get(top, 'employer')})"
+    if salary:
+        top_id = max(counts, key=lambda k: (counts[k], -k))
+        return (top_id,), f"Salary ({names.get(top_id, 'employer')})"
     return tuple(sorted(counts)), "Income"
 
 
@@ -424,3 +434,35 @@ def resolve(
     if m:
         r.currency = "EUR" if m[1].startswith("eu") else "USD"
     return r
+
+
+_PERIOD_WORDS = frozenset(
+    "january february march april may june july august september october"
+    " november december jan feb mar apr jun jul aug sep sept oct nov dec"
+    " last this next since year years week weeks month months tax before"
+    " previous past so far today one two three four six twelve during".split()
+)
+_FILLER = frozenset(
+    "money total altogether overall spending spent spend paid pay cost costs"
+    " me went go all big large expensive biggest purchases payments salary"
+    " income wages usual normal average typical euros euro eur dollars usd"
+    " account card".split()
+)
+
+
+def unresolved(text: str, r: Resolution) -> set[str]:
+    """Content words no resolver accounted for. The planner answers only
+    when this is empty; anything else goes to the model, which may ask."""
+    t = f" {_norm(text)} "
+    for name in _BY_LENGTH:
+        if set(NAMES[name]) & set(r.categories):
+            t = re.sub(rf"(?<=\s){re.escape(name)}(?=[\s?.!,])", " ", t)
+    for name in r.merchant_label.split(" + "):
+        if name:
+            t = t.replace(f" {name.casefold()}", " ")
+    words = set(re.findall(r"[a-z][a-z']*", t))
+    return {
+        w
+        for w in words - _STOP - _PERIOD_WORDS - _FILLER
+        if len(w) > 2 and w.rstrip("s") not in _FILLER
+    }

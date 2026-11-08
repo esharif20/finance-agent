@@ -659,7 +659,7 @@ def test_a_figure_in_memory_text_cannot_ground_a_reply(
     _remember(engine, "keep eating out under 350 pounds a month")
     m = fake("ask", "Your limit is £350.00.", "Your limit is £350.00.")
     a = turn(engine, m, "what is my eating out limit?")
-    assert a.path == "deterministic" and "350" not in a.reply
+    assert a.path == "miss" and "350" not in a.reply  # no fact answers it
 
 
 @pytest.mark.parametrize(
@@ -696,7 +696,7 @@ def test_a_result_the_budget_withheld_cannot_ground_a_reply(
     said = f"You spent {pounds(total)}."
     m = fake("ask", calls(("spending_summary", {"month": MONTH})), said, said)
     a = turn(engine, m, "spend in January?")
-    assert (a.path, a.evidence) == ("deterministic", ())
+    assert (a.path, a.evidence) == ("miss", ())
     assert pounds(total) not in a.reply
 
 
