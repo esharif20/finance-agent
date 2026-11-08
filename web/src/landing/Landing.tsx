@@ -1,4 +1,4 @@
-import { type MouseEvent, useCallback, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useState } from "react";
 import { Money } from "@/components/Money";
 import { Ask } from "./Ask";
 import { Field, Magnetic, Material, Rise, Roll, useStill } from "./fx";
@@ -56,9 +56,22 @@ export default function Landing() {
   const still = useStill();
   // the tally plays once a session; a returning visitor goes straight to the hero
   const [pre, setPre] = useState(() => !seenIntro());
-  const [play, setPlay] = useState(!pre);
+  const [play, setPlay] = useState(false);
+  // the headline enters only once its fonts are in, so nothing reflows under the visitor (at most
+  // 800 ms; then the fallback face enters and the swap happens while the letters are rising)
+  const [fonts, setFonts] = useState(() => typeof document === "undefined" || !document.fonts || document.fonts.status === "loaded");
+  useEffect(() => {
+    if (fonts) return;
+    const t = window.setTimeout(() => setFonts(true), 800);
+    void document.fonts.ready.then(() => setFonts(true));
+    return () => window.clearTimeout(t);
+  }, [fonts]);
+  const [handed, setHanded] = useState(!pre);
+  useEffect(() => {
+    if (handed && fonts) setPlay(true);
+  }, [handed, fonts]);
   const go = () => {
-    setPlay(true);
+    setHanded(true);
     try {
       sessionStorage.setItem("lp-intro", "1");
     } catch {

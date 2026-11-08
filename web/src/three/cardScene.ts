@@ -74,7 +74,9 @@ export type CardScene = Awaited<ReturnType<typeof createCardScene>>;
 
 export function createCardScene(canvas: HTMLCanvasElement, perspective: number) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // touch screens hold the drawing buffer to 1.5x: iOS kills the tab when GPU memory runs out
+  const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, coarse ? 1.5 : 2));
   renderer.toneMapping = THREE.NeutralToneMapping; // keeps bank colours true
   renderer.toneMappingExposure = 1;
   const scene = new THREE.Scene();
@@ -134,7 +136,9 @@ export function createCardScene(canvas: HTMLCanvasElement, perspective: number) 
       box = { w, h };
       const cw = w + 2 * mx;
       const ch = h + 2 * my;
-      renderer.setSize(cw, ch, false);
+      // a resize that keeps the size (the iOS URL bar) reallocates nothing
+      const now = renderer.getSize(new THREE.Vector2());
+      if (now.x !== cw || now.y !== ch) renderer.setSize(cw, ch, false);
       camera.aspect = cw / ch;
       camera.fov = (2 * Math.atan(ch / 2 / perspective) * 180) / Math.PI;
       camera.updateProjectionMatrix();

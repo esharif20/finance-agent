@@ -157,8 +157,7 @@
   position: absolute;
   inset: 0;
   background-image: var(--lp-grain);
-  opacity: 0.16;
-  mix-blend-mode: overlay;
+  opacity: 0.07;
   pointer-events: none;
 }
 .lp-hero-copy {
@@ -203,6 +202,10 @@
    pointer (written inline by fx.tsx; the transition makes it breathe) */
 .lp-flex {
   display: block;
+}
+/* until the hand-off (and the fonts) the letters wait unseen, so the fallback face never shows */
+.lp-flex:not([data-play]):not([data-still]) [data-l] {
+  opacity: 0;
 }
 .lp-flex-line {
   display: block;
@@ -251,7 +254,14 @@
   transform-style: preserve-3d;
   will-change: transform;
 }
-.lp-stage[data-three] .lp-acard {
+.lp-stage-canvas {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.lp-stage[data-drawn] .lp-stage-canvas {
+  opacity: 1;
+}
+.lp-stage[data-drawn] .lp-acard {
   visibility: hidden;
 }
 .lp-acard {
@@ -330,12 +340,10 @@
   width: min(560px, calc(100% - 2 * var(--lp-gutter)));
   padding: 28px 32px;
   border-radius: var(--lp-r-xl);
-  background: rgb(22 24 26 / 0.72);
+  background: rgb(22 24 26 / 0.92);
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 0.1),
     0 40px 80px -30px rgb(0 0 0 / 0.7);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
   opacity: 0;
   transform: translate(-50%, 32px);
   transition: opacity 0.5s var(--lp-ease-out), transform 0.8s var(--lp-ease-expo);
@@ -1455,9 +1463,6 @@
   aspect-ratio: 1;
   border-radius: 50%;
   --halo: conic-gradient(from 0deg, rgb(154 225 135 / 0.5), rgb(147 241 247 / 0.42), rgb(11 102 195 / 0.4), rgb(251 182 92 / 0.38), rgb(243 234 122 / 0.34), rgb(154 225 135 / 0.5));
-  -webkit-mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 72%);
-  mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 72%);
-  filter: blur(40px);
   opacity: 0.5;
   transform: translate(-50%, -50%) scale(0.7);
   transition: transform 1.4s var(--lp-ease-expo), opacity 1.2s ease;
@@ -1469,6 +1474,9 @@
   inset: 0;
   border-radius: inherit;
   background: var(--halo);
+  -webkit-mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.45) 40%, transparent 70%);
+  mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.45) 40%, transparent 70%);
+  will-change: transform;
   animation: lp-spin 40s linear infinite;
 }
 @keyframes lp-spin {
@@ -1573,8 +1581,7 @@
 }
 .lp-amb::before {
   background-image: var(--lp-grain);
-  opacity: 0.12;
-  mix-blend-mode: overlay;
+  opacity: 0.05;
 }
 /* ledger lines: a faint ruled page under the light chapters */
 .lp-amb::after {
@@ -1680,8 +1687,7 @@
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: radial-gradient(520px circle at var(--sx, 70%) var(--sy, 40%), rgb(255 255 255 / 0.1), transparent 60%);
-  mix-blend-mode: plus-lighter;
+  background: radial-gradient(520px circle at var(--sxy, 70% 40%), rgb(255 255 255 / 0.08), transparent 60%);
   pointer-events: none;
 }
 @media not ((hover: hover) and (pointer: fine)) {
@@ -1705,8 +1711,18 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp-amb i {
+  .ambient.lp-amb i:nth-child(n) {
     animation: none;
+  }
+}
+/* phones: the fields hold still, so a swipe composites nothing but the scroll itself */
+@media (max-width: 719.98px), (pointer: coarse) {
+  .ambient.lp-amb i:nth-child(n),
+  .lp-halo::after {
+    animation: none;
+  }
+  .ambient.lp-amb i:nth-child(n) {
+    will-change: auto;
   }
 }
 
@@ -2160,3 +2176,34 @@
 .lp-tile-head {
   background: transparent;
 }
+
+/* ===== phones and tablets: keep compositor memory small (iOS kills the tab when it runs out) =====
+   No WebGL (Hero), no promoted layers, the fields painted once and still, grain only in the hero,
+   and no sticky full-screen field layers stacked under the chapters. */
+@media (pointer: coarse), (max-width: 899.98px) {
+  .lp *,
+  .lp *::before,
+  .lp *::after {
+    will-change: auto !important;
+  }
+  .ambient.lp-amb i:nth-child(n),
+  .lp-halo::after {
+    animation: none;
+  }
+  .lp-amb::before {
+    display: none;
+  }
+  .st-pile > .lp-amb,
+  .st-gate > .lp-amb,
+  .hw > .lp-amb,
+  .lp-learn > .lp-amb {
+    position: absolute;
+    inset: 0;
+    height: auto;
+    margin-bottom: 0;
+  }
+  .lp-acard {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 16px 32px -20px rgb(0 0 0 / 0.6);
+  }
+}
+
