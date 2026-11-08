@@ -34,6 +34,16 @@ Rejected: the issue's first proposal, which paired only rows inside both coverag
 
 Shortcut: a sync's coverage ends at its last posted row, not its `balance-date`, because only the rows are stored per Statement Import. Storing each sync's requested start and `balance-date` would extend coverage to the fetch time and resolve edge bands sooner. Upgrade if edge bands stay surfaced too long in real use.
 
+## Amendment (#212): a synced Account's balances
+
+Every Account with a sync anchor is listed with its balances, whether it is synced only or a CSV Account linked to a synced one. One rule, used for both: such an Account's figures come from the sync, never from CSV running balances.
+
+- **Bank balance** is B_k: the latest sync's reported `balance` for the Account, less that response's pending amounts, exactly the B the Reconciliation above uses.
+- **Ledger balance** is B₁ plus the amounts of the Account's Ledger Transactions whose instant is in (t₁, t_k], the same sum the Reconciliation uses.
+- **The Gap** is their difference, shown as one Gap from t₁'s date to t_k's date when non-zero, so bank minus ledger always equals the Account's Gaps. It is worked out on every read from the stored rows, so a CSV import after the sync that fills a missing row closes it without another sync.
+
+A linked Account's CSV running-balance Gaps still exist (the month summary lists them), but its Accounts card shows only the sync figures: the sync balance is newer than any export, and two balance rules on one card could disagree. An Account with no anchor keeps the CSV rule (ADR 0006). The latest balance is read by re-parsing the stored responses, newest first, because no table keeps it; a balance-only sync (no posted rows) still counts, and a sync whose rows were rejected for conflicting IDs is skipped, as it was never reconciled.
+
 ## Known limits
 
 **Banks whose CSV has no balance or account number (HSBC, #130).** HSBC UK's export is `date, description, amount`: no running balance and no account number, and neither its filename nor its rows carry a masked number. Its rows store a NULL running balance, exactly as synced rows do, so:
