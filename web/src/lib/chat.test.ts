@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Chat, friendlyLabel, initial, parseBlocks, parseSse, pathLabel, reduce } from "./chat";
+import { type Chat, friendlyLabel, initial, parseBlocks, parseSse, parseTiming, pathLabel, reduce, shortModel, timingLine, timingRows } from "./chat";
 
 // synthetic
 const ev = (name: string, data: object) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -112,5 +112,27 @@ describe("friendlyLabel", () => {
     expect(friendlyLabel("something_else 2026-03 odd_field")).toBe("something_else 2026-03 odd_field");
     expect(friendlyLabel("spending_summary 2026-03 brand_new_field")).toBe("spending_summary 2026-03 brand_new_field");
     expect(friendlyLabel("spending_summary 2026-13 net")).toBe("spending_summary 2026-13 net");
+  });
+});
+
+describe("timing", () => {
+  const t = { total_ms: 18_400, phases: { plan: 12, fetch: 80, model: 18_200, check: 8, other: 100 }, model_calls: 1, model: "qwen3.5:4b-q4_K_M" };
+  it("reads the server's timing and drops junk", () => {
+    expect(parseTiming(t)).toEqual(t);
+    expect(parseTiming({ total_ms: "1", model_calls: 0 })).toBeUndefined();
+    expect(parseTiming({ total_ms: 5, model_calls: 0, phases: { plan: -1, fetch: 2 }, model: "" })).toEqual({ total_ms: 5, phases: { fetch: 2 }, model_calls: 0, model: null });
+  });
+  it("says how long the user waited and what ran", () => {
+    expect(shortModel("qwen3.5:4b-q4_K_M")).toBe("qwen 4b");
+    expect(timingLine(t)).toBe("18.4 s · 1 call · qwen 4b");
+    expect(timingLine({ ...t, model_calls: 0, model: null, total_ms: 40 }, 1200)).toBe("1.2 s · 0 model calls");
+  });
+  it("breaks the wait down in pipeline order, network last", () => {
+    expect(timingRows(t, 18_900).map(([k]) => k)).toEqual(["Reading the question", "Fetching figures", "Model", "Checking figures", "Other", "Network"]);
+    expect(timingRows(t, 18_900).at(-1)).toEqual(["Network", "0.5 s"]);
+  });
+  it("keeps the browser's wait on the finished message", () => {
+    const s = [{ type: "send", text: "x" } as const, { type: "event", event: { name: "done", data: { waited_ms: 900 } } } as const].reduce(reduce, initial);
+    expect(s.messages.at(-1)?.waitedMs).toBe(900);
   });
 });

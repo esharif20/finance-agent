@@ -5351,6 +5351,32 @@
         ]
       }
     },
+    "/api/chat/cool": {
+      "post": {
+        "description": "The chat screen closed: unload the model now rather than in 30 minutes.",
+        "operationId": "cool_api_chat_cool_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Cool Api Chat Cool Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cool",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/chat/model": {
       "get": {
         "description": "Settings' Assistant model: \"fast\" (Faster) or \"careful\" (More careful).",
