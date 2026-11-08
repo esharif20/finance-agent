@@ -221,7 +221,10 @@ def test_a_kept_possible_duplicate_never_reappears_unless_it_changes() -> None:
             )
         q = ReviewQueue(conn, 1)
         dup = next(i for i in q.items() if i.type == "possible_duplicate")
-        assert (dup.transaction_ids, dup.choices) == (tuple(ids[:2]), ("keep_both",))
+        assert (dup.transaction_ids, dup.choices) == (
+            tuple(ids[:2]),
+            ("keep_both", "merge"),
+        )
 
         q.answer(dup.id, dup.version, Answer(choice="keep_both"))
         assert all(i.type != "possible_duplicate" for i in q.items())
