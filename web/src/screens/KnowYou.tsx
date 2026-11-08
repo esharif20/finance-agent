@@ -70,7 +70,7 @@ export function KnowYou() {
   const briefing = useQuery({ queryKey: BRIEFING_KEY, queryFn: fetchBriefing });
   const forget = useMutation({
     mutationFn: forgetMemory,
-    onSettled: () => client.invalidateQueries({ queryKey: MEMORIES_KEY }),
+    onSettled: () => void client.invalidateQueries({ queryKey: MEMORIES_KEY }),
   });
   const answered = briefing.data?.regret.filter((r) => r.worth_it !== null).length;
   const gaps = briefing.data?.insufficient ?? [];

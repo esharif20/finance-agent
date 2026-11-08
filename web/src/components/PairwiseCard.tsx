@@ -20,7 +20,7 @@ export function PairwiseCard() {
     mutationFn: (choice: string) => answerPair(pair?.pair_id ?? 0, choice),
     onSuccess: () => {
       setDone((n) => n + 1);
-      return client.invalidateQueries({ queryKey: KEY });
+      void client.invalidateQueries({ queryKey: KEY });
     },
   });
   if (skipped || done >= PER_VISIT || !pair || typeof pair.pair_id !== "number") return null;

@@ -79,14 +79,14 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
     // totals on Overview and the drill-down come from the same Ledger: refetch everything
     onSuccess: (k, body) => {
       setUndo({ id: k.id, label: body.category[1] });
-      return client.invalidateQueries();
+      void client.invalidateQueries();
     },
   });
   const revert = useMutation({
     mutationFn: revertCorrection,
     onSuccess: () => {
       setUndo(null);
-      return client.invalidateQueries();
+      void client.invalidateQueries();
     },
   });
 

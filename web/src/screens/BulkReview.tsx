@@ -30,7 +30,7 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
   const [batch, setBatch] = useState(0); // answers the last accept wrote; Undo takes them all back
   const refocus = useRef<number | null>(null); // the accepted group's place, so focus does not fall to <body>
 
-  const act = useReviewWrite<{ call: () => Promise<ReviewQueueOut>; text: string; batch?: boolean }>(
+  const act = useReviewWrite<{ call: () => Promise<ReviewQueueOut>; text: string; batch?: boolean; items?: string[] }>(
     (q, { text, batch: wrote }) => {
       setNote({ text: q.message ?? text });
       setBatch(wrote ? q.applied : 0);
@@ -51,6 +51,7 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
       call: () => answerReviewBatch(items, g.category),
       text: `Accepted ${plural(items.length, "Merchant", "Merchants")} as ${g.category[1]}.`,
       batch: true,
+      items: items.map((i) => i.id),
     });
   };
   const undo = () => act.run({ call: () => undoReview(batch || 1), text: "Undid the last change." });

@@ -63,7 +63,7 @@ export function Settings() {
   const [copied, setCopied] = useState<"done" | "failed" | null>(null);
   const set = useMutation({
     mutationFn: ({ id, on, source }: { id: number; on: boolean; source?: "user" | "suggestion" }) => setAlwaysAsk(id, on, source),
-    onSuccess: () => client.invalidateQueries(),
+    onSuccess: () => void client.invalidateQueries(),
   });
 
   if (merchants.isPending) return <Skeleton className="h-64 w-full rounded-card" />;
