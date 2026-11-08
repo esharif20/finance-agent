@@ -30,6 +30,8 @@ from finance_agent.ledger import (
 MAX_ROWS = 20
 _STRICT = ConfigDict(extra="forbid", frozen=True)
 Month = Annotated[str, Field(pattern=r"^\d{4}-\d{2}$")]
+# Field descriptions are the only part of a tool the model reads besides its name
+TOP_LEVEL = "a top-level Category name"
 
 
 class Reads(Protocol):
@@ -113,7 +115,10 @@ def _month(led: Reads, month: str | None) -> str:
 
 class SpendingSummaryIn(BaseModel):
     model_config = _STRICT
-    month: Month | None = None  # default: the latest month with transactions
+    month: Month | None = Field(
+        default=None,
+        description="YYYY-MM, e.g. 2026-01; default the latest month with transactions",
+    )
 
 
 class CategoryRow(BaseModel):
@@ -171,9 +176,13 @@ def spending_summary(led: Reads, inp: SpendingSummaryIn) -> SpendingSummaryOut:
 
 class CategoryTrendIn(BaseModel):
     model_config = _STRICT
-    category: str = Field(min_length=1, max_length=40)  # top-level name
-    month: Month | None = None  # the trend ends here; default the latest month
-    months: int = Field(default=6, ge=1, le=12)
+    category: str = Field(
+        min_length=1, max_length=40, description=TOP_LEVEL + ", e.g. Food & Drink"
+    )
+    month: Month | None = Field(
+        default=None, description="YYYY-MM the trend ends at; default the latest"
+    )
+    months: int = Field(default=6, ge=1, le=12, description="how many months")
 
 
 class TrendRow(BaseModel):
@@ -264,11 +273,17 @@ def list_subscriptions(led: Reads, inp: ListSubscriptionsIn) -> ListSubscription
 
 class FindTransactionsIn(BaseModel):
     model_config = _STRICT
-    query: str | None = Field(default=None, max_length=100)  # description or Merchant
-    month: Month | None = None
-    category: str | None = Field(default=None, max_length=40)  # top-level name
-    kind: Literal["Spending", "Income", "Transfer", "Refund", "Fee"] | None = None
-    limit: int = Field(default=MAX_ROWS, ge=1, le=MAX_ROWS)
+    query: str | None = Field(
+        default=None, max_length=100, description="words in the description or Merchant"
+    )
+    month: Month | None = Field(default=None, description="YYYY-MM")
+    category: str | None = Field(default=None, max_length=40, description=TOP_LEVEL)
+    kind: Literal["Spending", "Income", "Transfer", "Refund", "Fee"] | None = Field(
+        default=None, description="the Transaction's kind"
+    )
+    limit: int = Field(
+        default=MAX_ROWS, ge=1, le=MAX_ROWS, description="most rows to return"
+    )
 
 
 class TransactionRow(BaseModel):

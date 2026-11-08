@@ -49,7 +49,7 @@ from finance_agent.assistant import (
 )
 from finance_agent.assistant.chat_model import printed_tool_call
 from finance_agent.assistant.graph import Assistant, ask
-from finance_agent.assistant.ollama import OLLAMA_PORT
+from finance_agent.assistant.ollama import NUM_CTX, OLLAMA_PORT
 from finance_agent.assistant.tools.registry import TOOLS
 from finance_agent.storage import open_db
 
@@ -59,7 +59,7 @@ from synthetic_assistant import ME, OTHER, seed  # noqa: E402 - lives with the t
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "assistant_fake.json"
 LOCAL_RESULTS = HERE / "results" / "assistant_local.json"
-NUM_CTX = 8192  # the memory gate is about 7 GB at 8k context (#144)
+
 SAMPLE_EVERY = 0.25  # seconds between memory samples
 GB = 1024**3
 
@@ -366,7 +366,7 @@ def local(
     connect: Callable[[], Any] | None = None,
 ) -> dict[str, Any]:
     """Benchmark one Ollama model; merge its scores into `path`."""
-    chat = OllamaChatModel(model, num_ctx=NUM_CTX, connect=connect)
+    chat = OllamaChatModel(model, connect=connect)
     try:
         with Peak(sample or (lambda: sample_ollama(model))) as peak:
             fresh = evaluate({model: (model, "", lambda _c, _i: chat)}, timed=True)

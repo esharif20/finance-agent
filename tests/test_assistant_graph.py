@@ -594,3 +594,13 @@ def test_a_result_the_budget_withheld_cannot_ground_a_reply(
     a = turn(engine, m, "spend in January?")
     assert (a.path, a.evidence) == ("deterministic", ())
     assert pounds(total) not in a.reply
+
+
+def test_the_model_is_told_today_so_it_can_fill_a_date_argument(
+    engine: Engine, txns: dict[str, int]
+) -> None:
+    # #144: with no date in context qwen3.5 sent simulate_purchase on=2023-10-06
+    m = fake("plan", "OK.")
+    turn(engine, m, "Can I afford a £50.00 jacket today?")
+    (system, *_) = m.calls[1][0]
+    assert system.role == "system" and "Today is 2026-01-20." in system.content

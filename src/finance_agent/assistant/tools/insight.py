@@ -56,7 +56,7 @@ def _row(i: StoredInsight) -> InsightRow:
 
 class ListInsightsIn(BaseModel):
     model_config = _STRICT
-    limit: int = Field(default=5, ge=1, le=MAX_ROWS)
+    limit: int = Field(default=5, ge=1, le=MAX_ROWS, description="most rows")
 
 
 class ListInsightsOut(BaseModel):
@@ -77,7 +77,9 @@ def list_insights(src: Source, inp: ListInsightsIn) -> ListInsightsOut:
 
 class ExplainInsightIn(BaseModel):
     model_config = _STRICT
-    insight_id: int = Field(ge=1, le=2**63 - 1)  # the number in insight:<id>
+    insight_id: int = Field(
+        ge=1, le=2**63 - 1, description="the number in insight:<id>"
+    )
 
 
 class ExplainInsightOut(BaseModel):

@@ -182,6 +182,7 @@ def test_a_local_run_unloads_the_model_even_when_it_fails(
             "stream": False,
             "keep_alive": "0",
             "think": False,
+            "options": {"temperature": 0, "presence_penalty": 0, "num_ctx": 8192},
         }
     ]
     assert not (tmp_path / "local.json").exists()

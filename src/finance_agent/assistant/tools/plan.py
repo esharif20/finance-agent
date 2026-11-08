@@ -29,7 +29,9 @@ def _gbp(minor: int) -> Money:
 
 class ForecastCashflowIn(BaseModel):
     model_config = _STRICT
-    months: int = Field(default=HORIZON, ge=1, le=6)
+    months: int = Field(
+        default=HORIZON, ge=1, le=6, description="how many months ahead"
+    )
 
 
 class ForecastMonth(BaseModel):
@@ -73,9 +75,18 @@ def forecast_cashflow(src: Source, inp: ForecastCashflowIn) -> ForecastCashflowO
 
 class SimulatePurchaseIn(BaseModel):
     model_config = _STRICT
-    amount_minor: int = Field(ge=1, le=MAX_MINOR)
-    on: date | None = None  # default today; never in the past
-    buffer_minor: int = Field(default=0, ge=0, le=MAX_MINOR)
+    amount_minor: int = Field(
+        ge=1, le=MAX_MINOR, description="the price in pence: £50.00 is 5000"
+    )
+    on: date | None = Field(
+        default=None, description="YYYY-MM-DD; default today, never in the past"
+    )
+    buffer_minor: int = Field(
+        default=0,
+        ge=0,
+        le=MAX_MINOR,
+        description="the least to keep spare, in pence: £50.00 is 5000",
+    )
 
 
 class SimulatePurchaseOut(BaseModel):
