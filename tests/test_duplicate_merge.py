@@ -7,6 +7,7 @@ import json
 from collections.abc import Callable, Iterator
 from datetime import date, datetime, time
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -21,6 +22,8 @@ from finance_agent.assistant import ToolCall
 from finance_agent.assistant.tools import run
 from finance_agent.ledger import InvalidMerge, Ledger, UnknownTarget
 from finance_agent.ledger.review import Answer, ReviewQueue
+from synthetic_lloyds import History, render_export
+from synthetic_lloyds.generator import SORT_CODE, _with_balances  # pyright: ignore[reportPrivateUsage]
 from test_dedupe import temp_ledger
 
 LONDON = ZoneInfo("Europe/London")
@@ -36,7 +39,8 @@ def _ts(day: int, n: int) -> int:
 
 def synced(rows: list[Row], twins: int = 1, account: str = "ACC-1") -> bytes:
     """One SimpleFIN response; rows[0] is also sent `twins` more times under
-    other IDs, as providers do (ADR 0014 (a))."""
+    other IDs. The bank lists them apart, so alone they are no Possible
+    Duplicate; `doubted` adds a bank file that disagrees."""
     out: list[dict[str, Any]] = []
     for n, (day, minor, text) in enumerate(rows):
         out.append(
@@ -64,6 +68,31 @@ def synced(rows: list[Row], twins: int = 1, account: str = "ACC-1") -> bytes:
             ],
         }
     ).encode()
+
+
+def doubted(
+    led: Ledger, d: Path, csv_rows: list[Row], raw: bytes, account: str
+) -> None:
+    """A bank file holding each of `csv_rows` once, linked to the sync `raw`:
+    where the sync lists a row more often, the sources disagree and the rows
+    are a Possible Duplicate (ADR 0014 matching)."""
+    ev = [
+        (date(2026, 1, day), "DEB" if minor < 0 else "CR", text, minor)
+        for day, minor, text in sorted(csv_rows)
+    ]
+    h = History(SORT_CODE, "00000001", _with_balances(ev, 100_000))
+    csv = d / f"{account}.csv"
+    csv.write_text(render_export(h, 0, len(ev)).text)
+    led.import_files([csv])
+    led.apply_sync(raw)
+    (acc,) = [a for a in led.accounts() if a.masked_number == "••••0001"]
+    led.link_synced_account(account, acc.id)
+
+
+def doubted_twins(
+    led: Ledger, d: Path, rows: list[Row], twins: int = 1, account: str = "ACC-1"
+) -> None:
+    doubted(led, d, rows[:1], synced(rows, twins, account), account)
 
 
 def figures(led: Ledger) -> tuple[Any, ...]:
@@ -98,18 +127,94 @@ ROWS = st.lists(
 )
 
 
+def queued_duplicates(led: Ledger) -> list[Any]:
+    q = ReviewQueue(led._db.conn, 1)  # pyright: ignore[reportPrivateUsage]
+    return [i for i in q.items() if i.type == "possible_duplicate"]
+
+
+def everything(led: Ledger) -> tuple[Any, ...]:
+    return (figures(led), sorted(t.id for t in led.transactions(merged=True)))
+
+
+# --- the bank's own IDs ---------------------------------------------------------
+
+
+@settings(max_examples=15, deadline=None)
+@given(rows=ROWS, twins=st.integers(1, 3))
+def test_same_day_repeats_under_distinct_ids_are_never_queued_and_all_count(
+    rows: list[Row], twins: int
+) -> None:
+    """Two coffees in one day: the bank lists each under its own ID, so both
+    are real purchases, counted, and nothing asks the user about them."""
+    raw = synced(rows, twins)
+    with temp_ledger() as (led, _):
+        led.apply_sync(raw)
+        led.apply_sync(raw + b" ")  # the next sync: same rows, other bytes
+        assert led.possible_duplicates() == [] and queued_duplicates(led) == []
+        assert len(led.transactions()) == len(rows) + twins  # none dropped
+        assert led.merged_ids() == set()
+        net = sum(m for _, m, _ in rows) + twins * rows[0][1]
+        assert led.summarise_month(MONTH).net == Decimal(net).scaleb(-2)
+
+
+@settings(max_examples=15, deadline=None)
+@given(rows=ROWS, twins=st.integers(0, 3))
+def test_a_bank_file_row_against_more_synced_copies_raises_one_item(
+    rows: list[Row], twins: int
+) -> None:
+    """Real doubt: the bank file lists the purchase once, the feed 1 + twins
+    times. One Possible Duplicate holds them all; nothing is merged or lost."""
+    with temp_ledger() as (led, d):
+        doubted(led, d, rows[:1], synced(rows, twins), "ACC-1")
+        if twins == 0:  # one each: they may simply pair, or stay in doubt
+            assert len(led.transactions()) in (len(rows), len(rows) + 1)
+            return
+        (item,) = queued_duplicates(led)
+        files = [t.id for t in led.transactions() if t.running_balance is not None]
+        assert len(files) == 1 and files[0] in item.transaction_ids
+        assert len(item.transaction_ids) >= twins + 2
+        assert len(led.transactions()) == len(rows) + twins + 1
+        assert led.merged_ids() == set()
+
+
+def test_an_old_item_the_bank_lists_apart_leaves_the_queue(
+    ledger_for: LedgerFor,
+) -> None:
+    """Groups stored by the old rule (a) stay in the table, but read as no
+    Possible Duplicate: off the queue at once, every total unchanged."""
+    from finance_agent.storage import schema
+
+    led = ledger_for(1)
+    led.apply_sync(synced([(5, -350, "SYNTH CAFE"), (6, -900, "SYNTH GROCER")], 2))
+    before = everything(led)
+    db = led._db  # pyright: ignore[reportPrivateUsage]
+    si = schema.statement_import
+    sync_id = db.execute(db.select(si, si.c.id)).scalar()
+    cafe = [t for t in led.transactions() if t.description == "SYNTH CAFE"]
+    for t in cafe:  # as the old rule stored it
+        db.insert(
+            schema.possible_duplicate,
+            group_id=1,
+            transaction_id=t.id,
+            account_id=t.account_id,
+            statement_import_id=sync_id,
+        )
+    assert queued_duplicates(led) == [] and led.possible_duplicates() == []
+    assert everything(led) == before and len(cafe) == 3
+
+
 @settings(max_examples=15, deadline=None)
 @given(rows=ROWS, twins=st.integers(1, 3), merges=st.data())
 def test_money_drops_by_exactly_the_duplicate_and_undo_restores_it(
     rows: list[Row], twins: int, merges: st.DataObject
 ) -> None:
-    with temp_ledger() as (led, _):
-        led.apply_sync(synced(rows, twins))
+    with temp_ledger() as (led, d):
+        doubted_twins(led, d, rows, twins)
         categorise.run(led._db.conn, 1)  # pyright: ignore[reportPrivateUsage]
         before = figures(led)
         group = the_group(led)
         k = merges.draw(st.integers(1, twins), label="merges")
-        made = [led.merge_duplicate(t) for t in group[1 : k + 1]]
+        made = [led.merge_duplicate(t) for t in group[1 : k + 1]]  # [0]: file
         s = led.summarise_month(MONTH)
         amount = Decimal(rows[0][1]).scaleb(-2) * k
         assert s.net == before[2] - amount
@@ -125,11 +230,11 @@ def test_money_drops_by_exactly_the_duplicate_and_undo_restores_it(
 @settings(max_examples=10, deadline=None)
 @given(rows=ROWS)
 def test_merges_never_cross_users(rows: list[Row]) -> None:
-    with temp_ledger() as (one, _):
+    with temp_ledger() as (one, d):
         conn = one._db.conn  # pyright: ignore[reportPrivateUsage]
         two = Ledger(conn, 2)
-        one.apply_sync(synced(rows))
-        two.apply_sync(synced(rows, account="ACC-2"))
+        doubted_twins(one, d, rows)
+        doubted_twins(two, d, rows, account="ACC-2")
         theirs = figures(two)
         mine, other = the_group(one), the_group(two)
         for t in other:  # another user's row is unknown, never merged
@@ -143,27 +248,44 @@ def test_merges_never_cross_users(rows: list[Row]) -> None:
 
 
 def test_the_last_unmerged_row_csv_rows_and_outsiders_are_refused(
-    ledger_for: LedgerFor,
+    ledger_for: LedgerFor, tmp_path: Path
 ) -> None:
     led = ledger_for(1)
-    led.apply_sync(synced([(5, -350, "SYNTH CAFE"), (6, -900, "SYNTH GROCER")], 2))
-    a, b, c = the_group(led)
+    rows = [(5, -350, "SYNTH CAFE"), (6, -900, "SYNTH GROCER")]
+    doubted_twins(led, tmp_path, rows, 2)
+    csv, a, b, c = the_group(led)
     led.merge_duplicate(b)
     with pytest.raises(InvalidMerge):
         led.merge_duplicate(b)  # already merged
-    led.merge_duplicate(c)
     with pytest.raises(InvalidMerge):
-        led.merge_duplicate(a)  # the group's last unmerged row
-    lone = next(t.id for t in led.transactions() if t.id not in (a, b, c))
+        led.merge_duplicate(csv)  # the Bank's own list stays
+    led.merge_duplicate(c)
+    lone = next(t.id for t in led.transactions() if t.id not in (csv, a, b, c))
     with pytest.raises(InvalidMerge):
         led.merge_duplicate(lone)  # in no Possible Duplicate
     with pytest.raises(UnknownTarget):
         led.revert_merge(10_000)
 
 
-def test_the_assistant_tools_agree_after_a_merge(ledger_for: LedgerFor) -> None:
+def test_a_reissued_ids_last_unmerged_row_stays(ledger_for: LedgerFor) -> None:
     led = ledger_for(1)
-    led.apply_sync(synced([(5, -350, "SYNTH CAFE"), (6, -900, "SYNTH GROCER")]))
+    raw = synced([(5, -350, "SYNTH CAFE"), (9, -900, "SYNTH GROCER")], 0)
+    led.apply_sync(raw)
+    body = json.loads(raw)
+    body["accounts"][0]["transactions"][0]["id"] = "ACC-1-reissued"
+    led.apply_sync(json.dumps(body).encode())  # ADR 0014 (b)
+    old, new = the_group(led)
+    led.merge_duplicate(new)
+    with pytest.raises(InvalidMerge):
+        led.merge_duplicate(old)  # the group's last unmerged row
+
+
+def test_the_assistant_tools_agree_after_a_merge(
+    ledger_for: LedgerFor, tmp_path: Path
+) -> None:
+    led = ledger_for(1)
+    rows = [(5, -350, "SYNTH CAFE"), (6, -900, "SYNTH GROCER")]
+    doubted_twins(led, tmp_path, rows)
     categorise.run(led._db.conn, 1)  # pyright: ignore[reportPrivateUsage]
     led.merge_duplicate(the_group(led)[1])
     conn = led._db.conn  # pyright: ignore[reportPrivateUsage]
@@ -171,26 +293,30 @@ def test_the_assistant_tools_agree_after_a_merge(ledger_for: LedgerFor) -> None:
         "ask", ToolCall(name="spending_summary", arguments={"month": MONTH}), conn
     )
     s = led.summarise_month(MONTH)
-    assert out.money_out.minor == int(s.money_out.scaleb(2)) == 1250
+    # the file's coffee, one synced coffee and the groceries
+    assert out.money_out.minor == int(s.money_out.scaleb(2)) == 1600
     found: Any = run("correct", ToolCall(name="find_transactions", arguments={}), conn)
-    assert found.total == 2
+    assert found.total == 3
 
 
-def test_the_review_queue_merges_and_undo_unmerges(ledger_for: LedgerFor) -> None:
+def test_the_review_queue_merges_and_undo_unmerges(
+    ledger_for: LedgerFor, tmp_path: Path
+) -> None:
     led = ledger_for(1)
-    led.apply_sync(synced([(5, -350, "SYNTH CAFE")], 2))
+    doubted_twins(led, tmp_path, [(5, -350, "SYNTH CAFE")])
     conn = led._db.conn  # pyright: ignore[reportPrivateUsage]
     q = ReviewQueue(conn, 1)
     (dup,) = [i for i in q.items() if i.type == "possible_duplicate"]
     assert dup.choices == ("keep_both", "merge")
-    _, b, c = dup.transaction_ids
+    _, b, c = dup.transaction_ids  # the file's row, then two synced copies
     q.answer(dup.id, dup.version, Answer(choice="merge", transaction_id=c))
     # two rows still unmerged: the group stays queued, as a changed item
     (again,) = [i for i in q.items() if i.type == "possible_duplicate"]
     assert again.version != dup.version
     with pytest.raises(Exception, match="merge takes"):
         q.answer(again.id, again.version, Answer(choice="merge", transaction_id=-1))
-    # no row named (what the web sends): the newest copy that may go, b
+    # no row named (what the web sends): the newest copy that may go, b; the
+    # file's row is never merged away
     q.answer(again.id, again.version, Answer(choice="merge"))
     assert [i for i in q.items() if i.type == "possible_duplicate"] == []
     assert led.merged_ids() == {b, c}
@@ -219,11 +345,12 @@ def client(engine: Engine) -> Iterator[TestClient]:
 
 
 def test_api_merge_is_scoped_to_the_current_user(
-    engine: Engine, client: TestClient
+    engine: Engine, client: TestClient, tmp_path: Path
 ) -> None:
+    cafe: list[Row] = [(5, -350, "SYNTH CAFE")]
     with engine.begin() as conn:
-        Ledger(conn, 1).apply_sync(synced([(5, -350, "SYNTH CAFE")]))
-        Ledger(conn, 2).apply_sync(synced([(5, -350, "SYNTH CAFE")], account="X"))
+        doubted_twins(Ledger(conn, 1), tmp_path, cafe)
+        doubted_twins(Ledger(conn, 2), tmp_path, cafe, account="X")
         theirs = sorted(next(iter(Ledger(conn, 2).possible_duplicates())))
     (dup,) = [
         i
@@ -235,14 +362,16 @@ def test_api_merge_is_scoped_to_the_current_user(
     url = f"/api/review-queue/{dup['id']}/answer"
     r = client.post(url, json=body | {"transaction_id": theirs[1]})
     assert r.status_code == 422  # not one of this item's rows
-    r = client.post(url, json=body | {"transaction_id": dup["transaction_ids"][1]})
+    r = client.post(url, json=body | {"transaction_id": dup["transaction_ids"][2]})
     assert r.status_code == 200
-    assert all(i["type"] != "possible_duplicate" for i in r.json()["items"])
+    # the file's row and one synced copy are left: still a Possible Duplicate
+    (left,) = [i for i in r.json()["items"] if i["type"] == "possible_duplicate"]
+    assert left["version"] != dup["version"]
     s = client.get(f"/api/summary?month={MONTH}").json()
-    assert s["money_out"]["minor"] == 350
+    assert s["money_out"]["minor"] == 700
     with engine.begin() as conn:
         assert Ledger(conn, 2).merged_ids() == set()
-        assert Ledger(conn, 2).summarise_month(MONTH).money_out == Decimal("7.00")
+        assert Ledger(conn, 2).summarise_month(MONTH).money_out == Decimal("10.50")
 
 
 def _two_groups(a: Row, b: Row, twins_a: int, twins_b: int) -> bytes:
@@ -267,13 +396,13 @@ def test_random_merge_and_undo_sequences_match_a_reference(
     every step the totals equal a reference summed from the raw rows less the
     merged ones, a refusal happens exactly when ADR 0014 says, and no group is
     ever left with every row merged."""
-    with temp_ledger() as (led, _):
-        led.apply_sync(
-            _two_groups((5, a, "SYNTH CAFE"), (9, b, "SYNTH GROCER"), *twins)
-        )
+    with temp_ledger() as (led, d):
+        cafe, grocer = (5, a, "SYNTH CAFE"), (9, b, "SYNTH GROCER")
+        doubted(led, d, [cafe, grocer], _two_groups(cafe, grocer, *twins), "ACC-1")
         groups = [frozenset(g) for g in led.possible_duplicates()]
         assert len(groups) == 2
         ids = sorted(groups[0] | groups[1])
+        files = {t.id for t in led.transactions() if t.running_balance is not None}
         amount = {t.id: t.amount for t in led.transactions(merged=True)}
         live: dict[int, int] = {}  # transaction id -> merge id
 
@@ -281,7 +410,7 @@ def test_random_merge_and_undo_sequences_match_a_reference(
             if is_merge:
                 t = ids[pick % len(ids)]
                 g = next(x for x in groups if t in x)
-                if t not in live and len(g - live.keys()) > 1:
+                if t not in files | live.keys() and len(g - live.keys()) > 1:
                     live[t] = led.merge_duplicate(t)
                 else:
                     with pytest.raises(InvalidMerge):
