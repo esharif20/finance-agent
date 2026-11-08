@@ -731,3 +731,39 @@ assistant_setting = Table(
         text("model IN ('fast', 'careful')"), name="ck_assistant_setting_model"
     ),
 )
+
+# The exposure log (#261, 0027, ADR 0015): every item shown to the user, once
+# per week, with its slate slot, the policy and the exact probability it had of
+# being shown (a Fraction, "num/den"), so later policies can be evaluated off
+# policy. `item` is an Insight id, a card id or a route; `context` is JSON of
+# ints and short codes only (for a route: features and cluster id, never the
+# question). `outcome` comes only from an explicit action, never an open.
+# Feedback, never a Memory: the user can wipe it, and rows go after 400 days.
+exposure = Table(
+    "exposure",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("kind", String(16), nullable=False),
+    Column("item", String(64), nullable=False),
+    Column("week", Date, nullable=False),  # its Monday
+    Column("slot", Integer, nullable=False),
+    Column("slate_size", Integer, nullable=False),
+    Column("policy", String(64), nullable=False),
+    Column("propensity", String(32), nullable=False),
+    Column("context", Text, nullable=False),
+    Column("shown_at", DateTime(timezone=True), nullable=False),
+    Column("outcome", String(16)),
+    Column("outcome_at", DateTime(timezone=True)),
+    CheckConstraint(
+        text("kind IN ('insight', 'card', 'model_route')"), name="ck_exposure_kind"
+    ),
+    CheckConstraint(
+        text(
+            "outcome IN ('accepted', 'rejected', 'dismissed', 'acted',"
+            " 'regret_worth_it', 'regret_not_worth_it')"
+        ),
+        name="ck_exposure_outcome",
+    ),
+    UniqueConstraint("user_id", "kind", "item", "week"),
+)

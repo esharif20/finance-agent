@@ -4946,7 +4946,7 @@
     },
     "/api/insights": {
       "get": {
-        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out.",
+        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out; the last may be a seeded exploration\n(#261). Each is logged as shown, with its propensity.",
         "operationId": "ranked_api_insights_get",
         "parameters": [
           {
@@ -4989,6 +4989,25 @@
           }
         },
         "summary": "Ranked"
+      }
+    },
+    "/api/insights/exposures": {
+      "delete": {
+        "description": "Wipe the exposure log: every shown Insight and card, and its outcome.",
+        "operationId": "forget_exposures_api_insights_exposures_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget Exposures"
       }
     },
     "/api/insights/feedback": {

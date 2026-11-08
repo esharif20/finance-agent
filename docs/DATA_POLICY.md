@@ -30,6 +30,7 @@ Status: draft for review.
 | Session summaries | 90 days | Automatic |
 | Feedback | Kept (it is the learning signal). A rejected Proposal is recorded by its kind only, never its text (#138) | User can wipe it all (`DELETE /api/feedback`): with the rejected Proposals it points at, the Insight ratings and dismissals (#150) and the regret-review answers (#152). Clearing the Insight ones resets relevance to Beta(1, 1); `DELETE /api/insights/feedback` wipes only those |
 | Regret-review answers ("worth it?" on a discretionary Transaction, #152) | Kept (feedback, never a Memory), with the week it was asked in | User can wipe them (`DELETE /api/briefing/regret`, or with all feedback by `DELETE /api/feedback`); an answer also goes with its Transaction. Never logged |
+| Exposure log (each Insight, card or model route shown, #261) | 400 days, then deleted on the next write. One row per item a week: its slot, the policy, the probability it had of being shown, ids and short codes as context (a model route: features and cluster id, never the question), and the user's explicit outcome (a rating, dismissal or answer; never an open or click) | Feedback, never a Memory. User can wipe it (`DELETE /api/insights/exposures`, or with all feedback by `DELETE /api/feedback`). Never logged |
 | Weekly briefing (#152) | Not stored: computed on request from the Ledger, the Insights and the forecast | Shown in the app only, never sent anywhere (no email or push) |
 | Assistant traces | 30 days, redacted | Automatic |
 | Gateway payload log | 90 days | Automatic |

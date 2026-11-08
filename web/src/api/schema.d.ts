@@ -454,12 +454,33 @@ export interface paths {
         /**
          * Ranked
          * @description The best `limit` Insights, by impact x confidence x relevance, less
-         *     those a constraint Memory rules out.
+         *     those a constraint Memory rules out; the last may be a seeded exploration
+         *     (#261). Each is logged as shown, with its propensity.
          */
         get: operations["ranked_api_insights_get"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Exposures
+         * @description Wipe the exposure log: every shown Insight and card, and its outcome.
+         */
+        delete: operations["forget_exposures_api_insights_exposures_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3190,6 +3211,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_exposures_api_insights_exposures_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
                 };
             };
         };
