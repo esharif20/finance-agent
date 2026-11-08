@@ -1,11 +1,11 @@
 {
   "harness": "assistant",
   "dataset": "assistant_golden",
-  "dataset_version": 4,
-  "dataset_sha256": "a96f85f1c6df8bbf92d9d12a4d574d55920d32e11fb07b22517e2d2ee5b937e5",
-  "prompt_sha256": "3fd4d25e44de70edb6a333e17f5828f9230c1ca0027329e9b6c2f6bd7ea3c401",
-  "cases": 33,
-  "refusal_cases": 6,
+  "dataset_version": 5,
+  "dataset_sha256": "456822fc3cf551362667b4dc5072e08faff1e2fe938d080da161cab024ed1bdb",
+  "prompt_sha256": "c506981690b66c7c452731e03b1684c1b2f24601fb72fdd3073402e4a5010c09",
+  "cases": 38,
+  "refusal_cases": 7,
   "models": {
     "fake_oracle": {
       "model": "FakeChatModel oracle",
@@ -26,11 +26,11 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.181818,
-        "grounding_pass_rate": 0.0,
+        "tool_call_accuracy": 0.210526,
+        "grounding_pass_rate": 0.032258,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.818182,
+        "printed_tool_call_rate": 0.789474,
         "model_error_rate": 0.0
       },
       "failures": {
@@ -59,6 +59,9 @@
           "memory-goal",
           "memory-constraint",
           "memory-list",
+          "memory-values",
+          "memory-tone",
+          "memory-goal-fields",
           "correct-category",
           "correct-note",
           "correct-split"
@@ -88,6 +91,9 @@
           "memory-goal",
           "memory-constraint",
           "memory-list",
+          "memory-values",
+          "memory-tone",
+          "memory-goal-fields",
           "correct-category",
           "correct-note",
           "correct-split"
@@ -117,6 +123,9 @@
           "memory-goal",
           "memory-constraint",
           "memory-list",
+          "memory-values",
+          "memory-tone",
+          "memory-goal-fields",
           "correct-category",
           "correct-note",
           "correct-split"

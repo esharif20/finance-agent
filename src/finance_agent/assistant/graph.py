@@ -46,7 +46,7 @@ from finance_agent.assistant.tools import (
     run,
     specs,
 )
-from finance_agent.assistant.tools.propose import FigureInMemory, ProposalOut
+from finance_agent.assistant.tools.propose import FigureInMemory, NotSaid, ProposalOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
 from finance_agent.ledger.answer_cache import AnswerCache
@@ -282,6 +282,11 @@ class Assistant:
         except FigureInMemory:
             d.refusal = NO_FIGURE_MEMORIES
             return '{"error": "refused: a Memory never holds a money figure"}'
+        except NotSaid:
+            return (
+                '{"error": "refused: that amount or date is not in what the user'
+                ' said this turn; ask them for it, do not guess"}'
+            )
         except ValueError:  # UnknownTarget, InvalidSplit, ...: refused
             return '{"error": "refused: no such Transaction or change"}'
         if isinstance(out, ProposalOut):
