@@ -7,12 +7,13 @@ every rule (ADR 0001); ML comes later, after rules.
 import logging
 import re
 import tomllib
+from collections import Counter
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, func
 
 from finance_agent.categorise import subscriptions
 from finance_agent.ledger import UNCATEGORISED as _NONE
@@ -231,6 +232,81 @@ def seed_taxonomy(
     return {(names[r.parent_id], r.name): r.id for r in rows if r.parent_id}
 
 
+def _decided(db: Scoped) -> set[int]:
+    """Merchant ids holding a decision keyed by `merchant_id`: an active
+    Merchant-wide Correction, "Always ask", or any registry entry."""
+    k, m, e = schema.correction, schema.merchant, schema.subscription_entry
+    return {
+        *db.execute(
+            db.select(k, k.c.merchant_id).where(
+                k.c.merchant_id.is_not(None), k.c.reverted_at.is_(None)
+            )
+        ).scalars(),
+        *db.execute(db.select(m, m.c.id).where(m.c.always_ask.is_not(None))).scalars(),
+        *db.execute(db.select(e, e.c.merchant_id)).scalars(),
+    }
+
+
+def _keep_merchants(
+    db: Scoped,
+    names: Mapping[int, str],
+    merchant_ids: dict[str, int],
+    ids: Mapping[Category, int],
+) -> dict[int, str]:
+    """Keep Merchant ids when a base change renames a descriptor family
+    (#215: NETFLIX.COM is now Netflix), so decisions keyed by `merchant_id`
+    stay in force. `names` is each Transaction's new Merchant name.
+
+    A Merchant no Transaction is named after any more is renamed (same row)
+    to the new name most of its Transactions take, if that name is free.
+    A decided Merchant that cannot be renamed keeps its Transactions, and a
+    new name only it gave up is an alias of it, so later imports join it too.
+    Returns the Merchant name for each Transaction that keeps another one."""
+    c, m = schema.categorisation, schema.merchant
+    prior: dict[int, int] = {
+        r.transaction_id: r.merchant_id
+        for r in db.execute(
+            db.select(c, c.c.transaction_id, c.c.merchant_id).where(
+                c.c.merchant_id.is_not(None)
+            )
+        )
+    }
+    name_of = {i: n for n, i in merchant_ids.items()}
+    decided = _decided(db)
+    moves: dict[int, Counter[str]] = {}
+    for tid, new in names.items():
+        if (was := prior.get(tid)) is not None and new != name_of[was]:
+            moves.setdefault(was, Counter())[new] += 1
+    wanted = set(names.values())
+    for p in sorted(moves, key=lambda p: (p not in decided, p)):  # decided first
+        new = min(moves[p], key=lambda n: (-moves[p][n], n))
+        if name_of[p] in wanted or new in merchant_ids:
+            continue
+        default = m.c.default_category_id
+        if new in MERCHANTS:  # the seeded default; a Correction still beats it
+            default = func.coalesce(default, ids[MERCHANTS[new][1]])
+        db.execute(
+            db.update(m)
+            .where(m.c.id == p)
+            .values(name=new, default_category_id=default)
+        )
+        merchant_ids[new] = merchant_ids.pop(name_of[p])
+        name_of[p] = new
+    alias: dict[str, str] = {}
+    for p in sorted(decided & moves.keys()):
+        for new in sorted(moves[p]):
+            if new not in merchant_ids:
+                alias.setdefault(new, name_of[p])
+    keep: dict[int, str] = {}
+    for tid, new in names.items():
+        was = prior.get(tid)
+        if was is not None and was in decided and new != name_of[was]:
+            keep[tid] = name_of[was]
+        elif new in alias:
+            keep[tid] = alias[new]
+    return keep
+
+
 def run(conn: Connection, user_id: int) -> int:
     """(Re)categorise every Transaction of this user; returns how many.
 
@@ -243,9 +319,22 @@ def run(conn: Connection, user_id: int) -> int:
     ids = seed_taxonomy(conn, user_id)
     merchant_ids = {m.name: m.id for m in ledger.merchants()}
     txns = ledger.transactions()
+    names = {
+        t.id: m
+        for t in txns
+        if (
+            m := classify(
+                t.description,
+                t.amount,
+                t.bank_type,
+                transfer=t.transfer_with is not None,
+            ).merchant
+        )
+    }
+    keep = _keep_merchants(db, names, merchant_ids, ids)
     # seed only the base Merchants that appear: not all of them, so the
     # Merchant list stays the user's own
-    for name in sorted({m for t in txns if (m := merchant_for(t.description))}):
+    for name in sorted({keep.get(i, m) for i, m in names.items()} & MERCHANTS.keys()):
         if name not in merchant_ids:
             merchant_ids[name] = db.insert(
                 schema.merchant, name=name, default_category_id=ids[MERCHANTS[name][1]]
@@ -262,14 +351,21 @@ def run(conn: Connection, user_id: int) -> int:
     ask = {m.name for m in ledger.merchants() if m.always_ask}
     db.execute(db.delete(schema.categorisation))
     for t in txns:
+        kept = keep.get(t.id)
         c = classify(
             t.description,
             t.amount,
             t.bank_type,
             transfer=t.transfer_with is not None,
             defaults=defaults,
-            ask=ask,
+            ask=() if kept else ask,
         )
+        if kept:  # the decided Merchant's row, with the base's Category
+            c = (
+                Classification(c.kind, kept, None, "always_ask")
+                if kept in ask
+                else replace(c, merchant=kept)
+            )
         if c.merchant and c.merchant not in merchant_ids:
             merchant_ids[c.merchant] = db.insert(schema.merchant, name=c.merchant)
         db.insert(
