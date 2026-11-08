@@ -5,6 +5,7 @@ import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { routeTable, viewFor } from "@/main";
+import { ACCOUNTS } from "./accounts.fixture";
 import { HEADLINE, HEADLINE_LINES, Hero } from "./Hero";
 
 const web = path.resolve(import.meta.dirname, "../..");
@@ -19,6 +20,15 @@ const mediaStub = (reduce: boolean) => (q: string) => ({
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+class NoObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
 
 describe("route split", () => {
   it("the local build has the app alone at / and no landing route", () => {
@@ -36,11 +46,13 @@ describe("route split", () => {
 });
 
 describe("hero headline", () => {
-  it("rises line by line, with the full text for screen readers", () => {
+  it("draws each line as letters, with the full text for screen readers", () => {
     vi.stubGlobal("matchMedia", mediaStub(false));
+    vi.stubGlobal("IntersectionObserver", NoObserver);
     render(<Hero />);
     const h1 = screen.getByRole("heading", { level: 1, name: HEADLINE });
-    expect(h1.querySelectorAll(".lp-line-mask")).toHaveLength(HEADLINE_LINES.length);
+    expect(h1.querySelectorAll(".lp-flex-line")).toHaveLength(HEADLINE_LINES.length);
+    expect(h1.querySelectorAll("[data-l]").length).toBe(HEADLINE.replace(/ /g, "").length);
   });
 
   it("renders static under prefers-reduced-motion", () => {
@@ -48,7 +60,10 @@ describe("hero headline", () => {
     const { container } = render(<Hero />);
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.textContent).toBe(HEADLINE);
-    expect(container.querySelectorAll(".lp-line-mask")).toHaveLength(0);
+    expect(container.querySelector(".lp-stage")).toBeNull();
+    // the still composition: every account and the combined total
+    for (const a of ACCOUNTS.accounts) expect(screen.getAllByText(a.name).length).toBeGreaterThan(0);
+    expect(container.querySelector(".lp-combined")).toBeTruthy();
     // nothing is held mid-move: no inline transform, opacity or clip on the hero
     for (const el of container.querySelectorAll<HTMLElement>("*")) {
       expect(el.style.transform || "none").toBe("none");
