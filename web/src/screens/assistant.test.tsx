@@ -212,4 +212,29 @@ describe("Assistant", () => {
     await ask();
     expect(await screen.findByRole("alert")).toHaveTextContent(/isn't available/);
   });
+
+  it("shows the wait, the breakdown on tap, and sends a chip as the next question", async () => {
+    const timing = { total_ms: 1180, phases: { plan: 20, fetch: 60, check: 5, other: 1095 }, model_calls: 0, model: null };
+    fetchMock.mockResolvedValueOnce(stream({ path: "planner", proposal_id: null, timing, chips: ["and the month before?"], resolved: ["Transport › Fuel"] }, "You spent £84.00 on fuel in December 2025."));
+    fetchMock.mockResolvedValueOnce(stream({ path: "planner", proposal_id: null }, "You spent £70.00 on fuel in November 2025."));
+    ui();
+    await ask("fuel last month?");
+    const summary = await screen.findByText(/0 model calls/);
+    expect(summary.textContent).toMatch(/^\d+\.\d s · 0 model calls$/);
+    expect(screen.getByText("Read as Transport › Fuel")).toBeInTheDocument();
+    await userEvent.click(summary);
+    expect(screen.getByTestId("timing")).toHaveProperty("open", true);
+    expect(screen.getByText("Fetching figures")).toBeInTheDocument();
+    expect(screen.getByText(/Answered by: Built in/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "and the month before?" }));
+    await screen.findByText(/November 2025/);
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toEqual({ message: "and the month before?", thread_id: "a".repeat(32) });
+  });
+
+  it("frees the local model when the chat closes", () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal("navigator", { ...navigator, sendBeacon: beacon });
+    ui().unmount();
+    expect(beacon).toHaveBeenLastCalledWith("/api/chat/cool");
+  });
 });

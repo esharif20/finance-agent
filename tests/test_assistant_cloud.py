@@ -479,3 +479,33 @@ def test_regenerate_recordings(
             ids,
             route(store, _recorder(ADVERSARIAL / kind, lambda t=text: t)),
         )
+
+
+def test_an_open_question_on_a_cloud_thread_sends_nothing_of_the_profile(
+    engine: Engine, ids: bench.Ids, store: SpendStore
+) -> None:
+    """The profile (#327) is local prompt prose: a cloud call carries only the
+    turn's redacted tool facts, so no line, figure or name of it leaves."""
+    from finance_agent.engine import profile
+
+    with engine.connect() as conn:
+        text, _ = profile.profile_context(conn, ME, golden.TODAY)
+    spy = Spy(FakeCloud(text="{P1}."))
+    case = bench.BY_ID["ask-spent-january"]
+    local = FakeChatModel(
+        [
+            *bench.routed(case),
+            Reply(
+                tool_calls=(
+                    ToolCall(name="spending_summary", arguments={"month": "2026-01"}),
+                )
+            ),
+            Reply(content="Look at your spending."),
+        ]
+    )
+    run_case(engine, case, ids, route(store, spy), model=local)
+    assert text and spy.bodies  # a profile exists and a cloud call was made
+    sent = json.dumps(spy.bodies)
+    lines = [ln.strip() for ln in text.splitlines() if len(ln.strip()) > 12]
+    assert [ln for ln in lines if ln in sent] == []
+    assert re.findall(r"£[\d,]+\.\d\d", sent) == []

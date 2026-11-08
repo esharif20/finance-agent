@@ -22,7 +22,7 @@ from synthetic_assistant import DECEMBER, ME, ROWS, seed
 
 TODAY = date(2026, 1, 20)
 # "petrol" is not a taxonomy name, so the model answers (fuel goes to the fast path)
-FUEL = "How much did I spend on petrol last month?"
+FUEL = "What did petrol cost me in December 2025?"  # the model path, not the planner
 pytestmark = pytest.mark.pre_router  # as in use: no Router call for this one
 
 
@@ -73,7 +73,7 @@ def test_the_listed_transactions_sum_exactly_to_the_figure_in_the_reply(
     use(client, fuel_model())
     stages, meta, reply = turn(client)
     assert meta["path"] == "local_model"
-    [group] = meta["counted"]
+    [group] = [g for g in meta["counted"] if g["evidence_id"].startswith("detail:")]
     assert group["evidence_id"] in meta["evidence"]
     rows = group["transactions"]
     assert len(rows) == 2  # Shell and Tesco PFS, not the taxi or the train
@@ -100,7 +100,7 @@ def test_the_fallback_table_lists_the_same_transactions(client: TestClient) -> N
     use(client, fuel_model("You spent £99.99.", "Still £99.99."))  # ungrounded twice
     _, meta, _ = turn(client)
     assert meta["path"] == "deterministic"
-    [group] = meta["counted"]
+    [group] = [g for g in meta["counted"] if g["evidence_id"].startswith("detail:")]
     assert sum(r["amount_minor"] for r in group["transactions"]) == 8400
 
 

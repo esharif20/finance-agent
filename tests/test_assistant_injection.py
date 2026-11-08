@@ -433,7 +433,7 @@ def test_a_figure_from_an_earlier_reply_cannot_be_reused_without_a_tool(
     a = turn(engine, m, "remind me", first.thread_id)
     sent_first = " ".join(x.content for x in m.calls[1][0])
     assert SPENT not in sent_first  # masked in the conversation slot
-    assert a.path == "deterministic" and SPENT not in a.reply
+    assert a.path == "miss" and SPENT not in a.reply
 
 
 # --- 5. exfiltration through a link, Memory or a Proposal ---------------------------
@@ -685,7 +685,7 @@ def test_a_printed_tool_call_with_no_tool_round_never_reaches_the_user(
     before = state(engine)
     a = turn(engine, fake("memory", PRINTED[0], PRINTED[0]), "remember I like tea")
     assert a.reply != PRINTED[0] and "tool_call" not in a.reply
-    assert a.path == "deterministic"
+    assert a.path == "miss"
     assert state(engine) == before  # printing a call runs nothing
 
 

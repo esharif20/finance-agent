@@ -45,6 +45,7 @@ from finance_agent.assistant import (
     Reply,
     ToolCall,
     graph,
+    planner,
 )
 from finance_agent.assistant.graph import Assistant, ask
 from finance_agent.assistant.tools import registry
@@ -143,10 +144,12 @@ def _row(
 
 def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], list[str]]:
     """Each case through the graph; the counted set is read off the last
-    spend_for_query result the model asked for."""
+    spend_for_query result the model asked for, or the planner's own Engine
+    read when code resolved the question with no model call (#317)."""
     rows: list[dict[str, Any]] = []
     outs: list[SpendForQueryOut] = []
     real_run = registry.run
+    real_spend = planner.spend
 
     def spy(*a: Any, **k: Any) -> Any:
         out = real_run(*a, **k)
@@ -154,10 +157,16 @@ def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], lis
             outs.append(out)
         return out
 
+    def spend_spy(*a: Any, **k: Any) -> Any:
+        out = real_spend(*a, **k)
+        outs.append(out)
+        return out
+
     for case in qp.CASES:
         rec = Recorder(factory(case))
         outs.clear()
         setattr(graph, "run", spy)  # noqa: B010 (the module global the graph calls)
+        setattr(planner, "spend", spend_spy)  # noqa: B010
         with s.engine.connect() as conn:
             tx = conn.begin()
             try:
@@ -170,6 +179,7 @@ def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], lis
             finally:
                 tx.rollback()
                 setattr(graph, "run", real_run)  # noqa: B010
+                setattr(planner, "spend", real_spend)  # noqa: B010
         out = outs[-1] if outs else None
         got: set[int | None] = {r.merchant_id for r in out.merchants} if out else set()
         total = out.total.minor if out else 0
@@ -177,7 +187,9 @@ def run_planner(s: _Seeded, factory: Factory) -> tuple[list[dict[str, Any]], lis
         row["sum_exact"] = bool(out) and (
             total == sum(r.amount.minor for r in out.merchants) + out.other.minor
         )
-        row["grounded"] = a.path == "local_model" and pounds(total) in a.reply
+        row["grounded"] = (
+            a.path in ("local_model", "planner") and pounds(total) in a.reply
+        )
         rows.append(row)
     return rows, [r["id"] for r in rows if not (r["exact"] and r["same_set"])]
 

@@ -53,6 +53,7 @@ const subscribe = (l: () => void) => {
 export const useChat = () => useSyncExternalStore(subscribe, () => state);
 
 async function turn(url: string, body: object) {
+  const sent = performance.now();
   try {
     const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     if (!res.ok || !res.body) {
@@ -72,7 +73,7 @@ async function turn(url: string, body: object) {
         dispatch({ type: "event", event });
       }
     }
-    dispatch({ type: "event", event: { name: "done", data: {} } });
+    dispatch({ type: "event", event: { name: "done", data: { waited_ms: Math.round(performance.now() - sent) } } });
   } catch {
     dispatch({ type: "fail", error: refusal(500) });
   }
