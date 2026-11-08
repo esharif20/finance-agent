@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { type CategoryGroup, type ReviewItem, fetchSplit, fetchTransactions } from "@/api/client";
+import { type CategoryGroup, type ReviewItem, fetchSplit, fetchTransaction } from "@/api/client";
 import { Money } from "@/components/Money";
 import { NoteField } from "@/components/NoteField";
 import { SplitEditor } from "@/components/SplitEditor";
@@ -15,10 +15,9 @@ type Body = { item: ReviewItem; groups: CategoryGroup[]; busy: boolean };
 export function AlwaysAskExtras({ item, groups }: Pick<Body, "item" | "groups">) {
   const [mode, setMode] = useState<"split" | "note" | null>(null);
   const txn = item.transaction_ids[0] ?? 0;
-  // no endpoint reads one Transaction yet: find it among the Merchant's payments
   const found = useQuery({
-    queryKey: ["review-txn", txn, item.title],
-    queryFn: async () => (await fetchTransactions({ q: item.title }, 200)).items.find((t) => t.id === txn) ?? null,
+    queryKey: ["review-txn", txn],
+    queryFn: () => fetchTransaction(txn),
     enabled: mode === "split",
   });
   const toggle = (m: "split" | "note") => setMode((cur) => (cur === m ? null : m));

@@ -43,12 +43,13 @@ export function useReviewCount(): number {
   return data?.remaining ?? 0;
 }
 
-function suggestions(groups: { name: string; subs: string[] }[]): Cat[] {
+// the local model's nearest-neighbour suggestions lead (#114); they are only buttons
+function suggestions(groups: { name: string; subs: string[] }[], model: Cat[] = []): Cat[] {
   const all: Cat[] = groups
     .filter((g) => g.name !== "Uncategorised")
     .flatMap((g) => g.subs.map((s): Cat => [g.name, s]));
   const seen = new Set<string>();
-  return [...recent, ...all]
+  return [...model, ...recent, ...all]
     .filter(([g, s]) => !seen.has(`${g}/${s}`) && seen.add(`${g}/${s}`))
     .slice(0, 3);
 }
@@ -78,7 +79,7 @@ export function ReviewQueue() {
   const item: ReviewItem | undefined = items[idx];
   const groups = categories.data ?? [];
   const asksCategory = item?.type === "category" || item?.type === "always_ask";
-  const picks = asksCategory ? suggestions(groups) : [];
+  const picks = asksCategory ? suggestions(groups, (item?.suggestions ?? []) as Cat[]) : [];
   const many = (item?.weight ?? 0) > 1 && item?.transaction_ids.length;
   const justOne = !all && !!many;
 

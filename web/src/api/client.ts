@@ -50,6 +50,7 @@ export const fetchTransactions = (f: TxnFilters, limit: number) => {
   for (const [k, v] of Object.entries(f)) if (v) p.set(k, v);
   return get<TxnPage>(`/api/transactions?${p}`);
 };
+export const fetchTransaction = (id: number) => get<TxnPage["items"][number]>(`/api/transactions/${id}`);
 export const fetchCategories = () => get<CategoryGroup[]>("/api/categories");
 
 export type CorrectionOut = components["schemas"]["CorrectionOut"];
@@ -185,7 +186,10 @@ export const setAlwaysAsk = (merchant: number, on: boolean, source: "user" | "su
 export type SubscriptionEntry = components["schemas"]["SubscriptionOut"];
 export type SubscriptionCosts = import("@/lib/subscriptions").Costs;
 export type Placement = { kind: "subscription" | "bill"; group: string };
-export const fetchSubscriptions = () => get<SubscriptionEntry[]>("/api/subscriptions");
+// The built-in Manage links (#174): the reviewed list is served by the API.
+export type ManageLinkEntry = components["schemas"]["ManageLinkOut"];
+export const fetchManageLinks = () => get<ManageLinkEntry[]>("/api/manage-links");
+export const fetchSubscriptions =() => get<SubscriptionEntry[]>("/api/subscriptions");
 export const fetchSubscriptionCosts = () => get<SubscriptionCosts>("/api/subscriptions/costs");
 
 const sub = (merchant: number, verb = "") => `/api/subscriptions/${merchant}${verb}`;

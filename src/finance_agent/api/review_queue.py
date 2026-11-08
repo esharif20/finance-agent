@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from finance_agent.categorise import embedding
 from finance_agent.identity import current_user
 from finance_agent.ledger import UnknownTarget
 from finance_agent.ledger.review import (
@@ -28,6 +29,9 @@ class ItemOut(BaseModel):
     merchant_id: int | None
     transaction_ids: list[int]
     choices: list[str]  # empty: answer with a Category
+    suggestions: list[
+        tuple[str, str]
+    ]  # local-model Categories, best first; may be empty
     skipped: bool
 
 
@@ -49,7 +53,14 @@ class AnswerIn(VersionIn):
 
 def _queue(request: Request) -> Iterator[ReviewQueue]:
     with request.app.state.engine.begin() as conn:
-        yield ReviewQueue(conn, current_user())
+        user = current_user()
+        yield ReviewQueue(
+            conn,
+            user,
+            suggester=lambda targets, labelled: embedding.suggest(
+                conn, user, targets, labelled
+            ),
+        )
 
 
 Queue = Annotated[ReviewQueue, Depends(_queue)]
@@ -66,6 +77,7 @@ def _item(i: Item) -> ItemOut:
         merchant_id=i.merchant_id,
         transaction_ids=list(i.transaction_ids),
         choices=list(i.choices),
+        suggestions=list(i.suggestions),
         skipped=i.skipped,
     )
 

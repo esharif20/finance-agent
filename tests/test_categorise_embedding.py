@@ -37,8 +37,8 @@ class FakeResponse:
     def __init__(self, status: int, body: bytes) -> None:
         self.status, self._body = status, body
 
-    def read(self) -> bytes:
-        return self._body
+    def read(self, amt: int = -1) -> bytes:
+        return self._body[:amt] if amt >= 0 else self._body
 
     def close(self) -> None:
         pass
@@ -277,6 +277,9 @@ class Counting(TrigramEmbedder):
 
 class Down:
     model = "nomic-embed-text"
+
+    def digest(self) -> str | None:
+        return None
 
     def embed(self, texts: Sequence[str]) -> list[embedding.Vector]:
         raise EmbeddingUnavailable("Ollama is not running on localhost")

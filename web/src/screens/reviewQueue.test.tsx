@@ -17,6 +17,7 @@ const item = (over: Partial<Item>): Item => ({
   merchant_id: 1,
   transaction_ids: [10, 11],
   choices: [],
+  suggestions: [],
   skipped: false,
   ...over,
 });
@@ -70,6 +71,13 @@ describe("ReviewQueue", () => {
     expect(screen.getByText("2 to review")).toBeInTheDocument();
     expect(screen.getByText("12 transactions")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+  });
+
+  it("puts the local model's suggestions first and answers nothing by itself", async () => {
+    const { calls } = setup(queue([item({ suggestions: [["Transport", "Taxi"]] })]));
+    const buttons = await screen.findAllByRole("button", { name: /Taxi|Groceries|Coffee/ });
+    expect(buttons[0]).toHaveTextContent("Taxi");
+    expect(calls).toHaveLength(0);
   });
 
   it("answers for the whole Merchant with key 1, then invalidates everything", async () => {

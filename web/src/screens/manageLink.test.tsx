@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { components } from "@/api/schema";
 import { PrivacyProvider } from "@/lib/privacy";
 import { CategoryScreen } from "./CategoryScreen";
+import { MANAGE_LINKS_STUB } from "./manageLinksStub";
 import { Transactions } from "./Transactions";
 
 type Txn = components["schemas"]["TransactionOut"];
@@ -32,7 +33,9 @@ function list(items: Txn[]) {
     vi.fn(async (url: string) =>
       url.startsWith("/api/transactions")
         ? Response.json({ items, total: items.length })
-        : Response.json(url.startsWith("/api/categories") ? groups : []),
+        : Response.json(
+            url.startsWith("/api/manage-links") ? MANAGE_LINKS_STUB : url.startsWith("/api/categories") ? groups : [],
+          ),
     ),
   );
   render(
@@ -90,7 +93,9 @@ describe("Manage link in the Category drill-down", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => Response.json(url.startsWith("/api/months") ? ["2026-02"] : d)),
+      vi.fn(async (url: string) =>
+        Response.json(url.startsWith("/api/months") ? ["2026-02"] : url.startsWith("/api/manage-links") ? MANAGE_LINKS_STUB : d),
+      ),
     );
     render(
       <QueryClientProvider client={client()}>

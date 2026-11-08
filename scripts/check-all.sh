@@ -18,7 +18,7 @@ uv run python scripts/fixture_guard.py
 uv run ruff check .
 uv run pyright
 uv run lint-imports
-uv run pytest -q
+uv run pytest -q -n auto
 uv run python evals/categoriser.py
 for h in detectors baselines ranking forecast; do uv run python "evals/$h.py"; done
 pnpm --dir web install --frozen-lockfile
