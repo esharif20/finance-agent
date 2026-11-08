@@ -3814,7 +3814,7 @@
     },
     "/api/chat": {
       "post": {
-        "description": "One turn. Omit `thread_id` to start a conversation; the reply's `meta`\nevent carries the new one.",
+        "description": "One turn. Omit `thread_id` to start a conversation; the reply's `meta`\nevent carries the new one. `cloud` (default false; omitted keeps the\nthread's choice) sends this conversation's wording through the gateway.",
         "operationId": "chat_api_chat_post",
         "responses": {
           "200": {

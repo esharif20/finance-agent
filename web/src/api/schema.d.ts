@@ -186,7 +186,8 @@ export interface paths {
         /**
          * Chat
          * @description One turn. Omit `thread_id` to start a conversation; the reply's `meta`
-         *     event carries the new one.
+         *     event carries the new one. `cloud` (default false; omitted keeps the
+         *     thread's choice) sends this conversation's wording through the gateway.
          */
         post: operations["chat_api_chat_post"];
         delete?: never;
