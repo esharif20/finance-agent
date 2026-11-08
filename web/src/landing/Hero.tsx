@@ -1,4 +1,4 @@
-import { motion, useMotionValueEvent, useScroll, useSpring } from "motion/react";
+import { motion, useMotionValue, useMotionValueEvent, useScroll } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Money } from "@/components/Money";
 import { ASPECT } from "@/lib/cardArt";
@@ -36,6 +36,11 @@ const MONTH = new Date(`${ACCOUNTS.month}-01T12:00:00Z`).toLocaleString("en-GB",
 const ROWS = [...REVIEW.map((r) => ({ name: r.merchant, amount: r.amount })), ...OVERVIEW.top.map((c) => ({ name: c.name, amount: c.amount }))];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+/** Key frames the playhead rests on going forward: the row with every balance, then the totals. */
+const HOLDS = [
+  { at: 0.34, ms: 420 },
+  { at: 0.66, ms: 900 },
+];
 const ease = (v: number) => v * v * (3 - 2 * v);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const span = (p: number, a: number, b: number) => ease(clamp01((p - a) / (b - a)));
@@ -49,8 +54,8 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
   // on a phone the row is a column, cards on the left and each label beside its card
   const row = narrow ? { x: -w * 0.36, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: -w * 0.08, rz: 0, rx: 0, ry: 0, z: 0 };
   const stack = { x: narrow ? n * 8 : n * 14, y: narrow ? -w * 0.86 + n * 10 : -w * 0.34 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
-  const a = span(p, 0.08, 0.34);
-  const b = span(p, 0.52, 0.76);
+  const a = span(p, 0.08, 0.3);
+  const b = span(p, 0.44, 0.62);
   const k = (key: keyof typeof row) => mix(mix(fan[key], row[key], a), stack[key], b);
   return {
     x: k("x"),
@@ -61,7 +66,7 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
     rz: k("rz"),
     s: mix(1, narrow ? 0.82 : 0.78, b),
     layer: i,
-    label: clamp01((p - 0.3) / 0.06) * (1 - clamp01((p - 0.5) / 0.06)),
+    label: clamp01((p - 0.24) / 0.06) * (1 - clamp01((p - 0.42) / 0.05)),
   };
 }
 
@@ -225,6 +230,10 @@ function LedgerField() {
     };
     const move = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
+      if (stale) {
+        stale = false;
+        rect = cv.getBoundingClientRect();
+      }
       aim.x = e.clientX - rect.left;
       aim.y = e.clientY - rect.top;
       energy = Math.min(1, energy + 0.08);
@@ -234,7 +243,8 @@ function LedgerField() {
       size();
       kick();
     };
-    const resync = () => void (rect = cv.getBoundingClientRect());
+    let stale = false;
+    const resync = () => void (stale = true);
     const io = new IntersectionObserver(([e]) => {
       visible = Boolean(e?.isIntersecting);
       if (visible) kick();
@@ -275,16 +285,18 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const playing = useRef(play);
   playing.current = play;
   const [landed, setLanded] = useState(0);
+  // one scroll driver: the raw scroll progress is the target, and the frame loop below moves a
+  // playhead `p` after it (see PLAYHEAD), so every stage plays in full however fast the scroll
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
-  const p = useSpring(scrollYProgress, { stiffness: 90, damping: 24, restDelta: 0.0005 });
+  const p = useMotionValue(0);
   const [phase, setPhase] = useState(0);
-  useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.62 ? 1 : 2));
+  useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.6 ? 1 : 2));
 
   // the odometer rolls up as the combined view arrives, a wheel every 70 ms
   const rolled = phase >= 2;
   useEffect(() => {
     if (still || !rolled) return;
-    const ids = Array.from({ length: digitsIn(TOTAL) }, (_, d) => window.setTimeout(() => setLanded((n) => Math.max(n, d + 1)), 250 + d * 70));
+    const ids = Array.from({ length: digitsIn(TOTAL) }, (_, d) => window.setTimeout(() => setLanded((n) => Math.max(n, d + 1)), 140 + d * 55));
     return () => ids.forEach((id) => window.clearTimeout(id));
   }, [still, rolled]);
 
@@ -311,11 +323,35 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     let dims = size();
     // render on demand: the loop runs only while something moves, and sleeps when the scroll,
     // the pointer tilt and the deal have all settled
-    let lastP = -1;
     let drawn = false;
+    let last = 0;
+    let held: { at: number; since: number } | null = null;
     const sizeScene = () => {
       dims = size();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
+    };
+    /** PLAYHEAD: p chases the scroll with a short ease (90 ms) but never faster than the whole
+        sequence in 0.7 s, and going forward it rests at each key frame (the labelled row, the
+        totals) for a minimum dwell, so a fast flick still shows every stage. Going back it just
+        follows. Transform and opacity only downstream; no layout reads here. */
+    const advance = (now: number) => {
+      const dt = last ? Math.min(64, now - last) : 16;
+      last = now;
+      const target = scrollYProgress.get();
+      let v = p.get();
+      if (held) {
+        if (target < held.at || now - held.since >= (HOLDS.find((h) => h.at === held?.at)?.ms ?? 0)) held = null;
+        else return v;
+      }
+      const step = Math.max(-dt / 700, Math.min(dt / 700, (target - v) * (1 - Math.exp(-dt / 90))));
+      const next = Math.abs(target - v) < 0.0004 ? target : v + step;
+      const hold = step > 0 ? HOLDS.find((h) => v < h.at && next >= h.at && target > h.at) : undefined;
+      if (hold) {
+        held = { at: hold.at, since: now };
+        v = hold.at;
+      } else v = next;
+      p.set(v);
+      return v;
     };
     const frame = () => {
       raf = 0;
@@ -328,9 +364,10 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (playing.current && !dealt) dealt = now;
       // the deal waits out the preloader's sheet as it lifts off the top of the page
       const since = dealt ? now - dealt - 450 : 0;
-      const pv = p.get();
+      const pv = advance(now);
       // on idle the fan turns slowly in place, desktop and fine pointer only, and only while it is a fan
-      const sway = finePointer() && !narrow ? clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08)) : 0;
+      // it settles after a few turns, so an idle page renders nothing
+      const sway = finePointer() && !narrow ? clamp01((since - 2200) / 1800) * (1 - clamp01((since - 7000) / 2000)) * (1 - clamp01((pv - 0.02) / 0.08)) : 0;
       const poses = ACCOUNTS.accounts.map((_, i) => {
         const q0 = pose(i, pv, w, narrow, tilt);
         // magnetic depth: each card sits at its own depth, so the eased tilt shifts the front card most (2 to 6 px)
@@ -391,8 +428,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // the last card lands at 160 + 2 * 170 + 1400 ms; the WebGL sweep ends at 1100 + 1500 ms
       const dealing = !dealt || since < 2800;
       const idling = sway > 0;
-      const moving = Math.abs(pv - lastP) > 0.00005;
-      lastP = pv;
+      const moving = held !== null || Math.abs(scrollYProgress.get() - pv) > 0.0004;
       if (dealing || idling || moving || settling || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
@@ -414,7 +450,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       sizeScene();
       kick();
     };
-    const offP = p.on("change", kick);
+    const offP = scrollYProgress.on("change", kick);
     window.addEventListener("pointermove", move);
     window.addEventListener("resize", resize);
     if (canvas.current && !liteDevice() && webgl()) {
