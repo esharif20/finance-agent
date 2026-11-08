@@ -138,6 +138,9 @@ def _meta(a: Answer) -> dict[str, Any]:
         "proposal_id": a.proposal_id,
         "cost_pence": a.cost_pence,
         "payload_id": a.payload_id,
+        "resolved": list(a.resolved),
+        "chips": list(a.chips),
+        "timing": a.timing,
         "counted": [
             {
                 "evidence_id": e.evidence_id,
@@ -272,6 +275,15 @@ def warm(model: Model) -> dict[str, bool]:
     except (OllamaError, OSError):
         return {"warm": False}
     return {"warm": True}
+
+
+@router.post("/cool")
+def cool(request: Request) -> dict[str, bool]:
+    """The chat screen closed: unload the model now rather than in 30 minutes."""
+    with request.app.state.engine.connect() as conn:
+        choice = Settings(conn, current_user()).assistant_model() or DEFAULT_CHOICE
+    unload(MODELS[choice])
+    return {"cool": True}
 
 
 @router.post("/{thread_id}/resume")
