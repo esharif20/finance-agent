@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, Newspaper, Repeat, Settings as SettingsIcon } from "lucide-react";
+import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, MessageCircle, Newspaper, Repeat, Settings as SettingsIcon } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
 import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
@@ -7,6 +7,7 @@ import { NavTabs } from "@/components/NavTabs";
 import { SyncNow } from "@/components/SyncNow";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy";
 import { useRoute } from "@/lib/route";
+import { Assistant } from "@/screens/Assistant";
 import { CategoryScreen } from "@/screens/CategoryScreen";
 import { Briefing } from "@/screens/Briefing";
 import { KnowYou } from "@/screens/KnowYou";
@@ -51,6 +52,7 @@ const tabs = (review: number) => [
   { id: "transactions", label: "Transactions", icon: <ListOrdered className="size-4" aria-hidden="true" /> },
   { id: "subscriptions", label: "Subscriptions", icon: <Repeat className="size-4" aria-hidden="true" /> },
   { id: "briefing", label: "Briefing", icon: <Newspaper className="size-4" aria-hidden="true" /> },
+  { id: "assistant", label: "Assistant", icon: <MessageCircle className="size-4" aria-hidden="true" /> },
   { id: "review", label: "Review", icon: <Inbox className="size-4" aria-hidden="true" />, badge: review },
 ];
 
@@ -58,7 +60,7 @@ function Shell() {
   const route = useRoute();
   const review = useReviewCount();
   const TABS = tabs(review);
-  const tab = route.name === "know" ? "briefing" : route.name === "transactions" || route.name === "briefing" || route.name === "review" || route.name === "subscriptions" ? route.name : route.name === "settings" ? "" : "overview";
+  const tab = route.name === "know" ? "briefing" : route.name === "transactions" || route.name === "briefing" || route.name === "assistant" || route.name === "review" || route.name === "subscriptions" ? route.name : route.name === "settings" ? "" : "overview";
   return (
     <>
       <Ambient />
@@ -110,6 +112,8 @@ function Shell() {
                 <Briefing />
               ) : route.name === "know" ? (
                 <KnowYou />
+              ) : route.name === "assistant" ? (
+                <Assistant />
               ) : route.name === "review" ? (
                 <ReviewQueue />
               ) : route.name === "settings" ? (
@@ -123,8 +127,8 @@ function Shell() {
         <NavTabs
           tabs={TABS}
           tab={tab}
-          className="glass fixed inset-x-4 bottom-3 z-20 flex justify-center gap-0.5 rounded-full p-1.5 sm:hidden"
-          item="inline-flex min-h-11 items-center gap-2 rounded-full px-2.5 text-xs font-semibold [&_svg]:hidden"
+          className="glass fixed inset-x-2 bottom-3 z-20 flex justify-center gap-0 rounded-full p-1 sm:hidden"
+          item="inline-flex min-h-11 items-center gap-2 rounded-full px-1.5 text-xs font-semibold [&_svg]:hidden"
         />
       </div>
     </>

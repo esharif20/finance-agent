@@ -10,6 +10,7 @@ export type Route =
   | { name: "subscriptions" }
   | { name: "briefing" }
   | { name: "know" }
+  | { name: "assistant" }
   | { name: "category"; category: string; month?: string; account?: number };
 
 const id = (s: string | undefined) => (s && /^\d+$/.test(s) ? Number(s) : undefined);
@@ -22,6 +23,7 @@ export function parseHash(hash: string): Route {
   if (kind === "subscriptions") return { name: "subscriptions" };
   if (kind === "briefing") return { name: "briefing" };
   if (kind === "know") return { name: "know" };
+  if (kind === "assistant") return { name: "assistant" };
   if (kind === "account" && id(name) !== undefined) return { name: "overview", account: id(name) };
   if (kind === "category" && name) {
     try {
