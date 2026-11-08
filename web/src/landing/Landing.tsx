@@ -1,5 +1,6 @@
 import { Hero } from "./Hero";
 import { Promises } from "./Promises";
+import { Story } from "./story/Story";
 import "./landing.css";
 
 const GITHUB = "https://github.com/esharif20/finance-agent";
@@ -55,6 +56,7 @@ export default function Landing() {
       </header>
       <main id="lp-main">
         <Hero />
+        <Story />
         <section id="what" className="lp-what" aria-labelledby="lp-what-title">
           <div className="lp-wrap lp-what-grid">
             <h2 id="lp-what-title" className="lp-h2">
