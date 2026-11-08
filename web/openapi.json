@@ -356,60 +356,26 @@
         "title": "AlwaysAskOut",
         "type": "object"
       },
-      "AnswerIn": {
+      "AnswerOut": {
         "properties": {
-          "category": {
-            "anyOf": [
-              {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category"
+          "pair_id": {
+            "title": "Pair Id",
+            "type": "integer"
           },
-          "choice": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+          "question": {
+            "enum": [
+              "cut",
+              "matters"
             ],
-            "title": "Choice"
-          },
-          "transaction_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transaction Id"
-          },
-          "version": {
-            "title": "Version",
+            "title": "Question",
             "type": "string"
           }
         },
         "required": [
-          "version"
+          "pair_id",
+          "question"
         ],
-        "title": "AnswerIn",
+        "title": "AnswerOut",
         "type": "object"
       },
       "AutoBatchOut": {
@@ -1923,105 +1889,6 @@
         "title": "InsightOut",
         "type": "object"
       },
-      "ItemOut": {
-        "properties": {
-          "choices": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Choices",
-            "type": "array"
-          },
-          "currency": {
-            "title": "Currency",
-            "type": "string"
-          },
-          "display_name": {
-            "title": "Display Name",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "merchant_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Merchant Id"
-          },
-          "skipped": {
-            "title": "Skipped",
-            "type": "boolean"
-          },
-          "spend_minor": {
-            "title": "Spend Minor",
-            "type": "integer"
-          },
-          "suggestions": {
-            "items": {
-              "maxItems": 2,
-              "minItems": 2,
-              "prefixItems": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "string"
-                }
-              ],
-              "type": "array"
-            },
-            "title": "Suggestions",
-            "type": "array"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "transaction_ids": {
-            "items": {
-              "type": "integer"
-            },
-            "title": "Transaction Ids",
-            "type": "array"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "string"
-          },
-          "weight": {
-            "title": "Weight",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "type",
-          "version",
-          "weight",
-          "title",
-          "display_name",
-          "merchant_id",
-          "transaction_ids",
-          "choices",
-          "suggestions",
-          "skipped",
-          "spend_minor",
-          "currency"
-        ],
-        "title": "ItemOut",
-        "type": "object"
-      },
       "Kind": {
         "enum": [
           "bill",
@@ -2047,6 +1914,36 @@
           "monthly"
         ],
         "title": "KindTotal",
+        "type": "object"
+      },
+      "LearnedOut": {
+        "properties": {
+          "answers": {
+            "title": "Answers",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrengthOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "question": {
+            "enum": [
+              "cut",
+              "matters"
+            ],
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answers",
+          "items"
+        ],
+        "title": "LearnedOut",
         "type": "object"
       },
       "LocalModelOut": {
@@ -2518,6 +2415,41 @@
         "title": "NoteOut",
         "type": "object"
       },
+      "PairOut": {
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/finance_agent__api__preferences__ItemOut"
+          },
+          "b": {
+            "$ref": "#/components/schemas/finance_agent__api__preferences__ItemOut"
+          },
+          "pair_id": {
+            "title": "Pair Id",
+            "type": "integer"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "question": {
+            "enum": [
+              "cut",
+              "matters"
+            ],
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pair_id",
+          "question",
+          "prompt",
+          "a",
+          "b"
+        ],
+        "title": "PairOut",
+        "type": "object"
+      },
       "PartIn": {
         "properties": {
           "amount_minor": {
@@ -2737,7 +2669,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ItemOut"
+              "$ref": "#/components/schemas/finance_agent__api__review_queue__ItemOut"
             },
             "title": "Items",
             "type": "array"
@@ -3354,6 +3286,34 @@
         ],
         "title": "Status",
         "type": "string"
+      },
+      "StrengthOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "rank",
+          "words"
+        ],
+        "title": "StrengthOut",
+        "type": "object"
       },
       "SubscriptionOut": {
         "properties": {
@@ -4008,6 +3968,200 @@
           "currency"
         ],
         "title": "Money",
+        "type": "object"
+      },
+      "finance_agent__api__preferences__AnswerIn": {
+        "properties": {
+          "choice": {
+            "maxLength": 80,
+            "title": "Choice",
+            "type": "string"
+          },
+          "pair_id": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Pair Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pair_id",
+          "choice"
+        ],
+        "title": "AnswerIn",
+        "type": "object"
+      },
+      "finance_agent__api__preferences__ItemOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "ItemOut",
+        "type": "object"
+      },
+      "finance_agent__api__review_queue__AnswerIn": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AnswerIn",
+        "type": "object"
+      },
+      "finance_agent__api__review_queue__ItemOut": {
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "spend_minor": {
+            "title": "Spend Minor",
+            "type": "integer"
+          },
+          "suggestions": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "transaction_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Transaction Ids",
+            "type": "array"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "version",
+          "weight",
+          "title",
+          "display_name",
+          "merchant_id",
+          "transaction_ids",
+          "choices",
+          "suggestions",
+          "skipped",
+          "spend_minor",
+          "currency"
+        ],
+        "title": "ItemOut",
         "type": "object"
       },
       "finance_agent__assistant__tools__read__Money": {
@@ -5009,7 +5163,7 @@
     },
     "/api/insights": {
       "get": {
-        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out.",
+        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out; the last may be a seeded exploration\n(#261). Each is logged as shown, with its propensity.",
         "operationId": "ranked_api_insights_get",
         "parameters": [
           {
@@ -5052,6 +5206,25 @@
           }
         },
         "summary": "Ranked"
+      }
+    },
+    "/api/insights/exposures": {
+      "delete": {
+        "description": "Wipe the exposure log: every shown Insight and card, and its outcome.",
+        "operationId": "forget_exposures_api_insights_exposures_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget Exposures"
       }
     },
     "/api/insights/feedback": {
@@ -5627,6 +5800,160 @@
         "summary": "Allocation"
       }
     },
+    "/api/preferences": {
+      "delete": {
+        "description": "Wipe every pairwise question and answer: strengths go back to the prior.",
+        "operationId": "reset_api_preferences_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset"
+      },
+      "get": {
+        "description": "What the answers say, strongest first, in words (never a number).",
+        "operationId": "learned_api_preferences_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "question",
+            "required": false,
+            "schema": {
+              "default": "cut",
+              "enum": [
+                "cut",
+                "matters"
+              ],
+              "title": "Question",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Learned"
+      }
+    },
+    "/api/preferences/answer": {
+      "post": {
+        "description": "Answer the pair last asked, once. A pair never asked, already answered\nor another user's is not found; a choice outside the pair is refused.",
+        "operationId": "answer_api_preferences_answer_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/finance_agent__api__preferences__AnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer"
+      }
+    },
+    "/api/preferences/next-pair": {
+      "get": {
+        "description": "The most informative pair to ask next; None with fewer than two items.\nIt replaces the question's unanswered pair.",
+        "operationId": "next_pair_api_preferences_next_pair_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "question",
+            "required": false,
+            "schema": {
+              "default": "cut",
+              "enum": [
+                "cut",
+                "matters"
+              ],
+              "title": "Question",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PairOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Next Pair Api Preferences Next Pair Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Next Pair"
+      }
+    },
     "/api/proposals": {
       "get": {
         "description": "Pending Proposals, oldest first: the confirm cards to show.",
@@ -5937,7 +6264,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnswerIn"
+                "$ref": "#/components/schemas/finance_agent__api__review_queue__AnswerIn"
               }
             }
           },

@@ -454,12 +454,33 @@ export interface paths {
         /**
          * Ranked
          * @description The best `limit` Insights, by impact x confidence x relevance, less
-         *     those a constraint Memory rules out.
+         *     those a constraint Memory rules out; the last may be a seeded exploration
+         *     (#261). Each is logged as shown, with its propensity.
          */
         get: operations["ranked_api_insights_get"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Exposures
+         * @description Wipe the exposure log: every shown Insight and card, and its outcome.
+         */
+        delete: operations["forget_exposures_api_insights_exposures_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -701,6 +722,72 @@ export interface paths {
         };
         /** Allocation */
         get: operations["allocation_api_plan_allocation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Learned
+         * @description What the answers say, strongest first, in words (never a number).
+         */
+        get: operations["learned_api_preferences_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Reset
+         * @description Wipe every pairwise question and answer: strengths go back to the prior.
+         */
+        delete: operations["reset_api_preferences_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer
+         * @description Answer the pair last asked, once. A pair never asked, already answered
+         *     or another user's is not found; a choice outside the pair is refused.
+         */
+        post: operations["answer_api_preferences_answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/next-pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Next Pair
+         * @description The most informative pair to ask next; None with fewer than two items.
+         *     It replaces the question's unanswered pair.
+         */
+        get: operations["next_pair_api_preferences_next_pair_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1313,19 +1400,15 @@ export interface components {
             /** Switched Off Corrections */
             switched_off_corrections: number[];
         };
-        /** AnswerIn */
-        AnswerIn: {
-            /** Category */
-            category?: [
-                string,
-                string
-            ] | null;
-            /** Choice */
-            choice?: string | null;
-            /** Transaction Id */
-            transaction_id?: number | null;
-            /** Version */
-            version: string;
+        /** AnswerOut */
+        AnswerOut: {
+            /** Pair Id */
+            pair_id: number;
+            /**
+             * Question
+             * @enum {string}
+             */
+            question: "cut" | "matters";
         };
         /** AutoBatchOut */
         AutoBatchOut: {
@@ -1785,38 +1868,6 @@ export interface components {
             /** Type */
             type: string;
         };
-        /** ItemOut */
-        ItemOut: {
-            /** Choices */
-            choices: string[];
-            /** Currency */
-            currency: string;
-            /** Display Name */
-            display_name: string;
-            /** Id */
-            id: string;
-            /** Merchant Id */
-            merchant_id: number | null;
-            /** Skipped */
-            skipped: boolean;
-            /** Spend Minor */
-            spend_minor: number;
-            /** Suggestions */
-            suggestions: [
-                string,
-                string
-            ][];
-            /** Title */
-            title: string;
-            /** Transaction Ids */
-            transaction_ids: number[];
-            /** Type */
-            type: string;
-            /** Version */
-            version: string;
-            /** Weight */
-            weight: number;
-        };
         /**
          * Kind
          * @enum {string}
@@ -1827,6 +1878,18 @@ export interface components {
             /** Kind */
             kind: string;
             monthly: components["schemas"]["Pence"];
+        };
+        /** LearnedOut */
+        LearnedOut: {
+            /** Answers */
+            answers: number;
+            /** Items */
+            items: components["schemas"]["StrengthOut"][];
+            /**
+             * Question
+             * @enum {string}
+             */
+            question: "cut" | "matters";
         };
         /** LocalModelOut */
         LocalModelOut: {
@@ -1976,6 +2039,20 @@ export interface components {
             /** Transaction Id */
             transaction_id: number;
         };
+        /** PairOut */
+        PairOut: {
+            a: components["schemas"]["finance_agent__api__preferences__ItemOut"];
+            b: components["schemas"]["finance_agent__api__preferences__ItemOut"];
+            /** Pair Id */
+            pair_id: number;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Question
+             * @enum {string}
+             */
+            question: "cut" | "matters";
+        };
         /** PartIn */
         PartIn: {
             /** Amount Minor */
@@ -2053,7 +2130,7 @@ export interface components {
              */
             applied: number;
             /** Items */
-            items: components["schemas"]["ItemOut"][];
+            items: components["schemas"]["finance_agent__api__review_queue__ItemOut"][];
             /** Ledger Version */
             ledger_version: number;
             /** Message */
@@ -2260,6 +2337,17 @@ export interface components {
          * @enum {string}
          */
         Status: "reached" | "overdue" | "at_risk" | "on_track" | "unchecked";
+        /** StrengthOut */
+        StrengthOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Rank */
+            rank: number;
+            /** Words */
+            words: string;
+        };
         /** SubscriptionOut */
         SubscriptionOut: {
             /** Changed At */
@@ -2464,6 +2552,66 @@ export interface components {
             currency: string;
             /** Minor */
             minor: number;
+        };
+        /** AnswerIn */
+        finance_agent__api__preferences__AnswerIn: {
+            /** Choice */
+            choice: string;
+            /** Pair Id */
+            pair_id: number;
+        };
+        /** ItemOut */
+        finance_agent__api__preferences__ItemOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** AnswerIn */
+        finance_agent__api__review_queue__AnswerIn: {
+            /** Category */
+            category?: [
+                string,
+                string
+            ] | null;
+            /** Choice */
+            choice?: string | null;
+            /** Transaction Id */
+            transaction_id?: number | null;
+            /** Version */
+            version: string;
+        };
+        /** ItemOut */
+        finance_agent__api__review_queue__ItemOut: {
+            /** Choices */
+            choices: string[];
+            /** Currency */
+            currency: string;
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Skipped */
+            skipped: boolean;
+            /** Spend Minor */
+            spend_minor: number;
+            /** Suggestions */
+            suggestions: [
+                string,
+                string
+            ][];
+            /** Title */
+            title: string;
+            /** Transaction Ids */
+            transaction_ids: number[];
+            /** Type */
+            type: string;
+            /** Version */
+            version: string;
+            /** Weight */
+            weight: number;
         };
         /** Money */
         finance_agent__assistant__tools__read__Money: {
@@ -3231,6 +3379,26 @@ export interface operations {
             };
         };
     };
+    forget_exposures_api_insights_exposures_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
     forget_feedback_api_insights_feedback_delete: {
         parameters: {
             query?: never;
@@ -3638,6 +3806,121 @@ export interface operations {
             };
         };
     };
+    learned_api_preferences_get: {
+        parameters: {
+            query?: {
+                question?: "cut" | "matters";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_api_preferences_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
+    answer_api_preferences_answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["finance_agent__api__preferences__AnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    next_pair_api_preferences_next_pair_get: {
+        parameters: {
+            query?: {
+                question?: "cut" | "matters";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pending_api_proposals_get: {
         parameters: {
             query?: never;
@@ -3895,7 +4178,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AnswerIn"];
+                "application/json": components["schemas"]["finance_agent__api__review_queue__AnswerIn"];
             };
         };
         responses: {

@@ -355,10 +355,16 @@ class Proposals:
 
     def forget_feedback(self) -> int:
         """Wipe the feedback, the rejected Proposals it points at and every
-        Insight rating, dismissal (#150) and regret answer (#152)."""
+        Insight rating, dismissal (#150), regret answer (#152), exposure
+        (#261) and pairwise answer (#262)."""
         f, p = schema.feedback, schema.proposal
         n = self._db.execute(self._db.delete(f)).rowcount
-        for t in (schema.insight_feedback, schema.regret_answer):
+        for t in (
+            schema.insight_feedback,
+            schema.regret_answer,
+            schema.exposure,
+            schema.pairwise_answer,
+        ):
             n += self._db.execute(self._db.delete(t)).rowcount
         self._db.execute(self._db.delete(p).where(p.c.status == "rejected"))
         return n
