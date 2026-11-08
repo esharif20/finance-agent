@@ -184,7 +184,18 @@ def assert_detail_matches(
             assert s.category == f"{top} > {sub['name']}"
             assert money(s.total) == minor_of(sub["amount"])
             assert s.subcategories == []
-            assert all(m.amount.minor <= s.total.minor for m in s.merchants)
+            assert [(m.merchant.data, *money(m.amount)) for m in s.merchants] == [
+                (r.merchant.data, *money(r.amount))
+                for r in call(
+                    engine,
+                    "ask",
+                    "category_detail",
+                    category=asked.upper(),
+                    month=month,
+                ).merchants
+            ]  # the name in any case
+    with pytest.raises(NoData):  # an unknown Subcategory is not its top's total
+        call(engine, "ask", "category_detail", category=f"{top} > Nope", month=month)
 
 
 def assert_matches_api(engine: Engine, c: TestClient) -> None:

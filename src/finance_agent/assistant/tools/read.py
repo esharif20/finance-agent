@@ -271,23 +271,25 @@ class CategoryDetailOut(BaseModel):
 def _category(name: str) -> tuple[str, str | None]:
     """(top, sub or None) for a Category the model named; unknown names pass
     through as a top level (the Ledger then finds nothing)."""
-    want = name.replace("/", ">").casefold()
-    top_part, _, sub_part = (p.strip() for p in want.partition(">"))
-    for top, subs in TAXONOMY.items():
-        if top.casefold() == top_part:
-            sub = next((s for s in subs if s.casefold() == sub_part), None)
-            return top, sub
-    if not sub_part:  # a Subcategory alone, e.g. "Fuel"
+    top_in, _, sub_in = (p.strip() for p in name.replace("/", ">").partition(">"))
+    for top in TAXONOMY:
+        if top.casefold() == top_in.casefold():
+            return top, sub_in or None
+    if not sub_in:  # a Subcategory alone, e.g. "Fuel"
         for top, subs in TAXONOMY.items():
             for s in subs:
-                if s.casefold() == top_part:
+                if s.casefold() == top_in.casefold():
                     return top, s
-    return name.strip(), None
+    # e.g. "To review", which the taxonomy doesn't list
+    return top_in, sub_in or None
 
 
 def category_detail(led: Reads, inp: CategoryDetailIn) -> CategoryDetailOut:
     m = _month(led, inp.month)
     top, sub = _category(inp.category)
+    if top not in TAXONOMY:  # e.g. "to review": the month's own name for it
+        names = (c.name for c in led.category_breakdown(m).categories)
+        top = next((n for n in names if n.casefold() == top.casefold()), top)
     # one more than the drill-down shows, so `truncated` can say there are more
     d = led.category_detail(top, m, trend=1, top_merchants=TOP_MERCHANTS + 1)
     if d is None:
@@ -295,10 +297,11 @@ def category_detail(led: Reads, inp: CategoryDetailIn) -> CategoryDetailOut:
     if sub is None:
         name, total, subs, merchants = d.name, d.total, d.subcategories, d.merchants
     else:
-        s = next((s for s in d.subcategories if s.name == sub), None)
+        want = sub.casefold()
+        s = next((s for s in d.subcategories if s.name.casefold() == want), None)
         if s is None:
             raise NoData("no spending in that Subcategory that month")
-        name, total, subs, merchants = f"{top} > {sub}", s.amount, (), s.children
+        name, total, subs, merchants = f"{d.name} > {s.name}", s.amount, (), s.children
     rows = [
         MerchantRow(
             # never the name in an ID: it is bank text
