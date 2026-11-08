@@ -27,6 +27,7 @@ ALLOWED = {
     "assistant/ollama.py": "the local model on localhost:11434 only (#135)",
     "categorise/embedding.py": "local embeddings on localhost:11434 only (#113)",
     "gateway/cloud.py": "the one pinned Gemini host only (ADR 0016, #298)",
+    "gateway/brief.py": "urllib.parse only, to check cited sources are https (#309)",
     "demo/app.py": "urllib.parse only, for the same-origin check (#296)",
     "cli/models.py": "local Ollama on localhost:11434 only (#311)",
     "cli/doctor.py": "urllib.parse only, to compare the bank host pin (#311)",

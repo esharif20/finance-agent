@@ -378,6 +378,9 @@ def test_the_demo_and_a_locked_keychain_have_no_gateway(
         assert chat.cloud_route(req) is None
     finally:
         keyring.set_keyring(held)
+        keyring.delete_password(
+            "finance-agent.gemini", "api-key"
+        )  # no leak to later tests
 
 
 # --- the recordings ----------------------------------------------------------
