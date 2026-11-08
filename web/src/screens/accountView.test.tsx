@@ -143,6 +143,26 @@ describe("Combined view (All accounts)", () => {
 });
 
 describe("Per-account view", () => {
+  it("choosing a card stays on the page: a history entry, no navigation, the same DOM", async () => {
+    serve();
+    await screen.findByRole("table", { name: /by account/i });
+    const card = screen.getByRole("button", { name: /••••0002/ });
+    const push = vi.spyOn(window.history, "pushState");
+    const unload = vi.fn();
+    window.addEventListener("beforeunload", unload);
+
+    await userEvent.click(card);
+
+    expect(push).toHaveBeenCalledWith(null, "", "#account/2");
+    expect(window.location.hash).toBe("#account/2");
+    await screen.findByRole("region", { name: "Northbank ••••0002" });
+    expect(unload).not.toHaveBeenCalled();
+    expect(card.isConnected).toBe(true); // the stack was not torn down and rebuilt
+    window.removeEventListener("beforeunload", unload);
+    push.mockRestore();
+  });
+
+
   it("opens from the card, puts the Account in the hash and Back returns to All accounts", async () => {
     const calls = serve();
     await screen.findByRole("table", { name: /by account/i });

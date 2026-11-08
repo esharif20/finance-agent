@@ -92,17 +92,16 @@ describe("privacy mode", () => {
     expect(screen.getByRole("img", { name: "Amounts hidden." })).toBeInTheDocument();
   });
 
-  it("H again shows amounts; the header button mirrors it with aria-pressed", async () => {
+  it("H again shows amounts; the header button's label mirrors it", async () => {
     render(<App />);
-    const button = await screen.findByRole("button", { name: /hide amounts/i });
-    expect(button).toHaveAttribute("aria-pressed", "false");
+    const button = await screen.findByRole("button", { name: "Hide values" });
 
     await userEvent.click(button);
-    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(button).toHaveAccessibleName("Show values");
     expect(localStorage.getItem("fa-private")).toBe("1");
 
     await userEvent.keyboard("H");
-    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button).toHaveAccessibleName("Hide values");
     expect(document.documentElement).not.toHaveAttribute("data-private");
     expect(await screen.findByText("+£936.90")).toBeInTheDocument();
   });
