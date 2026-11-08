@@ -2661,6 +2661,10 @@ export interface components {
         };
         /** ItemOut */
         finance_agent__api__review_queue__ItemOut: {
+            /** After Minor */
+            after_minor?: number | null;
+            /** Before Minor */
+            before_minor?: number | null;
             /** Choices */
             choices: string[];
             /** Currency */

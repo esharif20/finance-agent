@@ -13,6 +13,7 @@ import {
   undoAutoBatch,
   undoReview,
 } from "@/api/client";
+import { Money } from "@/components/Money";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BULK_MIN, bulkable } from "@/lib/bulkReview";
@@ -316,6 +317,22 @@ function OneAtATime() {
             </p>
           )}
         </div>
+
+        {item.type === "life_change" && item.before_minor != null && item.after_minor != null && (
+          <dl className="grid grid-cols-2 gap-3 rounded-[14px] bg-raised p-4">
+            {[
+              ["Before", item.before_minor],
+              ["After", item.after_minor],
+            ].map(([k, v]) => (
+              <div key={k as string}>
+                <dt className="text-sm text-muted-foreground">{k} (a month)</dt>
+                <dd>
+                  <Money value={{ minor: v as number, currency: item.currency }} className="text-title" />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
 
         {asksCategory && (
           <>

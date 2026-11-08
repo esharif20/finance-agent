@@ -66,6 +66,8 @@ class Item:
     # of `version`. Set by Category items only.
     spend: Decimal = Decimal(0)
     currency: str = "GBP"
+    # a life change's monthly level before and after, in minor units (#277)
+    levels: tuple[int, int] | None = None
 
     @property
     def id(self) -> str:
@@ -416,6 +418,7 @@ class LifeChangeItems:
                 transaction_ids=d.evidence,
                 choices=("yes", "no"),
                 spend=Decimal(abs(d.after - d.before)).scaleb(-2),
+                levels=(int(d.before), int(d.after)),
             )
 
     def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:

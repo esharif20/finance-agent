@@ -41,6 +41,8 @@ class ItemOut(BaseModel):
     skipped: bool
     spend_minor: int  # what an answer touches (absolute), in `currency`
     currency: str
+    before_minor: int | None = None  # a life change's level before, in `currency`
+    after_minor: int | None = None  # ... and after
 
 
 class QueueOut(BaseModel):
@@ -127,6 +129,8 @@ def _item(i: Item) -> ItemOut:
         skipped=i.skipped,
         spend_minor=int(i.spend.scaleb(2)),
         currency=i.currency,
+        before_minor=i.levels[0] if i.levels else None,
+        after_minor=i.levels[1] if i.levels else None,
     )
 
 

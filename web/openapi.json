@@ -4236,6 +4236,28 @@
       },
       "finance_agent__api__review_queue__ItemOut": {
         "properties": {
+          "after_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Minor"
+          },
+          "before_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Minor"
+          },
           "choices": {
             "items": {
               "type": "string"
