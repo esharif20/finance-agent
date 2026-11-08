@@ -1101,6 +1101,17 @@
             ],
             "title": "Next Due On"
           },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -1123,6 +1134,7 @@
           "kind",
           "group",
           "status",
+          "platform",
           "interval",
           "interval_source",
           "charge_count",
@@ -1157,6 +1169,9 @@
             "title": "Items",
             "type": "array"
           },
+          "likely_monthly": {
+            "$ref": "#/components/schemas/Pence"
+          },
           "rate_needed": {
             "title": "Rate Needed",
             "type": "integer"
@@ -1183,6 +1198,7 @@
           "total",
           "totals",
           "groups",
+          "likely_monthly",
           "rate_needed",
           "flag_count"
         ],

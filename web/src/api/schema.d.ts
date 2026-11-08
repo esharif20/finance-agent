@@ -1470,6 +1470,8 @@ export interface components {
             monthly: components["schemas"]["Pence"] | null;
             /** Next Due On */
             next_due_on: string | null;
+            /** Platform */
+            platform: string | null;
             /** Status */
             status: string;
             trial: components["schemas"]["TrialOut"] | null;
@@ -1482,6 +1484,7 @@ export interface components {
             groups: components["schemas"]["GroupTotal"][];
             /** Items */
             items: components["schemas"]["CostOut"][];
+            likely_monthly: components["schemas"]["Pence"];
             /** Rate Needed */
             rate_needed: number;
             total: components["schemas"]["Total"];
