@@ -1,0 +1,98 @@
+{
+  "harness": "playbook",
+  "dataset": "synthetic_personas",
+  "dataset_version": 1,
+  "dataset_sha256": "5406978efe7cf0ad73d12447c531e29d0c3333fadfe252e1ca3299a69225f8de",
+  "personas": 10,
+  "gold": {
+    "student": [
+      "emergency-fund"
+    ],
+    "early career": [
+      "emergency-fund"
+    ],
+    "subscription creeper": [
+      "subscription-creep"
+    ],
+    "credit-card revolver": [
+      "emergency-fund"
+    ],
+    "payday-tight": [
+      "emergency-fund"
+    ],
+    "goal saver": [],
+    "no history": [],
+    "mixed": [
+      "emergency-fund",
+      "subscription-creep"
+    ],
+    "annual blip": [],
+    "no subscriptions": [
+      "emergency-fund"
+    ]
+  },
+  "shown": {
+    "student": [
+      "emergency-fund"
+    ],
+    "early career": [
+      "emergency-fund"
+    ],
+    "subscription creeper": [
+      "subscription-creep"
+    ],
+    "credit-card revolver": [
+      "emergency-fund"
+    ],
+    "payday-tight": [
+      "emergency-fund"
+    ],
+    "goal saver": [],
+    "no history": [],
+    "mixed": [
+      "emergency-fund",
+      "subscription-creep"
+    ],
+    "annual blip": [],
+    "no subscriptions": [
+      "emergency-fund"
+    ]
+  },
+  "numbers_checked": 68,
+  "models": {
+    "playbook": {
+      "model": "engine.playbook conditions",
+      "model_version": "cards-a718acbb4254",
+      "metrics": {
+        "emergency-fund.precision": 1.0,
+        "emergency-fund.recall": 1.0,
+        "subscription-creep.precision": 1.0,
+        "subscription-creep.recall": 1.0,
+        "false_condition_shown": 0,
+        "figures_from_engine": 1.0
+      }
+    },
+    "show_all": {
+      "model": "show every card",
+      "model_version": "baseline",
+      "metrics": {
+        "emergency-fund.precision": 0.6,
+        "emergency-fund.recall": 1.0,
+        "subscription-creep.precision": 0.2,
+        "subscription-creep.recall": 1.0,
+        "false_condition_shown": 12
+      }
+    },
+    "show_none": {
+      "model": "show no card",
+      "model_version": "baseline",
+      "metrics": {
+        "emergency-fund.precision": 1.0,
+        "emergency-fund.recall": 0.0,
+        "subscription-creep.precision": 1.0,
+        "subscription-creep.recall": 0.0,
+        "false_condition_shown": 0
+      }
+    }
+  }
+}

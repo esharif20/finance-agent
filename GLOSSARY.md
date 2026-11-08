@@ -123,6 +123,14 @@ _Avoid_: Tip, alert, suggestion
 The deterministic, non-LLM part of the system that detects patterns, forecasts and ranks Insights.
 _Avoid_: AI, brain, model
 
+**Playbook card**:
+A short guidance card written as repo data: a topic, principles, gentle and blunt wording, and a "when this applies" condition the Intelligence Engine evaluates on the user's data. Its figures fill named slots from Engine results or a Fact, never typed into the card. It shows only while its condition holds.
+_Avoid_: Tip, article, knowledge base
+
+**Fact**:
+A statutory figure, such as the ISA allowance, kept in one facts file in the repo with its source and a "checked on" date that is always shown. Never fetched. One checked before the current tax year began shows "may be out of date".
+_Avoid_: Rule, constant
+
 **Assistant**:
 The conversational part of the system: it interprets questions, calls read-only tools and explains results. It never computes a financial figure itself.
 _Avoid_: Agent, bot, chatbot, AI

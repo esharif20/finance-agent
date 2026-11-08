@@ -101,7 +101,7 @@ Each turn's context is assembled, never accumulated:
 | Conversation | Last few turns of this session | ≤ 1,500 tokens |
 | Session summary | Short summary of recent sessions | ≤ 300 tokens |
 | Tool results | This turn's results | ≤ 2,500 tokens |
-| Knowledge | Cited guidance passages (when relevant) | ≤ 600 tokens |
+| Playbook | Cards whose Engine conditions hold, already filled from Engine figures and dated facts (#254) | ≤ 600 tokens |
 
 Financial facts never enter context except as this turn's tool results: digits in earlier replies are masked in the conversation slot. Memories enter as quoted `{"data": ...}`, sanitised like bank text. Tokens are counted as 4 characters until the benchmark (#143) needs the model's tokenizer.
 
@@ -133,7 +133,7 @@ Notes (#124) are left out by default. Transaction rows carry no note text; notes
 
 **Allocation Plans**: the Plan sub-graph gathers constraints and priorities as Memory Proposals; a linear program (`scipy.optimize`, OR-Tools only if needed) splits income with constraints as hard limits and weights from learned preferences; compared with a 50/30/20 baseline; explained with trade-offs.
 
-**Knowledge base**: a small, user-approved set of guidance documents (MoneyHelper, gov.uk), stored with source URL, fetch date and version, embedded locally (Ollama embeddings + `sqlite-vec`). Cited when used; never supplies figures.
+**Playbook** (#254, `engine.playbook`; it replaces the knowledge base, which the user dropped on 8 Nov 2026, so nothing is fetched or embedded): short guidance cards we write ourselves, versioned in the repo as data (`engine/playbook_data/cards/<id>.json`). A card has an id, a topic, principles, gentle and blunt variants, and a "when this applies" condition (`all`/`any` over `{signal, op, value}` clauses) on named Engine signals computed from the Ledger's Spending rows and savings balance: essential monthly spend (Bills, Groceries, Pharmacy, public transport and fuel over the last three complete months), savings in months of essentials (floored to 0.1, so the figure shown is the one the condition read), and Subscriptions spend with its run of monthly rises. A signal without enough history is `None`, which fails its clause, and conditions have no negation, so a card never shows on missing data. Titles and bodies name slots, `{signal}` or `{fact:id}`, filled only by Engine figures or a statutory fact. A fact (`playbook_data/facts.json`) carries a source URL, never fetched, and a "checked on" date, always shown; one checked before the current tax year began (6 April) shows "may be out of date" (#251 decision 6), and CI fails one over 13 months old. Loading fails on an unknown signal, slot, fact or key; a digit outside a slot (any script), a character outside printable ASCII and a few typographic marks, or instruction-like text in card prose fails it too, and the lint runs in CI. Evaluation: `evals/playbook.py` on ten seeded personas (`evals/synthetic_personas.py`) with gold "cards that apply": per-card precision and recall 1.00 against show-every-card (emergency fund 0.60, subscription creep 0.20 precision) and show-none (recall 0), `figures_from_engine` 1.0 and no card shown with its condition false. The cards are the version recorded with the results (`cards-<sha>`).
 
 ## Learning about the user
 

@@ -1,0 +1,20 @@
+{
+  "facts": [
+    {
+      "id": "isa_allowance",
+      "label": "ISA allowance for the tax year",
+      "value": 2000000,
+      "unit": "money",
+      "source": "https://www.gov.uk/individual-savings-accounts",
+      "checked_on": "2026-11-08"
+    },
+    {
+      "id": "fscs_deposit_limit",
+      "label": "FSCS protection for deposits, per person per bank",
+      "value": 12000000,
+      "unit": "money",
+      "source": "https://www.fscs.org.uk/check/what-are-we-protecting/",
+      "checked_on": "2026-11-08"
+    }
+  ]
+}
