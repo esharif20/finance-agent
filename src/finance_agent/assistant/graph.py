@@ -329,9 +329,10 @@ class Assistant:
 
     def _prefetch(self, s: State, d: Draft) -> None:
         """Retrieve-then-generate: the tool results an answer most likely
-        needs, fetched with no model call and shown as calls already made, so
-        one model call can word the answer (it may still call a tool).
-        Day-stable results come first, so the prompt's prefix repeats."""
+        needs, fetched with no model call and shown as compact `key: value`
+        facts just before the question, so the prompt before them (system,
+        Memories, last turns) is unchanged and Ollama reuses its KV cache.
+        One model call can word the answer; it may still call a tool."""
         wanted = [
             ToolCall(name="spending_summary", arguments={}),
             ToolCall(name="spending_summary", arguments={"month": _last(self.today)}),
@@ -344,23 +345,19 @@ class Assistant:
             ToolCall(name="search", arguments={"query": query, "limit": SEARCH_HITS})
         )
         left = PREFETCH_TOKENS * context.CHARS_PER_TOKEN
-        made: list[tuple[ToolCall, str]] = []
+        made: list[str] = []
         for call in wanted:
             seen = len(d.values)
             out = self._call("ask", call, s, d)
-            content = out.model_dump_json() if out is not None else ""
+            content = context.facts(call.name, out) if out is not None else ""
             if out is None or len(content) > left:
                 del d.values[seen:]  # unseen, so not evidence
                 continue
             left -= len(content)
-            made.append((call, content))
+            made.append(content)
         if made:
-            d.messages.append(
-                Message(role="assistant", tool_calls=tuple(c for c, _ in made))
-            )
-            d.messages += [
-                Message(role="tool", tool_name=c.name, content=text) for c, text in made
-            ]
+            body = "\n".join(made)
+            d.messages.insert(-1, Message(role="system", content=context.FACTS + body))
         d.prefetched = len(d.values)
 
     def _call(self, route: Route, call: ToolCall, s: State, d: Draft) -> Any:

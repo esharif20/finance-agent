@@ -19,7 +19,7 @@
         "printed_tool_call_rate": 0.0,
         "model_error_rate": 0.0,
         "llm_calls_per_turn": 2.377778,
-        "prompt_tokens_per_turn": 4239.3,
+        "prompt_tokens_per_turn": 3956.3,
         "planner_cases": 3,
         "planner_llm_calls": 0
       },
@@ -37,7 +37,7 @@
         "printed_tool_call_rate": 0.755556,
         "model_error_rate": 0.0,
         "llm_calls_per_turn": 2.311111,
-        "prompt_tokens_per_turn": 2773.2,
+        "prompt_tokens_per_turn": 2490.3,
         "planner_cases": 3,
         "planner_llm_calls": 0
       },
@@ -164,7 +164,7 @@
         "printed_tool_call_rate": 0.0,
         "model_error_rate": 0.0,
         "llm_calls_per_turn": 1.733333,
-        "prompt_tokens_per_turn": 2338.0,
+        "prompt_tokens_per_turn": 2158.2,
         "planner_cases": 3,
         "planner_llm_calls": 0
       },
