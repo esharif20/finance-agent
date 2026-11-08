@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import gate
+import metrics
 import synthetic_personas as sp
 from finance_agent.engine import playbook
 
@@ -79,6 +80,7 @@ def evaluate() -> dict[str, Any]:
             out["figures_from_engine"] = _ratio(accounted, numbers)
         return out
 
+    taste = _taste(book, ps)
     names = {
         "playbook": ("engine.playbook conditions", f"cards-{book.version}"),
         "show_all": ("show every card", "baseline"),
@@ -96,14 +98,52 @@ def evaluate() -> dict[str, Any]:
         },
         "numbers_checked": numbers,
         "models": {
-            key: {"model": model, "model_version": version, "metrics": metrics(key)}
+            key: {
+                "model": model,
+                "model_version": version,
+                "metrics": metrics(key) | taste.get(key, {}),
+            }
             for key, (model, version) in names.items()
         },
     }
 
 
+def _taste(
+    book: playbook.Playbook, ps: list[sp.Persona]
+) -> dict[str, dict[str, float]]:
+    """Tone, constraints and priority order (#264). The baseline, filed under
+    `show_all`, orders the applicable cards by the book's fixed order (the
+    Engine has no per-card impact yet), with the default tone and no
+    constraints."""
+    ndcg = {"playbook": 0.0, "show_all": 0.0}
+    tone_ok = {"playbook": 0, "show_all": 0}
+    ruled = {"playbook": 0, "show_all": 0}
+    for p in ps:
+        sigs = playbook.signals(p.rows, p.savings_balance, p.today)
+        applies = [c for c in book.cards if playbook.holds(c.when, sigs)]
+        orders = {
+            "playbook": playbook.prioritise(applies, p.memories),
+            "show_all": applies,
+        }
+        tones = {"playbook": playbook.choose_tone(p.memories), "show_all": "gentle"}
+        want = dict(p.want)
+        for key, order in orders.items():
+            tone_ok[key] += tones[key] == p.tone
+            ruled[key] += sum(c.id in p.ruled_out for c in order)
+            ndcg[key] += metrics.ndcg_at_k([want.get(c.id, 0) for c in order], 3)
+    n = len(ps)
+    return {
+        key: {
+            "tone_match": _ratio(tone_ok[key], n),
+            "ndcg_at_3": round(ndcg[key] / n, 6),
+            "constraint_violations": ruled[key],
+        }
+        for key in ndcg
+    }
+
+
 def lower_is_better(name: str) -> bool:
-    return name == "false_condition_shown"
+    return name in {"false_condition_shown", "constraint_violations"}
 
 
 if __name__ == "__main__":
