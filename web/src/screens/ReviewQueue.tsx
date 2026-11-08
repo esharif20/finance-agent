@@ -70,7 +70,7 @@ function AutoApplied() {
     mutationFn: undoAutoBatch,
     onSuccess: (q) => {
       client.setQueryData(REVIEW_KEY, q);
-      const back = `${q.applied} ${q.applied === 1 ? "payment" : "payments"}`;
+      const back = `${q.applied} ${q.applied === 1 ? "merchant" : "merchants"}`;
       setNote({ text: q.applied ? `Put ${back} back in the queue.` : (q.message ?? "Nothing to undo.") });
     },
     onError: (e) => setNote({ text: `${e.message} Nothing was changed.`, bad: true }),
@@ -94,12 +94,12 @@ function AutoApplied() {
             aria-live="polite"
             className={`text-sm ${note?.bad ? "rounded-[10px] bg-warning px-3 py-1.5 text-warning-foreground" : "text-muted-foreground"}`}
           >
-            {note?.text ?? `Auto-categorised ${n} ${n === 1 ? "payment" : "payments"}`}
+            {note?.text ?? `Auto-categorised ${n} ${n === 1 ? "merchant" : "merchants"}`}
           </p>
           {n > 0 && (
-            <button type="button" aria-label="Undo auto-categorising" disabled={undo.isPending} onClick={() => undo.mutate()} className={`${btn} glass`}>
+            <button type="button" aria-label="Undo all auto-categorising" disabled={undo.isPending} onClick={() => undo.mutate()} className={`${btn} glass`}>
               <Undo2 className="size-4" aria-hidden="true" />
-              Undo
+              Undo all
             </button>
           )}
         </motion.div>

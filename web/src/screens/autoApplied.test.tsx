@@ -37,8 +37,8 @@ afterEach(() => vi.unstubAllGlobals());
 describe("Auto-categorised line", () => {
   it("shows the API's count with an Undo", async () => {
     setup(7, () => new Response("{}"));
-    expect(await screen.findByText("Auto-categorised 7 payments")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Undo auto-categorising" })).toBeInTheDocument();
+    expect(await screen.findByText("Auto-categorised 7 merchants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo all auto-categorising" })).toBeInTheDocument();
   });
 
   it("is absent when nothing was auto-applied", async () => {
@@ -52,16 +52,16 @@ describe("Auto-categorised line", () => {
       3,
       () => new Response(JSON.stringify({ ...empty, applied: 3 })),
     );
-    await userEvent.click(await screen.findByRole("button", { name: "Undo auto-categorising" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Undo all auto-categorising" }));
     await waitFor(() => expect(calls).toEqual(["/api/review-queue/undo-auto"]));
-    expect(await screen.findByText("Put 3 payments back in the queue.")).toBeInTheDocument();
+    expect(await screen.findByText("Put 3 merchants back in the queue.")).toBeInTheDocument();
     expect(invalidate).toHaveBeenCalledWith();
-    expect(screen.queryByRole("button", { name: "Undo auto-categorising" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo all auto-categorising" })).not.toBeInTheDocument();
   });
 
   it("says so, and keeps the Undo, when the call fails", async () => {
     setup(2, () => new Response(JSON.stringify({ detail: "try again" }), { status: 500 }));
-    await userEvent.click(await screen.findByRole("button", { name: "Undo auto-categorising" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Undo all auto-categorising" }));
     expect(await screen.findByText(/Nothing was changed/)).toBeInTheDocument();
   });
 });
