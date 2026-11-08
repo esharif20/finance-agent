@@ -662,6 +662,21 @@ def _month_bounds(month: str) -> tuple[date, date]:
     return start, end
 
 
+@dataclass(frozen=True)
+class _Row:
+    """One registry row to write: the fields of `_registry` that travel together."""
+
+    merchant_id: int
+    source: str
+    kind: str | None
+    group: str | None
+    status: str
+    reason: str | None
+    evidence_on: date
+    charge_count: int | None = None
+    interval: str | None = None
+
+
 class Ledger:
     def __init__(self, conn: Connection, user_id: int) -> None:
         self._db = Scoped(conn, user_id)
@@ -2375,22 +2390,24 @@ class Ledger:
     def add_subscription(self, merchant_id: int, kind: str, group: str) -> None:
         """The user lists a Merchant as a Subscription or Bill."""
         self._registry(
-            merchant_id, "user", kind, group, "active", "user_added", date.today()
+            _Row(merchant_id, "user", kind, group, "active", "user_added", date.today())
         )
 
     def regroup_subscription(self, merchant_id: int, kind: str, group: str) -> None:
         """The user moves an entry to another kind or group; the rest is kept."""
         x = self._listed(merchant_id)
         self._registry(
-            merchant_id,
-            "user",
-            kind,
-            group,
-            x.status,
-            x.reason,
-            x.evidence_on,
-            x.charge_count,
-            x.interval,
+            _Row(
+                merchant_id,
+                "user",
+                kind,
+                group,
+                x.status,
+                x.reason,
+                x.evidence_on,
+                x.charge_count,
+                x.interval,
+            )
         )
 
     def confirm_subscription(
@@ -2402,15 +2419,19 @@ class Ledger:
         if x is None:
             raise UnknownTarget("no such registry entry")
         return self._registry(
-            merchant_id,
-            "user",
-            kind or x.kind,
-            group or x.group,
-            "active",
-            "user_confirmed",
-            date.today(),
-            x.charge_count,
-            x.interval,
+            _Row(
+                merchant_id,
+                "user",
+                kind or x.kind,
+                group or x.group,
+                "active",
+                "user_added"
+                if x.reason == "user_added"
+                else "user_confirmed",  # origin stays
+                date.today(),
+                x.charge_count,
+                x.interval,
+            )
         )
 
     def cancel_subscription(self, merchant_id: int) -> int:
@@ -2419,22 +2440,24 @@ class Ledger:
         Returns the registry row written."""
         x = self._listed(merchant_id)
         return self._registry(
-            merchant_id,
-            "user",
-            x.kind,
-            x.group,
-            USER_CANCELLED,
-            x.reason,
-            x.evidence_on,
-            x.charge_count,
-            x.interval,
+            _Row(
+                merchant_id,
+                "user",
+                x.kind,
+                x.group,
+                USER_CANCELLED,
+                x.reason,
+                x.evidence_on,
+                x.charge_count,
+                x.interval,
+            )
         )
 
     def not_a_subscription(self, merchant_id: int) -> int:
         """Remove or dismiss: remembered as "not a subscription", never deleted.
         Returns the registry row written."""
         return self._registry(
-            merchant_id, "user", None, None, NOT_SUBSCRIPTION, None, date.today()
+            _Row(merchant_id, "user", None, None, NOT_SUBSCRIPTION, None, date.today())
         )
 
     def revert_subscription_decision(self, entry_id: int) -> None:
@@ -2488,7 +2511,7 @@ class Ledger:
             x.interval,
         ):
             return False
-        self._registry(merchant_id, "detection", *same)
+        self._registry(_Row(merchant_id, "detection", *same))
         return True
 
     def _listed(self, merchant_id: int) -> SubscriptionEntry:
@@ -2497,37 +2520,27 @@ class Ledger:
             raise UnknownTarget("not in the registry")
         return x
 
-    def _registry(
-        self,
-        merchant_id: int,
-        source: str,
-        kind: str | None,
-        group: str | None,
-        status: str,
-        reason: str | None,
-        evidence_on: date,
-        charge_count: int | None = None,
-        interval: str | None = None,
-    ) -> int:
+    def _registry(self, r: _Row) -> int:
         m = schema.merchant
-        self._exists(self._db.select(m, m.c.id).where(m.c.id == merchant_id))
-        if status != NOT_SUBSCRIPTION and (
-            kind not in REGISTRY_KINDS or group not in TAXONOMY[REGISTRY_KINDS[kind]]
+        self._exists(self._db.select(m, m.c.id).where(m.c.id == r.merchant_id))
+        if r.status != NOT_SUBSCRIPTION and (
+            r.kind not in REGISTRY_KINDS
+            or r.group not in TAXONOMY[REGISTRY_KINDS[r.kind]]
         ):
             raise InvalidEntry("kind and group must be a Subscriptions or Bills leaf")
-        if interval is not None and interval not in INTERVALS:
+        if r.interval is not None and r.interval not in INTERVALS:
             raise InvalidEntry("interval must be weekly, monthly or annual")
         entry_id = self._db.insert(
             schema.subscription_entry,
-            merchant_id=merchant_id,
-            source=source,
-            kind=kind,
-            group_name=group,
-            status=status,
-            reason=reason,
-            evidence_on=evidence_on,
-            charge_count=charge_count,
-            interval=interval,
+            merchant_id=r.merchant_id,
+            source=r.source,
+            kind=r.kind,
+            group_name=r.group,
+            status=r.status,
+            reason=r.reason,
+            evidence_on=r.evidence_on,
+            charge_count=r.charge_count,
+            interval=r.interval,
             created_at=datetime.now(UTC),
         )
         self._db.bump_ledger_version()

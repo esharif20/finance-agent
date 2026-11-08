@@ -20,6 +20,7 @@ from finance_agent.ledger import (
     InvalidEntry,
     Ledger,
     UnknownTarget,
+    _Row,  # pyright: ignore[reportPrivateUsage]
 )
 from finance_agent.ledger.taxonomy import TAXONOMY
 from finance_agent.storage import open_db, schema
@@ -229,8 +230,10 @@ def test_a_detection_row_after_a_user_decision_never_wins(
     decided = led.subscription(m)
     assert decided is not None
     led._registry(  # pyright: ignore[reportPrivateUsage]
-        m, "detection", "subscription", "Streaming", "active", "pattern",
-        date(2026, 1, 1),
+        _Row(
+            m, "detection", "subscription", "Streaming", "active", "pattern",
+            date(2026, 1, 1),
+        )
     )  # fmt: skip
     led._db.conn.execute(  # pyright: ignore[reportPrivateUsage]
         schema.subscription_entry.update().values(created_at=decided.changed_at)
@@ -275,7 +278,7 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
                         led.revert_subscription_decision(eid)
                     continue
                 if kind == "raced":  # a detection that checked before the user
-                    led._registry(m, "detection", k, g, *rest)  # pyright: ignore[reportPrivateUsage]
+                    led._registry(_Row(m, "detection", k, g, *rest))  # pyright: ignore[reportPrivateUsage]
                     continue
                 x = led.subscription(m)
                 if action in ("regroup", "confirm") and (
@@ -356,7 +359,8 @@ def test_deleting_a_merchant_removes_its_whole_registry_history(
 
     db.execute(db.delete(schema.merchant).where(schema.merchant.c.id == m))
 
-    rows = db.execute(db.select(schema.subscription_entry, schema.subscription_entry.c.merchant_id)
+    rows = db.execute(
+        db.select(schema.subscription_entry, schema.subscription_entry.c.merchant_id)
     ).all()
     assert [r.merchant_id for r in rows] == [other]
 
