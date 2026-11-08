@@ -3,7 +3,7 @@
   "dataset": "assistant_golden",
   "dataset_version": 3,
   "dataset_sha256": "bf7b2be77fe6dd740714cc8e386fc37e7e4ecadfdc2c72d9cecdb6a7baad121d",
-  "prompt_sha256": "6878ae7a3cfbd515bef32fc9377aa2c7aca1e7250ef06d6835fc1a8d843b2ed7",
+  "prompt_sha256": "3fd4d25e44de70edb6a333e17f5828f9230c1ca0027329e9b6c2f6bd7ea3c401",
   "cases": 31,
   "refusal_cases": 6,
   "models": {

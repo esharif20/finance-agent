@@ -56,7 +56,8 @@ SYSTEM = {
     "ask": (
         "Always call a tool before you answer, even when the question names"
         " its month: you know no figure until a tool returns it. A month"
-        " written (YYYY-MM) is the tool's month argument. For anything inside a Category (fuel,"
+        " written (YYYY-MM) is the tool's month argument. For anything inside"
+        " a Category (fuel,"
         " coffee, taxis, a Merchant) call category_detail. A follow-up such as"
         " 'of that, how much was fuel?' keeps the month and Category of the"
         " question before it. If any tool can answer, call it rather than say"
