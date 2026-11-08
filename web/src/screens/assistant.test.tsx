@@ -26,7 +26,8 @@ const ui = () =>
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn();
-  vi.stubGlobal("fetch", fetchMock);
+  // the cloud toggle reads /api/spend on mount (#304); these tests count only chat calls
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (url === "/api/spend" ? Promise.resolve(new Response("[]")) : (fetchMock as unknown as (...a: unknown[]) => Promise<Response>)(url, init)));
   localStorage.clear();
   document.documentElement.removeAttribute("data-private");
 });

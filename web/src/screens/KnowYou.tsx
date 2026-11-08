@@ -9,9 +9,12 @@ import {
   resetRegretAnswers,
 } from "@/api/client";
 import { INSIGHTS_KEY, Explained } from "@/components/InsightsFeed";
+import { SpendMeter } from "@/components/SpendMeter";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BRIEFING_KEY } from "@/screens/Briefing";
 
+// the demo has no cloud and no spend store
+const DEMO = import.meta.env.VITE_DEMO === "1";
 const MEMORIES_KEY = ["memories"] as const;
 
 const btn =
@@ -143,6 +146,7 @@ export function KnowYou() {
           </p>
         )}
       </Card>
+      {!DEMO && <SpendMeter />}
       <Card aria-labelledby="know-ready">
         <CardHeader>
           <CardTitle id="know-ready">What I can't tell yet</CardTitle>
