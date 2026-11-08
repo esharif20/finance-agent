@@ -9,6 +9,7 @@ dependencies = [
     "langgraph==1.2.20",
     "langsmith>=0.14.17",
     "pydantic>=2.14.3",
+    "scipy>=1.18.1",
     "sqlalchemy>=2.1.8",
     "sqlcipher3-wheels>=0.5.7",
     "statsmodels>=0.15.0",

@@ -1,0 +1,36 @@
+{
+  "harness": "allocation",
+  "dataset": "synthetic_allocation",
+  "dataset_version": 1,
+  "dataset_sha256": "61cf49b35896ca6e8ee3cd5d07464d82015622ee43c79cb6a34a716382cd0b17",
+  "scenarios": 216,
+  "feasible_scenarios": 144,
+  "models": {
+    "allocation": {
+      "model": "engine.allocation linprog (HiGHS)",
+      "model_version": "lp-1",
+      "metrics": {
+        "feasibility_rate": 1.0,
+        "infeasible_reported": 1.0,
+        "constraint_violations": 0,
+        "sum_exact": 1.0,
+        "oracle_utility": 0.963868,
+        "deviation_from_recent": 0.115448,
+        "instability": 1.0
+      }
+    },
+    "fifty_thirty_twenty": {
+      "model": "50/30/20 rule",
+      "model_version": "baseline",
+      "metrics": {
+        "feasibility_rate": 0.388889,
+        "infeasible_reported": 0.333333,
+        "constraint_violations": 210,
+        "sum_exact": 1.0,
+        "oracle_utility": 0.350967,
+        "deviation_from_recent": 0.330218,
+        "instability": 1.0
+      }
+    }
+  }
+}
