@@ -220,3 +220,31 @@ def test_found_carries_the_category_of_its_latest_evidence() -> None:
         "recurring", "SYNTH GYM", "Health / Fitness", date(2026, 4, 3),
         3000 * 12, 90, (1, 2, 3, 4),
     )  # fmt: skip
+
+
+def test_a_refresh_with_nothing_new_writes_nothing(
+    engine: Engine, write_export: Export
+) -> None:
+    """Verifier (#150): GET /api/insights refreshes on every read, so an
+    unchanged Ledger must not take SQLite's write lock (two concurrent reads
+    would otherwise race to write and one fail)."""
+    from sqlalchemy import event
+
+    seed(engine, write_export)
+    with engine.begin() as conn:
+        ins.refresh(conn, 1)
+        assert Insights(conn, 1).current()
+    writes: list[str] = []
+
+    def spy(*args: object) -> None:
+        sql = str(args[2]).lstrip().upper()
+        if sql.startswith(("INSERT", "UPDATE", "DELETE")):
+            writes.append(sql.split()[0])
+
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        with engine.begin() as conn:
+            ins.refresh(conn, 1)
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+    assert writes == []
