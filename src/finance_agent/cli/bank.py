@@ -12,6 +12,7 @@ from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
 from finance_agent import categorise
+from finance_agent.categorise import embedding
 from finance_agent.cli import gbp
 from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
@@ -170,6 +171,8 @@ def _print(r: SyncReport) -> None:
         print(
             f"  {r.provider_duplicates} rows are Possible Duplicates; kept, not merged"
         )
+    if r.skipped_accounts:
+        print(f"  {r.skipped_accounts} account skipped: unsupported currency")
     if r.provider_errors:
         print(f"  the provider reported {r.provider_errors} messages")
     for g in r.gaps:
@@ -217,6 +220,7 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
         if any(r.added for r in reports):  # same as `fa import`
             with engine.begin() as conn:
                 categorise.run(conn, user_id)
+            embedding.refresh_quietly(engine, user_id)
     except NotConnected as e:
         return _err(str(e))
     except Busy:

@@ -43,12 +43,13 @@ export function useReviewCount(): number {
   return data?.remaining ?? 0;
 }
 
-function suggestions(groups: { name: string; subs: string[] }[]): Cat[] {
+// the local model's nearest-neighbour suggestions lead (#114); they are only buttons
+function suggestions(groups: { name: string; subs: string[] }[], model: Cat[] = []): Cat[] {
   const all: Cat[] = groups
     .filter((g) => g.name !== "Uncategorised")
     .flatMap((g) => g.subs.map((s): Cat => [g.name, s]));
   const seen = new Set<string>();
-  return [...recent, ...all]
+  return [...model, ...recent, ...all]
     .filter(([g, s]) => !seen.has(`${g}/${s}`) && seen.add(`${g}/${s}`))
     .slice(0, 3);
 }
@@ -65,7 +66,7 @@ export function ReviewQueue() {
     mutationFn: ({ call }: { call: () => Promise<ReviewQueueOut>; text: string }) => call(),
     onSuccess: (q, { text }) => {
       client.setQueryData(REVIEW_KEY, q);
-      setNote({ text });
+      setNote({ text: q.message ?? text }); // an undo that found nothing to undo says why
       setAll(true);
     },
     onError: (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
@@ -78,7 +79,7 @@ export function ReviewQueue() {
   const item: ReviewItem | undefined = items[idx];
   const groups = categories.data ?? [];
   const asksCategory = item?.type === "category" || item?.type === "always_ask";
-  const picks = asksCategory ? suggestions(groups) : [];
+  const picks = asksCategory ? suggestions(groups, (item?.suggestions ?? []) as Cat[]) : [];
   const many = (item?.weight ?? 0) > 1 && item?.transaction_ids.length;
   const justOne = !all && !!many;
 
@@ -89,7 +90,7 @@ export function ReviewQueue() {
     const txn = justOne ? item.transaction_ids[0] : undefined;
     act.mutate({
       call: () => answerReview(item, { category: cat, ...(txn === undefined ? {} : { transaction_id: txn }) }),
-      text: `${item.title}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
+      text: `${item.title || "This payment"}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
     });
   };
   const choose = (choice: string) => {

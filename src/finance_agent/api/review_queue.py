@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from finance_agent.categorise import embedding
 from finance_agent.identity import current_user
 from finance_agent.ledger import UnknownTarget
 from finance_agent.ledger.review import (
@@ -28,6 +29,9 @@ class ItemOut(BaseModel):
     merchant_id: int | None
     transaction_ids: list[int]
     choices: list[str]  # empty: answer with a Category
+    suggestions: list[
+        tuple[str, str]
+    ]  # local-model Categories, best first; may be empty
     skipped: bool
 
 
@@ -35,6 +39,9 @@ class QueueOut(BaseModel):
     items: list[ItemOut]
     remaining: int
     ledger_version: int
+    # set when an undo changed nothing because the answer's Correction was
+    # already reverted elsewhere; show it instead of "Undid the last change."
+    message: str | None = None
 
 
 class VersionIn(BaseModel):
@@ -49,7 +56,14 @@ class AnswerIn(VersionIn):
 
 def _queue(request: Request) -> Iterator[ReviewQueue]:
     with request.app.state.engine.begin() as conn:
-        yield ReviewQueue(conn, current_user())
+        user = current_user()
+        yield ReviewQueue(
+            conn,
+            user,
+            suggester=lambda targets, labelled: embedding.suggest(
+                conn, user, targets, labelled
+            ),
+        )
 
 
 Queue = Annotated[ReviewQueue, Depends(_queue)]
@@ -66,14 +80,16 @@ def _item(i: Item) -> ItemOut:
         merchant_id=i.merchant_id,
         transaction_ids=list(i.transaction_ids),
         choices=list(i.choices),
+        suggestions=list(i.suggestions),
         skipped=i.skipped,
     )
 
 
-def _out(q: ReviewQueue, change: Callable[[], None] | None = None) -> QueueOut:
+def _out(q: ReviewQueue, change: Callable[[], str | None] | None = None) -> QueueOut:
+    message = None
     try:
         if change is not None:
-            change()
+            message = change()
     except UnknownTarget:
         raise HTTPException(404, "no such item, Category or decision") from None
     except StaleItem as e:
@@ -81,7 +97,9 @@ def _out(q: ReviewQueue, change: Callable[[], None] | None = None) -> QueueOut:
     except InvalidAnswer as e:
         raise HTTPException(422, str(e)) from None
     items = [_item(i) for i in q.items()]
-    return QueueOut(items=items, remaining=len(items), ledger_version=q.version())
+    return QueueOut(
+        items=items, remaining=len(items), ledger_version=q.version(), message=message
+    )
 
 
 @router.get("")
