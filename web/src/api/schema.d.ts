@@ -21,6 +21,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/briefing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weekly
+         * @description The briefing for the week holding `on` (today by default).
+         */
+        get: operations["weekly_api_briefing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/briefing/regret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Answers
+         * @description Wipe every regret answer.
+         */
+        delete: operations["forget_answers_api_briefing_regret_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/briefing/regret/{transaction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer
+         * @description Answer "worth it?" on one of the week's regret items; a later answer
+         *     replaces it. Anything else, including another user's, is not found.
+         */
+        post: operations["answer_api_briefing_regret__transaction_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/card-art/{key}": {
         parameters: {
             query?: never;
@@ -33,6 +94,27 @@ export interface paths {
          * @description The user's local card image, or 404 so the app draws the generic face.
          */
         get: operations["card_image_api_card_art__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cash-flow/forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Forecast
+         * @description Monthly money-out band for the chart, as `engine.forecast` computes it.
+         *     Empty while no Category has enough history to forecast.
+         */
+        get: operations["forecast_api_cash_flow_forecast_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1043,6 +1125,25 @@ export interface components {
             accounts: components["schemas"]["AccountGbpOut"][];
             total: components["schemas"]["Money"] | null;
         };
+        /** BriefingOut */
+        BriefingOut: {
+            forecast: components["schemas"]["finance_agent__api__briefing__BandOut"] | null;
+            /** Insights */
+            insights: components["schemas"]["InsightOut"][];
+            /** Insufficient */
+            insufficient: string[];
+            /** Next Payday */
+            next_payday: string | null;
+            /** Regret */
+            regret: components["schemas"]["RegretItemOut"][];
+            /** Renewals */
+            renewals: components["schemas"]["RenewalOut"][];
+            /**
+             * Week
+             * Format: date
+             */
+            week: string;
+        };
         /** CategoryDetailOut */
         CategoryDetailOut: {
             /** Currency */
@@ -1586,12 +1687,55 @@ export interface components {
              */
             source: "bank" | "exchange" | "user";
         };
+        /** RegretAnswerIn */
+        RegretAnswerIn: {
+            /** Worth It */
+            worth_it: boolean;
+        };
+        /** RegretAnswerOut */
+        RegretAnswerOut: {
+            /** Transaction Id */
+            transaction_id: number;
+            /** Worth It */
+            worth_it: boolean;
+        };
+        /** RegretItemOut */
+        RegretItemOut: {
+            amount: components["schemas"]["Money"];
+            /** Description */
+            description: string;
+            /** Merchant */
+            merchant: string | null;
+            /**
+             * Posted On
+             * Format: date
+             */
+            posted_on: string;
+            /** Transaction Id */
+            transaction_id: number;
+            /** Worth It */
+            worth_it: boolean | null;
+        };
         /** RelevanceOut */
         RelevanceOut: {
             /** Disliked */
             disliked: number;
             /** Liked */
             liked: number;
+        };
+        /** RenewalOut */
+        RenewalOut: {
+            /** Amount Minor */
+            amount_minor: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Insight Id */
+            insight_id: number;
+            /** Merchant */
+            merchant: string;
         };
         /** RevertOut */
         RevertOut: {
@@ -1804,6 +1948,32 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** BandOut */
+        finance_agent__api__briefing__BandOut: {
+            /** Left Out */
+            left_out: number;
+            /** Lower Minor */
+            lower_minor: number;
+            /** Month */
+            month: string;
+            /** Point Minor */
+            point_minor: number;
+            /** Recurring Minor */
+            recurring_minor: number;
+            /** Upper Minor */
+            upper_minor: number;
+        };
+        /** BandOut */
+        finance_agent__api__cash_flow__BandOut: {
+            /** Lower */
+            lower: number;
+            /** Month */
+            month: string;
+            /** Point */
+            point: number;
+            /** Upper */
+            upper: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -1829,6 +1999,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountOut"][];
+                };
+            };
+        };
+    };
+    weekly_api_briefing_get: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_answers_api_briefing_regret_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
+    answer_api_briefing_regret__transaction_id__post: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegretAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegretAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1881,6 +2139,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forecast_api_cash_flow_forecast_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["finance_agent__api__cash_flow__BandOut"][];
                 };
             };
         };

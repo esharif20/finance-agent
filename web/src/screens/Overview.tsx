@@ -10,6 +10,8 @@ import {
   fetchSpending,
   fetchSummary,
 } from "@/api/client";
+import { ForecastPanel } from "@/components/ForecastPanel";
+import { InsightsFeed } from "@/components/InsightsFeed";
 import { SubscriptionsCard } from "@/components/SubscriptionsCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -134,6 +136,8 @@ export function Overview({ account }: { account?: number }) {
             <TransfersLine summary={summary.data} combined={account === undefined} />
           </MonthCard>
           <SpendingDonut spending={spending.data} account={account} />
+          <InsightsFeed />
+          <ForecastPanel />
           <SubscriptionsCard />
           <motion.div key={view} {...settle}>
             <TopMerchants spending={spending.data} />
