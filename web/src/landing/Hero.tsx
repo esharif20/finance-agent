@@ -9,6 +9,7 @@ import { ACCOUNTS } from "./accounts.fixture";
 import { Field, finePointer, Flex, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
 import { OVERVIEW, REVIEW } from "./story/story.fixture";
+import "./hero.css";
 
 export const HEADLINE = "An AI agent for your money, on your own Mac.";
 export const HEADLINE_LINES = ["An AI agent for your money,", "on your own Mac."];
@@ -146,6 +147,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const rows = useRef<HTMLUListElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
+  const floors = useRef<(HTMLSpanElement | null)[]>([]);
+  const glows = useRef<(HTMLSpanElement | null)[]>([]);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
@@ -176,6 +179,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     // light sweeps across them; it starts when the tally hands over (playing.current)
     let dealt = 0;
     const aim = { x: 0, y: 0 };
+    // the pointer light: page pixels, eased toward the mouse; drawn by transform only
+    const light = { x: -1e4, y: -1e4, tx: -1e4, ty: -1e4 };
     const size = () => {
       const r = el.getBoundingClientRect();
       const narrow = r.width < 720;
@@ -198,17 +203,32 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const since = dealt ? now - dealt : 0;
       const poses = ACCOUNTS.accounts.map((_, i) => {
         const q = pose(i, p.get(), w, narrow, tilt);
-        const k = ease(clamp01((since - 200 - i * 140) / 1300));
-        return { ...q, y: q.y + (1 - k) * w * 1.6, rz: q.rz * k + (1 - k) * (8 - i * 8), rx: q.rx + (1 - k) * 50, s: q.s * (0.82 + 0.18 * k) };
+        // a dealt card: thrown up from below and out of depth, spinning flat as it lands (quartic ease-out)
+        const k = 1 - (1 - clamp01((since - 160 - i * 170) / 1400)) ** 4;
+        const u = 1 - k;
+        return { ...q, rest: q.y, deal: k, y: q.y + u * w * 2.1, z: q.z - u * 520, rz: q.rz * k + u * (14 - i * 14), rx: q.rx + u * 64, ry: q.ry + u * (i - 1) * 18, s: q.s * (0.78 + 0.22 * k) };
       });
       const pv = p.get();
       // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
       if (rows.current) rows.current.style.transform = `translate3d(${tilt.x * -40}px, ${-pv * 22 + tilt.y * -24}vh, ${-260 - pv * 200}px)`;
-      el.style.setProperty("--sx", `${((aim.x + 0.5) * 100).toFixed(1)}%`);
-      el.style.setProperty("--sy", `${((aim.y + 0.5) * 100).toFixed(1)}%`);
-      const sweep = clamp01((since - 700) / 1500);
+      if (light.tx > -1e4) {
+        light.x = light.x < -1e3 ? light.tx : light.x + (light.tx - light.x) * 0.14;
+        light.y = light.y < -1e3 ? light.ty : light.y + (light.ty - light.y) * 0.14;
+        for (const g of glows.current) {
+          g?.style.setProperty("--gx", `${light.x.toFixed(1)}px`);
+          g?.style.setProperty("--gy", `${light.y.toFixed(1)}px`);
+        }
+      }
+      const sweep = clamp01((since - 1100) / 1500);
       const sweeping = sweep > 0 && sweep < 1;
+      // contact shadows on the floor under the fan; they gather as each card lands, gone once the hand opens
+      const onFloor = 1 - clamp01((pv - 0.04) / 0.16);
       poses.forEach((q, i) => {
+        const f = floors.current[i];
+        if (f) {
+          f.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.rest + dims.h * 0.78}px, 0) scale(${(1.25 - 0.25 * q.deal) * q.s}, ${0.22 * q.s})`;
+          f.style.opacity = String(q.deal * onFloor);
+        }
         const c = cards.current[i];
         if (c) c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
         const l = labels.current[i];
@@ -242,6 +262,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     io.observe(el);
     const move = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
+      light.tx = e.clientX;
+      light.ty = e.clientY;
+      if (!el.dataset.lit) el.dataset.lit = "";
       aim.x = e.clientX / window.innerWidth - 0.5;
       aim.y = e.clientY / window.innerHeight - 0.5;
     };
@@ -279,8 +302,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         <Field tone="night" />
         <div className="lp-halo" aria-hidden="true" data-phase={phase} />
         <div className="lp-grain" aria-hidden="true" />
+        {!still && <span ref={(n) => void (glows.current[0] = n)} className="lp-glow" aria-hidden="true" />}
         <div className="lp-hero-copy" data-phase={phase}>
-          <h1 id="lp-title" className="lp-display">
+          <h1 id="lp-title" className="lp-display" style={{ "--hd": `${delay}s` } as React.CSSProperties}>
             <Flex lines={HEADLINE_LINES} label={HEADLINE} still={still} play={play} delay={delay} />
           </h1>
           <motion.div
@@ -320,13 +344,17 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                 </li>
               ))}
             </ul>
-            <canvas ref={canvas} className="lp-stage-canvas" />
-            <span className="lp-spot" aria-hidden="true" />
             {ACCOUNTS.accounts.map((a, i) => (
-              <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot">
+              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" />
+            ))}
+            <canvas ref={canvas} className="lp-stage-canvas" />
+            {ACCOUNTS.accounts.map((a, i) => (
+              <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
                 <CardFace i={i} name={a.name} />
+                <span className="lp-acard-light" />
               </div>
             ))}
+            <span ref={(n) => void (glows.current[1] = n)} className="lp-glow lp-glow-near" />
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
                 <p className="lp-acct-name">{a.name}</p>
