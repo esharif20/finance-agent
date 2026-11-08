@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0014"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0015"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -419,4 +419,85 @@ def test_migration_0014_adds_embeddings_and_keeps_rows_that_reference_them(
         conn.execute(text("DELETE FROM categorisation"))
         conn.execute(text('DELETE FROM "transaction"'))
         assert conn.execute(text("SELECT * FROM merchant_embedding")).all() == []
+    eng.dispose()
+
+
+def _fk_engine(tmp_path: Path) -> Any:
+    from sqlalchemy import create_engine, event
+
+    eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
+
+    def fk_on(dbapi_conn: Any, _record: Any) -> None:
+        dbapi_conn.execute("PRAGMA foreign_keys = ON")
+
+    event.listen(eng, "connect", fk_on)
+    return eng
+
+
+_NOTED_TXN = (
+    "INSERT INTO user (id, created_at) VALUES (1, '2026-01-01')",
+    "INSERT INTO bank (id, user_id, name) VALUES (1, 1, 'Synth')",
+    "INSERT INTO account (id, user_id, bank_id, external_ref, name, kind,"
+    " masked_number, currency) VALUES (1, 1, 1, 'r', 'A', 'current', 'x', 'GBP')",
+    'INSERT INTO "transaction" (id, user_id, account_id, posted_on,'
+    " bank_type, description, amount_minor, currency, status) VALUES"
+    " (9, 1, 1, '2026-01-02', 'CARD', 'SYNTH', -1000, 'GBP', 'completed')",
+    "INSERT INTO note (user_id, transaction_id, text, created_at)"
+    " VALUES (1, 9, 'synthetic', '2026-01-02')",
+)
+
+
+def round_trip(
+    tmp_path: Path, before: str, after: str, added: set[str], rows: tuple[str, ...]
+) -> Any:
+    """Migrate `before` -> `after` -> `before` -> `after` with foreign keys on
+    and a noted Transaction present; `rows` are inserted at each `after`."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect, text
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    eng = _fk_engine(tmp_path)
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, before)
+        for sql in _NOTED_TXN:
+            conn.execute(text(sql))
+    for target in (after, before, after):
+        with eng.begin() as conn:
+            cfg.attributes["connection"] = conn
+            if target == before:
+                command.downgrade(cfg, target)
+            else:
+                command.upgrade(cfg, target)
+                for sql in rows:
+                    conn.execute(text(sql))
+            assert conn.execute(text("SELECT transaction_id FROM note")).all() == [(9,)]
+            assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+            tables = set(inspect(conn).get_table_names())
+            assert (tables & added) == (added if target == after else set())
+    return eng
+
+
+def test_migration_0015_adds_proposals_and_keeps_rows_that_reference_them(
+    tmp_path: Path,
+) -> None:
+    """0015 (#138) adds proposal, memory and feedback, nothing rebuilt; a
+    Memory and a feedback row point at Proposals, which they then pin."""
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT INTO proposal (id, user_id, kind, payload, status, created_at)"
+        " VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-03'),"
+        " (2, 1, 'correction', '{}', 'rejected', '2026-01-03')",
+        "INSERT INTO memory (user_id, proposal_id, type, text, tags, turn_id,"
+        " quote, said_on, created_at) VALUES (1, 1, 'goal', 'synthetic', '[]',"
+        " 't', 'q', '2026-01-03', '2026-01-03')",
+        "INSERT INTO feedback (user_id, proposal_id, kind, signal, created_at)"
+        " VALUES (1, 2, 'correction', 'rejected', '2026-01-03')",
+    )
+    eng = round_trip(tmp_path, "0014", "0015", {"proposal", "memory", "feedback"}, rows)
+    with eng.begin() as conn, pytest.raises(Exception, match="FOREIGN KEY"):
+        conn.execute(text("DELETE FROM proposal WHERE id = 1"))
     eng.dispose()

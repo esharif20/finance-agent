@@ -1,5 +1,6 @@
 """The Assistant's read-only tools (#136)."""
 
+from finance_agent.assistant.tools.propose import Turn
 from finance_agent.assistant.tools.read import (
     MAX_ROWS,
     Data,
@@ -26,6 +27,7 @@ __all__ = [
     "Money",
     "NoData",
     "ToolNotAllowed",
+    "Turn",
     "run",
     "sanitise",
     "specs",

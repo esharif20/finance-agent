@@ -112,6 +112,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget Feedback */
+        delete: operations["forget_feedback_api_feedback_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fx/balances": {
         parameters: {
             query?: never;
@@ -218,6 +235,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Memories */
+        get: operations["memories_api_memories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memories/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Memory
+         * @description Hard delete: the Memory and the Proposal it came from.
+         */
+        delete: operations["delete_memory_api_memories__memory_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/merchants": {
         parameters: {
             query?: never;
@@ -309,6 +363,84 @@ export interface paths {
          * @description Delete every version of the note. Backups keep it until they age out.
          */
         delete: operations["purge_api_notes__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending
+         * @description Pending Proposals, oldest first: the confirm cards to show.
+         */
+        get: operations["pending_api_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_api_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm
+         * @description Apply it through the same Ledger paths as the UI; confirming twice
+         *     writes once.
+         */
+        post: operations["confirm_api_proposals__proposal_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject
+         * @description Nothing is written; the rejection is kept as feedback.
+         */
+        post: operations["reject_api_proposals__proposal_id__reject_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -806,6 +938,24 @@ export interface components {
             /** Kind */
             kind?: ("subscription" | "bill") | null;
         };
+        /** CorrectionCardOut */
+        CorrectionCardOut: {
+            /** Category */
+            category: string[] | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "category" | "split" | "note";
+            /** Note */
+            note: string | null;
+            /** Part */
+            part: number | null;
+            /** Parts */
+            parts: components["schemas"]["PartOut"][] | null;
+            /** Transaction Id */
+            transaction_id: number;
+        };
         /** CorrectionIn */
         CorrectionIn: {
             /** Category */
@@ -865,6 +1015,11 @@ export interface components {
              * @constant
              */
             trial_detection: "partial";
+        };
+        /** DeletedOut */
+        DeletedOut: {
+            /** Deleted */
+            deleted: number;
         };
         /** EvidenceOut */
         EvidenceOut: {
@@ -981,6 +1136,54 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** MemoriesOut */
+        MemoriesOut: {
+            /** Items */
+            items: components["schemas"]["MemoryOut"][];
+        };
+        /** MemoryCardOut */
+        MemoryCardOut: {
+            /** Quote */
+            quote: string;
+            /**
+             * Said On
+             * Format: date
+             */
+            said_on: string;
+            /** Tags */
+            tags: string[];
+            /** Text */
+            text: string;
+            /** Type */
+            type: string;
+        };
+        /** MemoryOut */
+        MemoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Quote */
+            quote: string;
+            /** Review On */
+            review_on: string | null;
+            /**
+             * Said On
+             * Format: date
+             */
+            said_on: string;
+            /** Tags */
+            tags: string[];
+            /** Text */
+            text: string;
+            /** Turn Id */
+            turn_id: string;
+            /** Type */
+            type: string;
+        };
         /** MerchantOut */
         MerchantOut: {
             /** Always Ask */
@@ -1081,6 +1284,39 @@ export interface components {
         PreviewOut: {
             /** Parts */
             parts: components["schemas"]["PartOut"][];
+        };
+        /** ProposalOut */
+        ProposalOut: {
+            correction: components["schemas"]["CorrectionCardOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "memory" | "correction";
+            /** Ledger Version */
+            ledger_version: number;
+            memory: components["schemas"]["MemoryCardOut"] | null;
+            /** Result Id */
+            result_id: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "rejected";
+        };
+        /** ProposalsOut */
+        ProposalsOut: {
+            /** Items */
+            items: components["schemas"]["ProposalOut"][];
         };
         /** PurgeOut */
         PurgeOut: {
@@ -1536,6 +1772,26 @@ export interface operations {
             };
         };
     };
+    forget_feedback_api_feedback_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
     balances_api_fx_balances_get: {
         parameters: {
             query?: never;
@@ -1697,6 +1953,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManageLinkOut"][];
+                };
+            };
+        };
+    };
+    memories_api_memories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoriesOut"];
+                };
+            };
+        };
+    };
+    delete_memory_api_memories__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1898,6 +2205,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_api_proposals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalsOut"];
+                };
+            };
+        };
+    };
+    read_api_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_api_proposals__proposal_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
                 };
             };
             /** @description Validation Error */
