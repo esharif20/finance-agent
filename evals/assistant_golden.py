@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 6
+DATASET_VERSION = 7
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -182,6 +182,33 @@ CASES: tuple[Case, ...] = (
         "£84.00 of it was Fuel.",
         ("£84.00",),
         after="ask-transport-last-month",
+    ),
+    # --- Ask: compound questions (v7, #271) -----------------------------------
+    Case(
+        "ask-car-december",
+        "What did my car cost me in December 2025?",
+        "ask",
+        (
+            Call(
+                "spend_for_query",
+                {
+                    "categories": ["Transport > Fuel", "Transport > Parking"],
+                    "since": "2025-12",
+                    "until": "2025-12",
+                },
+            ),
+        ),
+        "Your car cost £84.00 in December 2025, at Shell and Tesco Fuel.",
+        ("£84.00",),
+    ),
+    Case(
+        "ask-car-followup-shell",
+        "Of that, how much was Shell?",
+        "ask",
+        (Call("spend_for_query", {"merchants": ["Shell"], "follow_up": True}),),
+        "£48.00 of it was Shell.",
+        ("£48.00",),
+        after="ask-car-december",
     ),
     # --- Plan --------------------------------------------------------------
     Case(

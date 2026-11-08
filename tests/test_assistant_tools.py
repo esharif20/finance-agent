@@ -72,6 +72,7 @@ def test_each_sub_graph_is_offered_only_its_own_tools() -> None:
         "category_detail",
         "list_guidance",
         "explain_card",
+        "spend_for_query",
         "list_subscriptions",
         "subscription_advice",
         "list_insights",
