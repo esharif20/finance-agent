@@ -790,22 +790,20 @@
         "title": "CorrectionIn",
         "type": "object"
       },
-      "CorrectionOut": {
+      "CorrectionsOut": {
         "properties": {
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "ledger_version": {
-            "title": "Ledger Version",
-            "type": "integer"
+          "corrections": {
+            "items": {
+              "$ref": "#/components/schemas/finance_agent__api__corrections__CorrectionOut"
+            },
+            "title": "Corrections",
+            "type": "array"
           }
         },
         "required": [
-          "id",
-          "ledger_version"
+          "corrections"
         ],
-        "title": "CorrectionOut",
+        "title": "CorrectionsOut",
         "type": "object"
       },
       "CostOut": {
@@ -3161,6 +3159,24 @@
         "title": "VersionOut",
         "type": "object"
       },
+      "finance_agent__api__CorrectionOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "ledger_version"
+        ],
+        "title": "CorrectionOut",
+        "type": "object"
+      },
       "finance_agent__api__briefing__BandOut": {
         "properties": {
           "left_out": {
@@ -3225,6 +3241,105 @@
           "upper"
         ],
         "title": "BandOut",
+        "type": "object"
+      },
+      "finance_agent__api__corrections__CorrectionOut": {
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "category": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Category",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "merchant_id": {
+            "title": "Merchant Id",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          }
+        },
+        "required": [
+          "id",
+          "merchant_id",
+          "category",
+          "base",
+          "rules",
+          "model"
+        ],
+        "title": "CorrectionOut",
         "type": "object"
       }
     }
@@ -3734,6 +3849,52 @@
       }
     },
     "/api/corrections": {
+      "get": {
+        "description": "`category`: \"Top/Sub\" (taxonomy ids), to list one Category's only.",
+        "operationId": "list_corrections_api_corrections_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Corrections"
+      },
       "post": {
         "operationId": "correct_api_corrections_post",
         "requestBody": {
@@ -3751,7 +3912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CorrectionOut"
+                  "$ref": "#/components/schemas/finance_agent__api__CorrectionOut"
                 }
               }
             },
@@ -3791,7 +3952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CorrectionOut"
+                  "$ref": "#/components/schemas/finance_agent__api__CorrectionOut"
                 }
               }
             },

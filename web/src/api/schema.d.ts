@@ -242,7 +242,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Corrections
+         * @description `category`: "Top/Sub" (taxonomy ids), to list one Category's only.
+         */
+        get: operations["list_corrections_api_corrections_get"];
         put?: never;
         /** Correct */
         post: operations["correct_api_corrections_post"];
@@ -1313,12 +1317,10 @@ export interface components {
             /** Transaction Id */
             transaction_id?: number | null;
         };
-        /** CorrectionOut */
-        CorrectionOut: {
-            /** Id */
-            id: number;
-            /** Ledger Version */
-            ledger_version: number;
+        /** CorrectionsOut */
+        CorrectionsOut: {
+            /** Corrections */
+            corrections: components["schemas"]["finance_agent__api__corrections__CorrectionOut"][];
         };
         /** CostOut */
         CostOut: {
@@ -2082,6 +2084,13 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** CorrectionOut */
+        finance_agent__api__CorrectionOut: {
+            /** Id */
+            id: number;
+            /** Ledger Version */
+            ledger_version: number;
+        };
         /** BandOut */
         finance_agent__api__briefing__BandOut: {
             /** Left Out */
@@ -2107,6 +2116,33 @@ export interface components {
             point: number;
             /** Upper */
             upper: number;
+        };
+        /** CorrectionOut */
+        finance_agent__api__corrections__CorrectionOut: {
+            /** Base */
+            base: [
+                string,
+                string
+            ] | null;
+            /** Category */
+            category: [
+                string,
+                string
+            ];
+            /** Id */
+            id: number;
+            /** Merchant Id */
+            merchant_id: number;
+            /** Model */
+            model: [
+                string,
+                string
+            ] | null;
+            /** Rules */
+            rules: [
+                string,
+                string
+            ] | null;
         };
     };
     responses: never;
@@ -2468,6 +2504,37 @@ export interface operations {
             };
         };
     };
+    list_corrections_api_corrections_get: {
+        parameters: {
+            query?: {
+                category?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     correct_api_corrections_post: {
         parameters: {
             query?: never;
@@ -2487,7 +2554,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CorrectionOut"];
+                    "application/json": components["schemas"]["finance_agent__api__CorrectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -2518,7 +2585,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CorrectionOut"];
+                    "application/json": components["schemas"]["finance_agent__api__CorrectionOut"];
                 };
             };
             /** @description Validation Error */

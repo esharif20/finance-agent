@@ -156,3 +156,39 @@ def test_a_merchant_correction_still_beats_the_base() -> None:
             GROCERIES,
             "correction",
         )
+
+
+PARKING = ("Transport", "Parking")
+RAIL = ("Transport", "Public transport")
+
+
+@pytest.mark.parametrize(
+    ("descriptor", "category"),
+    [
+        ("RIDGEWAY GARAGE PFS", FUEL),  # #215 F: the banks' PFS suffix
+        ("COSTCO PFS 0042", FUEL),  # before Costco, which is Groceries
+        ("VALERO 1234 LEEDS", FUEL),
+        ("MARKET SQ CAR PARK", PARKING),
+        ("TOWN HALL PAY AND DISPLAY", PARKING),
+        ("LUL TICKET MACHINE", RAIL),
+        ("THAMESLINK 0042", RAIL),
+        ("TRAIN TICKETS ONLINE", RAIL),
+    ],
+)
+def test_cheap_transport_rules_catch_fuel_parking_and_rail(
+    descriptor: str, category: tuple[str, str]
+) -> None:
+    assert c(descriptor).category == category
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [
+        "HYDE PARK WINTER FAIR",
+        "GREEN TRAIN MODELS",
+        "PERSONAL TRAINER JO",
+        "PETROLHEAD MONTHLY",
+    ],
+)
+def test_transport_lookalikes_stay_out_of_transport(descriptor: str) -> None:
+    assert (c(descriptor).category or ("",))[0] != "Transport"

@@ -23,6 +23,7 @@ merchants = [
   { name = "Morrisons Fuel", match = ["^MORRISONS PFS", "^MORRISONS PETROL", "^MORRISONS FUEL", "^MORRISONS DAILY FUEL"] },
   { name = "Co-op Fuel", match = ["^CO-OP FUEL", "^CO-OP PETROL", "^COOP PFS"] },
   { name = "M&S Fuel", match = ["^M&S PFS", "^M&S PETROL", "^MARKS & SPENCER PFS"] },
+  { name = "Costco Fuel", match = ["^COSTCO PFS", "^COSTCO PETROL", "^COSTCO FUEL"] },
 ]
 
 [[sub_brand]]
@@ -289,7 +290,7 @@ merchants = [
 [[base]]
 category = "Transport/Public transport"
 merchants = [
-  { name = "TfL", match = ["^TFL", "TRANSPORT FOR LONDON"] },
+  { name = "TfL", match = ["^TFL", "TRANSPORT FOR LONDON", "^LUL", "LONDON UNDERGROUND", "ELIZABETH LINE"] },
   { name = "Trainline", match = ["TRAINLINE"] },
   { name = "National Rail", match = ["NATIONAL RAIL", "RAIL DELIVERY GROUP"] },
   { name = "LNER", match = ["^LNER"] },
@@ -321,6 +322,15 @@ merchants = [
   { name = "Oyster", match = ["OYSTER"] },
   { name = "Translink", match = ["TRANSLINK"] },
   { name = "Merseyrail", match = ["MERSEYRAIL"] },
+  { name = "Thameslink", match = ["THAMESLINK"] },
+  { name = "South Western Railway", match = ["SOUTH WESTERN RAILWAY", "^SWR RAIL"] },
+  { name = "Lumo", match = ["^LUMO"] },
+  { name = "Hull Trains", match = ["HULL TRAINS"] },
+  { name = "Grand Central Rail", match = ["GRAND CENTRAL RAIL"] },
+  { name = "Transport for Wales", match = ["TRANSPORT FOR WALES", "^TFW RAIL"] },
+  { name = "London Northwestern", match = ["LONDON NORTHWESTERN"] },
+  { name = "West Midlands Trains", match = ["WEST MIDLANDS TRAINS", "WEST MIDLANDS RAILWAY"] },
+  { name = "Caledonian Sleeper", match = ["CALEDONIAN SLEEPER"] },
   { name = "Metrolink", match = ["METROLINK"] },
   { name = "West Midlands Metro", match = ["WEST MIDLANDS METRO", "^NETWORK WEST MIDLANDS"] },
   { name = "Dart Charge", match = ["DART CHARGE", "DARTCHARGE"] },
@@ -366,6 +376,7 @@ merchants = [
   { name = "Jet", match = ["^JET FILLING", "^JET PETROL", "^JET GARAGE"] },
   { name = "Gulf", match = ["^GULF PETROL", "^GULF FILLING"] },
   { name = "Murco", match = ["^MURCO"] },
+  { name = "Valero", match = ["^VALERO"] },
   { name = "Applegreen", match = ["APPLEGREEN"] },
   { name = "Motorway Services", match = ["MOTO HOSPITALITY", "^MOTO SERVICES", "WELCOME BREAK", "ROADCHEF", "EXTRA MSA", "^MOTORWAY SERVICE"] },
   { name = "Maxol", match = ["^MAXOL"] },
@@ -1133,13 +1144,24 @@ category = "Food & Drink/Groceries"
 
 [[rule]]
 id = "rail-words"
-pattern = '\b(RAILWAY|RAIL TICKET|TRAIN TICKET|BUS FARE|TRAMS?)\b'
+pattern = '\b(RAILWAY|RAIL TICKETS?|TRAIN TICKETS?|BUS FARE|TRAMS?|UNDERGROUND)\b'
 category = "Transport/Public transport"
 
 [[rule]]
 id = "fuel-words"
 pattern = '\b(DIESEL|UNLEADED|FORECOURT|FILLING STATION|SERVICE STATION|GARAGE FUEL)\b'
 category = "Transport/Fuel"
+
+# PFS: the banks' "petrol filling station" suffix (BP, Shell and independents)
+[[rule]]
+id = "fuel-pfs"
+pattern = '\bPFS\b'
+category = "Transport/Fuel"
+
+[[rule]]
+id = "parking-words"
+pattern = '\b(CAR PARKS?|CARPARK|PAY AND DISPLAY|PAY & DISPLAY|PARK AND RIDE|PARK & RIDE)\b'
+category = "Transport/Parking"
 
 [[rule]]
 id = "water-words"
