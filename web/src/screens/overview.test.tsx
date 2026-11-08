@@ -261,6 +261,73 @@ describe("Overview", () => {
     expect(screen.getByRole("button", { name: "Previous month" })).toBeDisabled();
   });
 
+  // The "click twice" bug: the stepper read the month of the figures on screen, so a second
+  // click before the first month's figures landed stepped from the old month again, a no-op.
+  it("steps once per click while the figures are still loading, keeping the last ones dimmed", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const december = { ...summary, month: "2025-12", money_in: m(70000), money_out: m(10000), net: m(60000) };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const at = url.match(/month=(\d{4}-\d{2})/)?.[1];
+        if (at && at !== "2026-02") await gate; // older months are slow to arrive
+        if (url.startsWith("/api/summary")) return Response.json(at === "2025-12" ? december : at === "2026-01" ? january.summary : summary);
+        if (url.startsWith("/api/spending")) return Response.json(at === "2026-02" || !at ? spending : { ...january.spending, month: at });
+        if (url.startsWith("/api/month-series")) return Response.json(series);
+        if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01", "2025-12"]);
+        if (url.startsWith("/api/transactions")) return Response.json({ items: [], total: 0 });
+        return Response.json([account()]);
+      }),
+    );
+    renderOverview();
+    expect(await screen.findByLabelText("Net")).toHaveTextContent("+£936.90");
+    const prev = screen.getByRole("button", { name: "Previous month" });
+
+    await userEvent.click(prev);
+    await userEvent.click(prev);
+
+    // both clicks counted at once, while February's figures stay, marked busy
+    expect(screen.getByText("December 2025", { selector: "nav span" })).toBeInTheDocument();
+    expect(prev).toBeDisabled();
+    expect(screen.getByLabelText("Net")).toHaveTextContent("+£936.90");
+    expect(screen.getByLabelText("Net").closest("[aria-busy]")).toHaveAttribute("aria-busy", "true");
+
+    release();
+    await vi.waitFor(() => expect(screen.getByLabelText("Net")).toHaveTextContent("+£600.00"));
+    expect(screen.getByLabelText("Net").closest("[aria-busy]")).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("keeps the last month's transactions on screen until the new month's land, never a blank", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const jan = url.includes("month=2026-01");
+        if (url.startsWith("/api/summary")) return Response.json(jan ? january.summary : summary);
+        if (url.startsWith("/api/spending")) return Response.json(jan ? january.spending : spending);
+        if (url.startsWith("/api/month-series")) return Response.json(series);
+        if (url.startsWith("/api/months")) return Response.json(["2026-02", "2026-01"]);
+        if (url.startsWith("/api/transactions")) {
+          if (jan) await gate;
+          return Response.json({ items: [{ ...txn(jan ? "2026-01-03" : "2026-02-03"), description: jan ? "SYNTH JAN" : "SYNTH FEB" }], total: 1 });
+        }
+        if (url.startsWith("/api/categories")) return Response.json([]);
+        return Response.json([account()]);
+      }),
+    );
+    renderOverview();
+    expect(await screen.findByText(/SYNTH FEB/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    await vi.waitFor(() => expect(screen.getByLabelText("Net")).toHaveTextContent("+£200.00"));
+
+    expect(screen.getByText(/SYNTH FEB/)).toBeInTheDocument(); // still there while January loads
+    release();
+    expect(await screen.findByText(/SYNTH JAN/)).toBeInTheDocument();
+  });
+
   it("picks a month from the comparison bars, by keyboard, and toggles in/out", async () => {
     stubApi();
     renderOverview();

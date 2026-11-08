@@ -555,6 +555,16 @@ html[data-private] .money {
   filter: brightness(0.97);
 }
 
+/* While a switched month or Account loads, the last one's figures stay in place, dimmed, so
+   the screen never blanks and it is clear they are about to change. Opacity only. */
+.waiting > * {
+  transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.waiting[data-waiting="true"] > * {
+  opacity: 0.55;
+  transition-delay: 120ms; /* a quick load never flashes; the new figures arrive undimmed */
+}
+
 /* Per-account view (#59). The combined view's share bars wear each Account's card hue, with a
    2px card-coloured gap between segments; the table under them is the legend and the figures.
    Top merchants are one series, so one hue: --data. */

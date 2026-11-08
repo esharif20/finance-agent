@@ -28,27 +28,36 @@ export function soFar(month: string, newest: string | undefined): string | undef
   return Number(newest.slice(8, 10)) < last ? dayMonth(newest) : undefined;
 }
 
+// As the Overview's month queries: going back to an Account refetches nothing until a change
+// invalidates them. Exported so a hover on a card can fetch them ahead of its click.
+export const seriesQuery = (account: number | undefined) => ({
+  queryKey: ["month-series", account],
+  queryFn: () => fetchMonthSeries(account),
+  staleTime: 30_000,
+});
+export const newestQuery = (account: number | undefined) => ({
+  queryKey: ["transactions", "newest", account],
+  queryFn: () => fetchTransactions(account === undefined ? {} : { account_id: String(account) }, 1),
+  staleTime: 30_000,
+});
+
 /** Last 12 months of money in or out. A bar picks the Overview month; figures come from the API. */
 export function MonthBars({
   month,
   account,
   onChange,
+  onPreview,
 }: {
   month: string;
   account?: number;
   onChange: (month: string) => void;
+  onPreview?: (month: string) => void; // a pointer is on a bar: fetch its month before the click
 }) {
   const [side, setSide] = useState<Side>("money_out");
   const reduce = useReducedMotion();
   const { hidden } = usePrivacy();
-  const series = useQuery({ queryKey: ["month-series", account],
-    queryFn: () => fetchMonthSeries(account),
-    placeholderData: keepPreviousData,
-  });
-  const newest = useQuery({
-    queryKey: ["transactions", "newest", account],
-    queryFn: () => fetchTransactions(account === undefined ? {} : { account_id: String(account) }, 1),
-  });
+  const series = useQuery({ ...seriesQuery(account), placeholderData: keepPreviousData });
+  const newest = useQuery(newestQuery(account));
   if (!series.data || series.data.length < 2) return null; // one month has nothing to compare
   const rows = series.data;
   const max = Math.max(...rows.map((r) => r[side].minor), 1);
@@ -91,6 +100,7 @@ export function MonthBars({
               aria-label={label}
               title={label}
               onClick={() => onChange(r.month)}
+              onPointerEnter={() => onPreview?.(r.month)}
               className="group flex min-w-0 flex-1 flex-col items-stretch justify-end gap-1.5 rounded-[10px] focus-visible:outline-offset-1"
             >
               <span className="flex min-h-0 flex-1 items-end">
