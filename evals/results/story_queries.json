@@ -1,0 +1,36 @@
+{
+  "harness": "story_queries",
+  "dataset": "synthetic_history recaps + synthetic month questions",
+  "dataset_version": 1,
+  "dataset_sha256": "d1c88501c4824031f52fcd88b7b0a8f796eff1fd790b8fec05d418a7c0b37649",
+  "questions": 48,
+  "stories": 180,
+  "models": {
+    "baseline": {
+      "model": "date-parse-only resolver + deterministic template",
+      "model_version": "1",
+      "metrics": {
+        "retrieval.accuracy_at_1": 0.520833,
+        "grounding.final_pass_rate": 1.0
+      }
+    },
+    "candidate": {
+      "model": "date parse + story index; FakeChatModel faithful",
+      "model_version": "1",
+      "metrics": {
+        "retrieval.accuracy_at_1": 0.916667,
+        "grounding.model_pass_rate": 1.0,
+        "grounding.final_pass_rate": 1.0
+      }
+    },
+    "fake_rounding": {
+      "model": "FakeChatModel rounding (negative control)",
+      "model_version": "1",
+      "metrics": {
+        "grounding.rejected_rate": 0.85,
+        "grounding.final_pass_rate": 1.0
+      }
+    }
+  },
+  "real_model": "pending: batched local run (pass rate, peak memory)"
+}

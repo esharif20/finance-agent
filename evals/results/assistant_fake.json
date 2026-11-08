@@ -1,10 +1,10 @@
 {
   "harness": "assistant",
   "dataset": "assistant_golden",
-  "dataset_version": 8,
-  "dataset_sha256": "5c83ea9aa43d6340af237f16aee5e4b6c4a5ee218178b80bd3bbde947ab91bc5",
+  "dataset_version": 9,
+  "dataset_sha256": "49dc6e6ab97f25bec55a0ce9e530cb847284b80294f7b12bc967edca39ac6715",
   "prompt_sha256": "c506981690b66c7c452731e03b1684c1b2f24601fb72fdd3073402e4a5010c09",
-  "cases": 43,
+  "cases": 45,
   "refusal_cases": 7,
   "models": {
     "fake_oracle": {
@@ -26,11 +26,11 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.186047,
-        "grounding_pass_rate": 0.027778,
+        "tool_call_accuracy": 0.177778,
+        "grounding_pass_rate": 0.026316,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.813953,
+        "printed_tool_call_rate": 0.822222,
         "model_error_rate": 0.0
       },
       "failures": {
@@ -42,6 +42,8 @@
           "ask-food-trend",
           "ask-food-vs-usual",
           "ask-search",
+          "ask-story-january",
+          "ask-compare-months",
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
@@ -79,6 +81,8 @@
           "ask-food-trend",
           "ask-food-vs-usual",
           "ask-search",
+          "ask-story-january",
+          "ask-compare-months",
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
@@ -116,6 +120,8 @@
           "ask-food-trend",
           "ask-food-vs-usual",
           "ask-search",
+          "ask-story-january",
+          "ask-compare-months",
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",

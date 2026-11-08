@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 8
+DATASET_VERSION = 9
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -102,6 +102,24 @@ CASES: tuple[Case, ...] = (
         "ask",
         (Call("search", {"query": "tesco"}),),
         "I found Transactions and a Merchant matching Tesco in your records.",
+    ),
+    # --- Ask: the monthly story (v9, #276). Two months of history is too
+    # short for any personal baseline, so January's story lists no change.
+    Case(
+        "ask-story-january",
+        "What's the story of my money in January 2026?",
+        "ask",
+        (Call("get_story", JAN),),
+        "Nothing moved far from usual in January 2026.",
+        ("January 2026",),
+    ),
+    Case(
+        "ask-compare-months",
+        "How was December 2025 compared with now?",
+        "ask",
+        (Call("compare_months", {"first": "2025-12"}),),
+        "You spent £112.80 in December 2025 and £92.34 in January 2026 (-£20.46).",
+        ("£112.80", "£92.34"),
     ),
     Case(
         "ask-subscriptions",

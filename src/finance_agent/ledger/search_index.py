@@ -4,7 +4,9 @@ Transactions, Merchants, live Notes, live Split parts and Memories.
 
 A document id is kind * 2**40 + the source row's id (a Split part's is its
 correction id * 10 + ordinal). Every statement here is filtered to one user.
-Query text, bodies and vectors are never logged; only counts are.
+Query text, bodies and vectors are never logged; only counts are. Monthly
+stories (#276) are matched here by the words their stored recap names, with no
+index table of their own (no migration): a user has one row a month.
 """
 
 import logging
@@ -12,10 +14,11 @@ import re
 from array import array
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
+from finance_agent.ledger.stories import Stories
 from finance_agent.storage import Scoped, schema
 
 log = logging.getLogger(__name__)  # counts only
@@ -246,3 +249,48 @@ def count(conn: Connection, user_id: int, kinds: Sequence[str] = KINDS) -> int:
         )
         for k in kinds
     )
+
+
+# --- monthly stories (#276) --------------------------------------------------
+
+
+def story_items(recap: Mapping[str, Any]) -> list[tuple[set[str], int]]:
+    """What a stored recap names, one item per change or Insight: its words
+    (Category, up or down, driving Merchants; an Insight's Merchant, Category
+    and type) and its size in pence. Wording is left out: its everyday words
+    would match every question."""
+    items: list[tuple[str, int]] = []
+    for c in recap.get("changes", ()):
+        way = "up more rose" if c["change"] > 0 else "down less fell"
+        names = [c["category"], way, *(d["merchant"] for d in c.get("drivers", ()))]
+        items.append((" ".join(names), abs(c["change"])))
+    for a in recap.get("anomalies", ()):
+        kind = a["type"].replace("_", " ")
+        items.append((f"{a['key']} {a['category']} {kind}", abs(a["impact"])))
+    return [(set(_WORD.findall(t.lower())), size) for t, size in items]
+
+
+def story_rank(recaps: Mapping[str, Mapping[str, Any]], query: str) -> list[str]:
+    """Months by their best item: the most words of `query` it names
+    (prefixes of two letters or more), then the largest change, then the
+    earliest month. Months naming none are left out."""
+    words = {w for w in _WORD.findall(query.lower()) if len(w) >= 2}
+    scored: list[tuple[int, int, str]] = []
+    for month, recap in recaps.items():
+        best = max(
+            (
+                (sum(any(h.startswith(w) for h in have) for w in words), size)
+                for have, size in story_items(recap)
+            ),
+            default=(0, 0),
+        )
+        if best[0]:
+            scored.append((-best[0], -best[1], month))
+    return [m for *_, m in sorted(scored)]
+
+
+def story_months(conn: Connection, user_id: int, query: str) -> list[str]:
+    """`story_rank` over this user's stored monthly stories."""
+    s = Stories(conn, user_id)
+    found = {m: got.recap for m in s.months() if (got := s.get(m)) is not None}
+    return story_rank(found, query)
