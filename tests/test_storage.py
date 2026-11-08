@@ -613,3 +613,53 @@ def test_migration_0020_adds_merges_and_alerts_which_go_with_their_source(
         conn.execute(text("DELETE FROM merchant WHERE id = 5"))
         assert conn.execute(text("SELECT * FROM subscription_alert")).all() == []
     eng.dispose()
+
+
+def test_migration_0021_adds_and_drops_only_the_registry_trigger(
+    tmp_path: Path,
+) -> None:
+    """0021 (#132) adds one trigger, nothing rebuilt: at 0021 a Merchant takes
+    its registry history with it; at 0020 the foreign key still refuses."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT OR IGNORE INTO merchant (id, user_id, name) VALUES (5, 1, 'SYNTH')",
+        "INSERT INTO subscription_entry (user_id, merchant_id, source, kind,"
+        " group_name, status, reason, evidence_on, created_at) VALUES (1, 5,"
+        " 'user', 'subscription', 'Streaming', 'active', 'user_added',"
+        " '2026-01-05', '2026-01-05')",
+    )
+    trig = "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = :n"
+    name = {"n": "subscription_entry_merchant_gone"}
+    count = "SELECT count(*) FROM subscription_entry"
+    eng = round_trip(tmp_path, "0020", "0021", set(), rows)
+    with eng.begin() as conn:
+        assert conn.execute(text(trig), name).all() == [(name["n"],)]
+        assert conn.execute(text(count)).scalar() == 2  # both upgrades' rows kept
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.downgrade(cfg, "0020")
+        assert conn.execute(text(trig), name).all() == []
+    with eng.begin() as conn, pytest.raises(Exception, match="FOREIGN KEY"):
+        conn.execute(text("DELETE FROM merchant WHERE id = 5"))
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0021")
+        conn.execute(text("DELETE FROM merchant WHERE id = 5"))
+        assert conn.execute(text(count)).scalar() == 0
+    eng.dispose()
+
+
+def test_the_registry_trigger_is_present_at_head(engine: Engine) -> None:
+    """A later migration that rebuilds `merchant` drops its triggers silently;
+    this catches that before the registry can outlive its Merchant."""
+    from sqlalchemy import text
+
+    sql = "SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='merchant'"
+    with engine.connect() as conn:
+        got = conn.execute(text(sql)).scalars().all()
+    assert len(got) == 1 and "subscription_entry" in got[0]
