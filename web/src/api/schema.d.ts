@@ -195,6 +195,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/warm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Warm
+         * @description Load the model while the chat screen opens, so the first turn doesn't
+         *     wait for it. An empty chat only loads; it stays for the keep_alive.
+         */
+        post: operations["warm_api_chat_warm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/{thread_id}": {
         parameters: {
             query?: never;
@@ -2400,6 +2421,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    warm_api_chat_warm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
                 };
             };
         };

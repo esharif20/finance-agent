@@ -3645,6 +3645,32 @@
         ]
       }
     },
+    "/api/chat/warm": {
+      "post": {
+        "description": "Load the model while the chat screen opens, so the first turn doesn't\nwait for it. An empty chat only loads; it stays for the keep_alive.",
+        "operationId": "warm_api_chat_warm_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Warm Api Chat Warm Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Warm",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/chat/{thread_id}": {
       "delete": {
         "description": "End the conversation: its checkpoints are deleted.",

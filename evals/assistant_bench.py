@@ -46,6 +46,7 @@ from finance_agent.assistant import (
     ToolCall,
     ToolSpec,
     context,
+    graph,
 )
 from finance_agent.assistant.chat_model import printed_tool_call
 from finance_agent.assistant.graph import Assistant, ask
@@ -54,7 +55,7 @@ from finance_agent.assistant.tools.registry import TOOLS
 from finance_agent.storage import open_db
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
-from synthetic_assistant import ME, OTHER, seed  # noqa: E402 - lives with the tests
+from synthetic_assistant import DECEMBER, ME, OTHER, ROWS, seed  # noqa: E402
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "assistant_fake.json"
@@ -63,28 +64,41 @@ LOCAL_RESULTS = HERE / "results" / "assistant_local.json"
 SAMPLE_EVERY = 0.25  # seconds between memory samples
 GB = 1024**3
 
+PHASES = ("router", "tool_turn", "answer_turn", "regenerate")
+BY_ID = {c.id: c for c in golden.CASES}
+
 type Ids = dict[str, int]
 type Factory = Callable[[golden.Case, Ids], ChatModel]
 
 
 class Recorder:
-    """Wraps a ChatModel: the tool calls it asked for, and any it printed."""
+    """Wraps a ChatModel: the tool calls it asked for, any it printed, and the
+    wall time of each model call by phase (PHASES)."""
 
     def __init__(self, model: ChatModel) -> None:
         self.model = model
         self.calls: list[ToolCall] = []
         self.printed = False
         self.errors = 0
+        self.phases: dict[str, list[float]] = {p: [] for p in PHASES}
 
     def chat(
         self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()
     ) -> Reply:
+        start = time.perf_counter()
         try:
             r = self.model.chat(messages, tools)
         except (OllamaError, OSError):
             self.errors += 1
             raise
-        if tools:  # the Router and the regeneration are offered none
+        took = time.perf_counter() - start
+        if not tools:  # the Router and the regeneration are offered none
+            router = bool(messages) and messages[0].content == context.SYSTEM["router"]
+            phase = "router" if router else "regenerate"
+        else:
+            phase = "tool_turn" if r.tool_calls else "answer_turn"
+        self.phases[phase].append(took)
+        if tools:
             self.calls += r.tool_calls
         self.printed |= printed_tool_call(r.content, frozenset(TOOLS))
         return r
@@ -141,14 +155,27 @@ def percentile(xs: Sequence[float], p: float) -> float:
 # --- the scripted models ------------------------------------------------------
 
 
-def oracle(case: golden.Case, ids: Ids) -> ChatModel:
-    script = [Reply(content=case.route)]
+def routed(case: golden.Case) -> list[Reply]:
+    """The Router's reply, unless the keyword pre-router answers without it."""
+    return [] if graph.pre_route(case.question) else [Reply(content=case.route)]
+
+
+def _oracle_turn(case: golden.Case, ids: Ids) -> list[Reply]:
+    script = routed(case)
     script += [
         Reply(tool_calls=(ToolCall(name=c.name, arguments=_resolve(c.args, ids)),))
         for c in case.calls
     ]
-    script.append(Reply(content=case.answer))
-    return FakeChatModel(script)
+    return [*script, Reply(content=case.answer)]
+
+
+def _before(case: golden.Case, ids: Ids) -> list[Reply]:
+    """The oracle's script for the turn a follow-up case follows."""
+    return _oracle_turn(BY_ID[case.after], ids) if case.after else []
+
+
+def oracle(case: golden.Case, ids: Ids) -> ChatModel:
+    return FakeChatModel([*_before(case, ids), *_oracle_turn(case, ids)])
 
 
 def prints_tool_calls(case: golden.Case, ids: Ids) -> ChatModel:
@@ -163,7 +190,7 @@ def prints_tool_calls(case: golden.Case, ids: Ids) -> ChatModel:
     ]
     tail = printed or [Reply(content=case.answer)]
     # padded: the graph may regenerate after a printed call fails grounding
-    return FakeChatModel([Reply(content=case.route), *tail, *tail, *tail])
+    return FakeChatModel([*_before(case, ids), *routed(case), *tail, *tail, *tail])
 
 
 FAKES: dict[str, tuple[str, str, Factory]] = {
@@ -198,14 +225,22 @@ def _score(
         for k in ("route", "tool_calls", "grounding", "refusal", "printed", "errors")
     }
     latencies: list[float] = []
+    phases: dict[str, list[float]] = {p: [] for p in PHASES}
     for case in golden.CASES:
         rec = Recorder(factory(case, ids))
         with engine.connect() as conn:
             tx = conn.begin()
             try:
+                thread = None
+                if case.after:  # the earlier turn of the conversation, unscored
+                    first = BY_ID[case.after].question
+                    thread = ask(Assistant(rec, conn, golden.TODAY), first).thread_id
+                    rec = Recorder(rec.model)
                 start = time.perf_counter()
-                a = ask(Assistant(rec, conn, golden.TODAY), case.question)
+                a = ask(Assistant(rec, conn, golden.TODAY), case.question, thread)
                 latencies.append(time.perf_counter() - start)
+                for p in PHASES:
+                    phases[p] += rec.phases[p]
             finally:
                 tx.rollback()  # Proposals, cache and checkpoints: gone
         proposed = a.proposal_id is not None or any(
@@ -246,6 +281,12 @@ def _score(
             "latency_p50_ms": round(percentile(ms, 50), 1),
             "latency_p95_ms": round(percentile(ms, 95), 1),
         }
+        for p, ts in phases.items():  # where a turn's time goes
+            if ts:
+                metrics[f"{p}_p50_ms"] = round(
+                    percentile([t * 1000 for t in ts], 50), 1
+                )
+            metrics[f"{p}_calls_per_turn"] = round(len(ts) / n, 3)
     return metrics, {k: v for k, v in fails.items() if v}
 
 
@@ -260,7 +301,7 @@ def evaluate(
             engine = open_db(d / "db" / "bench.db")
             try:
                 seed(engine, OTHER, d)
-                ids = seed(engine, ME, d)
+                ids = seed(engine, ME, d, DECEMBER + ROWS)
                 out: dict[str, Any] = {}
                 for key, (name, version, factory) in models.items():
                     metrics, fails = _score(factory, engine, ids, timed)
@@ -369,6 +410,9 @@ def local(
     chat = OllamaChatModel(model, connect=connect)
     try:
         with Peak(sample or (lambda: sample_ollama(model))) as peak:
+            start = time.perf_counter()
+            chat.chat([])  # loads the model, timed apart: the chat screen warms it
+            load_ms = round((time.perf_counter() - start) * 1000, 1)
             fresh = evaluate({model: (model, "", lambda _c, _i: chat)}, timed=True)
     finally:
         try:  # an empty chat with keep_alive 0 unloads the model
@@ -379,6 +423,7 @@ def local(
     entry["model_version"] = peak.digest
     entry["num_ctx"] = NUM_CTX
     entry["metrics"] |= {
+        "model_load_ms": load_ms,
         "peak_rss_gb": round(peak.rss / GB, 3),
         "peak_ollama_size_gb": round(peak.size / GB, 3),
         "peak_memory_gb": round(max(peak.rss, peak.size) / GB, 3),

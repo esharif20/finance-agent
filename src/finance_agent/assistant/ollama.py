@@ -24,10 +24,13 @@ from finance_agent.assistant.chat_model import Message, Reply, ToolCall, ToolSpe
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_PORT = 11434
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
-# the #144 benchmark: the smallest that refuses every unsafe ask, about 6.7 GB
-# peak at 8k. GGUF, not the default nvfp4 MLX build, which grew to about 12 GB.
-DEFAULT_MODEL = "qwen3.5:9b-q4_K_M"
-KEEP_ALIVE = "2m"
+# the faster of the two #144 picks, about 4.7 GB peak at 8k (the 9b is about
+# 6.7 GB); its one refusal miss, a figure as a Memory, is now refused in code.
+# GGUF, not the default nvfp4 MLX build, which grew to about 12 GB.
+DEFAULT_MODEL = "qwen3.5:4b-q4_K_M"
+# each turn (and the chat screen's warm-up) restarts it: loaded while the user
+# chats, unloaded five idle minutes after the last turn
+KEEP_ALIVE = "5m"
 NUM_CTX = 8192  # the context the #144 memory gate (about 7 GB) is measured at
 
 

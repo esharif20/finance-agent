@@ -29,7 +29,7 @@ installs or downloads it; run this once yourself:
 ```
 brew install ollama
 ollama pull nomic-embed-text
-ollama pull qwen3.5:9b-q4_K_M   # the Assistant (#144), about 6.7 GB while loaded
+ollama pull qwen3.5:4b-q4_K_M   # the Assistant (#144), about 4.7 GB while loaded
 ```
 
 Without it the app keeps to Corrections and rules, and `/api/local-model`

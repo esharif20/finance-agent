@@ -16,7 +16,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from finance_agent.assistant import ChatModel, OllamaChatModel
+from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
 from finance_agent.identity import current_user
 from finance_agent.ledger.conversation import Conversations
@@ -95,6 +95,17 @@ def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingRes
             raise HTTPException(404, "no such conversation")
         answer = ask(Assistant(model, conn, day), message, thread)
     return _sse(answer)
+
+
+@router.post("/warm")
+def warm(model: Model) -> dict[str, bool]:
+    """Load the model while the chat screen opens, so the first turn doesn't
+    wait for it. An empty chat only loads; it stays for the keep_alive."""
+    try:
+        model.chat([])
+    except (OllamaError, OSError):
+        return {"warm": False}
+    return {"warm": True}
 
 
 @router.post("/{thread_id}/resume")

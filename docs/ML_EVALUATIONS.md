@@ -179,7 +179,7 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 
 ### Model benchmark (#143)
 
-`evals/assistant_bench.py` runs the whole graph on the golden set in `evals/assistant_golden.py`. Each case is a question, its route, the expected tool calls in order, and a grounded answer. v2 (#155) has 25 cases: Ask (with Insights), Plan (a what-if purchase, with and without a buffer, and the cash-flow forecast), Memory and Correct, plus six refusals (a payment, an unconfirmed bulk write, a figure as a Memory, a saving plan, a transfer asked of Plan, and investment advice). They run over the synthetic Ledger of `tests/synthetic_assistant.py`. Each case runs in a rolled-back transaction on a throwaway encrypted database, keyed in memory.
+`evals/assistant_bench.py` runs the whole graph on the golden set in `evals/assistant_golden.py`. Each case is a question, its route, the expected tool calls in order, and a grounded answer. v2 (#155) has 25 cases: Ask (with Insights), Plan (a what-if purchase, with and without a buffer, and the cash-flow forecast), Memory and Correct, plus six refusals (a payment, an unconfirmed bulk write, a figure as a Memory, a saving plan, a transfer asked of Plan, and investment advice). v3 adds six inside-a-Category cases ("fuel last month", "petrol", the Transport breakdown, the top fuel Merchant, and a follow-up, "Of that transport, how much was fuel for my car?", which the bench runs after its earlier turn on the same conversation, unscored), over a synthetic December 2025 of Transport: 31 cases. They run over the synthetic Ledger of `tests/synthetic_assistant.py`. Each case runs in a rolled-back transaction on a throwaway encrypted database, keyed in memory.
 
 | Metric | Passes when |
 | --- | --- |
@@ -190,10 +190,12 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 | `printed_tool_call_rate` (lower is better) | the qwen tool-call printing bug: a reply whose text holds a tool call (a `<tool_call>` or `<function=` marker, a `{"name": <tool>, "arguments"/"parameters": ...}` object, or `<tool>(`) |
 | `model_error_rate` (lower is better) | Ollama errors, including malformed tool calls it refuses |
 | `latency_p50_ms`, `latency_p95_ms` | nearest-rank percentiles of the wall time of each turn (real runs only) |
+| `<phase>_p50_ms`, `<phase>_calls_per_turn` | where a turn's time goes: each model call is timed as `router`, `tool_turn` (it asked for tools), `answer_turn` (it replied) or `regenerate` (real runs only) |
+| `model_load_ms` | an empty request that loads the model before the cases, timed apart, as the chat screen's warm-up does (real runs only) |
 | `peak_rss_gb`, `peak_ollama_size_gb`, `peak_memory_gb` | peak RSS of Ollama's runner process and peak `/api/ps` size, sampled every 0.25 s, and the larger of the two (real runs only) |
 
-- **CI** runs it on two scripted `FakeChatModel`s and requires `evals/results/assistant_fake.json` to reproduce (`gate.py`). The oracle does what each case expects and scores 1.0 everywhere. The negative control prints its tool calls as text, and must be flagged on every tool-using case: it scores 0.25 tool-call accuracy and a 0.75 printing rate.
-- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:9b-q4_K_M`.
+- **CI** runs it on two scripted `FakeChatModel`s and requires `evals/results/assistant_fake.json` to reproduce (`gate.py`). The oracle does what each case expects and scores 1.0 everywhere. The negative control prints its tool calls as text, and must be flagged on every tool-using case: on v3 it scores 0.19 tool-call accuracy and a 0.81 printing rate. The scripts leave out the Router reply for a message the keyword pre-router takes, and a follow-up case scripts its earlier turn first.
+- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:4b-q4_K_M`.
   - It talks only to localhost Ollama, at `num_ctx` 8192.
   - It merges the model's scores into `evals/results/assistant_local.json`, which CI never reads. The model digest is its `model_version`.
   - It unloads the model afterwards (`keep_alive` 0), even if the run fails.

@@ -3,6 +3,7 @@ a pending Proposal. Nothing changes until the user confirms it on a card
 (`/api/proposals/{id}/confirm`). Provenance (the turn, the user's own words,
 the date) comes from the graph's `Turn`, never from the model's arguments."""
 
+import re
 from datetime import date
 from typing import Annotated, Literal, Protocol
 
@@ -86,7 +87,21 @@ class ProposeMemoryIn(BaseModel):
     )
 
 
+class FigureInMemory(ValueError):
+    """A Memory never holds a money figure, whatever the model was told."""
+
+
+# £ or $ or € anywhere, "pound(s)" or "quid", or digits with a currency or pence
+_MONEY = re.compile(
+    r"[£$€]|\b(?:pounds?|quid)\b|\d[\d,.]*\s*(?:gbp|usd|eur|pence|p)\b"
+    r"|\b(?:gbp|usd|eur)\s*\d",
+    re.IGNORECASE,
+)
+
+
 def propose_memory(st: Store, inp: ProposeMemoryIn, turn: Turn) -> ProposalOut:
+    if _MONEY.search(inp.text):
+        raise FigureInMemory("a Memory never holds a money figure")
     draft = MemoryDraft(
         type=inp.type, text=inp.text, tags=tuple(inp.tags), provenance=turn.provenance()
     )

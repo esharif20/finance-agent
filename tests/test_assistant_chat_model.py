@@ -178,13 +178,13 @@ def wire_reply(message: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_default_model_and_keep_alive() -> None:
-    assert DEFAULT_MODEL == "qwen3.5:9b-q4_K_M"
+    assert DEFAULT_MODEL == "qwen3.5:4b-q4_K_M"
     model, opened = ollama_with(body=wire_reply({"role": "assistant", "content": "ok"}))
     model.chat(ASK, [SPEND])
     method, path, sent = opened[0].requests[0]
     assert (method, path) == ("POST", "/api/chat")
-    assert sent["model"] == "qwen3.5:9b-q4_K_M"
-    assert sent["keep_alive"] == "2m"
+    assert sent["model"] == "qwen3.5:4b-q4_K_M"
+    assert sent["keep_alive"] == "5m"  # warm through a chat session, then unloaded
     assert sent["stream"] is False
     assert sent["messages"] == [
         {"role": "user", "content": "What did I spend on eating out in May?"}
