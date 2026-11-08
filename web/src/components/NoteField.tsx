@@ -19,13 +19,13 @@ export function NoteField({ txn, part = null, label = "Note" }: { txn: number; p
   const [confirming, setConfirming] = useState(false);
   useEffect(() => setText(saved), [saved]);
 
-  const done = () => client.invalidateQueries({ queryKey: ["note", txn] });
+  const done = () => void client.invalidateQueries({ queryKey: ["note", txn] });
   const save = useMutation({ mutationFn: () => saveNote(txn, text.trim(), part), onSuccess: done });
   const purge = useMutation({
     mutationFn: () => purgeNote(txn, part),
     onSuccess: () => {
       setConfirming(false);
-      return done();
+      done();
     },
   });
   const busy = save.isPending || purge.isPending;

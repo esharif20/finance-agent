@@ -740,6 +740,19 @@ def test_migration_0024_adds_a_per_user_settings_table(tmp_path: Path) -> None:
     eng.dispose()
 
 
+def test_gemini_key_is_read_from_its_pinned_keychain_item() -> None:
+    import keyring  # conftest's in-memory backend: never the real Keychain
+
+    assert keychain.gemini_key() is None
+    keyring.set_password("finance-agent.gemini", "api-key", "synthetic-key")
+    try:
+        assert keychain.gemini_key() == "synthetic-key"
+        # the shared account name is not the Gemini item
+        assert keychain.get_text(keychain.GEMINI_SERVICE) is None
+    finally:
+        keyring.delete_password("finance-agent.gemini", "api-key")
+
+
 def test_migration_0025_adds_goal_fields_and_keeps_memories(tmp_path: Path) -> None:
     """0025 (#257) adds four nullable memory columns, nothing rebuilt on the
     way up; a Memory survives the round trip, and deleting its linked Account

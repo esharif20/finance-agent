@@ -38,6 +38,7 @@ from finance_agent.api import (
     proposals,
     review_queue,
     search,
+    spend,
     splits,
     story,
     subscription_costs,
@@ -387,7 +388,7 @@ AccountId = Annotated[int | None, Query()]
 
 
 def _known(led: Ledger, account_id: int | None) -> None:
-    if account_id is not None and account_id not in {a.id for a in led.accounts()}:
+    if account_id is not None and account_id not in led.account_ids():
         raise HTTPException(404, "No such account.")
 
 
@@ -417,13 +418,11 @@ def create_app(
         if month is None:
             raise HTTPException(404, "No transactions yet. Run `fa import` first.")
         try:
-            whole = led.summarise_month(month, account_id)
-            parts = (
-                {a.id: led.summarise_month(month, a.id) for a in led.accounts()}
-                if account_id is None
-                else None
-            )
-            return _summary(whole, parts)
+            if account_id is not None:
+                return _summary(led.summarise_month(month, account_id))
+            # one pass for the whole and each Account: not accounts(), whose
+            # balances re-walk every Account's history (#summary-perf)
+            return _summary(*led.summarise_month_by_account(month, led.account_ids()))
         except ValueError:
             raise HTTPException(422, "month must be a real YYYY-MM") from None
 
@@ -648,6 +647,7 @@ def create_app(
     app.include_router(guidance.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)
+    app.include_router(spend.router)
     app.include_router(preferences.router)
     app.include_router(know_you.router)
 

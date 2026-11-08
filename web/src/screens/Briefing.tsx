@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type RegretItem, answerRegret, fetchBriefing } from "@/api/client";
 import { Explained } from "@/components/InsightsFeed";
 import { Money } from "@/components/Money";
+import { NewsCards } from "@/components/NewsBriefing";
 import { PairwiseCard } from "@/components/PairwiseCard";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +21,7 @@ function Regret({ item }: { item: RegretItem }) {
   const client = useQueryClient();
   const save = useMutation({
     mutationFn: (worth: boolean) => answerRegret(item.transaction_id, worth),
-    onSettled: () => client.invalidateQueries({ queryKey: BRIEFING_KEY }),
+    onSettled: () => void client.invalidateQueries({ queryKey: BRIEFING_KEY }),
   });
   const name = item.display_name ?? item.merchant ?? item.description;
   const mark = save.isPending ? save.variables : item.worth_it;
@@ -168,6 +169,7 @@ export function Briefing() {
           </Card>
         </div>
       </div>
+      <NewsCards />
       <PairwiseCard />
       <Card aria-labelledby="brief-regret">
         <CardHeader>

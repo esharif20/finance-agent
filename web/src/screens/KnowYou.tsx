@@ -15,9 +15,12 @@ import {
   resetRegretAnswers,
 } from "@/api/client";
 import { INSIGHTS_KEY, Explained } from "@/components/InsightsFeed";
+import { SpendMeter } from "@/components/SpendMeter";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BRIEFING_KEY } from "@/screens/Briefing";
 
+// the demo has no cloud and no spend store
+const DEMO = import.meta.env.VITE_DEMO === "1";
 const MEMORIES_KEY = ["memories"] as const;
 const KNOW_KEY = ["know-you"] as const;
 const LEARNED_KEY = ["preferences", "cut"] as const;
@@ -81,7 +84,7 @@ export function KnowYou() {
   const briefing = useQuery({ queryKey: BRIEFING_KEY, queryFn: fetchBriefing });
   const forget = useMutation({
     mutationFn: forgetMemory,
-    onSettled: () => client.invalidateQueries({ queryKey: MEMORIES_KEY }),
+    onSettled: () => void client.invalidateQueries({ queryKey: MEMORIES_KEY }),
   });
   const know = useQuery({ queryKey: KNOW_KEY, queryFn: fetchKnowYou });
   const learned = useQuery({ queryKey: LEARNED_KEY, queryFn: fetchLearned });
@@ -207,6 +210,7 @@ export function KnowYou() {
           </p>
         )}
       </Card>
+      {!DEMO && <SpendMeter />}
       <Card aria-labelledby="know-ready">
         <CardHeader>
           <CardTitle id="know-ready">What I can't tell yet</CardTitle>

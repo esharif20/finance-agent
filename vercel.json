@@ -1,0 +1,27 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm i -g pnpm@10.28.2 --prefix /tmp/pn && PATH=/tmp/pn/bin:$PATH sh -c 'pnpm --dir web install --frozen-lockfile && sh scripts/build_demo.sh'",
+  "outputDirectory": "web/dist-demo",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{src/finance_agent/**,demo-data/personas/**}",
+      "excludeFiles": "{tests/**,evals/**,web/**,docs/**,.venv/**,node_modules/**,demo-data/web/**}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "installCommand": ""
+}

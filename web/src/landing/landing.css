@@ -1,0 +1,515 @@
+/* The public landing page (#297). Structure after the Revolut reference (big type scale, pill
+   buttons, a true-black first act, light surfaces after it); palette and mark are our own.
+   Manrope Variable is self-hosted through @fontsource. No hue between 235 and 290. */
+@import "@fontsource-variable/manrope";
+
+.lp {
+  /* the first act is true black in both themes (DIRECTIONS.md, "Night Ledger" opening) */
+  --lp-night: #000000;
+  --lp-night-ink: #f4f5f6;
+  --lp-night-soft: #b6bbc1;
+  --lp-ground: #f3f5f7;
+  --lp-ink: #1b1d1f;
+  --lp-soft: #53575b;
+  --lp-field: #0b66c3; /* hue 210 */
+  --lp-field-ink: #ffffff;
+  --lp-field-soft: #e3eefa;
+  --lp-card: #0e6f8a; /* hue 195, the app's data colour */
+  --lp-card-low: #0b5a70;
+  --lp-ring: #0b66c3;
+  --lp-pill-ink: #1b1d1f;
+  --lp-pill-ink-fg: #ffffff;
+  --lp-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --lp-gutter: clamp(16px, 4vw, 56px);
+
+  font-family: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: normal;
+  color: var(--lp-ink);
+  background: var(--lp-ground);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lp {
+    --lp-ground: #111111;
+    --lp-ink: #f4f5f6;
+    --lp-soft: #b6bbc1;
+    --lp-field: #0a3a6b;
+    --lp-field-ink: #f4f5f6;
+    --lp-field-soft: #c9dcf2;
+    --lp-ring: #7db7f5;
+    --lp-pill-ink: #f4f5f6;
+    --lp-pill-ink-fg: #111214;
+  }
+}
+
+.lp *,
+.lp *::before,
+.lp *::after {
+  box-sizing: border-box;
+}
+
+/* zero-specificity resets, so every class below wins */
+:where(.lp) :where(p, h1, h2, h3, dl, dd, ul) {
+  margin: 0;
+  padding: 0;
+}
+
+:where(.lp) a {
+  color: inherit;
+}
+
+.lp :focus-visible {
+  outline: 3px solid var(--lp-ring);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.lp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.lp-skip {
+  position: absolute;
+  left: var(--lp-gutter);
+  top: 8px;
+  z-index: 70;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--lp-night-ink);
+  color: var(--lp-night);
+  font-weight: 650;
+  transform: translateY(-160%);
+}
+.lp-skip:focus-visible {
+  transform: none;
+}
+
+.lp-wrap {
+  width: 100%;
+  max-width: 1328px;
+  margin-inline: auto;
+  padding-inline: var(--lp-gutter);
+}
+
+/* Type: five sizes. Display, section, item, body, small. */
+.lp-display {
+  font-size: clamp(2.75rem, 0.8rem + 7.6vw, 8.5rem);
+  font-weight: 720;
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.lp-h2 {
+  font-size: clamp(2.25rem, 1.3rem + 3.4vw, 4.25rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.lp-h3 {
+  font-size: 1.5rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+}
+:where(.lp) :where(p, dd) {
+  font-size: 1.125rem;
+  line-height: 1.55;
+  letter-spacing: -0.006em;
+}
+
+/* Pills */
+.lp-pill {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 26px;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    transform 160ms var(--lp-ease),
+    background-color 160ms ease;
+}
+.lp-pill:active {
+  transform: scale(0.97);
+}
+.lp-pill-primary {
+  background: var(--lp-pill-ink);
+  color: var(--lp-pill-ink-fg);
+}
+.lp-pill-small {
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 0.9375rem;
+}
+.lp-pill-large {
+  min-height: 60px;
+  padding: 0 36px;
+  font-size: 1.125rem;
+}
+
+/* Night: the nav and the hero */
+.lp-nav,
+.lp-hero {
+  --lp-pill-ink: var(--lp-night-ink);
+  --lp-pill-ink-fg: var(--lp-night);
+  --lp-ring: #7db7f5;
+  background: var(--lp-night);
+  color: var(--lp-night-ink);
+}
+.lp-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 20px var(--lp-gutter);
+}
+.lp-brand {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+.lp-nav-links {
+  display: flex;
+  gap: 28px;
+  margin-inline-start: auto;
+}
+.lp-nav-links a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  font-weight: 550;
+  color: var(--lp-night-soft);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+.lp-nav-links + .lp-pill {
+  margin-inline-start: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-nav-links a:hover {
+    color: var(--lp-night-ink);
+  }
+  .lp-pill-primary:hover {
+    background: color-mix(in oklab, var(--lp-pill-ink) 86%, var(--lp-pill-ink-fg));
+  }
+  .lp-pill-ghost:hover {
+    background: rgb(255 255 255 / 0.1);
+  }
+}
+@media (max-width: 760px) {
+  .lp-nav-links {
+    display: none;
+  }
+  .lp-nav .lp-pill {
+    margin-inline-start: auto;
+  }
+}
+
+/* our mark: three bars of decreasing length, money being sorted */
+.lp-mark {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 22px;
+}
+.lp-mark i {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.lp-mark i:nth-child(2) {
+  width: 72%;
+}
+.lp-mark i:nth-child(3) {
+  width: 44%;
+}
+
+.lp-hero {
+  display: grid;
+  grid-template:
+    "title title" auto
+    "copy card" 1fr / minmax(0, 6fr) minmax(0, 6fr);
+  align-items: center;
+  gap: 40px 48px;
+  min-height: calc(100svh - 84px);
+  padding: clamp(32px, 5vw, 72px) var(--lp-gutter) clamp(72px, 8vw, 128px);
+}
+.lp-hero .lp-display {
+  grid-area: title;
+  align-self: end;
+}
+.lp-hero-copy {
+  grid-area: copy;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.lp-card-stage {
+  grid-area: card;
+}
+.lp-lede {
+  max-width: 34ch;
+  color: var(--lp-night-soft);
+  font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
+}
+.lp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.lp-pill-ghost {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--lp-night-ink);
+}
+@media (max-width: 900px) {
+  .lp-hero {
+    grid-template: "title" auto "copy" auto "card" auto / minmax(0, 1fr);
+    gap: 32px;
+    min-height: 0;
+  }
+}
+
+/* #76 letter reel: each letter turns over and settles, left to right */
+.lp-reel-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+.lp-reel-letter {
+  display: inline-block;
+  transform-origin: 50% 80%;
+  animation: lp-reel calc(0.45s + var(--i) * 12ms) cubic-bezier(0.3, 0, 0, 1) calc(var(--i) * 22ms) both;
+}
+@keyframes lp-reel {
+  from {
+    opacity: 0;
+    transform: perspective(420px) translateY(0.3em) rotateX(-95deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* #76 word-by-word fade-up: 30ms a word, the whole line in by about 0.8s */
+.lp-word {
+  display: inline-block;
+  animation: lp-rise 0.3s var(--lp-ease) calc(0.12s + var(--w) * 30ms) both;
+}
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+}
+
+/* the generic card */
+.lp-card-stage {
+  --cw: clamp(280px, 34vw, 480px);
+  display: grid;
+  place-items: center;
+  perspective: 1100px;
+  padding-block: 24px;
+  animation: lp-card-in 0.9s var(--lp-ease) 0.25s both;
+}
+.lp-card {
+  width: var(--cw);
+  aspect-ratio: 85.6 / 53.98;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.lp-card-face {
+  position: relative;
+  display: grid;
+  grid-template: auto 1fr auto / 1fr auto;
+  height: 100%;
+  padding: calc(var(--cw) * 0.065);
+  border-radius: calc(var(--cw) * 0.037);
+  background: linear-gradient(var(--lp-card) 0 0) top / 100% 62% no-repeat, var(--lp-card-low);
+  color: #ffffff;
+  transform: rotate(-7deg);
+}
+.lp-mark-card {
+  width: calc(var(--cw) * 0.075);
+  gap: calc(var(--cw) * 0.009);
+}
+.lp-mark-card i {
+  height: calc(var(--cw) * 0.012);
+}
+.lp-card-chip {
+  grid-column: 1;
+  align-self: center;
+  width: calc(var(--cw) * 0.13);
+  aspect-ratio: 1.3;
+  border-radius: calc(var(--cw) * 0.016);
+  background: #d9c79a;
+}
+.lp-card-name {
+  grid-column: 1;
+  font-size: calc(var(--cw) * 0.042);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.lp-card-num {
+  grid-column: 2;
+  font-size: calc(var(--cw) * 0.038);
+  font-weight: 550;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes lp-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(32px) rotate(4deg);
+  }
+}
+@media (max-width: 900px) {
+  .lp-card-stage {
+    --cw: min(calc(100vw - 2 * var(--lp-gutter) - 24px), 420px);
+  }
+}
+
+/* What it does */
+.lp-what {
+  padding-block: clamp(96px, 12vw, 192px);
+}
+.lp-what-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 48px;
+  align-items: start;
+}
+.lp-what-grid .lp-h2 {
+  position: sticky;
+  top: 40px;
+}
+.lp-features {
+  display: grid;
+  gap: 56px;
+}
+.lp-feature {
+  display: grid;
+  gap: 12px;
+  max-width: 60ch;
+}
+.lp-feature dd {
+  color: var(--lp-ink);
+}
+@media (max-width: 900px) {
+  .lp-what-grid {
+    grid-template-columns: 1fr;
+  }
+  .lp-what-grid .lp-h2 {
+    position: static;
+  }
+}
+
+/* The promises: one whole field of colour */
+.lp-promises {
+  --lp-ring: #ffffff;
+  padding-block: clamp(96px, 12vw, 192px);
+  background: var(--lp-field);
+  color: var(--lp-field-ink);
+}
+.lp-promises .lp-h2 {
+  max-width: 14ch;
+}
+.lp-promise-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 48px;
+  margin-top: clamp(56px, 7vw, 96px);
+  list-style: none;
+}
+.lp-promise {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+.lp-promise p {
+  color: var(--lp-field-soft);
+}
+@media (max-width: 900px) {
+  .lp-promise-list {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+/* Open the demo */
+.lp-open {
+  padding-block: clamp(96px, 12vw, 192px);
+}
+.lp-open .lp-wrap {
+  display: grid;
+  justify-items: start;
+  gap: 28px;
+}
+.lp-open-title {
+  max-width: 16ch;
+}
+.lp-open-text {
+  max-width: 48ch;
+  color: var(--lp-soft);
+}
+
+/* Footer: the name returns at full width */
+.lp-foot {
+  padding-block: 0 40px;
+  overflow: hidden;
+}
+.lp-foot-name {
+  font-size: clamp(3rem, 12.4vw, 11.5rem);
+  font-weight: 760;
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+  white-space: nowrap;
+}
+.lp-foot-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 32px;
+  margin-top: 28px;
+}
+.lp-foot-row p {
+  color: var(--lp-soft);
+  font-size: 0.9375rem;
+}
+.lp-foot-row a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  font-weight: 650;
+  text-underline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reel-letter,
+  .lp-word,
+  .lp-card-stage {
+    animation: none;
+  }
+  .lp-pill {
+    transition: background-color 160ms ease;
+  }
+  .lp-pill:active {
+    transform: none;
+  }
+}

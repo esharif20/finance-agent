@@ -576,6 +576,44 @@
         "title": "BriefingOut",
         "type": "object"
       },
+      "BucketOut": {
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "cap_pence": {
+            "title": "Cap Pence",
+            "type": "integer"
+          },
+          "reserved_pence": {
+            "title": "Reserved Pence",
+            "type": "integer"
+          },
+          "spent_pence": {
+            "title": "Spent Pence",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "warn",
+              "capped"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "cap_pence",
+          "spent_pence",
+          "reserved_pence",
+          "state"
+        ],
+        "title": "BucketOut",
+        "type": "object"
+      },
       "CardOut": {
         "properties": {
           "body": {
@@ -2495,6 +2533,137 @@
         "title": "MonthTotalsOut",
         "type": "object"
       },
+      "NewsCardOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NewsItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "spent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/finance_agent__api__fx__Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic",
+          "spent",
+          "items"
+        ],
+        "title": "NewsCardOut",
+        "type": "object"
+      },
+      "NewsItemOut": {
+        "properties": {
+          "change": {
+            "title": "Change",
+            "type": "string"
+          },
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "read": {
+            "title": "Read",
+            "type": "boolean"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/NewsSourceOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "headline",
+          "summary",
+          "change",
+          "on",
+          "sources",
+          "read"
+        ],
+        "title": "NewsItemOut",
+        "type": "object"
+      },
+      "NewsOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/NewsCardOut"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/TopicOut"
+            },
+            "title": "Topics",
+            "type": "array"
+          },
+          "window_months": {
+            "title": "Window Months",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "window_months",
+          "topics",
+          "cards"
+        ],
+        "title": "NewsOut",
+        "type": "object"
+      },
+      "NewsSourceOut": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "title"
+        ],
+        "title": "NewsSourceOut",
+        "type": "object"
+      },
       "NodeOut": {
         "properties": {
           "id": {
@@ -2666,6 +2835,40 @@
           "category"
         ],
         "title": "PartOut",
+        "type": "object"
+      },
+      "PayloadOut": {
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "cost_pence": {
+            "title": "Cost Pence",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "sent_at": {
+            "title": "Sent At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "payload",
+          "model",
+          "cost_pence",
+          "sent_at"
+        ],
+        "title": "PayloadOut",
         "type": "object"
       },
       "Pence": {
@@ -3871,6 +4074,68 @@
         "title": "SyncStatusOut",
         "type": "object"
       },
+      "TopicIn": {
+        "properties": {
+          "name": {
+            "pattern": "^[A-Za-z][A-Za-z &+'-]{1,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "on",
+              "off"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "state"
+        ],
+        "title": "TopicIn",
+        "type": "object"
+      },
+      "TopicOut": {
+        "properties": {
+          "from_spending": {
+            "title": "From Spending",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "spent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/finance_agent__api__fx__Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "on",
+              "off",
+              "suggested"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "state",
+          "from_spending",
+          "spent"
+        ],
+        "title": "TopicOut",
+        "type": "object"
+      },
       "Total": {
         "properties": {
           "annual": {
@@ -4583,6 +4848,89 @@
         "summary": "Weekly"
       }
     },
+    "/api/briefing/news": {
+      "get": {
+        "description": "The topic list (suggested from spending, ticked, blocked or added) and\na card per topic with its fresh items, newest first.",
+        "operationId": "news_api_briefing_news_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "News"
+      }
+    },
+    "/api/briefing/news/{item_id}/read": {
+      "post": {
+        "description": "Mark an item read; another user's or an unknown one is not found.",
+        "operationId": "read_item_api_briefing_news__item_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Item"
+      }
+    },
     "/api/briefing/regret": {
       "delete": {
         "description": "Wipe every regret answer.",
@@ -4669,6 +5017,86 @@
           }
         },
         "summary": "Answer"
+      }
+    },
+    "/api/briefing/topics": {
+      "put": {
+        "description": "Tick (`on`), block or mute (`off`) a topic, or add one of your own.",
+        "operationId": "set_topic_api_briefing_topics_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Topic"
+      }
+    },
+    "/api/briefing/topics/{name}": {
+      "delete": {
+        "description": "Forget a tick or block: a spending topic goes back to suggested.",
+        "operationId": "forget_topic_api_briefing_topics__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z][A-Za-z &+'-]{1,39}$",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget Topic"
       }
     },
     "/api/card-art/{key}": {
@@ -4905,7 +5333,7 @@
     },
     "/api/chat": {
       "post": {
-        "description": "One turn. Omit `thread_id` to start a conversation; the reply's `meta`\nevent carries the new one.",
+        "description": "One turn. Omit `thread_id` to start a conversation; the reply's `meta`\nevent carries the new one. `cloud` (default false; omitted keeps the\nthread's choice) sends this conversation's wording through the gateway.",
         "operationId": "chat_api_chat_post",
         "responses": {
           "200": {
@@ -5368,6 +5796,51 @@
           }
         },
         "summary": "Set Rate"
+      }
+    },
+    "/api/gateway/payloads": {
+      "get": {
+        "operationId": "payloads_api_gateway_payloads_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "conversation",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Conversation",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PayloadOut"
+                  },
+                  "title": "Response Payloads Api Gateway Payloads Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payloads"
       }
     },
     "/api/goals": {
@@ -6799,6 +7272,28 @@
         "tags": [
           "search"
         ]
+      }
+    },
+    "/api/spend": {
+      "get": {
+        "operationId": "spend_api_spend_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BucketOut"
+                  },
+                  "title": "Response Spend Api Spend Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Spend"
       }
     },
     "/api/spending": {

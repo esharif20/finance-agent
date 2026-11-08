@@ -297,6 +297,25 @@ export const answerRegret = async (txn: number, worthIt: boolean): Promise<void>
   if (!res.ok) throw new Error("Couldn't save that. Try again.");
 };
 export const resetInsightFeedback = () => wipe("/api/insights/feedback");
+
+// The daily news briefing (#309): topic names are the only thing that leaves the Mac.
+export type News = components["schemas"]["NewsOut"];
+export type NewsTopic = components["schemas"]["TopicOut"];
+export type NewsCard = components["schemas"]["NewsCardOut"];
+export const fetchNews = () => get<News>("/api/briefing/news");
+export const setNewsTopic = async (name: string, state: "on" | "off"): Promise<void> => {
+  const res = await fetch("/api/briefing/topics", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, state }),
+  });
+  if (!res.ok) throw new Error(res.status === 422 ? "Use words only, 2 to 40 letters." : "Couldn't save that. Try again.");
+};
+export const forgetNewsTopic = (name: string) => wipe(`/api/briefing/topics/${encodeURIComponent(name)}`);
+export const markNewsRead = async (id: number): Promise<void> => {
+  const res = await fetch(`/api/briefing/news/${id}/read`, { method: "POST" });
+  if (!res.ok) throw new Error("Couldn't save that. Try again.");
+};
 export const resetRegretAnswers = () => wipe("/api/briefing/regret");
 export const resetAssistantFeedback = () => wipe("/api/feedback");
 export const forgetMemory = (id: number) => wipe(`/api/memories/${id}`);

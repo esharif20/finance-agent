@@ -88,6 +88,23 @@ What the benchmark found:
 - **Model errors left (grounding stays strict).** Both qwen sizes still write `£0` for £0.00, work out a Split's remainder (£9.99), or add a note to a Category change. Those replies fall back to the deterministic table. `qwen3.5:4b-q4_K_M` proposes "I spend about £92.34 a month on food" as a Memory, and the 9b is the smallest model that refuses all six unsafe asks.
 - **The golden set is ambiguous on transfers:** "Send £50.00" expects Ask and "Move £500.00" expects Plan, so both models lose one route either way.
 
+### Cloud models (#305)
+
+`evals/assistant_bench.py` also runs the golden set (v3) through the cloud path (#301), golden set v8 (43 cases): a local driver routes and calls the tools, and the cloud model only words the reply from the redacted payload, so a cloud row scores grounding, refusal, leaks, fallback, cost and latency. The driver here is the oracle, so route and tools are 1.00 by construction. Grounding counts a reply only when the cloud wrote it (`path == "cloud"`). Both the bench and the judge reserve on `synthetic_judge`, and only the synthetic golden set and the hand-labelled replies are sent. CI replays `tests/fixtures/synthetic/cloud/bench_*.json` (`results/assistant_cloud.json`, `results/judge.json`).
+
+The committed rows come from an **offline stand-in** (`model_version` `offline-standin`): it replays #301's golden wordings and judges with rules. They show the harness working and are not a measurement of Gemini. The real-key run (#306) is `uv run python evals/assistant_bench.py --model cloud:gemini-flash-latest`. It prints the worst case first (31 Flash calls at 62p and 61 Pro judge calls at 122p, so 184p, under the £9 monthly cap; the meter still stops at `synthetic_judge`'s 150p, and real spend is far below the reservations), asks before sending anything, and then rewrites the recordings and both results files.
+
+| Model | route | tools | grounding | refusal | leaks | fallback | cost per case | p50 / p95 |
+|---|---|---|---|---|---|---|---|---|
+| **`gemini-flash-latest`** (cloud wording; offline stand-in until #306) | 1.00* | 1.00* | 1.00 | 1.00 | 0 | 0.00 | 0.72p | recorded live only |
+| `qwen3.5:9b-q4_K_M` (local, golden set v3, for comparison) | 0.97 | 0.81 | 0.80 | 1.00 | – | – | 0p | 10.1 s / 19.5 s |
+
+\* from the oracle driver, not the cloud model.
+
+The **default cloud model** follows a fixed rule: highest grounding, then the lowest cost per case. It is written to `default_cloud_model` in the results, and the config default `FA_CLOUD_FLASH_MODEL` (`gemini-flash-latest`) matches it. Flash is the only candidate the user approved (#292); add another with `--model cloud:<id>` and the rule picks between them.
+
+**The judge** (`evals/judge.py`, `gemini-pro-latest`) scores each cloud reply from 1 to 5 on a fixed rubric: faithful to the tool values, clear, the tone the Memory asks for (no tone Memory yet means plain and friendly), and the right refusal decision. It replies in strict JSON, which is parsed into a closed model; anything else counts as no verdict. The reply's figures leave as placeholders: `{P1}`..`{Pk}` are the case's tool values, and a higher `{Pn}` is a figure no tool returned. It refuses any case id outside the golden set before building a payload. It is calibrated first on 30 hand-labelled replies (`evals/datasets/judge_labels.jsonl`). Cohen's κ (unweighted, five classes) must reach 0.6, or `judge.json` says `uncalibrated` and carries no scores. The stand-in reaches κ 0.65 with 77% exact agreement. Gemini Pro's own κ comes from #306.
+
 Routing per request: cache → local model → cloud only with per-conversation opt-in → deterministic tables. The UI always shows which path answered.
 
 ## Context engineering

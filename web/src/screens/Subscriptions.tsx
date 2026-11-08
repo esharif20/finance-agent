@@ -104,7 +104,7 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
   const client = useQueryClient();
   const kind = row.entry.kind === "bill" ? "bill" : "subscription";
   const place: Place = { kind, group: row.entry.group ?? "" };
-  const refresh = () => client.invalidateQueries({ queryKey: SUBS_KEY });
+  const refresh = () => void client.invalidateQueries({ queryKey: SUBS_KEY });
   const fail = (e: Error) => onNote({ text: e.message, bad: true });
   const regroup = useMutation({
     mutationFn: (p: Place) => regroupSubscription(row.merchant_id, p),
@@ -342,7 +342,7 @@ function AddOne({ taken, onNote }: { taken: Set<number>; onNote: (n: Note) => vo
       setOpen(false);
     },
     onError: (e) => onNote({ text: e.message, bad: true }),
-    onSettled: () => client.invalidateQueries({ queryKey: SUBS_KEY }),
+    onSettled: () => void client.invalidateQueries({ queryKey: SUBS_KEY }),
   });
   if (!open)
     return (

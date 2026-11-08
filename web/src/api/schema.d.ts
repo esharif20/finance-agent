@@ -41,6 +41,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/briefing/news": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * News
+         * @description The topic list (suggested from spending, ticked, blocked or added) and
+         *     a card per topic with its fresh items, newest first.
+         */
+        get: operations["news_api_briefing_news_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/briefing/news/{item_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Item
+         * @description Mark an item read; another user's or an unknown one is not found.
+         */
+        post: operations["read_item_api_briefing_news__item_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/briefing/regret": {
         parameters: {
             query?: never;
@@ -77,6 +118,46 @@ export interface paths {
          */
         post: operations["answer_api_briefing_regret__transaction_id__post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/briefing/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Topic
+         * @description Tick (`on`), block or mute (`off`) a topic, or add one of your own.
+         */
+        put: operations["set_topic_api_briefing_topics_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/briefing/topics/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Topic
+         * @description Forget a tick or block: a spending topic goes back to suggested.
+         */
+        delete: operations["forget_topic_api_briefing_topics__name__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -186,7 +267,8 @@ export interface paths {
         /**
          * Chat
          * @description One turn. Omit `thread_id` to start a conversation; the reply's `meta`
-         *     event carries the new one.
+         *     event carries the new one. `cloud` (default false; omitted keeps the
+         *     thread's choice) sends this conversation's wording through the gateway.
          */
         post: operations["chat_api_chat_post"];
         delete?: never;
@@ -386,6 +468,23 @@ export interface paths {
         get: operations["rates_api_fx_rates_get"];
         /** Set Rate */
         put: operations["set_rate_api_fx_rates_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/payloads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payloads */
+        get: operations["payloads_api_gateway_payloads_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1098,6 +1197,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spend */
+        get: operations["spend_api_spend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spending": {
         parameters: {
             query?: never;
@@ -1555,6 +1671,22 @@ export interface components {
              * Format: date
              */
             week: string;
+        };
+        /** BucketOut */
+        BucketOut: {
+            /** Bucket */
+            bucket: string;
+            /** Cap Pence */
+            cap_pence: number;
+            /** Reserved Pence */
+            reserved_pence: number;
+            /** Spent Pence */
+            spent_pence: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "warn" | "capped";
         };
         /** CardOut */
         CardOut: {
@@ -2147,6 +2279,52 @@ export interface components {
             /** Month */
             month: string;
         };
+        /** NewsCardOut */
+        NewsCardOut: {
+            /** Items */
+            items: components["schemas"]["NewsItemOut"][];
+            spent: components["schemas"]["finance_agent__api__fx__Money"] | null;
+            /** Topic */
+            topic: string;
+        };
+        /** NewsItemOut */
+        NewsItemOut: {
+            /** Change */
+            change: string;
+            /** Headline */
+            headline: string;
+            /** Id */
+            id: number;
+            /**
+             * On
+             * Format: date
+             */
+            on: string;
+            /** Read */
+            read: boolean;
+            /** Sources */
+            sources: components["schemas"]["NewsSourceOut"][];
+            /** Summary */
+            summary: string;
+        };
+        /** NewsOut */
+        NewsOut: {
+            /** Available */
+            available: boolean;
+            /** Cards */
+            cards: components["schemas"]["NewsCardOut"][];
+            /** Topics */
+            topics: components["schemas"]["TopicOut"][];
+            /** Window Months */
+            window_months: number;
+        };
+        /** NewsSourceOut */
+        NewsSourceOut: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
         /** NodeOut */
         NodeOut: {
             /** Id */
@@ -2207,6 +2385,21 @@ export interface components {
             amount_minor: number;
             /** Category */
             category: string[];
+        };
+        /** PayloadOut */
+        PayloadOut: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Cost Pence */
+            cost_pence: number;
+            /** Model */
+            model: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Sent At */
+            sent_at: string;
         };
         /** Pence */
         Pence: {
@@ -2607,6 +2800,29 @@ export interface components {
             /** Last Sync At */
             last_sync_at: string | null;
         };
+        /** TopicIn */
+        TopicIn: {
+            /** Name */
+            name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "on" | "off";
+        };
+        /** TopicOut */
+        TopicOut: {
+            /** From Spending */
+            from_spending: boolean;
+            /** Name */
+            name: string;
+            spent: components["schemas"]["finance_agent__api__fx__Money"] | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "on" | "off" | "suggested";
+        };
         /** Total */
         Total: {
             annual: components["schemas"]["Pence"];
@@ -2870,6 +3086,66 @@ export interface operations {
             };
         };
     };
+    news_api_briefing_news_get: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_item_api_briefing_news__item_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     forget_answers_api_briefing_regret_delete: {
         parameters: {
             query?: never;
@@ -2914,6 +3190,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegretAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_topic_api_briefing_topics_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TopicIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopicOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_topic_api_briefing_topics__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
                 };
             };
             /** @description Validation Error */
@@ -3443,6 +3783,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payloads_api_gateway_payloads_get: {
+        parameters: {
+            query: {
+                conversation: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayloadOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4535,6 +4906,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spend_api_spend_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BucketOut"][];
                 };
             };
         };
