@@ -591,3 +591,47 @@ regret_answer = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("user_id", "transaction_id"),
 )
+
+# A confirmed Possible Duplicate (#158, ADR 0014): the synced Transaction the
+# user dropped. An overlay like `correction` (ADR 0001), never deleted, only
+# reverted: while live, the row counts in no total. Its own table because
+# widening `ck_correction_kind` would rebuild `correction` (migration 0020).
+duplicate_merge = Table(
+    "duplicate_merge",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "transaction_id",
+        Integer,
+        ForeignKey("transaction.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("reverted_at", DateTime(timezone=True)),
+    Index("ix_duplicate_merge_user", "user_id", "transaction_id"),
+)
+
+# Subscription alerts already sent (#108), so each fires once per state:
+# `state` is the flag's evidence date, or `converts_on` for a trial. Written
+# insert-if-absent; never holds an amount.
+subscription_alert = Table(
+    "subscription_alert",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "merchant_id",
+        Integer,
+        ForeignKey("merchant.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("code", String(32), nullable=False),
+    Column("state", Date, nullable=False),
+    Column("alerted_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(
+        text("code IN ('price_rise', 'charged_after_cancel', 'trial_converting')"),
+        name="ck_subscription_alert_code",
+    ),
+    UniqueConstraint("user_id", "merchant_id", "code", "state"),
+)
