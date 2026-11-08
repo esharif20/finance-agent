@@ -105,10 +105,12 @@ function Shell() {
   );
 }
 
-export function App() {
+/** `children` render above the shell, inside its providers (the demo's banner). */
+export function App({ children }: { children?: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <PrivacyProvider>
+        {children}
         <Shell />
       </PrivacyProvider>
     </QueryClientProvider>

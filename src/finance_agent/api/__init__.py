@@ -37,6 +37,7 @@ from finance_agent.api import (
     proposals,
     review_queue,
     search,
+    spend,
     splits,
     story,
     subscription_costs,
@@ -647,6 +648,7 @@ def create_app(
     app.include_router(guidance.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)
+    app.include_router(spend.router)
     app.include_router(preferences.router)
 
     dist = web_dir or WEB_DIST

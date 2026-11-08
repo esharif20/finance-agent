@@ -5,16 +5,25 @@ The reply streams only after the grounding check has passed (or the
 deterministic table has replaced it), so no unchecked figure ever reaches the
 screen. Events: `stage` (progress words while the turn runs, never data),
 `meta` (thread, which path answered, any confirm card, the Transactions
-behind each spending total), then `delta` chunks of the reply, then `done`;
-`error` if the turn failed. Bodies are parsed here rather than
-by FastAPI, so a refusal never echoes the user's text (#169)."""
+behind each spending total, and a cloud call's `cost_pence` and
+`payload_id`), then `delta` chunks of the reply, then `done`; `error` if the
+turn failed. Bodies are parsed here rather than by FastAPI, so a refusal never
+echoes the user's text (#169).
 
+`cloud: true` opts the thread in to the privacy gateway (#301). The opt-in is
+kept on the thread's checkpointed state, so it lasts for that conversation
+only and ends when it is deleted or purged; it needs a Gemini key in the
+Keychain, and the demo (#296) never has one."""
+
+import contextvars
 import json
+import os
 import queue
 import re
 import threading
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,11 +31,15 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import Connection, Engine
 
 from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
+from finance_agent.assistant.cloud_route import CloudRoute
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
 from finance_agent.assistant.ollama import DEFAULT_CHOICE, MODELS, WARM_KEEP_ALIVE
+from finance_agent.gateway.cloud import CloudChatModel, CloudError
 from finance_agent.identity import current_user
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.settings import CHOICES, Choice, Settings
+from finance_agent.storage import keychain
+from finance_agent.storage.spend import SpendStore
 
 MESSAGE_MAX = 2000
 IDLE = timedelta(days=1)  # a conversation lasts one session (DATA_POLICY)
@@ -59,7 +72,25 @@ def today() -> date:
     return date.today()
 
 
+def cloud_route(request: Request) -> CloudRoute | None:
+    """The gateway, or None: in the demo, with no key, or with no ledger file
+    for `spend.sqlite` to sit beside."""
+    if os.environ.get("FA_DEMO"):
+        return None
+    db = getattr(getattr(request.app.state.engine, "url", None), "database", None)
+    if not db or db == ":memory:":
+        return None
+    try:
+        key = keychain.gemini_key()
+        return CloudRoute(CloudChatModel(key or ""), SpendStore.beside(Path(db)))
+    except CloudError:  # no key, or a malformed one
+        return None
+    except Exception:  # a locked or broken Keychain (the demo) fails closed
+        return None
+
+
 Model = Annotated[ChatModel, Depends(chat_model)]
+Cloud = Annotated[CloudRoute | None, Depends(cloud_route)]
 Today = Annotated[date, Depends(today)]
 
 
@@ -90,6 +121,8 @@ def _meta(a: Answer) -> dict[str, Any]:
         "path": a.path,
         "evidence": list(a.evidence),
         "proposal_id": a.proposal_id,
+        "cost_pence": a.cost_pence,
+        "payload_id": a.payload_id,
         "counted": [
             {
                 "evidence_id": e.evidence_id,
@@ -134,7 +167,9 @@ def _sse(
         except BaseException:  # noqa: BLE001
             q.put(("error", None))
 
-    threading.Thread(target=run, daemon=True).start()
+    # the request's context goes along: the demo's per-visitor ledger is in it
+    ctx = contextvars.copy_context()
+    threading.Thread(target=ctx.run, args=(run,), daemon=True).start()
 
     def events() -> Iterator[str]:
         while True:
@@ -155,14 +190,22 @@ def _sse(
 
 
 @router.post("")
-def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingResponse:
+def chat(
+    request: Request, body: Body, model: Model, day: Today, gateway: Cloud
+) -> StreamingResponse:
     """One turn. Omit `thread_id` to start a conversation; the reply's `meta`
-    event carries the new one."""
+    event carries the new one. `cloud` (default false; omitted keeps the
+    thread's choice) sends this conversation's wording through the gateway."""
     message = body.get("message")
     if not isinstance(message, str) or not 1 <= len(message.strip()) <= MESSAGE_MAX:
         raise HTTPException(422, f"message is text of 1 to {MESSAGE_MAX} characters")
-    if set(body) - {"message", "thread_id"}:
-        raise HTTPException(422, "only message and thread_id are accepted")
+    if set(body) - {"message", "thread_id", "cloud"}:
+        raise HTTPException(422, "only message, thread_id and cloud are accepted")
+    cloud = body.get("cloud")
+    if cloud is not None and not isinstance(cloud, bool):
+        raise HTTPException(422, "cloud is true or false")
+    if cloud and gateway is None:
+        raise HTTPException(409, "the cloud gateway is not set up")
     engine: Engine = request.app.state.engine
     with engine.begin() as conn:
         convo = Conversations(conn, current_user())
@@ -172,8 +215,8 @@ def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingRes
             raise HTTPException(404, "no such conversation")
     return _sse(
         engine,
-        lambda a: ask(a, message, thread),
-        lambda conn: Assistant(model, conn, day, prefetch=True),
+        lambda a: ask(a, message, thread, cloud),
+        lambda conn: Assistant(model, conn, day, cloud=gateway, prefetch=True),
     )
 
 

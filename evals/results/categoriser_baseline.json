@@ -175,6 +175,11 @@
           "rows": 10,
           "accuracy": 0.0
         }
+      },
+      "cloud": {
+        "rows": 400,
+        "accuracy": 0.37,
+        "coverage": 0.3825
       }
     },
     "nn": {
@@ -309,6 +314,11 @@
           "rows": 10,
           "accuracy": 0.3
         }
+      },
+      "cloud": {
+        "rows": 400,
+        "accuracy": 0.8325,
+        "coverage": 1.0
       }
     }
   }

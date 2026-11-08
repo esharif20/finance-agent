@@ -11,6 +11,11 @@ HMAC_SERVICE = "finance-agent.account-hmac"
 # The SimpleFIN access URL: it carries the credentials (ADR 0013).
 SIMPLEFIN_ACCESS_SERVICE = "finance-agent.simplefin-access"
 ACCOUNT = "finance-agent"
+# The Gemini API key for the privacy gateway (ADR 0016), made by the user with
+# `fa keys set gemini` (a hidden prompt; `security ... -w` outside a TTY stored
+# an empty key on 8 Nov).
+GEMINI_SERVICE = "finance-agent.gemini"
+GEMINI_ACCOUNT = "api-key"
 # The #26 spike stored the real access URL under this account name; `fa connect`
 # adopts it once, then it is deleted.
 LEGACY_ACCOUNT = "lunchflow"
@@ -54,3 +59,24 @@ def legacy_text(service: str) -> str | None:
 
 def delete_legacy(service: str) -> None:
     keyring.delete_password(service, LEGACY_ACCOUNT)
+
+
+def gemini_key() -> str | None:
+    """The gateway's Gemini key, or None if the user has not stored one."""
+    return keyring.get_password(GEMINI_SERVICE, GEMINI_ACCOUNT) or None
+
+
+def item(service: str, account: str = ACCOUNT) -> str | None:
+    """Any of the app's items by service and account (`fa keys`, `fa doctor`)."""
+    return keyring.get_password(service, account)
+
+
+def set_item(service: str, value: str, account: str = ACCOUNT) -> None:
+    keyring.set_password(service, account, value)
+
+
+def delete_item(service: str, account: str = ACCOUNT) -> bool:
+    if keyring.get_password(service, account) is None:
+        return False
+    keyring.delete_password(service, account)
+    return True

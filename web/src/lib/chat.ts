@@ -1,7 +1,7 @@
 /** Chat state for the Assistant panel (#145): SSE parsing, the turn reducer, reply blocks.
  * Model text is only ever data here; components render it as text nodes, never HTML. */
 
-export type Path = "cache" | "local_model" | "deterministic";
+export type Path = "cache" | "local_model" | "cloud" | "deterministic";
 export type SseEvent = { name: string; data: Record<string, unknown> };
 
 export function parseSse(buffer: string, chunk: string): { events: SseEvent[]; rest: string } {
@@ -34,6 +34,7 @@ export type Message = {
   role: "user" | "assistant";
   text: string;
   path?: Path;
+  costPence?: number | null;
   proposalId?: number | null;
   streaming?: boolean;
   stage?: string; // progress words while the turn runs
@@ -85,7 +86,7 @@ export function reduce(s: Chat, a: Action): Chat {
         const thread = typeof data.thread_id === "string" ? data.thread_id : s.thread;
         const proposalId = typeof data.proposal_id === "number" ? data.proposal_id : null;
         const counted = parseCounted(data.counted);
-        return last({ ...s, thread }, (m) => ({ ...m, path: data.path as Path, proposalId, counted, stage: undefined }));
+        return last({ ...s, thread }, (m) => ({ ...m, path: data.path as Path, proposalId, counted, costPence: typeof data.cost_pence === "number" ? data.cost_pence : null, stage: undefined }));
       }
       if (name === "stage" && typeof data.text === "string") {
         const stage = data.text;
@@ -122,6 +123,7 @@ export const sumMinor = (rows: CountedTxn[]) => rows.reduce((n, t) => n + t.amou
 export function pathLabel(path: Path, reply: string): string {
   if (path === "cache") return "Cache";
   if (path === "local_model") return "Local model";
+  if (path === "cloud") return "Cloud model";
   return parseBlocks(reply).some((b) => b.kind === "table") ? "Table" : "Built in";
 }
 

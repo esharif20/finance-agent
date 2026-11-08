@@ -33,6 +33,7 @@ from finance_agent.assistant.chat_model import (
     printed_tool_call,
 )
 from finance_agent.assistant.checkpoints import LedgerSaver
+from finance_agent.assistant.cloud_route import CloudRoute, Name, named_in, names
 from finance_agent.assistant.evidence import Evidence, counted
 from finance_agent.assistant.grounding import (
     ToolValue,
@@ -60,10 +61,11 @@ from finance_agent.ledger.proposals import Proposals
 from finance_agent.ledger.taxonomy import TAXONOMY
 
 Route = Literal["ask", "plan", "memory", "correct"]
-Path = Literal["cache", "local_model", "deterministic", "planner"]
+Path = Literal["cache", "local_model", "cloud", "deterministic", "planner"]
 ROUTES: tuple[Route, ...] = ("ask", "plan", "memory", "correct")
 MAX_ROUNDS = 3  # model calls that may ask for tools in one turn
 MAX_CALLS = 4  # tool calls run per round
+CLOUD = ("ask", "plan")  # Memory and Correct stay local: no Proposal from the cloud
 CACHED = ("ask",)  # read-only answers; Proposals are never cached (ADR 0010)
 # Insight ratings and dismissals change these without a Ledger version bump; a
 # spend_for_query answer depends on the thread's plan and must set it (#271)
@@ -175,12 +177,16 @@ class State(TypedDict):
     message: str
     turn_id: str
     today: str  # ISO date
+    thread_id: NotRequired[str]  # the payload log's conversation id
     route: NotRequired[Route]
     reply: NotRequired[str]
     path: NotRequired[Path]
     evidence: NotRequired[list[str]]
     proposal_id: NotRequired[int | None]
     history: NotRequired[Annotated[list[dict[str, str]], _keep_last]]
+    cloud: NotRequired[bool]  # this thread's opt-in (#301); kept until changed
+    cost_pence: NotRequired[int | None]  # this turn's cloud call, if any
+    payload_id: NotRequired[str | None]
     # the last spend_for_query plan (#271): selectors and ids, never figures
     query_plan: NotRequired[dict[str, Any] | None]
 
@@ -202,6 +208,7 @@ class Draft:
     )
     cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
     refusal: str | None = None  # a fixed reply that replaces the model's
+    names: list[Name] = field(default_factory=list[Name])  # for the redactor
     plan: QueryPlan | None = None  # this turn's last spend_for_query plan
     prefetched: int = 0  # values[:prefetched] came from _prefetch
 
@@ -213,6 +220,7 @@ class Assistant:
     today: date
     prefetch: bool = False  # retrieve-then-generate (the app turns it on)
     saver: LedgerSaver = field(init=False)
+    cloud: CloudRoute | None = None  # None: no key, or the demo (#296)
     on_stage: Callable[[str], None] | None = None  # progress words, no data
     # Transactions behind each spending total this turn, by evidence ID;
     # shown to the user only, never checkpointed (ADR 0007)
@@ -226,13 +234,12 @@ class Assistant:
 
     def router(self, s: State) -> Update:
         route = pre_route(s["message"])
-        if route is None and (
-            fast_path.parse(s["message"], self.today) or self._first_hit("ask", s)
-        ):
+        fast = not self._cloud_on(s) and fast_path.parse(s["message"], self.today)
+        if route is None and (fast or self._first_hit("ask", s)):
             route = "ask"
         if route is not None:
             self._stage(ROUTE_STAGE[route])
-            return {"route": route, "proposal_id": None, "evidence": []}
+            return {"route": route, **_NEW_TURN}
         try:
             r = self.model.chat(
                 [
@@ -245,11 +252,13 @@ class Assistant:
             word = ""
         route = next((r for r in ROUTES if r == word), "ask")
         self._stage(ROUTE_STAGE[route])
-        return {"route": route, "proposal_id": None, "evidence": []}
+        return {"route": route, **_NEW_TURN}
 
     def subgraph(self, route: Route) -> Callable[[State], Update]:
         def node(s: State) -> Update:
-            if route == "ask" and (fast := self._fast(s)) is not None:
+            # a thread opted in to cloud wording keeps it (#301)
+            fast = None if self._cloud_on(s) else self._fast(s)
+            if route == "ask" and fast is not None:
                 return fast
             d = self._tools(route, s)
             if d.failed and not d.values:
@@ -289,7 +298,7 @@ class Assistant:
         return {
             "reply": reply,
             "path": "deterministic",
-            "proposal_id": None,
+            **_NEW_TURN,
             "history": [{"role": "assistant", "content": reply}],
         }
 
@@ -309,7 +318,9 @@ class Assistant:
             )
         )
         hit = self._first_hit(route, s)
-        if route == "ask" and self.prefetch:
+        # an opted-in cloud turn sends its tool values, so it is not widened
+        cloud = self._cloud_on(s)
+        if route == "ask" and self.prefetch and not cloud:
             self._prefetch(s, d)  # on a hit, re-read only for the Transactions shown
         if hit is not None:
             d.reply, d.cached = hit
@@ -354,6 +365,9 @@ class Assistant:
         if route not in CACHED or s.get("history"):
             return None
         return self._cache().get(route, s["message"], FIRST, self.today)
+
+    def _cloud_on(self, s: State) -> bool:
+        return bool(s.get("cloud")) and self.cloud is not None
 
     def _fast(self, s: State) -> Update | None:
         """A simple spending question with no model call: the planner's one
@@ -451,6 +465,8 @@ class Assistant:
         if (ev := counted(Ledger(self.conn, current_user()), out)) is not None:
             self.counted[ev.evidence_id] = ev
         d.values += tool_values(call.name, out)
+        if self.cloud is not None:
+            d.names += names(out)
         return out.model_dump_json()
 
     def _ground(self, route: Route, s: State, d: Draft) -> Update:
@@ -458,6 +474,40 @@ class Assistant:
             return {"reply": d.reply, "path": "cache", "evidence": list(d.cached)}
         if d.refusal is not None and d.proposal_id is None:
             return {"reply": d.refusal, "path": "deterministic"}
+        if not (
+            s.get("cloud")
+            and self.cloud is not None
+            and route in CLOUD
+            and d.proposal_id is None
+        ):
+            return self._ground_local(route, s, d)
+        w = self.cloud.word(
+            s["message"],
+            d.values,
+            d.names + self._named(s["message"]),
+            user_id=current_user(),
+            thread_id=s.get("thread_id", ""),
+        )
+        meter = {"cost_pence": w.cost_pence, "payload_id": w.payload_id}
+        if w.text is not None:
+            res = check_grounding(w.text, d.values, today=self.today)
+            if res.grounded and _shown(w.text):
+                return {
+                    "reply": w.text,
+                    "path": "cloud",
+                    "proposal_id": None,
+                    "evidence": list(res.evidence_ids),
+                    **meter,
+                }
+        return self._ground_local(route, s, d) | meter  # then local, then the table
+
+    def _named(self, question: str) -> list[Name]:
+        """Names the question mentions, whether or not a tool returned them."""
+        ms = Ledger(self.conn, current_user()).merchants()
+        cats = (c for m in ms for c in m.default_category or ())
+        return named_in(question, (m.name for m in ms), cats)
+
+    def _ground_local(self, route: Route, s: State, d: Draft) -> Update:
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         self._stage(CHECKING)
@@ -537,6 +587,14 @@ def _last(today: date) -> str:
     return f"{n // 12}-{n % 12 + 1:02d}"
 
 
+_NEW_TURN: Update = {
+    "proposal_id": None,
+    "evidence": [],
+    "cost_pence": None,
+    "payload_id": None,
+}
+
+
 def _plan(state: State) -> QueryPlan | None:
     """The thread's last QueryPlan; None when there is none or it no longer
     validates (an older checkpoint)."""
@@ -556,6 +614,8 @@ class Answer:
     path: Path
     evidence: tuple[str, ...]
     proposal_id: int | None  # a confirm card is waiting for this Proposal
+    cost_pence: int | None = None  # a cloud call this turn (#301)
+    payload_id: str | None = None
     counted: tuple[Evidence, ...] = ()  # Transactions behind its totals
 
 
@@ -570,21 +630,30 @@ def _answer(assistant: Assistant, thread: str, out: dict[str, Any]) -> Answer:
         path=out.get("path", "deterministic"),
         evidence=evidence,
         proposal_id=out.get("proposal_id") if pending else None,
+        cost_pence=out.get("cost_pence"),
+        payload_id=out.get("payload_id"),
         counted=tuple(assistant.counted[e] for e in evidence if e in assistant.counted),
     )
 
 
-def ask(assistant: Assistant, message: str, thread_id: str | None = None) -> Answer:
-    """Run one turn on a thread (a new one when `thread_id` is None)."""
+def ask(
+    assistant: Assistant,
+    message: str,
+    thread_id: str | None = None,
+    cloud: bool | None = None,
+) -> Answer:
+    """Run one turn on a thread (a new one when `thread_id` is None). `cloud`
+    sets the thread's opt-in; None keeps it (off on a new thread)."""
     thread = thread_id or uuid.uuid4().hex
-    out = assistant.invoke(
-        {
-            "message": message,
-            "turn_id": uuid.uuid4().hex,
-            "today": assistant.today.isoformat(),
-        },
-        thread,
-    )
+    turn: dict[str, Any] = {
+        "message": message,
+        "turn_id": uuid.uuid4().hex,
+        "today": assistant.today.isoformat(),
+        "thread_id": thread,
+    }
+    if cloud is not None:
+        turn["cloud"] = cloud
+    out = assistant.invoke(turn, thread)
     return _answer(assistant, thread, out)
 
 

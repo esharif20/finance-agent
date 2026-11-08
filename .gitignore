@@ -36,3 +36,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.tsbuildinfo
+
+dist-demo/
+demo-data/
+.vercel/

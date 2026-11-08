@@ -11,6 +11,7 @@ from finance_agent import categorise
 from finance_agent.categorise import auto, embedding, subscription_alerts
 from finance_agent.cli import launcher
 from finance_agent.identity import current_user
+from finance_agent.ingest.simplefin import SimpleFINError
 from finance_agent.ledger import Ledger, SyncStatus
 from finance_agent.notify import printed
 from finance_agent.storage import open_db
@@ -49,6 +50,38 @@ UNEXPECTED = (
 )
 
 
+def _brief(command: str) -> int:
+    from datetime import date
+
+    from finance_agent.cli import brief
+    from finance_agent.gateway.cloud import CloudChatModel, CloudError
+    from finance_agent.storage import default_db_path, keychain
+
+    try:
+        if command == "install":
+            print(f"Installed {brief.install()}")
+            return 0
+        if command == "remove":
+            brief.remove()
+            print("Removed")
+            return 0
+        try:
+            cloud = CloudChatModel(keychain.gemini_key() or "")
+        except CloudError as e:
+            print(f"fa: {e}; run `fa keys set gemini`", file=sys.stderr)
+            return 1
+        engine = open_db(create=False)
+        try:
+            return brief.refresh(
+                LOCAL_USER, engine, default_db_path(), cloud, date.today()
+            )
+        finally:
+            engine.dispose()
+    except (OSError, ValueError) as e:
+        print(f"fa: {e}", file=sys.stderr)  # messages never carry the key
+        return 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         return _main(argv)
@@ -57,9 +90,199 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
 
+GROUPS = (
+    ("Start", ("up", "setup", "demo", "stop")),
+    ("See", ("status", "month", "subs", "summary")),
+    ("Look after", ("doctor", "models", "keys", "bank", "uninstall")),
+    (
+        "Data",
+        (
+            "sync",
+            "brief",
+            "import",
+            "watch",
+            "connect",
+            "disconnect",
+            "backup",
+            "restore",
+            "forget-embeddings",
+            "forget-alerts",
+        ),
+    ),
+)
+
+
+def _grouped_help(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> str:  # pyright: ignore[reportPrivateUsage]  # noqa: E501
+    helps = {a.dest: a.help or "" for a in sub._choices_actions}  # pyright: ignore[reportPrivateUsage]
+    lines = ["`fa` alone starts the app and opens it in your browser.", ""]
+    for title, names in GROUPS:
+        lines.append(f"{title}:")
+        lines += [f"  {n:<19}{helps.get(n, '')}" for n in names]
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _front_door(args: argparse.Namespace) -> int | None:
+    """The #311 commands; None when `args` is not one of them."""
+    c = args.command
+    if c == "demo":
+        from finance_agent.cli import demo
+
+        return demo.list_personas() if args.list else demo.run(args.persona)
+    if c == "setup":
+        from finance_agent.cli import banner, setup
+
+        banner.show()
+        ctx = setup.Ctx()
+        if args.token_stdin:
+            ctx.token = setup.read_token_stdin()
+        return setup.run(ctx, restart=args.restart)
+    if c == "uninstall":
+        from finance_agent.cli import setup
+
+        return setup.uninstall(args.purge)
+    if c == "doctor":
+        from finance_agent.cli import doctor
+
+        return doctor.run()
+    if c in ("models", "brain", "ai"):
+        from finance_agent.cli import models
+
+        if args.models_command == "install":
+            return models.install(None if args.recommended else args.name)
+        if args.models_command == "remove":
+            return models.remove(args.name)
+        return models.show()
+    if c == "keys":
+        from finance_agent.cli import keys
+
+        if args.keys_command == "set":
+            return keys.set_key(args.name)
+        if args.keys_command == "remove":
+            return keys.remove(args.name)
+        if args.keys_command == "check":
+            results = keys.check()
+            for ok, what, fix in results:
+                print(f"  {'✓' if ok else '✗'} {what}" + ("" if ok else f"  → {fix}"))
+            return 0 if all(ok for ok, _, _ in results) else 1
+        return keys.show()
+    if c == "bank":
+        from finance_agent.cli import bank, setup
+
+        bc = args.bank_command
+        if bc == "sync":
+            return bank.sync(LOCAL_USER)
+        if bc == "disconnect":
+            return bank.disconnect()
+        if bc == "status":
+            return bank.status(LOCAL_USER)
+        if bc == "add":
+            return bank.add(LOCAL_USER, launcher._open_browser)  # pyright: ignore[reportPrivateUsage]
+        if bc == "manage":
+            return bank.manage(launcher._open_browser)  # pyright: ignore[reportPrivateUsage]
+        token = setup.read_token_stdin() if args.token_stdin else None
+        return bank.guide(LOCAL_USER, launcher._open_browser, input, token)  # pyright: ignore[reportPrivateUsage]
+    if c in ("status", "month", "subs"):
+        from finance_agent.cli import status
+
+        engine = open_db(create=False)
+        try:
+            if c == "status":
+                return status.status(engine, LOCAL_USER)
+            if c == "month":
+                try:
+                    return status.month(engine, LOCAL_USER, args.month)
+                except ValueError:
+                    print("month must be YYYY-MM", file=sys.stderr)
+                    return 2
+            return status.subs(engine, LOCAL_USER)
+        finally:
+            engine.dispose()
+    return None
+
+
+def _up() -> int:
+    """`fa` and `fa up`: the banner and a one-line status, then the UI."""
+    from datetime import UTC, datetime
+
+    from finance_agent.cli import banner, status
+
+    try:
+        engine = open_db(create=False)
+    except (OSError, ValueError) as e:
+        print(f"fa: {e}; new here? run `fa setup`", file=sys.stderr)
+        return 1
+    try:
+        now = datetime.now(UTC)
+        line = status.one_line(status.snapshot(engine, LOCAL_USER, now.date()), now)
+    finally:
+        engine.dispose()
+    banner.show(line)
+    try:
+        launcher.default().start()
+    except (OSError, launcher.ServerDidNotStart) as e:
+        print(f"fa: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _add_front_door(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:  # pyright: ignore[reportPrivateUsage]  # noqa: E501
+    sub.add_parser("up", help="start the app and open it (same as `fa`)")
+    st = sub.add_parser("setup", help="guided setup; resumes where it stopped")
+    st.add_argument(
+        "--token-stdin", action="store_true", help="read the setup token from stdin"
+    )
+    st.add_argument("--restart", action="store_true", help="run every step again")
+    de = sub.add_parser("demo", help="try it on synthetic data, no setup")
+    de.add_argument("--persona", type=int, metavar="N", help="pick a persona")
+    de.add_argument("--list", action="store_true", help="list the personas")
+    sub.add_parser("status", help="a terminal dashboard")
+    mo = sub.add_parser("month", help="a month by Category, with bars")
+    mo.add_argument("month", nargs="?", metavar="YYYY-MM")
+    sub.add_parser("subs", help="subscriptions, monthly total and the AI cap")
+    sub.add_parser("doctor", help="check keys, database, models, jobs and backups")
+    md = sub.add_parser(
+        "models", aliases=["brain", "ai"], help="local models: compare, install"
+    )
+    msub = md.add_subparsers(dest="models_command")
+    mi = msub.add_parser("install", help="pull, check and select a model")
+    which = mi.add_mutually_exclusive_group()
+    which.add_argument("--recommended", action="store_true")
+    which.add_argument("name", nargs="?", help="4b or 9b")
+    mr = msub.add_parser("remove", help="delete a pulled model")
+    mr.add_argument("name")
+    ky = sub.add_parser("keys", help="Keychain items, by length only")
+    ksub = ky.add_subparsers(dest="keys_command")
+    ksub.add_parser("set", help="store a key (hidden prompt)").add_argument(
+        "name", choices=["gemini"]
+    )
+    ksub.add_parser("remove", help="remove a key").add_argument("name")
+    ksub.add_parser("check", help="check the keys")
+    bk = sub.add_parser("bank", help="connect banks through Lunch Flow")
+    bk.add_argument(
+        "bank_command",
+        nargs="?",
+        choices=["status", "sync", "disconnect", "add", "manage"],
+    )
+    bk.add_argument(
+        "--token-stdin", action="store_true", help="read the setup token from stdin"
+    )
+    un = sub.add_parser("uninstall", help="remove the app and its jobs; data stays")
+    un.add_argument(
+        "--purge", action="store_true", help="also delete data and keys (asks first)"
+    )
+
+
 def _main(argv: Sequence[str] | None) -> int:
-    parser = argparse.ArgumentParser(prog="fa")
-    sub = parser.add_subparsers(dest="command")
+    parser = argparse.ArgumentParser(
+        prog="fa",
+        usage="fa [<command>] [options]",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(
+        dest="command", metavar="<command>", help=argparse.SUPPRESS
+    )
+    _add_front_door(sub)
     sub.add_parser("stop", help="stop the local server")
     imp = sub.add_parser(
         "import",
@@ -79,7 +302,7 @@ def _main(argv: Sequence[str] | None) -> int:
     wsub.add_parser("remove", help="remove the launchd agent")
     wr = wsub.add_parser("run", help="import the folder now (launchd calls this)")
     wr.add_argument("folder", type=Path)
-    con = sub.add_parser("connect", help="connect a SimpleFIN aggregator (setup token)")
+    con = sub.add_parser("connect", help="connect Lunch Flow with a setup token")
     con.add_argument(
         "--renewed",
         action="store_true",
@@ -90,12 +313,17 @@ def _main(argv: Sequence[str] | None) -> int:
         action="store_true",
         help="link synced Accounts to CSV Accounts imported since connecting",
     )
-    sub.add_parser("disconnect", help="remove the SimpleFIN access URL")
-    sy = sub.add_parser("sync", help="fetch new Transactions from SimpleFIN")
+    sub.add_parser("disconnect", help="remove the Lunch Flow access from the Keychain")
+    sy = sub.add_parser("sync", help="fetch new Transactions from Lunch Flow")
     mode = sy.add_mutually_exclusive_group()
     mode.add_argument("--install", action="store_true", help="run daily (launchd)")
     mode.add_argument("--uninstall", action="store_true", help="stop the daily run")
     mode.add_argument("--notify", action="store_true", help="alert on trouble")
+    br = sub.add_parser("brief", help="the daily news briefing on your topics")
+    brsub = br.add_subparsers(dest="brief_command", required=True)
+    brsub.add_parser("refresh", help="fetch today's items (launchd calls this)")
+    brsub.add_parser("install", help="run it daily (launchd)")
+    brsub.add_parser("remove", help="stop the daily run")
     bk = sub.add_parser(
         "backup",
         help="back up to the registered external drive",
@@ -123,7 +351,20 @@ def _main(argv: Sequence[str] | None) -> int:
         "forget-alerts",
         help="delete the record of subscription alerts sent (#108)",
     )
+    parser.epilog = _grouped_help(sub)
     args = parser.parse_args(argv)
+    if args.command in (None, "up"):
+        return _up()
+    try:
+        rc = _front_door(args)
+    except (OSError, ValueError, LookupError) as e:
+        print(f"fa: {e}", file=sys.stderr)  # messages never carry a secret
+        return 1
+    except SimpleFINError as e:
+        print(f"fa: {e}", file=sys.stderr)  # messages never carry the URL
+        return 1
+    if rc is not None:
+        return rc
 
     if args.command in ("forget-embeddings", "forget-alerts"):
         try:
@@ -167,7 +408,6 @@ def _main(argv: Sequence[str] | None) -> int:
 
     if args.command in ("connect", "disconnect", "sync"):
         from finance_agent.cli import bank
-        from finance_agent.ingest.simplefin import SimpleFINError
 
         try:
             if args.command == "disconnect":
@@ -195,23 +435,16 @@ def _main(argv: Sequence[str] | None) -> int:
             print(f"fa: {e}", file=sys.stderr)  # messages never carry the URL
             return 1
 
-    if args.command is None:  # serving never creates the ledger; `fa import` does
+    if args.command == "stop":
         try:
-            open_db(create=False).dispose()
-        except (OSError, ValueError) as e:
-            print(f"fa: {e}", file=sys.stderr)
-            return 1
-    if args.command in (None, "stop"):
-        ln = launcher.default()
-        try:
-            if args.command is None:
-                ln.start()
-            elif not ln.stop():
+            if not launcher.default().stop():
                 print("fa: the server is not running")
-        except (OSError, launcher.ServerDidNotStart) as e:
+        except OSError as e:
             print(f"fa: {e}", file=sys.stderr)
             return 1
         return 0
+    if args.command == "brief":
+        return _brief(args.brief_command)
     if args.command == "watch":
         from finance_agent.cli import watch
 

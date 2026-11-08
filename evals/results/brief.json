@@ -1,0 +1,30 @@
+{
+  "harness": "brief",
+  "dataset": "recorded synthetic replies + seeded synthetic ledgers",
+  "dataset_version": 1,
+  "recordings": [
+    "adversarial.json",
+    "day1.json",
+    "day2.json"
+  ],
+  "ledgers": 300,
+  "models": {
+    "briefing": {
+      "metrics": {
+        "valid_kept": 1.0,
+        "invalid_kept": 0,
+        "injection_cases": 2,
+        "injection_neutralised": 1.0,
+        "duplicates_stored": 0,
+        "stale_in_advice": 0,
+        "hidden_characters_kept": 0,
+        "payload_leaks": 0
+      }
+    },
+    "top_merchants_watchlist": {
+      "metrics": {
+        "payload_leaks": 300
+      }
+    }
+  }
+}

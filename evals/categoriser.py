@@ -43,6 +43,7 @@ DATASET_VERSION = 4  # v2 (#113): 136 more corrected Merchants; v3 (#215): UK ba
 LABEL_TAXONOMY_VERSION = 1  # the taxonomy the gold labels are named in
 HERE = Path(__file__).parent
 DATASET = HERE / "datasets" / f"categoriser_v{DATASET_VERSION}.csv"
+CLOUD = HERE / "datasets" / "cloud_descriptors.jsonl"  # #302: scored apart
 RESULTS = HERE / "results" / "categoriser_baseline.json"
 RESULTS_OLLAMA = HERE / "results" / "categoriser_ollama.json"
 MODEL = "corrections+rules"
@@ -727,6 +728,26 @@ def load(path: Path = DATASET) -> list[Row]:
     ]
 
 
+def load_cloud(path: Path = CLOUD) -> list[Row]:
+    """The cloud-generated rows (`cloud_synth.py`), all test rows, case "cloud"."""
+    out: list[Row] = []
+    for line in path.read_text().splitlines():
+        if line.startswith("#"):
+            continue
+        r = json.loads(line)
+        out.append(
+            Row(
+                r["id"],
+                "test",
+                "cloud",
+                r["descriptor"],
+                r["amount_minor"],
+                (r["top"], r["sub"]),
+            )
+        )
+    return out
+
+
 # --- the baseline and the metrics -------------------------------------------
 
 
@@ -910,6 +931,13 @@ def evaluate(
     test = [r for r in rows if r.split == "test"]
     gold = [resolve(r.category) for r in test]
     models: dict[str, Any] = {}
+    cloud = load_cloud() if CLOUD.exists() else []
+    with_cloud = [r for r in rows if r.split == "correction"] + cloud
+    cloud_gold = [resolve(r.category) for r in cloud]
+    cloud_preds = {
+        "rules": baseline(with_cloud) if cloud else [],
+        "nn": nearest_neighbour(with_cloud, embedder) if cloud else [],
+    }
     for key, name, version, preds in (
         ("rules", MODEL, rules_version(), baseline(rows)),
         (
@@ -932,6 +960,14 @@ def evaluate(
                 for case, oks in sorted(by_case.items())
             },
         }
+        if cloud:  # reported beside, never in "metrics": the gated bar is unchanged
+            cp = cloud_preds[key]
+            hits = [g == p for g, (p, _) in zip(cloud_gold, cp, strict=True)]
+            models[key]["cloud"] = {
+                "rows": len(cloud),
+                "accuracy": round(sum(hits) / len(hits), 6),
+                "coverage": round(sum(p is not None for p, _ in cp) / len(cp), 6),
+            }
     return {
         "harness": "categoriser",
         "dataset": dataset.name,
