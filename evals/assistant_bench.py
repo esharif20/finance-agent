@@ -196,10 +196,10 @@ def routed(case: golden.Case) -> list[Reply]:
 def planned(case: golden.Case) -> ToolCall | None:
     """The fast path's call for a planner-parsable case: no model call then.
     A cloud run has none: an opted-in thread keeps cloud wording."""
-    return None if _CLOUD_RUN else fast_path.parse(case.question, golden.TODAY)
+    return None if _cloud_run else fast_path.parse(case.question, golden.TODAY)
 
 
-_CLOUD_RUN = False  # set by evaluate() for the length of a cloud run
+_cloud_run = False  # set by evaluate() for the length of a cloud run
 
 
 def _oracle_turn(case: golden.Case, ids: Ids) -> list[Reply]:
@@ -405,10 +405,10 @@ def evaluate(
     replies: list[dict[str, str]] | None = None,
     cases: tuple[golden.Case, ...] = golden.CASES,  # the routing dataset's (#283)
 ) -> dict[str, Any]:
-    global _CLOUD_RUN
+    global _cloud_run
     prev = keyring.get_keyring()
     keyring.set_keyring(_MemoryKeyring())  # never the real Keychain
-    _CLOUD_RUN = gateway is not None
+    _cloud_run = gateway is not None
     try:
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
@@ -431,7 +431,7 @@ def evaluate(
                 engine.dispose()
     finally:
         keyring.set_keyring(prev)
-        _CLOUD_RUN = False
+        _cloud_run = False
     return {
         "harness": "assistant",
         "dataset": "assistant_golden",

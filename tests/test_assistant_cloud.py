@@ -80,7 +80,7 @@ def route(store: SpendStore, transport: Transport) -> CloudRoute:
 @pytest.fixture(autouse=True)
 def _cloud_scripts(monkeypatch: pytest.MonkeyPatch) -> None:
     """An opted-in thread takes no fast path, so the oracle scripts every case."""
-    monkeypatch.setattr(bench, "_CLOUD_RUN", True)
+    monkeypatch.setattr(bench, "_cloud_run", True)
 
 
 @pytest.fixture
