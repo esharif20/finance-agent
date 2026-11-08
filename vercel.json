@@ -21,6 +21,10 @@
     {
       "source": "/app/(.*)",
       "destination": "/index.html"
+    },
+    {
+      "source": "/architecture",
+      "destination": "/index.html"
     }
   ],
   "installCommand": ""
