@@ -73,7 +73,7 @@ def test_a_known_service_is_listed_from_its_first_charge(
     e = by_name(
         recognise(engine, write_export, [(date(2026, 1, 3), "NETFLIX.COM", "-10.99")])
     )
-    x = e["NETFLIX.COM"]
+    x = e["Netflix"]
     assert (x.kind, x.group, x.reason, x.status, x.source) == (
         "subscription",
         "Streaming",

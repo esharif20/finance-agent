@@ -127,7 +127,8 @@ def test_costs_carry_waste_flags_and_a_flag_count(
         "after": {"minor": 1299, "currency": "GBP"},
     }
     overlap = {"code": "overlap", "on": None, "before": None, "after": None}
-    assert by == {"NETFLIX.COM": [rise, overlap], "DISNEY PLUS": [overlap]}
+    # the UK merchant base (#215) names these two Merchants
+    assert by == {"Netflix": [rise, overlap], "Disney Plus": [overlap]}
     assert body["flag_count"] == 3 and body["trial_detection"] == "partial"
 
 
@@ -173,7 +174,7 @@ def test_another_users_subscriptions_never_raise_my_flags(
     theirs += charges("NETFLIX.COM", ["10.99", "10.99"], last_days_ago=5)
     seed_rows(engine, write_export, theirs, user_id=2)
     body = client.get("/api/subscriptions/costs").json()
-    assert [i["merchant"] for i in body["items"]] == ["NETFLIX.COM"]
+    assert [i["merchant"] for i in body["items"]] == ["Netflix"]
     assert body["items"][0]["flags"] == [] and body["flag_count"] == 0
 
 
