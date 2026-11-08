@@ -414,6 +414,21 @@ merchant_embedding = Table(
     Column("vector", LargeBinary, nullable=False),
 )
 
+# Search vectors (#253): one int16 vector per search document (`doc_id` is its
+# `search_fts` rowid, ledger/search_index.py), same packing as
+# merchant_embedding. The FTS5 table `search_fts` is SQLite-only, so it lives in
+# migration 0026, not here; the triggers there delete a vector with its
+# document, and `fa forget-embeddings` wipes them all.
+text_embedding = Table(
+    "text_embedding",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("doc_id", BigInteger, primary_key=True, autoincrement=False),
+    Column("model", String(64), nullable=False),
+    Column("dims", Integer, nullable=False),
+    Column("vector", LargeBinary, nullable=False),
+)
+
 # Proposals (#138): the Assistant's only write. `payload` (JSON) is held only
 # while pending; deciding clears it to "{}", so a rejection leaves no trace of
 # what was proposed and a confirmed one's effect lives only where it was
