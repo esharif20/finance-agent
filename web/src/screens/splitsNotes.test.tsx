@@ -274,7 +274,7 @@ describe("To review bucket", () => {
 
 describe("Review Queue renderers", () => {
   const item = (over: Partial<Item>): Item => ({
-    id: "x:1", type: "category", version: "v1", weight: 1, title: "Tesco", merchant_id: 3, transaction_ids: [7], choices: [], skipped: false, ...over,
+    id: "x:1", type: "category", version: "v1", weight: 1, title: "Tesco", merchant_id: 3, transaction_ids: [7], choices: [], suggestions: [], skipped: false, ...over,
   });
   const queue = (i: Item) => ({ items: [i], remaining: 1, ledger_version: 1 });
 

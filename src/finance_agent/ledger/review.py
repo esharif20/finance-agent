@@ -50,6 +50,9 @@ class Item:
     merchant_id: int | None = None
     transaction_ids: tuple[int, ...] = ()
     choices: tuple[str, ...] = ()  # empty: the answer is a Category
+    # up to 3 Categories a local model proposes (#114); only ever buttons, and
+    # not part of `version`, so a model refresh never invalidates a decision
+    suggestions: tuple[tuple[str, str], ...] = ()
     skipped: bool = False
 
     @property
@@ -321,6 +324,13 @@ ITEM_TYPES: dict[str, ItemType] = {
     )
 }
 
+# (item key -> Merchant id, Merchant id -> its corrected Categories) -> item key
+# -> suggested Categories. Injected by the API so the Ledger never imports
+# `categorise`.
+Suggester = Callable[
+    [dict[str, int], dict[int, set[tuple[str, str]]]], dict[str, list[tuple[str, str]]]
+]
+
 # money modules take no float: a later scorer (information gain) returns a Decimal
 Scorer = Callable[[Item], int | Decimal]
 
@@ -338,11 +348,16 @@ def order(items: Iterable[Item], scorer: Scorer = by_frequency) -> list[Item]:
 
 class ReviewQueue:
     def __init__(
-        self, conn: Connection, user_id: int, scorer: Scorer = by_frequency
+        self,
+        conn: Connection,
+        user_id: int,
+        scorer: Scorer = by_frequency,
+        suggester: Suggester | None = None,
     ) -> None:
         self._led = Ledger(conn, user_id)
         self._db = Scoped(conn, user_id)
         self._scorer = scorer
+        self._suggester = suggester
 
     def items(self) -> list[Item]:
         txns = self._led.transactions()
@@ -354,7 +369,39 @@ class ReviewQueue:
                 if action == "answer":
                     continue
                 out.append(replace(i, skipped=action == "skip"))
-        return order(out, self._scorer)
+        return order(self._suggest(out, txns), self._scorer)
+
+    def _suggest(self, items: list[Item], txns: Sequence[Transaction]) -> list[Item]:
+        """Fill `suggestions` on Category items; a Correction is the only thing
+        that ever assigns, so this only reads."""
+        if self._suggester is None:
+            return items
+        targets = {
+            i.key: i.merchant_id
+            for i in items
+            if i.type == CategoryItems.name and i.merchant_id is not None
+        }
+        if not targets:
+            return items
+        labelled: dict[int, set[tuple[str, str]]] = {}
+        for t in txns:
+            c = t.categorisation
+            if (
+                c is not None
+                and c.merchant_id is not None
+                and c.source == "correction"
+                and c.category is not None
+                and c.category != (UNCATEGORISED, UNCATEGORISED)
+            ):
+                cat = (c.category[0], c.category[1])
+                labelled.setdefault(c.merchant_id, set()).add(cat)
+        found = self._suggester(targets, labelled)
+        return [
+            replace(i, suggestions=tuple(found[i.key]))
+            if i.type == CategoryItems.name and i.key in found
+            else i
+            for i in items
+        ]
 
     def version(self) -> int:
         return self._led.ledger_version()
