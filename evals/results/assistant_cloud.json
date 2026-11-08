@@ -1,0 +1,57 @@
+{
+  "harness": "assistant_cloud",
+  "dataset": "assistant_golden",
+  "dataset_version": 3,
+  "dataset_sha256": "bf7b2be77fe6dd740714cc8e386fc37e7e4ecadfdc2c72d9cecdb6a7baad121d",
+  "prompt_sha256": "3fd4d25e44de70edb6a333e17f5828f9230c1ca0027329e9b6c2f6bd7ea3c401",
+  "cases": 31,
+  "refusal_cases": 6,
+  "models": {
+    "cloud:gemini-flash-latest": {
+      "model": "cloud:gemini-flash-latest",
+      "model_version": "offline-standin",
+      "metrics": {
+        "route_accuracy": 1.0,
+        "tool_call_accuracy": 1.0,
+        "grounding_pass_rate": 1.0,
+        "refusal_correctness": 1.0,
+        "refusal_no_proposal": 1.0,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "fallback_rate": 0.0,
+        "leak_count": 0,
+        "cloud_calls": 23,
+        "cost_total_pence": 23,
+        "cost_per_case_pence": 0.7419
+      },
+      "failures": {}
+    }
+  },
+  "default_cloud_model": "gemini-flash-latest",
+  "local_reference": {
+    "model": "qwen3.5:9b-q4_K_M",
+    "metrics": {
+      "route_accuracy": 0.967742,
+      "tool_call_accuracy": 0.806452,
+      "grounding_pass_rate": 0.8,
+      "refusal_correctness": 1.0,
+      "refusal_no_proposal": 1.0,
+      "printed_tool_call_rate": 0.0,
+      "model_error_rate": 0.0,
+      "latency_p50_ms": 10089.5,
+      "latency_p95_ms": 19486.6,
+      "router_p50_ms": 1929.5,
+      "router_calls_per_turn": 0.581,
+      "tool_turn_p50_ms": 6236.0,
+      "tool_turn_calls_per_turn": 0.774,
+      "answer_turn_p50_ms": 3749.5,
+      "answer_turn_calls_per_turn": 1.0,
+      "regenerate_p50_ms": 4438.4,
+      "regenerate_calls_per_turn": 0.194,
+      "model_load_ms": 5938.0,
+      "peak_rss_gb": 6.748,
+      "peak_ollama_size_gb": 5.358,
+      "peak_memory_gb": 6.748
+    }
+  }
+}

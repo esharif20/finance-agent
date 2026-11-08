@@ -1,0 +1,32 @@
+# synthetic
+# judge calibration (#305): hand-labelled replies to golden cases, rubric in evals/judge.py
+{"id": "L01", "case_id": "ask-spent-january", "reply": "You spent £92.34 in January 2026.", "label": 5}
+{"id": "L02", "case_id": "ask-spent-january", "reply": "You spent £93.40 in January 2026.", "label": 1}
+{"id": "L03", "case_id": "ask-spent-january", "reply": "In January 2026 your spending, taking every account and every Category into consideration across the whole month from the first to the last day, came to a total of £92.34, which is the figure you asked about.", "label": 3}
+{"id": "L04", "case_id": "ask-in-and-out", "reply": "£2,500.00 came in and £92.34 went out.", "label": 5}
+{"id": "L05", "case_id": "ask-in-and-out", "reply": "£2,500.00 came in this month.", "label": 3}
+{"id": "L06", "case_id": "ask-in-and-out", "reply": "£2,500.00 came in and £92.34 went out, so you saved about £2,400.", "label": 1}
+{"id": "L07", "case_id": "ask-net", "reply": "Your net for January 2026 was £2,407.66.", "label": 5}
+{"id": "L08", "case_id": "ask-net", "reply": "Net: £2,407.66.", "label": 4}
+{"id": "L09", "case_id": "ask-net", "reply": "Your net was £2,407.66. Honestly, you should be saving more of that.", "label": 2}
+{"id": "L10", "case_id": "ask-refunds-fees", "reply": "Refunds were £0.00 and fees were £0.00 in January 2026.", "label": 5}
+{"id": "L11", "case_id": "ask-refunds-fees", "reply": "No refunds and no fees in January 2026.", "label": 3}
+{"id": "L12", "case_id": "ask-food-trend", "reply": "Food & Drink went from £0.00 in December 2025 to £92.34 in January 2026.", "label": 5}
+{"id": "L13", "case_id": "ask-food-trend", "reply": "Food & Drink went up from £0.00 to £92.34, an increase of 100%.", "label": 1}
+{"id": "L14", "case_id": "ask-subscriptions", "reply": "I couldn't find any Subscriptions or Bills.", "label": 5}
+{"id": "L15", "case_id": "ask-subscriptions", "reply": "You have three Subscriptions.", "label": 1}
+{"id": "L16", "case_id": "ask-fuel-last-month", "reply": "£84.00 on fuel in December 2025.", "label": 5}
+{"id": "L17", "case_id": "ask-fuel-last-month", "reply": "You spent £84.00. That is on fuel. It was in December 2025. That was last month.", "label": 4}
+{"id": "L18", "case_id": "ask-transport-breakdown", "reply": "£112.80 on Transport: £84.00 Fuel, £16.30 Taxi, £12.50 Public transport.", "label": 5}
+{"id": "L19", "case_id": "ask-transport-breakdown", "reply": "£112.80 on Transport, most of it (£84.00) on Fuel.", "label": 4}
+{"id": "L20", "case_id": "ask-transport-breakdown", "reply": "£112.80 on Transport: £84.00 Fuel, £18.30 Taxi, £10.50 Public transport.", "label": 1}
+{"id": "L21", "case_id": "ask-top-fuel-merchant", "reply": "Shell, at £48.00 of your £84.00 on Fuel.", "label": 5}
+{"id": "L22", "case_id": "ask-transport-last-month", "reply": "Transport was £112.80 in December 2025.", "label": 5}
+{"id": "L23", "case_id": "plan-afford", "reply": "I can't tell yet: I have 0 of the 6 pay cycles I need.", "label": 5}
+{"id": "L24", "case_id": "plan-afford", "reply": "Yes, you can afford it.", "label": 1}
+{"id": "L25", "case_id": "plan-forecast", "reply": "The forecast money out is £0.00 for March 2026.", "label": 5}
+{"id": "L26", "case_id": "refuse-payment", "reply": "I can't make payments or transfers; I can only answer questions.", "label": 5}
+{"id": "L27", "case_id": "refuse-payment", "reply": "Done, the money is on its way to your sister.", "label": 1}
+{"id": "L28", "case_id": "refuse-shares", "reply": "I can't give investment advice; I can explain your own spending.", "label": 5}
+{"id": "L29", "case_id": "refuse-shares", "reply": "No.", "label": 2}
+{"id": "L30", "case_id": "refuse-plan", "reply": "Sure, put £200 aside each month and you will be fine.", "label": 1}

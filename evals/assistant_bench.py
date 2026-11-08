@@ -6,6 +6,13 @@ qwen tool-call printing bug, plus p50/p95 latency and peak memory on a real run.
     uv run python evals/assistant_bench.py                     # CI: results reproduce
     uv run python evals/assistant_bench.py --write             # refresh (see gate.py)
     uv run python evals/assistant_bench.py --model qwen3.5:4b  # local, opt-in
+    uv run python evals/assistant_bench.py --model cloud:gemini-flash-latest
+        # the real-key cloud run and judge (#305, #306): worst case first
+    uv run python evals/assistant_bench.py --offline-record --write
+        # stand-in cloud and judge recordings, no network
+
+The default run also checks `results/assistant_cloud.json` (the cloud path,
+replayed from `bench_chat_*.json`) and `results/judge.json` (`judge.py`).
 
 CI runs two scripted `FakeChatModel`s: an oracle that does what each case
 expects, and a negative control that prints its tool calls as text, as some
@@ -23,12 +30,15 @@ import http.client
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,9 +60,23 @@ from finance_agent.assistant import (
     graph,
 )
 from finance_agent.assistant.chat_model import printed_tool_call
+from finance_agent.assistant.cloud_route import CloudRoute
 from finance_agent.assistant.graph import Assistant, ask
 from finance_agent.assistant.ollama import NUM_CTX, OLLAMA_PORT
 from finance_agent.assistant.tools.registry import TOOLS
+from finance_agent.gateway import cost
+from finance_agent.gateway.cloud import (
+    FLASH_MODEL,
+    CloudChatModel,
+    CloudError,
+    RecordedTransport,
+    Transport,
+    Usage,
+    _model_of,  # pyright: ignore[reportPrivateUsage]
+    load_recording,
+    recording_key,
+)
+from finance_agent.gateway.types import MONTH_TEXT, PLACEHOLDER
 from finance_agent.storage import open_db
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
@@ -60,6 +84,7 @@ from synthetic_assistant import DECEMBER, ME, OTHER, ROWS, seed  # noqa: E402
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "assistant_fake.json"
+LOCAL_REFERENCE = "qwen3.5:9b-q4_K_M"
 LOCAL_RESULTS = HERE / "results" / "assistant_local.json"
 
 SAMPLE_EVERY = 0.25  # seconds between memory samples
@@ -219,8 +244,15 @@ class _MemoryKeyring(keyring.backend.KeyringBackend):
 
 
 def _score(
-    factory: Factory, engine: Any, ids: Ids, timed: bool
+    factory: Factory,
+    engine: Any,
+    ids: Ids,
+    timed: bool,
+    gateway: CloudRoute | None = None,
+    replies: list[dict[str, str]] | None = None,
 ) -> tuple[dict[str, float], dict[str, list[str]]]:
+    """With `gateway`, every turn opts in to the cloud: `factory` then only
+    routes and calls tools, and grounding counts cloud-worded replies only."""
     fails: dict[str, list[str]] = {
         k: []
         for k in (
@@ -231,8 +263,10 @@ def _score(
             "refusal_no_proposal",
             "printed",
             "errors",
+            "fallback",
         )
     }
+    to_cloud = 0
     latencies: list[float] = []
     phases: dict[str, list[float]] = {p: [] for p in PHASES}
     for case in golden.CASES:
@@ -243,10 +277,13 @@ def _score(
                 thread = None
                 if case.after:  # the earlier turn of the conversation, unscored
                     first = BY_ID[case.after].question
-                    thread = ask(Assistant(rec, conn, golden.TODAY), first).thread_id
+                    turn = Assistant(rec, conn, golden.TODAY, cloud=gateway)
+                    thread = ask(turn, first, None, gateway is not None).thread_id
                     rec = Recorder(rec.model)
                 start = time.perf_counter()
-                a = ask(Assistant(rec, conn, golden.TODAY), case.question, thread)
+                turn = Assistant(rec, conn, golden.TODAY, cloud=gateway)
+                optin = None if case.after else gateway is not None
+                a = ask(turn, case.question, thread, optin)
                 latencies.append(time.perf_counter() - start)
                 for p in PHASES:
                     phases[p] += rec.phases[p]
@@ -265,9 +302,16 @@ def _score(
             checks["refusal"] = not proposed  # the model never even asked
             checks["refusal_no_proposal"] = a.proposal_id is None  # nothing waits
         else:
-            checks["grounding"] = a.path == "local_model" and all(
+            worded = gateway is not None and case.route in graph.CLOUD
+            want = "cloud" if worded else "local_model"
+            checks["grounding"] = a.path == want and all(
                 f in a.reply for f in case.figures
             )
+        if gateway is not None and a.cost_pence is not None:  # the cloud was asked
+            to_cloud += 1
+            checks["fallback"] = a.path == "cloud"
+        if replies is not None:
+            replies.append({"case_id": case.id, "path": a.path, "reply": a.reply})
         if dump := os.environ.get(
             "ASSISTANT_BENCH_REPLIES"
         ):  # synthetic, for diagnosis
@@ -293,6 +337,8 @@ def _score(
         "printed_tool_call_rate": round(len(fails["printed"]) / n, 6),
         "model_error_rate": round(len(fails["errors"]) / n, 6),
     }
+    if gateway is not None:
+        metrics["fallback_rate"] = round(len(fails["fallback"]) / max(to_cloud, 1), 6)
     if timed:  # wall clock: real runs only, so CI's results stay reproducible
         ms = [t * 1000 for t in latencies]
         metrics |= {
@@ -309,7 +355,10 @@ def _score(
 
 
 def evaluate(
-    models: dict[str, tuple[str, str, Factory]] = FAKES, timed: bool = False
+    models: dict[str, tuple[str, str, Factory]] = FAKES,
+    timed: bool = False,
+    gateway: CloudRoute | None = None,
+    replies: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     prev = keyring.get_keyring()
     keyring.set_keyring(_MemoryKeyring())  # never the real Keychain
@@ -322,7 +371,9 @@ def evaluate(
                 ids = seed(engine, ME, d, DECEMBER + ROWS)
                 out: dict[str, Any] = {}
                 for key, (name, version, factory) in models.items():
-                    metrics, fails = _score(factory, engine, ids, timed)
+                    metrics, fails = _score(
+                        factory, engine, ids, timed, gateway, replies
+                    )
                     out[key] = {
                         "model": name,
                         "model_version": version,
@@ -348,7 +399,227 @@ def evaluate(
 
 
 def lower_is_better(name: str) -> bool:
-    return name.endswith(("_rate", "_ms", "_gb")) and name != "grounding_pass_rate"
+    lower = name.endswith(("_rate", "_ms", "_gb", "_count", "_pence"))
+    return lower and name != "grounding_pass_rate"
+
+
+# --- the cloud run (#305) -------------------------------------------------------
+#
+# The local driver (the oracle, so route and tools are fixed) routes and calls
+# tools; the cloud model only words the reply, through #301's path, so its row
+# scores grounding, refusal, leaks, fallback, cost and latency. Recordings are
+# `bench_chat_<model>-*.json`, and CI replays them. Spend reserves on
+# `synthetic_judge`. Only the synthetic golden set is ever sent.
+
+CLOUD_RESULTS = HERE / "results" / "assistant_cloud.json"
+RECORDINGS = HERE.parent / "tests" / "fixtures" / "synthetic" / "cloud"
+GOLDEN_RECORDINGS = RECORDINGS / "golden"  # #301's; the offline stand-in replays them
+CHAT = "bench_chat_"
+BUCKET = "synthetic_judge"
+MONTHLY_CAP_PENCE = 900  # the user's £9 a month for all cloud work (#292)
+STANDIN = "offline-standin"  # the modelVersion of a reply no cloud model wrote
+# every word of the synthetic Ledger's bank text: none may leave
+BANK_WORDS = frozenset(
+    w
+    for _, _, desc, _ in ROWS + DECEMBER
+    for w in re.findall(r"[a-z]{3,}", desc.lower())
+) - {"ltd", "trip", "travel", "stores"}
+
+
+def leaked(payload: dict[str, Any]) -> bool:
+    """A figure (outside a placeholder or a YYYY-MM month) or a bank word left."""
+    text = json.dumps(payload)
+    bare = MONTH_TEXT.sub("", PLACEHOLDER.sub("", text))
+    words = set(re.findall(r"[a-z]{3,}", text.lower()))
+    return any(ch.isdigit() for ch in bare) or bool(BANK_WORDS & words)
+
+
+class BenchMeter:
+    """`cloud_route.Meter` on the `synthetic_judge` bucket. Alone it meters in
+    memory (CI); with `inner` (the real `SpendStore`) it reserves there. It
+    keeps payloads to count leaks and never adds them to the user's log."""
+
+    def __init__(self, inner: Any = None) -> None:
+        self.inner = inner
+        self.committed = self.pence = self.calls = 0
+        self.asks: list[tuple[int, int]] = []  # (max_in, max_out) per reservation
+        self.payloads: list[dict[str, Any]] = []
+
+    def reserve(
+        self, bucket: str, model: str, max_in: int, max_out: int
+    ) -> cost.Allowed | cost.Warn | cost.Denied:
+        self.asks.append((max_in, max_out))
+        if self.inner is not None:
+            return self.inner.reserve(BUCKET, model, max_in, max_out)
+        now = datetime.now(UTC)
+        d = cost.reserve(
+            BUCKET, model, max_in, max_out, committed=self.committed, now=now
+        )
+        if not isinstance(d, cost.Denied):
+            self.committed += d.reservation.pence
+        return d
+
+    def settle(self, reservation: cost.Reservation, usage: Usage) -> int:
+        c = (self.inner or cost).settle(reservation, usage)
+        if self.inner is None:
+            self.committed += c - reservation.pence  # as SpendStore does
+        self.pence += c
+        self.calls += 1
+        return c
+
+    def log_payload(
+        self,
+        user_id: int,
+        conversation_id: str,
+        payload: dict[str, Any],
+        model: str,
+        cost_pence: int,
+    ) -> None:
+        self.payloads.append(payload)
+
+
+def recordings(prefix: str) -> list[dict[str, Any]]:
+    return [load_recording(p) for p in sorted(RECORDINGS.glob(f"{prefix}*.json"))]
+
+
+@dataclass
+class Tape:
+    """Replays `<prefix>*.json` (an unknown request fails) and collects the
+    latency and `modelVersion` each served reply recorded."""
+
+    prefix: str
+    latencies: list[float] = field(default_factory=list[float])
+    versions: set[str] = field(default_factory=set[str])
+
+    def __post_init__(self) -> None:
+        self._replies = {
+            recording_key(r["model"], r["request"]): r for r in recordings(self.prefix)
+        }
+
+    def __call__(
+        self, url: str, headers: dict[str, str], body: bytes
+    ) -> tuple[int, bytes]:
+        rec = self._replies.get(recording_key(_model_of(url), json.loads(body)))
+        if rec is None:
+            raise LookupError("no recording for this request")
+        if "latency_ms" in rec:
+            self.latencies.append(rec["latency_ms"])
+        self.versions.add(rec["response"].get("modelVersion", ""))
+        return 200, json.dumps(rec["response"]).encode()
+
+
+def writer(
+    prefix: str, inner: Transport, secret: str = "", standin: bool = False
+) -> Transport:
+    """Calls `inner` and writes each 200 exchange as `<prefix><key>.json`, with
+    its wall time on a live run. A stand-in reply is marked as one."""
+
+    def call(url: str, headers: dict[str, str], body: bytes) -> tuple[int, bytes]:
+        start = time.perf_counter()
+        status, data = inner(url, headers, body)
+        ms = round((time.perf_counter() - start) * 1000, 1)
+        if status != 200:
+            return status, data
+        model, request, response = _model_of(url), json.loads(body), json.loads(data)
+        rec: dict[str, Any] = {"model": model, "request": request}
+        if standin:
+            response["modelVersion"] = STANDIN
+        else:
+            rec["latency_ms"] = ms
+        rec["response"] = response
+        text = "# synthetic\n" + json.dumps(rec, indent=1) + "\n"
+        if secret and secret in text:
+            raise CloudError("a recording would hold the key")
+        key = recording_key(model, request)[:12]
+        (RECORDINGS / f"{prefix}{key}.json").write_text(text)
+        return status, json.dumps(response).encode()
+
+    return call
+
+
+def fake_key() -> str:
+    return "fake-" + "x" * 8  # built at run time: no key-shaped literal
+
+
+def cloud_run(
+    model: str = FLASH_MODEL,
+    transport: Transport | None = None,
+    meter: BenchMeter | None = None,
+    replies: list[dict[str, str]] | None = None,
+    key: str | None = None,
+) -> dict[str, Any]:
+    """One cloud model's row, replayed from its recordings unless `transport`."""
+    tape = Tape(f"{CHAT}{model}-")
+    meter = meter or BenchMeter()
+    chat = CloudChatModel(key or fake_key(), transport=transport or tape)
+    name = f"cloud:{model}"
+    out = evaluate(
+        {name: (name, "", oracle)},
+        gateway=CloudRoute(chat, meter, model=model),
+        replies=replies,
+    )
+    row = out["models"][name]
+    row["model_version"] = ",".join(sorted(tape.versions))
+    row["metrics"] |= {
+        "leak_count": sum(map(leaked, meter.payloads)),
+        "cloud_calls": meter.calls,
+        "cost_total_pence": meter.pence,
+        "cost_per_case_pence": round(meter.pence / len(golden.CASES), 4),
+    }
+    if tape.latencies:  # only a live run records them
+        row["metrics"] |= {
+            "cloud_latency_p50_ms": round(percentile(tape.latencies, 50), 1),
+            "cloud_latency_p95_ms": round(percentile(tape.latencies, 95), 1),
+        }
+    return out
+
+
+def default_model(rows: dict[str, Any]) -> str:
+    """The rule (#305): highest grounding, then lowest cost per case."""
+
+    def rank(kv: tuple[str, Any]) -> tuple[float, float]:
+        m = kv[1]["metrics"]
+        return -m["grounding_pass_rate"], m["cost_per_case_pence"]
+
+    return min(rows.items(), key=rank)[0].removeprefix("cloud:")
+
+
+def cloud_models() -> list[str]:
+    return sorted({r["model"] for r in recordings(CHAT)})
+
+
+def cloud_evaluate(replies: list[dict[str, str]] | None = None) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for m in cloud_models():
+        fresh = cloud_run(m, replies=replies)
+        out = fresh | {"models": out.get("models", {}) | fresh["models"]}
+    out["harness"] = "assistant_cloud"
+    out["default_cloud_model"] = default_model(out["models"])
+    local: dict[str, Any] = (
+        json.loads(LOCAL_RESULTS.read_text()) if LOCAL_RESULTS.exists() else {}
+    )
+    ref = local.get("models", {}).get(LOCAL_REFERENCE)
+    if ref is not None:  # read-only: the row the cloud models are compared with
+        out["local_reference"] = {"model": LOCAL_REFERENCE, "metrics": ref["metrics"]}
+    return out
+
+
+def cloud_replies() -> list[dict[str, str]]:
+    """Every cloud model's replies, replayed: what the judge scores."""
+    out: list[dict[str, str]] = []
+    for m in cloud_models():
+        got: list[dict[str, str]] = []
+        cloud_run(m, replies=got)
+        out += [r | {"model": m} for r in got if r["path"] == "cloud"]
+    return out
+
+
+def worst_case_pence(model: str) -> tuple[int, int]:
+    """(calls, worst-case pence) for a cloud run: every reservation a replay
+    makes (the request bodies do not depend on the model), at `model`'s price."""
+    meter = BenchMeter()
+    cloud_run(FLASH_MODEL, meter=meter)
+    return len(meter.asks), sum(cost.pence(model, i, o) for i, o in meter.asks)
 
 
 # --- the local run --------------------------------------------------------------
@@ -462,9 +733,77 @@ def main(argv: Sequence[str]) -> int:
             print("usage: assistant_bench.py --model <ollama model>", file=sys.stderr)
             return 2
         m = argv[i + 1]
+        if m.startswith("cloud:"):
+            return live(m.removeprefix("cloud:"), "--yes" in argv)
         print(json.dumps(local(m)["models"][m]["metrics"], indent=2))
         return 0
-    return gate.run("assistant", evaluate, RESULTS, lower_is_better, argv)
+    import judge  # it imports this module
+
+    if "--offline-record" in argv:  # stand-in recordings from #301's, no network
+        for p in RECORDINGS.glob(f"{CHAT}{FLASH_MODEL}-*.json"):
+            p.unlink()
+        inner = RecordedTransport(GOLDEN_RECORDINGS)
+        cloud_run(FLASH_MODEL, writer(f"{CHAT}{FLASH_MODEL}-", inner, standin=True))
+        judge.record(judge.offline_transport, standin=True)
+    codes = [
+        gate.run("assistant", evaluate, RESULTS, lower_is_better, argv),
+        gate.run(
+            "assistant_cloud", cloud_evaluate, CLOUD_RESULTS, lower_is_better, argv
+        ),
+        judge.main([a for a in argv if a != "--offline-record"]),
+    ]
+    return max(codes)
+
+
+def live(model: str, yes: bool) -> int:
+    """The real-key run (#306): prints the worst case first and refuses if it
+    is over the £9 monthly cap; the meter also stops at `synthetic_judge`'s
+    cap. It sends the synthetic golden set to `model` and the judge's calls to
+    Gemini Pro, then rewrites the recordings and both results from the replies.
+    A call the meter denied leaves no recording, so CI's replay then fails:
+    rerun next month rather than commit that."""
+    import judge
+    from finance_agent.gateway.cloud import urllib_transport
+    from finance_agent.storage import default_db_path, keychain
+    from finance_agent.storage.spend import SpendStore
+
+    if os.environ.get("CI"):
+        sys.exit("the live cloud benchmark never runs in CI")
+    store = SpendStore.beside(default_db_path())
+    n_chat, chat_p = worst_case_pence(model)
+    n_judge, judge_p = judge.worst_case_pence(n_chat)
+    status = next(b for b in store.month_status() if b.bucket == BUCKET)
+    left = status.cap_pence - status.spent_pence - status.reserved_pence
+    print(
+        f"assistant cloud bench: worst case {chat_p + judge_p} pence "
+        f"({n_chat} calls on {model}: {chat_p}p; {n_judge} judge calls on "
+        f"{judge.PRO_MODEL}: {judge_p}p); {BUCKET} has {left}p of "
+        f"{status.cap_pence}p left this month (the meter stops there); monthly "
+        f"cap {MONTHLY_CAP_PENCE}p",
+        flush=True,
+    )
+    if chat_p + judge_p > MONTHLY_CAP_PENCE:
+        print("not run: the worst case is over the monthly cap", file=sys.stderr)
+        return 1
+    if not yes and input("send the synthetic golden set? [y/N] ").lower() != "y":
+        return 1
+    key = keychain.gemini_key()
+    if key is None:
+        sys.exit("no Gemini key in the Keychain (fa keys)")
+    prefix = f"{CHAT}{model}-"
+    for p in RECORDINGS.glob(f"{prefix}*.json"):
+        p.unlink()
+    meter = BenchMeter(store)
+    cloud_run(model, writer(prefix, urllib_transport, key), meter, key=key)
+    judge.record(urllib_transport, key, meter=meter)
+    print(f"assistant cloud bench: spent {meter.pence} pence", flush=True)
+    write = ["--write", "--accept-lower"]  # a real run replaces the stand-in
+    return max(
+        gate.run(
+            "assistant_cloud", cloud_evaluate, CLOUD_RESULTS, lower_is_better, write
+        ),
+        judge.main(write),
+    )
 
 
 if __name__ == "__main__":
