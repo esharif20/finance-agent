@@ -32,6 +32,7 @@ from finance_agent.api import (
     notes,
     proposals,
     review_queue,
+    spend,
     splits,
     subscription_costs,
     subscriptions,
@@ -634,6 +635,7 @@ def create_app(
     app.include_router(cash_flow.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)
+    app.include_router(spend.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():

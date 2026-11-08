@@ -393,6 +393,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gateway/payloads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payloads */
+        get: operations["payloads_api_gateway_payloads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -871,6 +888,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spend */
+        get: operations["spend_api_spend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spending": {
         parameters: {
             query?: never;
@@ -1278,6 +1312,22 @@ export interface components {
              * Format: date
              */
             week: string;
+        };
+        /** BucketOut */
+        BucketOut: {
+            /** Bucket */
+            bucket: string;
+            /** Cap Pence */
+            cap_pence: number;
+            /** Reserved Pence */
+            reserved_pence: number;
+            /** Spent Pence */
+            spent_pence: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "warn" | "capped";
         };
         /** CategoryDetailOut */
         CategoryDetailOut: {
@@ -1759,6 +1809,21 @@ export interface components {
             amount_minor: number;
             /** Category */
             category: string[];
+        };
+        /** PayloadOut */
+        PayloadOut: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Cost Pence */
+            cost_pence: number;
+            /** Model */
+            model: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Sent At */
+            sent_at: string;
         };
         /** Pence */
         Pence: {
@@ -2835,6 +2900,37 @@ export interface operations {
             };
         };
     };
+    payloads_api_gateway_payloads_get: {
+        parameters: {
+            query: {
+                conversation: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayloadOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -3585,6 +3681,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spend_api_spend_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BucketOut"][];
                 };
             };
         };
