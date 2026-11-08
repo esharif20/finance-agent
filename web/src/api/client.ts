@@ -106,7 +106,7 @@ export type CategoryDetail = components["schemas"]["CategoryDetailOut"];
 export const fetchCategory = (name: string, month: string, accountId?: number) =>
   get<CategoryDetail>(`/api/categories/${encodeURIComponent(name)}${query(month, accountId)}`);
 
-export type ReviewItem = components["schemas"]["ItemOut"];
+export type ReviewItem = components["schemas"]["finance_agent__api__review_queue__ItemOut"];
 export type ReviewQueueOut = components["schemas"]["QueueOut"];
 export type ReviewAnswer = { category?: [string, string]; transaction_id?: number; choice?: string };
 

@@ -11,7 +11,7 @@ import { SpendingDonut } from "./SpendingDonut";
 import { TxnRow } from "./TxnRow";
 
 type Txn = components["schemas"]["TransactionOut"];
-type Item = components["schemas"]["ItemOut"];
+type Item = components["schemas"]["finance_agent__api__review_queue__ItemOut"];
 const m = (minor: number) => ({ minor, currency: "GBP" });
 const groups = [
   { name: "Food & Drink", subs: ["Groceries", "Coffee"] },

@@ -6,7 +6,7 @@ import type { components } from "@/api/schema";
 import { PrivacyProvider } from "@/lib/privacy";
 import { ReviewQueue } from "./ReviewQueue";
 
-type Item = components["schemas"]["ItemOut"];
+type Item = components["schemas"]["finance_agent__api__review_queue__ItemOut"];
 type Queue = components["schemas"]["QueueOut"];
 
 const FOOD = ["Food & Drink", "Groceries"];
