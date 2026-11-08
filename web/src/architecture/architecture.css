@@ -1,0 +1,700 @@
+/* The public /architecture page. It follows the landing page's world (colour chapters: one flat
+   field per chapter, Red Hat Display/Text) and the dark demo app (the question's path runs on
+   black). The values are copied rather than imported, so this page doesn't move when the landing
+   page is restyled. No hue between 235 and 290. */
+@import "@fontsource-variable/red-hat-display";
+@import "@fontsource-variable/red-hat-text";
+
+.ar {
+  --ar-paper: #f4f6f2;
+  --ar-ink: #0a0a0a;
+  --ar-black: #000000;
+  --ar-white: #ffffff;
+  --ar-mint: #9ae187; /* hue 108 */
+  --ar-cyan: #93f1f7; /* hue 183 */
+  --ar-lemon: #f3ea7a; /* hue 56 */
+  --ar-orange: #fbb65c; /* hue 34 */
+  --ar-night-1: #161915; /* tone steps on black */
+  --ar-night-2: #232722;
+  --ar-night-ink: #f4f6f2;
+  --ar-night-soft: #c9cfc6;
+
+  --ar-display: "Red Hat Display Variable", ui-sans-serif, system-ui, sans-serif;
+  --ar-text: "Red Hat Text Variable", ui-sans-serif, system-ui, sans-serif;
+  --ar-step-small: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
+  --ar-step-body: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --ar-step-lead: clamp(1.125rem, 1rem + 0.5vw, 1.4375rem);
+  --ar-step-head: clamp(2.25rem, 1.2rem + 3.6vw, 4.5rem);
+  --ar-step-display: clamp(2.5rem, 0.8rem + 5.6vw, 6rem);
+  --ar-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ar-gutter: clamp(16px, 3.2vw, 48px);
+
+  /* the page ground; chapters set their own field */
+  --ar-ground: var(--ar-paper);
+  --ar-ground-ink: var(--ar-ink);
+  --ar-ground-node: rgb(0 0 0 / 0.06);
+  --ar-ground-node-hover: rgb(0 0 0 / 0.1);
+  --ar-ground-panel: var(--ar-white);
+
+  font-family: var(--ar-text);
+  font-size: var(--ar-step-body);
+  line-height: 1.55;
+  color: var(--ar-ground-ink);
+  background: var(--ar-ground);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+  min-height: 100dvh;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ar {
+    --ar-ground: var(--ar-black);
+    --ar-ground-ink: var(--ar-night-ink);
+    --ar-ground-node: var(--ar-night-1);
+    --ar-ground-node-hover: var(--ar-night-2);
+    --ar-ground-panel: var(--ar-night-1);
+  }
+}
+
+.ar *,
+.ar *::before,
+.ar *::after {
+  box-sizing: border-box;
+}
+:where(.ar) :where(h1, h2, h3, h4, p, ul, ol, figure) {
+  margin: 0;
+  padding: 0;
+}
+:where(.ar) :where(ul, ol) {
+  list-style: none;
+}
+:where(.ar) a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
+}
+.ar ::selection {
+  background: var(--ar-mint);
+  color: var(--ar-ink);
+}
+.ar :focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.ar :where(p, li) {
+  text-wrap: pretty;
+}
+.ar :where(h1, h2, h3) {
+  font-family: var(--ar-display);
+  text-wrap: balance;
+}
+
+/* ---- the bar */
+.ar-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px var(--ar-gutter);
+}
+.ar-word {
+  font-family: var(--ar-display);
+  font-weight: 800;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+.ar-bar nav {
+  display: flex;
+  gap: clamp(16px, 2.4vw, 32px);
+}
+.ar-bar nav a,
+.ar-foot nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: none;
+  font-weight: 600;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ar-bar nav a:hover,
+  .ar-foot nav a:hover {
+    text-decoration: underline;
+  }
+}
+
+/* ---- hero */
+.ar-hero {
+  padding: clamp(56px, 12vh, 140px) var(--ar-gutter) clamp(64px, 9vw, 128px);
+  display: grid;
+  gap: 32px;
+}
+.ar-hero h1 {
+  font-size: var(--ar-step-display);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+.ar-sub {
+  font-size: var(--ar-step-lead);
+  line-height: 1.45;
+  max-width: 44ch;
+}
+.ar-hero-text {
+  display: grid;
+  gap: 32px;
+  align-content: start;
+}
+.ar-toc ul {
+  display: grid;
+}
+.ar-toc li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ar-toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  font-family: var(--ar-display);
+  font-weight: 700;
+  font-size: var(--ar-step-lead);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: transform 200ms var(--ar-ease-out);
+}
+.ar-toc span {
+  font-size: var(--ar-step-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ar-toc a:hover {
+    text-decoration: underline;
+    transform: translateX(4px);
+  }
+}
+@media (min-width: 900px) {
+  .ar-hero {
+    grid-template-columns: 8fr 4fr;
+    column-gap: clamp(32px, 5vw, 96px);
+    align-items: end;
+  }
+}
+.ar-hero-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 40px;
+  margin-top: 8px;
+}
+.ar-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+/* ---- pills */
+.ar-pill {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: var(--ar-ground-ink);
+  color: var(--ar-ground);
+  transition:
+    transform 160ms var(--ar-ease-out),
+    background-color 160ms ease;
+}
+.ar-pill:active {
+  transform: scale(0.97);
+}
+.ar-pill-big {
+  min-height: 56px;
+  padding: 14px 30px;
+  font-size: var(--ar-step-lead);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ar-pill:hover {
+    background: var(--ar-mint);
+    color: var(--ar-ink);
+  }
+}
+
+/* ---- status marks: filled, half, ring; always with the word beside */
+.ar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ar-step-small);
+  font-weight: 600;
+}
+.ar-mark {
+  position: relative;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  overflow: hidden;
+}
+.ar-mark-built {
+  background: currentColor;
+}
+.ar-mark-shadow::after {
+  content: "";
+  position: absolute;
+  inset: 0 50% 0 0;
+  background: currentColor;
+}
+
+/* ---- chapters: one flat field each */
+.ar-chapter {
+  --field: var(--ar-ground);
+  --ink: var(--ar-ground-ink);
+  --node: var(--ar-ground-node);
+  --node-hover: var(--ar-ground-node-hover);
+  --node-open: var(--ar-ground-ink);
+  --node-open-ink: var(--ar-ground);
+  --panel: var(--ar-ground-panel);
+  background: var(--field);
+  color: var(--ink);
+  padding: clamp(72px, 10vw, 160px) var(--ar-gutter);
+}
+.ar-knowledge,
+.ar-context,
+.ar-learning,
+.ar-security {
+  --ink: var(--ar-ink);
+  --node: rgb(0 0 0 / 0.07);
+  --node-hover: rgb(0 0 0 / 0.13);
+  --node-open: var(--ar-ink);
+  --node-open-ink: var(--field);
+  --panel: rgb(255 255 255 / 0.62);
+}
+.ar-knowledge {
+  --field: var(--ar-cyan);
+}
+.ar-context {
+  --field: var(--ar-lemon);
+}
+.ar-learning {
+  --field: var(--ar-mint);
+}
+.ar-security {
+  --field: var(--ar-orange);
+}
+
+.ar-chapter h2 {
+  font-size: var(--ar-step-head);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.ar-lede {
+  font-size: var(--ar-step-lead);
+  line-height: 1.45;
+  max-width: 46ch;
+}
+.ar-chapter-text {
+  display: grid;
+  gap: 24px;
+  margin-bottom: clamp(40px, 5vw, 72px);
+}
+.ar-chapter-body {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .ar-chapter-text {
+    grid-template-columns: 5fr 7fr;
+    align-items: end;
+    column-gap: clamp(32px, 4vw, 64px);
+  }
+  .ar-chapter-text h2 {
+    grid-row: span 2;
+    align-self: start;
+  }
+  .ar-chapter-body {
+    grid-template-columns: 5fr 7fr;
+    align-items: start;
+    column-gap: clamp(32px, 4vw, 64px);
+  }
+  .ar-chapter-body > .ar-detail {
+    position: sticky;
+    top: 24px;
+  }
+}
+
+/* ---- nodes */
+.ar-nodes {
+  display: grid;
+  gap: 12px;
+}
+.ar-node {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: var(--node);
+  transition:
+    transform 200ms var(--ar-ease-out),
+    background-color 200ms ease,
+    color 200ms ease;
+}
+.ar-node:active {
+  transform: scale(0.98);
+}
+.ar-node-title {
+  font-family: var(--ar-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.ar-node-short {
+  line-height: 1.4;
+}
+.ar-node .ar-status {
+  margin-top: 4px;
+}
+.ar-node[data-open] {
+  background: var(--node-open);
+  color: var(--node-open-ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ar-node:not([data-open]):hover {
+    background: var(--node-hover);
+    transform: translateY(-2px);
+  }
+}
+.ar-nodes > li > .ar-detail,
+.ar-path-node > .ar-detail {
+  margin-top: 12px;
+}
+
+/* knowledge: strata, from the small L0 always in the prompt to the whole Ledger */
+.ar-nodes[data-layout="knowledge"] > li:nth-child(1) {
+  width: 70%;
+}
+.ar-nodes[data-layout="knowledge"] > li:nth-child(2) {
+  width: 80%;
+}
+.ar-nodes[data-layout="knowledge"] > li:nth-child(3) {
+  width: 90%;
+}
+.ar-nodes[data-layout="knowledge"] > li:has(> .ar-detail) {
+  width: 100%;
+}
+
+/* models: the router feeds the two kinds of model */
+@media (min-width: 600px) {
+  .ar-nodes[data-layout="models"] {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "router local" "router cloud";
+  }
+  .ar-nodes[data-layout="models"] > li:nth-child(1) {
+    grid-area: local;
+  }
+  .ar-nodes[data-layout="models"] > li:nth-child(2) {
+    grid-area: router;
+  }
+  .ar-nodes[data-layout="models"] > li:nth-child(2) > .ar-node {
+    height: 100%;
+    align-content: center;
+  }
+  .ar-nodes[data-layout="models"] > li:nth-child(3) {
+    grid-area: cloud;
+  }
+  .ar-nodes[data-layout="learning"],
+  .ar-nodes[data-layout="evals"],
+  .ar-nodes[data-layout="security"] {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 600px) and (max-width: 899px) {
+  .ar-nodes > li:has(> .ar-detail) {
+    grid-column: 1 / -1;
+  }
+  .ar-nodes[data-layout="models"]:has(.ar-detail) {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+  }
+  .ar-nodes[data-layout="models"]:has(.ar-detail) > li {
+    grid-area: auto;
+  }
+}
+
+/* context: the prompt's order, cached part dark */
+.ar-strip {
+  display: grid;
+  gap: 12px;
+}
+.ar-strip ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ar-strip li {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: var(--ar-step-small);
+  background: rgb(255 255 255 / 0.62);
+}
+.ar-strip li[data-cached] {
+  background: var(--ar-ink);
+  color: var(--ar-lemon);
+}
+.ar-strip figcaption {
+  font-size: var(--ar-step-small);
+}
+
+/* ---- the detail panel */
+.ar-detail {
+  background: var(--panel);
+  border-radius: 24px;
+  padding: clamp(20px, 3vw, 36px);
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+.ar-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.ar-detail h3 {
+  font-size: clamp(1.5rem, 1.2rem + 1vw, 2.125rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.ar-pair {
+  display: grid;
+  gap: 6px;
+}
+.ar-detail h4 {
+  font-family: var(--ar-display);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.ar-detail p {
+  max-width: 68ch;
+}
+.ar-rejected {
+  display: grid;
+  gap: 6px;
+}
+.ar-rejected li {
+  position: relative;
+  padding-left: 20px;
+}
+.ar-rejected li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.72em;
+  width: 9px;
+  height: 2px;
+  background: currentColor;
+}
+.ar-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.ar-sources a {
+  text-decoration: underline;
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.ar-sources code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85em;
+}
+
+/* ---- the question's path, on black like the demo app */
+.ar-flow {
+  --field: var(--ar-black);
+  --ink: var(--ar-night-ink);
+  --node: var(--ar-night-1);
+  --node-hover: var(--ar-night-2);
+  --node-open: var(--ar-night-ink);
+  --node-open-ink: var(--ar-ink);
+  --panel: var(--ar-night-1);
+}
+.ar-flow-head {
+  display: grid;
+  gap: 24px;
+  margin-bottom: clamp(40px, 5vw, 72px);
+}
+@media (min-width: 900px) {
+  .ar-flow-head {
+    grid-template-columns: 5fr 7fr;
+    align-items: end;
+    column-gap: clamp(32px, 4vw, 64px);
+  }
+}
+.ar-stage {
+  display: grid;
+  gap: 28px;
+}
+.ar-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+}
+.ar-bubble {
+  font-family: var(--ar-display);
+  font-weight: 700;
+  font-size: var(--ar-step-lead);
+  padding: 14px 22px;
+  border-radius: 24px 24px 24px 6px;
+  background: var(--ar-night-2);
+}
+.ar-flow .ar-pill {
+  background: var(--ar-mint);
+  color: var(--ar-ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ar-flow .ar-pill:hover {
+    background: var(--ar-night-ink);
+  }
+}
+.ar-caption {
+  font-size: var(--ar-step-lead);
+  color: var(--ar-night-soft);
+  min-height: 2.9em;
+  max-width: 52ch;
+}
+
+.ar-path {
+  display: flex;
+  flex-direction: column;
+}
+.ar-wire {
+  position: relative;
+  align-self: flex-start;
+  width: 4px;
+  height: 28px;
+  margin-left: 30px;
+  border-radius: 2px;
+  background: var(--ar-night-2);
+  overflow: hidden;
+}
+.ar-wire-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ar-mint);
+  transform-origin: top;
+}
+.ar-flow .ar-node[data-lit] {
+  background: var(--ar-mint);
+  color: var(--ar-ink);
+}
+.ar-flow .ar-node[data-current] {
+  transform: scale(1.03);
+}
+.ar-flow .ar-node[data-open] {
+  box-shadow: 0 0 0 3px var(--ar-night-ink);
+}
+.ar-flow .ar-node[data-open]:not([data-lit]) {
+  background: var(--ar-night-2);
+  color: var(--ar-night-ink);
+}
+
+@media (min-width: 900px) {
+  .ar-path {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .ar-path-node {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .ar-path-node > .ar-node {
+    height: 100%;
+    align-content: start;
+  }
+  .ar-wire {
+    align-self: center;
+    flex: 0 0 clamp(16px, 2.2vw, 40px);
+    width: auto;
+    height: 4px;
+    margin: 0;
+  }
+  .ar-wire-fill {
+    transform-origin: left;
+  }
+  .ar-stage > .ar-detail {
+    column-count: 2;
+    column-gap: 56px;
+    display: block;
+  }
+  .ar-stage > .ar-detail > * {
+    break-inside: avoid;
+    margin-bottom: 18px;
+  }
+  .ar-stage > .ar-detail > .ar-detail-head {
+    column-span: all;
+  }
+}
+
+/* ---- footer: the name returns at full width */
+.ar-foot {
+  padding: clamp(72px, 10vw, 140px) var(--ar-gutter) 24px;
+  display: grid;
+  gap: 24px;
+}
+.ar-foot p:first-child {
+  font-size: var(--ar-step-lead);
+  max-width: 48ch;
+}
+.ar-foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+}
+.ar-foot-name {
+  font-family: var(--ar-display);
+  font-weight: 800;
+  font-size: 11.5vw;
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+  margin-top: clamp(32px, 6vw, 96px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-node,
+  .ar-pill {
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+  .ar-node:active,
+  .ar-pill:active,
+  .ar-flow .ar-node[data-current] {
+    transform: none;
+  }
+}
