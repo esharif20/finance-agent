@@ -1,0 +1,80 @@
+{
+  "harness": "assistant",
+  "dataset": "assistant_golden",
+  "dataset_version": 1,
+  "dataset_sha256": "00a304e179aadfcf58d9887ec682dbd6c429df4cdc8863968993472869feeb56",
+  "prompt_sha256": "8ca5e5a1c79415fb54ce92bbace7c4f700437e02abd56c40894557322049b600",
+  "cases": 20,
+  "refusal_cases": 5,
+  "models": {
+    "fake_oracle": {
+      "model": "FakeChatModel oracle",
+      "model_version": "1",
+      "metrics": {
+        "route_accuracy": 1.0,
+        "tool_call_accuracy": 1.0,
+        "grounding_pass_rate": 1.0,
+        "refusal_correctness": 1.0,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0
+      },
+      "failures": {}
+    },
+    "fake_prints_tool_calls": {
+      "model": "FakeChatModel printing bug",
+      "model_version": "1",
+      "metrics": {
+        "route_accuracy": 1.0,
+        "tool_call_accuracy": 0.25,
+        "grounding_pass_rate": 0.6,
+        "refusal_correctness": 1.0,
+        "printed_tool_call_rate": 0.75,
+        "model_error_rate": 0.0
+      },
+      "failures": {
+        "tool_calls": [
+          "ask-spent-january",
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual",
+          "ask-subscriptions",
+          "ask-bills",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ],
+        "grounding": [
+          "ask-spent-january",
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual"
+        ],
+        "printed": [
+          "ask-spent-january",
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual",
+          "ask-subscriptions",
+          "ask-bills",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ]
+      }
+    }
+  }
+}
