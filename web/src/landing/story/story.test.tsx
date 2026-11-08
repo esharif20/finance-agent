@@ -18,6 +18,20 @@ const mediaStub = (reduce: boolean) => (q: string) => ({
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** jsdom has no IntersectionObserver; the reveals only need one that never fires. */
+class NoObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+const motionOn = () => {
+  vi.stubGlobal("matchMedia", mediaStub(false));
+  vi.stubGlobal("IntersectionObserver", NoObserver);
+};
+
 const transformed = (root: HTMLElement) =>
   [root, ...root.querySelectorAll<HTMLElement>("*")].filter((el) => {
     const t = el.style.transform;
@@ -45,13 +59,13 @@ describe("story under prefers-reduced-motion", () => {
 
 describe("story with motion", () => {
   it("animates the pile and the focus list", () => {
-    vi.stubGlobal("matchMedia", mediaStub(false));
+    motionOn();
     const { container } = render(<Story />);
     expect(transformed(container).length).toBeGreaterThan(0);
   });
 
   it("the pile never exceeds 3 layers", () => {
-    vi.stubGlobal("matchMedia", mediaStub(false));
+    motionOn();
     expect(MAX_LAYERS).toBe(3);
     expect(PILE.length).toBeLessThanOrEqual(MAX_LAYERS);
     const { container } = render(<Story />);
@@ -59,7 +73,7 @@ describe("story with motion", () => {
   });
 
   it("has at most one wave wipe", () => {
-    vi.stubGlobal("matchMedia", mediaStub(false));
+    motionOn();
     const { container } = render(<Story />);
     expect(container.querySelectorAll("[data-wave]").length).toBeLessThanOrEqual(1);
   });

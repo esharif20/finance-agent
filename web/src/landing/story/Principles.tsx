@@ -6,8 +6,8 @@ import { PRINCIPLES } from "./story.fixture";
 function Focused({ text }: { text: string }) {
   const ref = useRef<HTMLLIElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const opacity = useTransform(scrollYProgress, [0.1, 0.5, 0.9], [0.28, 1, 0.28]);
-  const fontWeight = useTransform(scrollYProgress, [0.1, 0.5, 0.9], [340, 760, 340]);
+  const opacity = useTransform(scrollYProgress, [0.1, 0.5, 0.9], [0.42, 1, 0.42]);
+  const fontWeight = useTransform(scrollYProgress, [0.1, 0.5, 0.9], [380, 900, 380]);
   return (
     <motion.li ref={ref} className="st-principle" style={{ opacity, fontWeight }}>
       {text}
