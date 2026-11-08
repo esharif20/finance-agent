@@ -1,5 +1,5 @@
 /* The scroll story: three chapters, three fields. The pile is night, the gateway is lemon with
-   black water rising through it (the peak), the rules are mint. Transform, opacity and clip-path
+   one payment crossing the gateway (the peak), the rules are mint. Transform, opacity and clip-path
    only, except the focus list's weight axis. No gradient, no hue between 235 and 290. */
 
 /* chapter 1: the sticky pile, on night */
@@ -145,161 +145,344 @@
   font-weight: 800;
 }
 
-/* chapter 2: the gateway, the peak. Lemon is your Mac; the black water is what leaves. */
+/* chapter 2: the gateway, the peak. One made-up payment crosses from your Mac to the cloud model
+   and loses its amount and shop name at the gateway; the answer comes back and gets them back.
+   Scroll drives custom properties (--t travel, --m masked, --a-* arrows); CSS draws from them. */
 .st-gate {
   position: relative;
   background: var(--lp-lemon);
   color: var(--lp-black);
 }
 .st-gate-track {
-  height: 340vh;
+  height: 300vh;
 }
 .st-gate-stage {
   position: sticky;
   top: 0;
   height: 100svh;
+  min-height: 640px;
+  display: grid;
+  align-content: center;
   overflow: clip;
 }
+.st-gate[data-still] {
+  padding-block: clamp(96px, 12vw, 160px);
+}
+.st-gw {
+  display: grid;
+  gap: clamp(16px, 2.6vh, 32px);
+}
 .st-gate-title {
-  position: absolute;
-  z-index: 4;
-  top: clamp(72px, 10vh, 112px);
-  left: var(--lp-gutter);
+  font-size: clamp(2.5rem, 1rem + 4.4vw, 5.5rem);
 }
-.st-water {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+.st-gw-lead {
+  max-width: 44ch;
+  font-size: var(--lp-step-lead);
+  line-height: 1.35;
+  font-weight: 500;
+}
+.st-gw-wrap {
+  container-type: inline-size;
+}
+.st-gw-lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40fr 20fr 40fr;
+  align-items: stretch;
+}
+.st-gw-panel {
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  align-content: start;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 20px;
+}
+.st-gw-mac {
+  grid-column: 1;
+  background: rgb(255 255 255 / 0.6);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+}
+.st-gw-cloud {
+  --m: 1;
+  grid-column: 3;
   background: var(--lp-black);
-  will-change: transform;
+  color: var(--lp-white);
 }
-.st-wave {
+.st-gw-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.st-gw-gate {
+  position: relative;
+  grid-column: 2;
+  display: grid;
+  place-items: center;
+}
+.st-gw-gate::before {
+  content: "";
   position: absolute;
-  bottom: calc(100% - 1px);
-  left: 0;
-  width: 200%;
-  height: clamp(14px, 1.6vw, 24px);
-  color: var(--lp-black);
+  inset: 8px auto 8px 50%;
+  border-left: 2px dashed rgb(0 0 0 / 0.45);
 }
-.st-wave svg {
+.st-gw-gate > span {
+  position: relative;
+  max-width: 11ch;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--lp-black);
+  color: var(--lp-lemon);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+.st-gw-slot {
+  position: relative;
   display: block;
-  width: 100%;
-  height: 100%;
-  fill: currentColor;
 }
-.st-plane {
+.st-gw-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--lp-white);
+  color: var(--lp-black);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+.st-gw-cloud .st-gw-row {
+  background: #1c1e20;
+  color: var(--lp-white);
+}
+.st-gw-cat {
+  color: #4a4e52;
+  font-weight: 500;
+}
+.st-gw-cloud .st-gw-cat {
+  color: #b9bdb6;
+}
+.st-gw-reply {
+  font-weight: 500;
+}
+/* a field holds both values in one cell and crossfades through a blur as --m goes 0 to 1 */
+.st-gw-field {
+  display: inline-grid;
+  font-weight: 800;
+}
+.st-gw-field > span {
+  grid-area: 1 / 1;
+}
+.st-gw-real {
+  opacity: calc(1 - var(--m, 0));
+  filter: blur(calc(var(--m, 0) * 4px));
+}
+.st-gw-sent {
+  justify-self: start;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: rgb(11 102 195 / 0.12);
+  color: var(--lp-blue);
+  opacity: var(--m, 0);
+  filter: blur(calc((1 - var(--m, 0)) * 4px));
+}
+.st-gw-cloud .st-gw-sent {
+  background: rgb(147 241 247 / 0.16);
+  color: var(--lp-cyan);
+}
+.st-gw-keep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 2.8em;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  opacity: var(--keep, 1);
+}
+.st-gw-keep svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.st-gw-spacer {
+  visibility: hidden;
+}
+/* the travelling copy: from its slot on the Mac, 60% of the lane across, to the same slot in the cloud */
+.st-gw-packet {
   position: absolute;
   inset: 0;
   z-index: 2;
+  transform: translate3d(calc(var(--t, 0) * 60cqw), 0, 0);
+  opacity: var(--o, 1);
+  will-change: transform;
+}
+.st-gw-packet .st-gw-row {
+  box-shadow: 0 16px 32px -14px rgb(0 0 0 / 0.45);
+  background: color-mix(in srgb, #1c1e20 calc(var(--t, 0) * 100%), var(--lp-white));
+  color: color-mix(in srgb, var(--lp-white) calc(var(--t, 0) * 100%), var(--lp-black));
+}
+.st-gate:not([data-still]) .st-gw-arrival {
+  visibility: hidden;
+}
+.st-gate:not([data-still]) .st-gw-rest {
+  display: block;
+  opacity: var(--land, 0);
+}
+.st-gw-arrow {
+  position: absolute;
+  left: 41%;
+  width: 18%;
+  z-index: 1;
   display: grid;
-  align-content: center;
-  padding-inline: var(--lp-gutter);
+  justify-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
   pointer-events: none;
 }
-.st-plane-real {
-  color: var(--lp-black);
+.st-gw-arrow svg {
+  width: 100%;
+  height: 12px;
+  overflow: visible;
 }
-.st-plane-token {
-  color: var(--lp-lemon);
+.st-gw-arrow path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - var(--a, 1) * 100);
 }
-.st-plane-lens {
-  z-index: 3;
+.st-gw-arrow-out {
+  --a: var(--a-out, 1);
+  top: 14%;
+}
+.st-gw-arrow-back {
+  --a: var(--a-back, 1);
+  bottom: 12%;
+}
+.st-gw-arrow-label {
+  padding: 2px 6px;
+  border-radius: 6px;
   background: var(--lp-lemon);
-  color: var(--lp-black);
+  opacity: var(--a);
 }
-.st-line {
+.st-gw-steps {
   display: grid;
-  font-family: var(--lp-display);
-  font-size: clamp(3rem, 0.4rem + 8.6vw, 10rem);
-  font-weight: 900;
-  line-height: 0.9;
-  letter-spacing: -0.04em;
-  white-space: nowrap;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  list-style: none;
+  counter-reset: gw;
 }
-.st-token {
-  font-variant-numeric: tabular-nums;
+.st-gw-steps li {
+  counter-increment: gw;
+  max-width: 36ch;
+  font-size: 1rem;
+  line-height: 1.45;
+  font-weight: 500;
 }
-.st-gate-foot {
-  position: absolute;
-  z-index: 4;
-  bottom: clamp(24px, 5vh, 48px);
-  left: 0;
-  right: 0;
+.st-gw-steps li::before {
+  content: counter(gw);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
-  align-items: end;
-  gap: 16px 40px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: var(--lp-black);
   color: var(--lp-lemon);
-}
-.st-gate-label {
-  display: grid;
-  font-family: var(--lp-display);
-  font-size: var(--lp-step-lead);
+  font-size: 0.875rem;
   font-weight: 800;
 }
-.st-gate-label > span {
-  grid-area: 1 / 1;
-}
-.st-gate-lead {
-  max-width: 46ch;
-  font-size: var(--lp-step-body);
-  line-height: 1.5;
-}
-.st-gate-peek {
-  min-height: 48px;
-  padding: 0 22px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--lp-lemon);
-  color: var(--lp-black);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  transition: scale 140ms var(--lp-ease-out);
-}
-.st-gate-peek:active {
-  scale: 0.97;
-}
-.st-gate-peek:focus-visible {
-  outline-color: var(--lp-lemon);
-}
 
-/* peeking from the keyboard: the whole stage shows the real values, so the foot takes black ink */
-.st-gate-stage[data-pinned] .st-gate-foot {
-  color: var(--lp-black);
-}
-.st-gate-stage[data-pinned] .st-gate-peek {
-  background: var(--lp-black);
-  color: var(--lp-lemon);
-}
-.st-gate-stage[data-pinned] .st-gate-peek:focus-visible {
-  outline-color: var(--lp-black);
-}
-
-/* the still gateway: dry above, wet below, both readable at once */
-.st-gate-dry {
-  display: grid;
-  gap: 24px;
-  padding-block: clamp(96px, 12vw, 176px) clamp(48px, 6vw, 96px);
-}
-.st-gate-dry .st-gate-title {
-  position: static;
-  padding: 0;
-  margin-bottom: 24px;
-}
-.st-gate-wet {
-  position: relative;
-  display: grid;
-  padding-block: clamp(48px, 6vw, 96px) clamp(96px, 12vw, 176px);
-  background: var(--lp-black);
-  color: var(--lp-lemon);
-}
-.st-gate-wet .lp-wrap {
-  display: grid;
-  gap: 24px;
-}
-.st-gate-wet .st-wave {
-  width: 100%;
+/* phone: the lane is a column you scroll past, Mac above, cloud below; no pin, nothing travels
+   sideways: the cloud's copy fades in already labelled as its arrow draws */
+@media (max-width: 719.98px) {
+  .st-gate-track {
+    height: auto;
+    padding-block: 88px;
+  }
+  .st-gate-stage {
+    position: relative;
+    height: auto;
+    min-height: 0;
+  }
+  .st-gw-lane {
+    grid-template-columns: 1fr;
+    grid-template-areas: "mac" "out" "gate" "cloud" "back";
+    gap: 8px;
+  }
+  .st-gw-mac {
+    grid-area: mac;
+  }
+  .st-gw-gate {
+    grid-area: gate;
+    padding-block: 4px;
+  }
+  .st-gw-gate::before {
+    inset: 50% 8px auto 8px;
+    border-left: 0;
+    border-top: 2px dashed rgb(0 0 0 / 0.45);
+  }
+  .st-gw-gate > span {
+    max-width: none;
+  }
+  .st-gw-cloud {
+    grid-area: cloud;
+  }
+  .st-gw-arrow {
+    position: static;
+    width: auto;
+    grid-template-columns: 24px auto;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    font-size: 0.875rem;
+  }
+  .st-gw-arrow svg {
+    width: 44px;
+    margin-inline: -10px;
+    transform: rotate(90deg);
+  }
+  .st-gw-arrow-out {
+    grid-area: out;
+  }
+  .st-gw-arrow-back {
+    grid-area: back;
+  }
+  .st-gw-packet {
+    display: none;
+  }
+  .st-gate:not([data-still]) .st-gw-arrival {
+    visibility: visible;
+    opacity: var(--a-out, 1);
+  }
+  .st-gate:not([data-still]) .st-gw-slot-reply.st-gw-arrival {
+    opacity: var(--a-back, 1);
+  }
+  .st-gw-keep {
+    min-height: 0;
+  }
+  .st-gw-cloud .st-gw-spacer {
+    display: none;
+  }
+  .st-gw-steps {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
 }
 
 /* chapter 3: the focus list, on mint */
@@ -357,24 +540,8 @@
   .st-rows li > span:has(> button) {
     grid-column: 1 / -1;
   }
-  .st-gate-track {
-    height: 280vh;
-  }
-  .st-line {
-    font-size: 11.2vw;
-  }
   .st-principle {
     font-size: 1.5rem;
-  }
-  .st-plane {
-    align-content: start;
-    padding-top: 36svh;
-  }
-  .st-gate-foot {
-    grid-template-columns: 1fr;
-  }
-  .st-gate-foot .st-gate-lead {
-    display: none;
   }
 }
 
@@ -387,9 +554,4 @@
 }
 .st[data-still] .st-card {
   will-change: auto;
-}
-
-/* keyboard focus always shows the foot, even before the water reaches it */
-.st-gate-foot:focus-within {
-  opacity: 1 !important;
 }

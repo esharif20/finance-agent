@@ -2,7 +2,7 @@
 // the letter roll on links and the masked line rise. Hover moves only run for a fine pointer
 // that can hover; keyboard focus gets the same end state through :focus-visible in CSS.
 import { motion, useMotionValue, useSpring } from "motion/react";
-import { type CSSProperties, Fragment, type PointerEvent, type ReactNode, useState } from "react";
+import { type CSSProperties, Fragment, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 /** Read once per mount, so a test (or a visitor) can switch it between renders. */
 export function prefersReducedMotion() {
@@ -117,5 +117,136 @@ export function Rise({ still, delay = 0, className, children }: { still: boolean
     >
       {children}
     </motion.div>
+  );
+}
+
+/** A surface with material: it tilts toward the pointer and lifts, a specular light and a lit
+    border follow the pointer, and grain sits in the paint. Fine pointers only; keyboard focus
+    inside it gets the same lifted, lit state from CSS (:focus-within). Writes the element's own
+    style, so a hover never re-renders React. */
+export function Material({ className = "", max = 7, children }: { className?: string; max?: number; children: ReactNode }) {
+  const [live] = useState(() => finePointer() && !prefersReducedMotion());
+  const move = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse") return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    el.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`);
+    el.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
+    // tilt toward the pointer, lift, and a magnetic pull of a few pixels after it
+    el.style.transform = `perspective(900px) translate3d(${((x - 0.5) * 8).toFixed(1)}px, ${((y - 0.5) * 8 - 6).toFixed(1)}px, 0) rotateX(${((0.5 - y) * max).toFixed(2)}deg) rotateY(${((x - 0.5) * max).toFixed(2)}deg)`;
+    el.dataset.hot = "";
+  };
+  const leave = (e: PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.style.transform = "";
+    delete e.currentTarget.dataset.hot;
+  };
+  // touch has no hover: a tap lights the surface where the finger lands, then lets go
+  const tap = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || prefersReducedMotion()) return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
+    el.style.setProperty("--my", `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
+    el.dataset.hot = "";
+    window.setTimeout(() => delete el.dataset.hot, 700);
+  };
+  return (
+    <div className={`lp-mat ${className}`} onPointerDown={tap} onPointerMove={live ? move : undefined} onPointerLeave={live ? leave : undefined}>
+      {children}
+      <span className="lp-mat-light" aria-hidden="true" />
+    </div>
+  );
+}
+
+/** Variable type that breathes: on load each letter sweeps from hairline to its weight in a wave,
+    and the letters nearest the pointer swell in weight and width (Codrops variable-font hover).
+    Screen readers get the sentence once; the letters are a drawing of it. */
+export function Flex({
+  lines,
+  label,
+  still,
+  play = true,
+  delay = 0,
+  className = "",
+}: {
+  lines: string[];
+  label: string;
+  still: boolean;
+  play?: boolean;
+  delay?: number;
+  className?: string;
+}) {
+  const [live] = useState(() => !still && finePointer());
+  const root = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const host = root.current?.closest("section");
+    if (!live || !host || !root.current) return;
+    const letters = [...root.current.querySelectorAll<HTMLElement>("[data-l]")];
+    let raf = 0;
+    let px = -1e4;
+    let py = -1e4;
+    const paint = () => {
+      raf = 0;
+      for (const l of letters) {
+        const b = l.getBoundingClientRect();
+        const f = Math.max(0, 1 - Math.hypot(b.left + b.width / 2 - px, b.top + b.height / 2 - py) / 340) ** 2;
+        l.style.fontVariationSettings = f > 0 ? `"wght" ${Math.round(560 + 240 * f)}, "wdth" ${Math.round(84 + 16 * f)}` : "";
+      }
+    };
+    const move = (e: globalThis.PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      px = e.clientX;
+      py = e.clientY;
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const out = () => {
+      px = py = -1e4;
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    host.addEventListener("pointermove", move);
+    host.addEventListener("pointerleave", out);
+    return () => {
+      cancelAnimationFrame(raf);
+      host.removeEventListener("pointermove", move);
+      host.removeEventListener("pointerleave", out);
+    };
+  }, [live]);
+  let n = 0;
+  if (still)
+    return (
+      <span className={`lp-flex ${className}`} data-still="">
+        {lines.map((line, i) => (
+          <Fragment key={i}>
+            {i > 0 && " "}
+            <span className="lp-flex-line">{line}</span>
+          </Fragment>
+        ))}
+      </span>
+    );
+  return (
+    <span ref={root} className={`lp-flex ${className}`} data-play={play && !still ? "" : undefined} data-still={still ? "" : undefined}>
+      <span className="lp-sr">{label}</span>
+      {lines.map((line, i) => (
+        <span key={i} className="lp-flex-line" aria-hidden="true">
+          {line.split(" ").map((w, j) => (
+            <Fragment key={j}>
+              {j > 0 && " "}
+              <span className="lp-flex-word">
+                {[...w].map((c) => {
+                  const k = n++;
+                  return (
+                    <span key={k} data-l="" style={still ? undefined : ({ "--i": k, "--d": `${delay}s` } as CSSProperties)}>
+                      {c}
+                    </span>
+                  );
+                })}
+              </span>
+            </Fragment>
+          ))}
+        </span>
+      ))}
+    </span>
   );
 }

@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { type MouseEvent, useCallback, useState } from "react";
 import { Money } from "@/components/Money";
 import { Ask } from "./Ask";
-import { Magnetic, Rise, Roll, useStill } from "./fx";
-import { Hero, restLevel } from "./Hero";
+import { Magnetic, Material, Rise, Roll, useStill } from "./fx";
+import { Hero } from "./Hero";
+import { HowItWorks } from "./HowItWorks";
+import { Learns } from "./Learns";
+import { Opener } from "./Opener";
 import { Preloader } from "./Preloader";
 import { Promises } from "./Promises";
 import { Story } from "./story/Story";
+import { Terminal } from "./terminal/Terminal";
 import { OVERVIEW } from "./story/story.fixture";
 import "./landing.css";
+import "./motion.css";
 
 const GITHUB = "https://github.com/esharif20/finance-agent";
 const NAME = "Finance Agent";
@@ -49,8 +54,6 @@ export default function Landing() {
   const still = useStill();
   // the tally plays once a session; a returning visitor goes straight to the hero
   const [pre, setPre] = useState(() => !seenIntro());
-  const [risen] = useState(pre);
-  const [rest] = useState(restLevel);
   const [play, setPlay] = useState(!pre);
   const go = () => {
     setPlay(true);
@@ -60,9 +63,19 @@ export default function Landing() {
       // private mode: the tally just plays again next time
     }
   };
+  // every "Open the demo" plays the opener, which makes the visitor's ledger before the app loads
+  const [opening, setOpening] = useState(false);
+  const gone = useCallback(() => setOpening(false), []);
+  const open = (e: MouseEvent<HTMLDivElement>) => {
+    const a = (e.target as Element).closest?.('a[href="/app"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    setOpening(true);
+  };
   return (
-    <div className="lp">
-      {pre && <Preloader still={still} rest={rest} onGo={go} onDone={() => setPre(false)} />}
+    <div className="lp" onClick={open}>
+      {pre && <Preloader still={still} onGo={go} onDone={() => setPre(false)} />}
+      {opening && <Opener still={still} onGone={gone} />}
       <a className="lp-skip" href="#lp-main">
         Skip to content
       </a>
@@ -75,8 +88,14 @@ export default function Landing() {
           <a href="#what">
             <Roll text="What it does" />
           </a>
+          <a href="#how">
+            <Roll text="How it works" />
+          </a>
           <a href="#privacy">
             <Roll text="Privacy" />
+          </a>
+          <a href="/architecture">
+            <Roll text="Architecture" />
           </a>
           <a href={GITHUB}>
             <Roll text="GitHub" />
@@ -87,9 +106,12 @@ export default function Landing() {
         </Magnetic>
       </header>
       <main id="lp-main">
-        <Hero delay={0.05} play={play} risen={risen} />
+        <Hero delay={0.05} play={play} />
         <Ask />
         <Story />
+        <HowItWorks />
+        <Learns />
+        <Terminal />
         <section id="what" className="lp-what" aria-labelledby="lp-what-title">
           <div className="lp-wrap lp-mosaic">
             <Rise still={still} className="lp-tile lp-tile-head">
@@ -97,32 +119,42 @@ export default function Landing() {
                 What it does
               </h2>
             </Rise>
-            <Rise still={still} delay={0.07} className="lp-tile lp-tile-import">
-              <h3 className="lp-h3">Import</h3>
-              <p className="lp-tile-big">{FEATURES.import}</p>
+            <Rise still={still} delay={0.06} className="lp-slot lp-tile-import">
+              <Material className="lp-tile">
+                <h3 className="lp-h3">Import</h3>
+                <p className="lp-tile-big">{FEATURES.import}</p>
+              </Material>
             </Rise>
-            <Rise still={still} delay={0.14} className="lp-tile lp-tile-review">
-              <h3 className="lp-h3">Review Queue</h3>
-              <p>{FEATURES.review}</p>
+            <Rise still={still} delay={0.12} className="lp-slot lp-tile-review">
+              <Material className="lp-tile">
+                <h3 className="lp-h3">Review Queue</h3>
+                <p>{FEATURES.review}</p>
+              </Material>
             </Rise>
-            <Rise still={still} delay={0.21} className="lp-tile lp-tile-figure">
-              <h3 className="lp-h3">Overview</h3>
-              <p className="lp-figure">
-                <Money value={OVERVIEW.spent} />
-              </p>
-              <p>spent in {OVERVIEW.month} on the made-up ledger, added up from its transactions</p>
+            <Rise still={still} delay={0.18} className="lp-slot lp-tile-figure">
+              <Material className="lp-tile">
+                <h3 className="lp-h3">Overview</h3>
+                <p className="lp-figure">
+                  <Money value={OVERVIEW.spent} />
+                </p>
+                <p>spent in {OVERVIEW.month} on the made-up ledger, added up from its transactions</p>
+              </Material>
             </Rise>
-            <Rise still={still} delay={0.07} className="lp-tile lp-tile-assistant">
-              <h3 className="lp-h3">An Assistant that never invents a figure</h3>
-              <p className="lp-tile-big">{FEATURES.assistant}</p>
+            <Rise still={still} delay={0.24} className="lp-slot lp-tile-assistant">
+              <Material className="lp-tile">
+                <h3 className="lp-h3">An Assistant that never invents a figure</h3>
+                <p className="lp-tile-big">{FEATURES.assistant}</p>
+              </Material>
             </Rise>
-            <Rise still={still} delay={0.14} className="lp-tile lp-tile-insights">
-              <h3 className="lp-h3">Insights</h3>
-              <ul>
-                {FEATURES.insights.map((l) => (
-                  <li key={l}>{l}</li>
-                ))}
-              </ul>
+            <Rise still={still} delay={0.3} className="lp-slot lp-tile-insights">
+              <Material className="lp-tile">
+                <h3 className="lp-h3">Insights</h3>
+                <ul>
+                  {FEATURES.insights.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              </Material>
             </Rise>
           </div>
         </section>
@@ -149,9 +181,14 @@ export default function Landing() {
         <div className="lp-wrap">
           <div className="lp-foot-row">
             <p>A personal finance app that runs on your Mac. Open source.</p>
-            <a href={GITHUB}>
-              <Roll text="Source on GitHub" />
-            </a>
+            <span className="lp-foot-links">
+              <a href="/architecture">
+                <Roll text="Architecture" />
+              </a>
+              <a href={GITHUB}>
+                <Roll text="Source on GitHub" />
+              </a>
+            </span>
           </div>
           <p className="lp-foot-name" aria-hidden="true">
             {NAME}

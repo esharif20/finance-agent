@@ -1,6 +1,6 @@
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
-import { Lines, useStill } from "./fx";
+import { Lines, Material, useStill } from "./fx";
 
 const PROMISES = [
   {
@@ -9,9 +9,9 @@ const PROMISES = [
     body: "Statements, transactions and everything the Assistant learns about you sit in a database on your own computer. There is no account to create and no server of ours holding a copy.",
   },
   {
-    mark: "{P1}",
-    title: "The cloud is opt-in, and sees placeholders.",
-    body: "The Assistant runs on a local model. If you turn the cloud model on for a conversation, names, amounts and account details are swapped for placeholders before anything leaves, and the real values are filled back in on your Mac. You can read exactly what was sent.",
+    mark: "Opt-in",
+    title: "The cloud is off until you turn it on.",
+    body: "The Assistant runs on a local model. If you turn the cloud model on for a conversation, your amounts, shop names and account details are swapped for plain labels such as “Amount 1” and “Merchant A” before anything leaves, and your Mac puts the real values back into the answer. You can read exactly what was sent.",
   },
   {
     mark: "Read only",
@@ -47,17 +47,19 @@ export function Promises() {
         <ul className="lp-promise-list">
           {PROMISES.map((p, i) => (
             <li key={p.title} className="lp-promise" data-i={i}>
-              {still ? (
-                <div className="lp-bar">
-                  <span className="lp-bar-mark" aria-hidden="true">
-                    {p.mark}
-                  </span>
-                </div>
-              ) : (
-                <Bar i={i} progress={scrollYProgress} />
-              )}
-              <h3 className="lp-h3">{p.title}</h3>
-              <p>{p.body}</p>
+              <Material className="lp-promise-card">
+                {still ? (
+                  <div className="lp-bar">
+                    <span className="lp-bar-mark" aria-hidden="true">
+                      {p.mark}
+                    </span>
+                  </div>
+                ) : (
+                  <Bar i={i} progress={scrollYProgress} />
+                )}
+                <h3 className="lp-h3">{p.title}</h3>
+                <p>{p.body}</p>
+              </Material>
             </li>
           ))}
         </ul>

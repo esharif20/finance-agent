@@ -49,7 +49,7 @@ describe("preloader, the tally", () => {
   it("starts at zero and settles on the made-up ledger's own figure", () => {
     expect(TALLY).toBe(formatMoney(OVERVIEW.spent));
     vi.stubGlobal("matchMedia", mediaStub(false));
-    const { container } = render(<Preloader still={false} rest={56} onGo={() => {}} onDone={() => {}} />);
+    const { container } = render(<Preloader still={false} onGo={() => {}} onDone={() => {}} />);
     expect(settled(container)).toBe(TALLY);
     // every strip counts 0–9 in order from zero: an odometer rolling up, with nothing else on it
     for (const strip of container.querySelectorAll(".pl-wheel-in"))
@@ -60,7 +60,7 @@ describe("preloader, the tally", () => {
     vi.stubGlobal("matchMedia", mediaStub(false));
     const onGo = vi.fn();
     const onDone = vi.fn();
-    render(<Preloader still={false} rest={56} onGo={onGo} onDone={onDone} />);
+    render(<Preloader still={false} onGo={onGo} onDone={onDone} />);
     act(() => vi.advanceTimersByTime(1000));
     expect(onGo).not.toHaveBeenCalled(); // the minimum display time
     act(() => vi.advanceTimersByTime(1600));
@@ -72,7 +72,7 @@ describe("preloader, the tally", () => {
   it("under reduced motion is only a short fade over the settled frame", () => {
     vi.stubGlobal("matchMedia", mediaStub(true));
     const onDone = vi.fn();
-    const { container } = render(<Preloader still rest={56} onGo={() => {}} onDone={onDone} />);
+    const { container } = render(<Preloader still onGo={() => {}} onDone={onDone} />);
     expect(container.querySelectorAll(".pl-wheel-in:not([data-on])")).toHaveLength(0);
     act(() => vi.advanceTimersByTime(400));
     expect(onDone).toHaveBeenCalled();

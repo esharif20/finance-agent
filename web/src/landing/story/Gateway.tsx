@@ -1,129 +1,162 @@
-import { type MotionValue, motion, useMotionTemplate, useMotionValue, useScroll, useSpring, useTransform } from "motion/react";
-import { type PointerEvent, useRef, useState } from "react";
-import { Money } from "@/components/Money";
+import { motion, type MotionStyle, type MotionValue, useScroll, useSpring, useTransform } from "motion/react";
+import { type ReactNode, useRef, useState } from "react";
 import { formatMoney } from "@/lib/money";
-import { finePointer } from "../fx";
 import { GATEWAY } from "./story.fixture";
 
-const LEAD =
-  "When you turn the cloud model on, names and amounts are swapped for placeholders before anything leaves. The real values are filled back in on your Mac.";
+const REAL = { amount: formatMoney(GATEWAY.amount), merchant: GATEWAY.merchant };
+const SENT = { amount: GATEWAY.amountLabel, merchant: GATEWAY.merchantLabel };
 
-/** The water's surface: one wave, drawn once, that drifts sideways as you scroll. */
-function Wave({ x }: { x?: MotionValue<string> }) {
+const STEPS = [
+  "Your Mac swaps the amount and the shop’s name for plain labels. The category stays, so the question still makes sense.",
+  "Only the labelled version is sent, and only when you have turned the cloud model on for that conversation.",
+  "The answer comes back with the labels in it, and your Mac puts the real values back before you read it.",
+];
+
+const SR = `${REAL.amount} at ${REAL.merchant}, ${GATEWAY.category}, is sent to the cloud model as ${SENT.amount} at ${SENT.merchant}, ${GATEWAY.category}. Its answer comes back with the labels, and your Mac fills the real values back in.`;
+
+/** One field that turns from the real value into its label as `--m` goes from 0 to 1. Both sit in
+    one grid cell, so the row keeps its width while it changes. */
+function Field({ real, sent }: { real: string; sent: string }) {
   return (
-    <motion.div className="st-wave" data-wave="" style={x ? { x } : undefined} aria-hidden="true">
-      <svg viewBox="0 0 2880 40" preserveAspectRatio="none">
-        <path d="M0 20 C 240 0, 480 0, 720 20 S 1200 40, 1440 20 S 1920 0, 2160 20 S 2640 40, 2880 20 L 2880 40 L 0 40 Z" />
+    <span className="st-gw-field">
+      <span className="st-gw-real">{real}</span>
+      <span className="st-gw-sent">{sent}</span>
+    </span>
+  );
+}
+
+function Payment() {
+  return (
+    <span className="st-gw-row">
+      <Field real={REAL.merchant} sent={SENT.merchant} />
+      <span className="st-gw-cat">{GATEWAY.category}</span>
+      <Field real={REAL.amount} sent={SENT.amount} />
+    </span>
+  );
+}
+
+function Reply() {
+  return (
+    <span className="st-gw-row st-gw-reply">
+      <span>You spent</span>
+      <Field real={REAL.amount} sent={SENT.amount} />
+      <span>at</span>
+      <Field real={REAL.merchant} sent={SENT.merchant} />
+    </span>
+  );
+}
+
+/** A labelled arrow, drawn as `--a` goes from 0 to 1. */
+function Arrow({ label, className, back = false }: { label: string; className: string; back?: boolean }) {
+  return (
+    <span className={`st-gw-arrow ${className}`}>
+      <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+        <path pathLength={100} d={back ? "M98 6 H4 M11 1 L3 6 L11 11" : "M2 6 H96 M89 1 L97 6 L89 11"} />
       </svg>
-    </motion.div>
+      <span className="st-gw-arrow-label">{label}</span>
+    </span>
   );
 }
 
-function Real() {
+/** The two sides and the gateway between them. `out` and `back` are the travelling copies; they
+    sit in the Mac's slots and are moved across with container units. */
+function Lane({ out, back }: { out?: ReactNode; back?: ReactNode }) {
   return (
-    <p className="st-line">
-      <span>
-        <Money value={GATEWAY.amount} /> at
-      </span>
-      <span>{GATEWAY.merchant}</span>
-    </p>
+    <div className="st-gw-lane">
+      <div className="st-gw-panel st-gw-mac">
+        <p className="st-gw-label">On your Mac</p>
+        <span className="st-gw-slot st-gw-home">
+          <Payment />
+          {out}
+        </span>
+        <span className="st-gw-keep">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 21 V5 M6 11 L12 4 L18 11" />
+          </svg>
+          Stays on your Mac: the real amount and the shop’s name
+        </span>
+        <span className="st-gw-slot st-gw-slot-reply st-gw-landing">
+          <span className="st-gw-rest">
+            <Reply />
+          </span>
+          {back}
+        </span>
+      </div>
+      <div className="st-gw-gate">
+        <span>Privacy gateway, on your Mac</span>
+      </div>
+      <div className="st-gw-panel st-gw-cloud">
+        <p className="st-gw-label">What the cloud model sees</p>
+        <span className="st-gw-slot st-gw-arrival">
+          <Payment />
+        </span>
+        <span className="st-gw-keep st-gw-spacer" />
+        <span className="st-gw-slot st-gw-slot-reply st-gw-arrival">
+          <Reply />
+        </span>
+      </div>
+      <Arrow label="Sent only if you opt in" className="st-gw-arrow-out" />
+      <Arrow label="The answer comes back" className="st-gw-arrow-back" back />
+    </div>
   );
 }
 
-function Token() {
+const vars = (v: Record<string, MotionValue<number>>) => v as unknown as MotionStyle;
+
+/** A copy that travels across the lane (`--t`: 0 at the Mac, 1 at the cloud) and turns into its
+    labels as it passes the gateway (`--m`). */
+function Packet({ t, m, o, reply = false }: { t: MotionValue<number>; m: MotionValue<number>; o?: MotionValue<number>; reply?: boolean }) {
   return (
-    <p className="st-line">
-      <span>
-        <span className="st-token">{GATEWAY.amountToken}</span> at
-      </span>
-      <span className="st-token">{GATEWAY.merchantToken}</span>
-    </p>
+    <motion.span className="st-gw-packet" style={vars(o ? { "--t": t, "--m": m, "--o": o } : { "--t": t, "--m": m })}>
+      {reply ? <Reply /> : <Payment />}
+    </motion.span>
   );
 }
 
-/** The signature move: black water rises through the line on your statement. What it covers turns
-    into the placeholders the cloud model sees; a lens under the pointer shows what only your Mac can
-    read. Then the water drains and the real values come back. */
+function Step({ step, i, text }: { step: MotionValue<number>; i: number; text: string }) {
+  const opacity = useTransform(step, (s) => (Math.round(s) === i ? 1 : 0.34));
+  return <motion.li style={{ opacity }}>{text}</motion.li>;
+}
+
+/** The signature move, explained: one made-up payment leaves the Mac, loses its amount and shop
+    name at the gateway, and its answer comes back and gets them back. Scroll drives it. */
 function Moving() {
   const track = useRef<HTMLDivElement>(null);
-  const [lensLive] = useState(finePointer);
-  const [pinned, setPinned] = useState(false);
-  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
+  // a phone shows the lane as a column in the page flow, so it plays while it scrolls past, not pinned
+  const [narrow] = useState(() => typeof window.matchMedia === "function" && window.matchMedia("(max-width: 719.98px)").matches);
+  const { scrollYProgress } = useScroll({ target: track, offset: narrow ? ["start 0.75", "end 0.95"] : ["start start", "end end"] });
   const p = useSpring(scrollYProgress, { stiffness: 110, damping: 26, restDelta: 0.0005 });
-  // seam in % of the stage: dry, rises over the line, holds, drains back
-  const seam = useTransform(p, [0.06, 0.4, 0.62, 0.94], [100, 27, 27, 100]);
-  const waterY = useTransform(seam, (s) => `${s}%`);
-  const above = useTransform(seam, (s) => `inset(0 0 ${100 - s}% 0)`);
-  const below = useMotionTemplate`inset(${seam}% 0 0 0)`;
-  const drift = useTransform(p, [0, 1], ["0%", "-50%"]);
-  const mac = useTransform(seam, [60, 40], [1, 0]);
-  const cloud = useTransform(seam, [60, 40], [0, 1]);
-  // the foot is set in lemon for the water, so it only shows once the water has reached it
-  const foot = useTransform(seam, [92, 78], [0, 1]);
-
-  const lx = useMotionValue(0);
-  const ly = useMotionValue(0);
-  const radius = useMotionValue(0);
-  const r = useSpring(radius, { stiffness: 260, damping: 26 });
-  // the lens trails the pointer a little (MotionSites "spotlight reveal mask": the lag makes it physical)
-  const tx = useSpring(lx, { stiffness: 300, damping: 30 });
-  const ty = useSpring(ly, { stiffness: 300, damping: 30 });
-  const lens = useMotionTemplate`circle(${r}px at ${tx}px ${ty}px)`;
-  const move = (e: PointerEvent<HTMLDivElement>) => {
-    if (!lensLive || pinned || e.pointerType !== "mouse") return;
-    const b = e.currentTarget.getBoundingClientRect();
-    // snap to the first position instead of flying in from the corner
-    if (radius.get() === 0) {
-      tx.jump(e.clientX - b.left);
-      ty.jump(e.clientY - b.top);
-    }
-    lx.set(e.clientX - b.left);
-    ly.set(e.clientY - b.top);
-    // the lens opens only under the surface, where there is something hidden to see
-    radius.set((e.clientY - b.top) / b.height > seam.get() / 100 ? 120 : 0);
-  };
-  const leave = () => !pinned && radius.set(0);
-  const toggle = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const stage = e.currentTarget.closest(".st-gate-stage")?.getBoundingClientRect();
-    if (stage) {
-      lx.set(stage.width / 2);
-      ly.set(stage.height / 2);
-    }
-    radius.set(pinned ? 0 : 2400);
-    setPinned(!pinned);
-  };
-
+  const c = { clamp: true };
+  const outT = useTransform(p, [0.12, 0.42], [0, 1], c);
+  const outM = useTransform(p, [0.22, 0.32], [0, 1], c);
+  const backT = useTransform(p, [0.58, 0.86], [1, 0], c);
+  const backM = useTransform(p, [0.68, 0.78], [1, 0], c);
+  const backO = useTransform(p, [0.5, 0.56], [0, 1], c);
+  const lane = vars({
+    "--a-out": useTransform(p, [0.06, 0.26], [0, 1], c),
+    "--a-back": useTransform(p, [0.54, 0.68], [0, 1], c),
+    "--keep": useTransform(p, [0.04, 0.14], [0, 1], c),
+    "--land": useTransform(p, [0.86, 0.9], [0, 1], c),
+  });
+  const step = useTransform(p, [0.2, 0.42, 0.62], [0, 1, 2], c);
   return (
     <div ref={track} className="st-gate-track">
-      <div className="st-gate-stage" data-pinned={pinned ? "" : undefined} onPointerMove={move} onPointerLeave={leave}>
-        <h2 id="st-gate-title" className="lp-h2 st-gate-title">
-          What leaves your Mac.
-        </h2>
-        <p className="lp-sr">
-          {formatMoney(GATEWAY.amount)} at {GATEWAY.merchant} is sent as {GATEWAY.amountToken} at {GATEWAY.merchantToken}.
-        </p>
-        <motion.div className="st-water" style={{ y: waterY }} aria-hidden="true">
-          <Wave x={drift} />
-        </motion.div>
-        <motion.div className="st-plane st-plane-real" style={{ clipPath: above }} aria-hidden="true">
-          <Real />
-        </motion.div>
-        <motion.div className="st-plane st-plane-token" style={{ clipPath: below }} aria-hidden="true">
-          <Token />
-        </motion.div>
-        <motion.div className="st-plane st-plane-lens" style={{ clipPath: lens }} aria-hidden="true">
-          <Real />
-        </motion.div>
-        <motion.div className="st-gate-foot lp-wrap" style={pinned ? undefined : { opacity: foot }}>
-          <p className="st-gate-label" aria-hidden="true">
-            <motion.span style={{ opacity: mac }}>On your Mac</motion.span>
-            <motion.span style={{ opacity: cloud }}>What the cloud model sees</motion.span>
-          </p>
-          <p className="st-gate-lead">{LEAD}</p>
-          <button type="button" className="st-gate-peek" aria-pressed={pinned} onClick={toggle}>
-            {pinned ? "Hide the real values" : "See what stays on your Mac"}
-          </button>
-        </motion.div>
+      <div className="st-gate-stage">
+        <div className="lp-wrap st-gw">
+          <h2 id="st-gate-title" className="lp-h2 st-gate-title">
+            What leaves your Mac.
+          </h2>
+          <p className="st-gw-lead">Nothing, unless you turn the cloud model on. Then this is one payment on its way out.</p>
+          <p className="lp-sr">{SR}</p>
+          <motion.div className="st-gw-wrap" style={lane} aria-hidden="true">
+            <Lane out={<Packet t={outT} m={outM} />} back={<Packet t={backT} m={backM} o={backO} reply />} />
+          </motion.div>
+          <ol className="st-gw-steps">
+            {STEPS.map((s, i) => (
+              <Step key={s} step={step} i={i} text={s} />
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );
@@ -131,29 +164,27 @@ function Moving() {
 
 function Still() {
   return (
-    <div className="st-gate-still">
-      <div className="st-gate-dry lp-wrap">
-        <h2 id="st-gate-title" className="lp-h2 st-gate-title">
-          What leaves your Mac.
-        </h2>
-        <p className="st-gate-label">On your Mac</p>
-        <Real />
+    <div className="lp-wrap st-gw">
+      <h2 id="st-gate-title" className="lp-h2 st-gate-title">
+        What leaves your Mac.
+      </h2>
+      <p className="st-gw-lead">Nothing, unless you turn the cloud model on. Then this is one payment on its way out.</p>
+      <p className="lp-sr">{SR}</p>
+      <div className="st-gw-wrap" aria-hidden="true">
+        <Lane />
       </div>
-      <div className="st-gate-wet">
-        <Wave />
-        <div className="lp-wrap">
-          <p className="st-gate-label">What the cloud model sees</p>
-          <Token />
-          <p className="st-gate-lead">{LEAD}</p>
-        </div>
-      </div>
+      <ol className="st-gw-steps">
+        {STEPS.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ol>
     </div>
   );
 }
 
 export function Gateway({ still }: { still: boolean }) {
   return (
-    <section className="st-gate" aria-labelledby="st-gate-title">
+    <section className="st-gate" aria-labelledby="st-gate-title" data-still={still ? "" : undefined}>
       {still ? <Still /> : <Moving />}
     </section>
   );
