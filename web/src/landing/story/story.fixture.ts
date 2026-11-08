@@ -42,14 +42,14 @@ export const ANSWER = {
   previous: gbp(18_920),
 };
 
-/** The gateway chapter's one line and its placeholders. */
-export const GATEWAY = { amount: gbp(4_210), merchant: "Corner Grocer", amountToken: "{P1}", merchantToken: "{M1}" };
+/** The gateway chapter's one payment, and the plain labels the cloud model sees in place of its amount and shop. */
+export const GATEWAY = { amount: gbp(4_210), merchant: "Corner Grocer", category: "Groceries", amountLabel: "Amount 1", merchantLabel: "Merchant A" };
 
 export const PRINCIPLES = [
   "Your ledger lives in one file on your Mac.",
   "Every figure comes from a calculation, never a guess.",
   "Unsure categories wait for you, not for the model.",
-  "The cloud is off until you turn it on, and sees placeholders.",
+  "The cloud is off until you turn it on, and sees labels, not your figures.",
   "It reads your accounts. It never moves money.",
 ];
 

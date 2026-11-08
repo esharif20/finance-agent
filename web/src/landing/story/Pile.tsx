@@ -2,6 +2,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { type Category, CategoryChip } from "@/components/CategoryChip";
 import { Money } from "@/components/Money";
+import { Field, Material } from "../fx";
 import { ANSWER, GROUPS, OVERVIEW, REVIEW } from "./story.fixture";
 
 /** #76: the pile shows at most this many frosted layers. */
@@ -93,6 +94,7 @@ export function Pile({ still }: { still: boolean }) {
   const slots = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
   return (
     <section className="st-pile" data-still={still ? "" : undefined} aria-labelledby="st-pile-title">
+      <Field tone="night" />
       <div className="lp-wrap st-pile-grid">
         <div className="st-pile-title">
           <h2 id="st-pile-title" className="lp-h2">
@@ -111,11 +113,15 @@ export function Pile({ still }: { still: boolean }) {
             );
             return (
               <div key={title} ref={slots[i]} className="st-slot" data-layer={i} style={{ zIndex: i + 1 }}>
-                {still || !next || i === PILE.length - 1 ? (
-                  <article className="st-card" data-ui="">{content}</article>
-                ) : (
-                  <Sinking next={next}>{content}</Sinking>
-                )}
+                <Material className="st-card-host" max={4}>
+                  {still || !next || i === PILE.length - 1 ? (
+                    <article className="st-card" data-ui="">
+                      {content}
+                    </article>
+                  ) : (
+                    <Sinking next={next}>{content}</Sinking>
+                  )}
+                </Material>
               </div>
             );
           })}
