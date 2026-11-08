@@ -46,7 +46,7 @@ from finance_agent.assistant.tools import (
     run,
     specs,
 )
-from finance_agent.assistant.tools.propose import ProposalOut
+from finance_agent.assistant.tools.propose import FigureInMemory, ProposalOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
 from finance_agent.ledger.answer_cache import AnswerCache
@@ -64,6 +64,10 @@ UNCACHED = frozenset({"list_insights", "explain_insight"})
 HISTORY = 12  # messages kept in the thread for the conversation slot
 MODEL_DOWN = "The local model isn't answering, so I can't help with that right now."
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
+NO_FIGURE_MEMORIES = (
+    "I don't remember money figures or spending patterns, only preferences,"
+    " goals and constraints in your words."
+)
 REGENERATE = (
     "Some figures in that reply are not in this turn's tool results. Rewrite it"
     " using only figures copied exactly from the tool results, or none, and"
@@ -77,6 +81,31 @@ _LINK = re.compile(
     r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}[/?]",
     re.IGNORECASE,
 )
+
+
+_UNSURE = re.compile(
+    r"\b(will|next|afford|forecast|going to|plan|save|saving|savings|move|send"
+    r"|transfer|pay (?:off|for)|can i|could i|should i|would|split"
+    r"|recategori[sz]e|categori[sz]e|actually|really|note|ignore|forget)\b",
+    re.IGNORECASE,
+)
+_MEMORY = re.compile(r"^\s*(please\s+)?remember\b|\bwhat do you remember\b", re.I)
+_ASK = re.compile(
+    r"\bhow much\b|\bwhat did\b|\bwhat came in\b|\bwhere did i\b"
+    r"|\bsubscriptions?\b|\bmy net\b",
+    re.IGNORECASE,
+)
+
+
+def pre_route(message: str) -> Route | None:
+    """The route of an obvious message without a Router call (saves one model
+    call a turn); None sends it to the model Router. Anything about the
+    future, a write or a payment is never obvious."""
+    if _UNSURE.search(message):
+        return None
+    if _MEMORY.search(message):
+        return "memory"
+    return "ask" if _ASK.search(message) else None
 
 
 def _shown(reply: str) -> bool:
@@ -119,6 +148,7 @@ class Draft:
         default_factory=list[list[dict[str, Any]]]
     )
     cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
+    refusal: str | None = None  # a fixed reply that replaces the model's
 
 
 @dataclass
@@ -131,6 +161,8 @@ class Assistant:
     # --- nodes ---------------------------------------------------------------
 
     def router(self, s: State) -> Update:
+        if (route := pre_route(s["message"])) is not None:
+            return {"route": route, "proposal_id": None, "evidence": []}
         try:
             r = self.model.chat(
                 [
@@ -247,6 +279,9 @@ class Assistant:
             return '{"error": "no data for that"}'
         except ValidationError:  # its message would quote the arguments
             return '{"error": "invalid arguments"}'
+        except FigureInMemory:
+            d.refusal = NO_FIGURE_MEMORIES
+            return '{"error": "refused: a Memory never holds a money figure"}'
         except ValueError:  # UnknownTarget, InvalidSplit, ...: refused
             return '{"error": "refused: no such Transaction or change"}'
         if isinstance(out, ProposalOut):
@@ -257,6 +292,8 @@ class Assistant:
     def _ground(self, route: Route, s: State, d: Draft) -> Update:
         if d.cached is not None:
             return {"reply": d.reply, "path": "cache", "evidence": list(d.cached)}
+        if d.refusal is not None and d.proposal_id is None:
+            return {"reply": d.refusal, "path": "deterministic"}
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)

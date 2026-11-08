@@ -56,6 +56,17 @@ TOOLS = {
             read.category_trend,
         ),
         Tool(
+            "category_detail",
+            "One month's spending in a Category or Subcategory, its Subcategories"
+            " and its top Merchants, in minor units, as the Category screen shows"
+            " them. Use it for anything inside a Category, e.g. fuel, petrol or"
+            " diesel: Transport > Fuel; trains, buses or the tube: Transport >"
+            " Public transport; coffee: Food & Drink > Coffee. Categories, as"
+            " top-level: subcategories: " + _CATEGORIES + _DATA,
+            read.CategoryDetailIn,
+            read.category_detail,
+        ),
+        Tool(
             "list_subscriptions",
             "The user's Subscriptions and Bills, with status and interval." + _DATA,
             read.ListSubscriptionsIn,
@@ -136,6 +147,7 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
     "ask": (
         "spending_summary",
         "category_trend",
+        "category_detail",
         "list_subscriptions",
         "list_insights",
         "explain_insight",

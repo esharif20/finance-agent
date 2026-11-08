@@ -190,6 +190,12 @@ export function Assistant() {
   const end = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
+  // load the local model while the user types, so the first turn skips the load;
+  // a beacon, not fetch: nothing waits on it and nothing is shown
+  useEffect(() => {
+    navigator.sendBeacon?.("/api/chat/warm");
+  }, []);
+
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
   }, [chat.messages, reduceMotion]);

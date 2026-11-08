@@ -23,6 +23,14 @@ ROWS = [
     (4, "DEB", "DELIVEROO 2BX9", -2310),
     (5, "DEB", "TESCO STORES 3214", -1999),
 ]
+# December 2025's Transport, for the Subcategory golden cases: £112.80 in all,
+# Fuel £84.00, Taxi £16.30, Public transport £12.50
+DECEMBER = [
+    (-25, "DEB", "SHELL KINGS CROSS", -4800),
+    (-20, "DEB", "TFL TRAVEL CH", -1250),
+    (-14, "DEB", "UBER TRIP", -1630),
+    (-10, "DEB", "TESCO PFS 4471", -3600),
+]
 
 
 def history(rows: list[tuple[int, str, str, int]], account: str) -> History:

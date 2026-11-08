@@ -209,6 +209,12 @@ export const fetchMerchants = () => get<{ items: MerchantRow[] }>("/api/merchant
 export const setAlwaysAsk = (merchant: number, on: boolean, source: "user" | "suggestion" = "user") =>
   call<AlwaysAskResult>(`/api/merchants/${merchant}/always-ask`, json("PUT", { on, source }));
 
+// The Assistant's model (Settings): "fast" is Faster, "careful" is More careful.
+export type AssistantModel = "fast" | "careful";
+export const fetchAssistantModel = () => get<{ model: AssistantModel }>("/api/chat/model").then((r) => r.model);
+export const setAssistantModel = (model: AssistantModel) =>
+  call<{ model: AssistantModel }>("/api/chat/model", json("PUT", { model }));
+
 // Subscriptions (#101). Costs may carry flags and trials (#106); lib/subscriptions types them.
 export type SubscriptionEntry = components["schemas"]["SubscriptionOut"];
 export type SubscriptionCosts = import("@/lib/subscriptions").Costs;

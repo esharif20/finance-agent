@@ -1,7 +1,9 @@
 """The Assistant's synthetic golden set (#143, docs/ML_EVALUATIONS.md): question
 -> route -> expected tool calls -> grounded answer, over the synthetic Ledger of
 `tests/synthetic_assistant.py` (January 2026: £2,500.00 in, £92.34 spent, all
-Food & Drink). Synthetic only.
+Food & Drink; December 2025: £112.80 of Transport, £84.00 of it Fuel).
+Synthetic only. A case with `after` is a follow-up: the bench first runs that
+case's question on the same conversation, unscored.
 
 Expected calls are in order; their arguments are a subset the model's call must
 carry: dicts match key by key, lists item by item, and an expected string must
@@ -18,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 2
+DATASET_VERSION = 3
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -38,6 +40,7 @@ class Case(NamedTuple):
     answer: str = ""
     figures: tuple[str, ...] = ()
     refusal: bool = False
+    after: str | None = None  # the id of the case this one follows up
 
 
 JAN = {"month": "2026-01"}
@@ -113,6 +116,56 @@ CASES: tuple[Case, ...] = (
         "ask",
         (Call("list_insights"),),
         "There are no Insights for you yet.",
+    ),
+    # --- Ask: inside a Category (v3) ------------------------------------------
+    Case(
+        "ask-fuel-last-month",
+        "How much did I spend on fuel last month?",
+        "ask",
+        (Call("category_detail", {"category": "fuel", "month": "2025-12"}),),
+        "£84.00 on fuel in December 2025.",
+        ("£84.00",),
+    ),
+    Case(
+        "ask-petrol-word",
+        "What did petrol cost me in December 2025?",
+        "ask",
+        (Call("category_detail", {"category": "fuel", "month": "2025-12"}),),
+        "Petrol (Fuel) cost £84.00 in December 2025.",
+        ("£84.00",),
+    ),
+    Case(
+        "ask-transport-breakdown",
+        "What did my Transport spending go on in December 2025?",
+        "ask",
+        (Call("category_detail", {"category": "Transport", "month": "2025-12"}),),
+        "£112.80 on Transport: £84.00 Fuel, £16.30 Taxi, £12.50 Public transport.",
+        ("£112.80", "£84.00"),
+    ),
+    Case(
+        "ask-top-fuel-merchant",
+        "Where did I buy most of my fuel in December 2025?",
+        "ask",
+        (Call("category_detail", {"category": "fuel", "month": "2025-12"}),),
+        "Shell, at £48.00 of your £84.00 on Fuel.",
+        ("£48.00",),
+    ),
+    Case(
+        "ask-transport-last-month",
+        "How much did I spend on transport last month?",
+        "ask",
+        (Call("category_detail", {"category": "Transport", "month": "2025-12"}),),
+        "£112.80 on Transport in December 2025.",
+        ("£112.80",),
+    ),
+    Case(
+        "ask-followup-fuel",
+        "Of that transport, how much was fuel for my car?",
+        "ask",
+        (Call("category_detail", {"category": "fuel", "month": "2025-12"}),),
+        "£84.00 of it was Fuel.",
+        ("£84.00",),
+        after="ask-transport-last-month",
     ),
     # --- Plan --------------------------------------------------------------
     Case(

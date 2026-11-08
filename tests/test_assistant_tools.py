@@ -69,6 +69,7 @@ def test_each_sub_graph_is_offered_only_its_own_tools() -> None:
     assert {s.name for s in specs("ask")} == {
         "spending_summary",
         "category_trend",
+        "category_detail",
         "list_subscriptions",
         "list_insights",
         "explain_insight",
@@ -162,6 +163,41 @@ def client(two_users: Engine) -> Iterator[TestClient]:
         yield c
 
 
+def assert_detail_matches(
+    engine: Engine, top: str, month: str, api_detail: dict[str, Any]
+) -> None:
+    """category_detail: the drill-down's Subcategories and top Merchants, and
+    each Subcategory asked for as "Top > Sub" or by its name alone."""
+    d = call(engine, "ask", "category_detail", category=top, month=month)
+    assert money(d.total) == minor_of(api_detail["total"])
+    assert [(r.name, *money(r.amount)) for r in d.subcategories] == [
+        (x["name"], *minor_of(x["amount"])) for x in api_detail["subcategories"]
+    ]
+    assert [(r.merchant.data, *money(r.amount)) for r in d.merchants] == [
+        (sanitise(x["display_name"]), *minor_of(x["amount"]))
+        for x in api_detail["merchants"]
+    ]
+    for sub in api_detail["subcategories"]:
+        alone = () if sub["name"] == top else (sub["name"].lower(),)
+        for asked in (f"{top} > {sub['name']}", *alone):
+            s = call(engine, "ask", "category_detail", category=asked, month=month)
+            assert s.category == f"{top} > {sub['name']}"
+            assert money(s.total) == minor_of(sub["amount"])
+            assert s.subcategories == []
+            assert [(m.merchant.data, *money(m.amount)) for m in s.merchants] == [
+                (r.merchant.data, *money(r.amount))
+                for r in call(
+                    engine,
+                    "ask",
+                    "category_detail",
+                    category=asked.upper(),
+                    month=month,
+                ).merchants
+            ]  # the name in any case
+    with pytest.raises(NoData):  # an unknown Subcategory is not its top's total
+        call(engine, "ask", "category_detail", category=f"{top} > Nope", month=month)
+
+
 def assert_matches_api(engine: Engine, c: TestClient) -> None:
     """Every tool's figures against the endpoint the dashboard draws."""
     months = c.get("/api/months").json()
@@ -198,6 +234,7 @@ def assert_matches_api(engine: Engine, c: TestClient) -> None:
             assert [(p.month, *money(p.amount)) for p in t.points] == [
                 (p["month"], *minor_of(p["amount"])) for p in r.json()["trend"]
             ]
+            assert_detail_matches(engine, cat["name"], month, r.json())
         f = call(engine, "correct", "find_transactions", month=month)
         tx = c.get("/api/transactions", params={"month": month, "limit": 20}).json()
         assert f.total == tx["total"]
@@ -506,6 +543,15 @@ def test_one_evidence_id_names_one_figure(two_users: Engine) -> None:
             note(t.evidence_id, t.total)
             for p in t.points:
                 note(p.evidence_id, p.amount)
+            d = call(two_users, "ask", "category_detail", category=r.name, month=m)
+            note(d.evidence_id, d.total)
+            for x in d.subcategories:
+                note(x.evidence_id, x.amount)
+                sub = f"{r.name} > {x.name}"
+                one = call(two_users, "ask", "category_detail", category=sub, month=m)
+                note(one.evidence_id, one.total)
+                for mr in [*d.merchants, *one.merchants]:
+                    note(mr.evidence_id, mr.amount)
 
 
 def test_a_month_with_an_import_gap_says_its_figures_are_incomplete(
