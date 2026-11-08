@@ -6,7 +6,7 @@ export type BulkGroup = {
   category: Cat;
   items: ReviewItem[];
   score: number;
-  /** Merchants that start unticked: those whose score is below the group's median. */
+  /** Merchants that start unticked: those whose spend is below the group's median. */
   off: ReadonlySet<string>;
 };
 
@@ -44,8 +44,8 @@ export function groupBySuggestion(items: ReviewItem[]): BulkGroup[] {
   const byScore = (a: ReviewItem, b: ReviewItem) => score(b) - score(a) || a.title.localeCompare(b.title);
   return [...by.values()]
     .map((g) => {
-      const mid = median(g.items.map(score));
-      return { ...g, items: g.items.sort(byScore), off: new Set(g.items.filter((i) => score(i) < mid).map((i) => i.id)) };
+      const mid = median(g.items.map((i) => i.spend_minor));
+      return { ...g, items: g.items.sort(byScore), off: new Set(g.items.filter((i) => i.spend_minor < mid).map((i) => i.id)) };
     })
     .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
 }
@@ -58,7 +58,7 @@ export const shown = (g: BulkGroup, page: number) => {
   return isBig(g) ? g.items.slice(p * GROUP_CAP, (p + 1) * GROUP_CAP) : g.items;
 };
 
-/** Ticked unless below the group's median, with the user's changes (`flipped`) on top of that default. */
+/** Ticked unless its spend is below the group's median, with the user's changes (`flipped`) on top of that default. */
 export const ticked = (g: BulkGroup, flipped: ReadonlySet<string>, id: string) => g.off.has(id) === flipped.has(id);
 
 /** What "Accept N" would send: the ticked rows of what is shown. */

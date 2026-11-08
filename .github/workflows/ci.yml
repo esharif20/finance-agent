@@ -59,6 +59,7 @@ jobs:
         run: |
           uv run python evals/categoriser.py
           uv run python evals/categoriser_gate.py
+          uv run python evals/review_suggestions.py
       - name: detector, baseline, ranking, forecast and playbook evals (results reproduce)
         run: |
           uv run python evals/detectors.py
