@@ -120,8 +120,8 @@ function Shell() {
         <NavTabs
           tabs={TABS}
           tab={tab}
-          className="glass fixed inset-x-4 bottom-3 z-20 flex justify-center gap-0.5 rounded-full p-1.5 sm:hidden"
-          item="inline-flex min-h-11 items-center gap-2 rounded-full px-2.5 text-xs font-semibold [&_svg]:hidden"
+          className="glass fixed inset-x-2 bottom-3 z-20 flex justify-center gap-0 rounded-full p-1 sm:hidden"
+          item="inline-flex min-h-11 items-center gap-2 rounded-full px-1.5 text-xs font-semibold [&_svg]:hidden"
         />
       </div>
     </>

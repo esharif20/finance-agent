@@ -32,7 +32,7 @@ export function Figures({ text }: { text: string }) {
 
 function ReplyTable({ block }: { block: Extract<Block, { kind: "table" }> }) {
   return (
-    <div className="my-2 overflow-x-auto rounded-xl border border-border">
+    <div className="my-2 max-h-96 overflow-auto rounded-xl border border-border">
       <table className="w-full text-label">
         <thead>
           <tr className="text-left text-muted-foreground">
