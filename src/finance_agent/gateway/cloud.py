@@ -84,9 +84,11 @@ def check_base_url(url: str) -> str:
     return f"https://{HOST}"
 
 
-def request_body(payload: GatewayPayload, max_tokens: int) -> dict[str, Any]:
+def request_body(
+    payload: GatewayPayload, max_tokens: int, system: str = SYSTEM
+) -> dict[str, Any]:
     return {
-        "systemInstruction": {"parts": [{"text": SYSTEM}]},
+        "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": payload.model_dump_json()}]}],
         "generationConfig": {"maxOutputTokens": max_tokens},
     }
@@ -165,14 +167,19 @@ class CloudChatModel:
         raise TypeError("CloudChatModel holds a key and never pickles")
 
     def complete(
-        self, payload: GatewayPayload, *, model: str, max_tokens: int
+        self,
+        payload: GatewayPayload,
+        *,
+        model: str,
+        max_tokens: int,
+        system: str = SYSTEM,  # evals/cloud_synth.py words its own (synthetic only)
     ) -> tuple[str, Usage]:
         if not isinstance(payload, GatewayPayload):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("only a GatewayPayload from redact may leave")
         if not _MODEL.fullmatch(model) or not 1 <= max_tokens <= 65536:
             raise CloudError("the model id or max_tokens is out of range")
         url = f"{self._base}/v1beta/models/{model}:generateContent"
-        body = json.dumps(request_body(payload, max_tokens)).encode()
+        body = json.dumps(request_body(payload, max_tokens, system)).encode()
         headers = {"Content-Type": "application/json", "x-goog-api-key": self._key}
         status = 0
         for _ in range(1 + MAX_RETRIES):
