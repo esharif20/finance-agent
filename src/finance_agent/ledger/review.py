@@ -50,7 +50,7 @@ class Item:
     type: str
     key: str  # stable within the type: a Merchant id, "t<id>", or row ids
     version: str  # hash of the inputs; a decision holds while it matches
-    weight: int  # Transactions an answer touches: all the Merchant's rows
+    weight: int  # Transactions a Merchant-wide answer changes
     title: str = ""  # the Merchant's name, if any
     merchant_id: int | None = None
     transaction_ids: tuple[int, ...] = ()
@@ -97,18 +97,21 @@ class CategoryItems:
     def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
         rows: dict[int, list[int]] = {}
         names: dict[int, str] = {}
-        counts: dict[int, int] = {}  # every row of the Merchant, for `weight`
+        # `weight`: every row a Merchant-wide answer changes, rule-categorised
+        # too; never a Transaction's own Correction or a Split, which beat it
+        counts: dict[int, int] = {}
         for t in txns:
             c = t.categorisation
-            if c is not None and c.merchant_id is not None:
-                counts[c.merchant_id] = counts.get(c.merchant_id, 0) + 1
             if (
-                c is not None
-                and c.kind in CATEGORISED_KINDS
-                and c.category == (UNCATEGORISED, UNCATEGORISED)
-                # the user chose Uncategorised, or split it (its own items)
-                and c.source not in ("correction", "split", "split_refund")
+                c is None
+                or c.kind not in CATEGORISED_KINDS
+                # the user chose a Category for it, or split it (its own items)
+                or c.source in ("correction", "split", "split_refund")
             ):
+                continue
+            if c.merchant_id is not None:
+                counts[c.merchant_id] = counts.get(c.merchant_id, 0) + 1
+            if c.category == (UNCATEGORISED, UNCATEGORISED):
                 if c.merchant_id is None:
                     yield Item(
                         self.name, f"t{t.id}", _version(t.id), 1, "", None, (t.id,)

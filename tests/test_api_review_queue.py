@@ -130,3 +130,42 @@ def test_undo_of_an_answer_reverted_elsewhere_returns_a_message(
 
     assert r.status_code == 200 and "already" in r.json()["message"]
     assert client.get("/api/review-queue").json()["message"] is None
+
+
+def test_a_no_merchant_answer_cannot_reach_another_users_row(
+    engine: Engine, tmp_path: Path, client: TestClient
+) -> None:
+    """Adversarial (#158): each user has a no-Merchant row; user 1 aims an
+    answer at user 2's row by its item id and by transaction_id."""
+    for uid in (1, 2):
+        p = tmp_path / f"nomerchant{uid}.csv"
+        p.write_text(export([("0000 1234", -500)]))
+        with engine.begin() as conn:
+            if uid != 1:
+                conn.execute(
+                    schema.user.insert().values(id=uid, created_at=datetime.now(UTC))
+                )
+            Ledger(conn, uid).import_files([p])
+            categorise.run(conn, uid)
+    with engine.begin() as conn:
+        (theirs,) = ReviewQueue(conn, 2).items()
+    (mine,) = client.get("/api/review-queue").json()["items"]
+    assert mine["id"] != theirs.id and mine["weight"] == 1
+    cat = ["Travel", "Hotels"]
+
+    r = client.post(
+        f"/api/review-queue/{theirs.id}/answer",
+        json={"version": theirs.version, "category": cat},
+    )
+    assert r.status_code == 404
+    r = client.post(
+        f"/api/review-queue/{mine['id']}/answer",
+        json={
+            "version": mine["version"],
+            "category": cat,
+            "transaction_id": theirs.transaction_ids[0],
+        },
+    )
+    assert r.status_code == 422
+    with engine.begin() as conn:
+        assert Ledger(conn, 1).corrections() == Ledger(conn, 2).corrections() == []

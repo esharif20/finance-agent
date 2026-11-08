@@ -346,14 +346,20 @@ def test_uncategorised_rows_with_no_merchant_are_queued_one_by_one() -> None:
         assert category_items(q) == [second]
 
 
-def test_weight_counts_every_row_of_the_merchant() -> None:
+def test_weight_counts_the_rows_a_merchant_answer_changes() -> None:
+    """Not a row the user already corrected one by one: that Correction beats
+    the Merchant's, so "Apply to N similar" would overstate N."""
     with ledger_with([("SYNTH CAFE", -350)] * 3) as (conn, led):
         q = ReviewQueue(conn, 1)
         (item,) = category_items(q)
         led.correct_transaction(item.transaction_ids[0], ("Travel", "Hotels"))
 
         (left,) = category_items(q)
-        assert len(left.transaction_ids) == 2 and left.weight == 3
+        assert len(left.transaction_ids) == 2 and left.weight == 2
+        before = categories(led)
+        q.answer(left.id, left.version, Answer(category=("Food & Drink", "Coffee")))
+        after = categories(led)
+        assert sum(after[t] != before[t] for t in after) == left.weight
 
 
 def test_a_skip_and_its_undo_never_bump_the_ledger_version() -> None:
@@ -459,6 +465,8 @@ def test_the_queue_never_changes_money_and_answers_reach_only_their_rows(
             reached = {t for t in after if after[t] != before[t]}
             intended = {one} if action == "one" else set(item.transaction_ids)
             assert reached <= intended
+            if action == "answer" and item.merchant_id is not None:
+                assert len(reached) == item.weight  # "Apply to N similar"
             assert all(after[t] == (cat, "correction") for t in intended)
             assert figures(led) == money
         assert figures(led) == money
