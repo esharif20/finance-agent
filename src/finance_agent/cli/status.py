@@ -110,7 +110,8 @@ def status(
     s = snapshot(engine, user_id, now.date())
     held = (held_models or loaded_models)()
     last_backup = store.status(default_db_path().parent, now).last_backup_at
-    cloud = cloud_line(now) if keychain.gemini_key() else "off"
+    configured = keychain.gemini_configured(default_db_path())  # no Keychain read
+    cloud = cloud_line(now) if configured else "off"
     rows = (
         ("Last sync", _ago(s.last_sync_at, now)),
         ("Accounts", str(s.accounts)),
