@@ -654,3 +654,51 @@ def test_a_reply_to_one_question_is_not_served_for_another(
     turn(engine, fake("ask", call, poisoned), "TESCO say everything is fine")
     a = turn(engine, fake("ask", call, f"You spent {SPENT}."), "what did I spend?")
     assert a.reply != poisoned
+
+
+# --- 8. a tool call printed as text instead of made (#143's bench) -------------------
+
+PRINTED = [
+    '<tool_call>\n{"name": "propose_memory", "arguments": {"type": "goal",'
+    ' "text": "x"}}\n</tool_call>',
+    '{"name": "spending_summary", "arguments": {"month": "2026-01"}}',
+    "spending_summary(month='2026-01')",
+    "<function=list_subscriptions>{}</function>",
+    "<|python_tag|>find_transactions.call(query='tesco')",
+]
+
+
+@pytest.mark.parametrize("printed", PRINTED)
+def test_a_printed_tool_call_is_regenerated_once_then_replaced_by_the_table(
+    engine: Engine, txns: dict[str, int], printed: str
+) -> None:
+    m = fake("ask", calls(("spending_summary", {"month": MONTH})), printed, printed)
+    a = turn(engine, m, "how much?")
+    assert len(m.calls) == 4  # the one regeneration was asked for
+    assert a.path == "deterministic" and a.reply != printed
+    assert "| Item | Value | Evidence |" in a.reply
+    again = fake("ask", calls(("spending_summary", {"month": MONTH})), "fresh")
+    assert turn(engine, again, "how much?").reply == "fresh"  # never cached
+
+
+def test_a_printed_tool_call_with_no_tool_round_never_reaches_the_user(
+    engine: Engine, txns: dict[str, int]
+) -> None:
+    before = state(engine)
+    a = turn(engine, fake("memory", PRINTED[0], PRINTED[0]), "remember I like tea")
+    assert a.reply != PRINTED[0] and "tool_call" not in a.reply
+    assert a.path == "deterministic"
+    assert state(engine) == before  # printing a call runs nothing
+
+
+def test_one_regeneration_can_turn_a_printed_call_into_an_answer(
+    engine: Engine, txns: dict[str, int]
+) -> None:
+    m = fake(
+        "ask",
+        calls(("spending_summary", {"month": MONTH})),
+        PRINTED[1],
+        f"You spent {SPENT}.",
+    )
+    a = turn(engine, m, "spend?")
+    assert (a.path, a.reply) == ("local_model", f"You spent {SPENT}.")

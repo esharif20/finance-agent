@@ -25,7 +25,12 @@ from pydantic import ValidationError
 from sqlalchemy import Connection
 
 from finance_agent.assistant import context
-from finance_agent.assistant.chat_model import ChatModel, Message, Reply
+from finance_agent.assistant.chat_model import (
+    ChatModel,
+    Message,
+    Reply,
+    printed_tool_call,
+)
 from finance_agent.assistant.checkpoints import LedgerSaver
 from finance_agent.assistant.grounding import (
     ToolValue,
@@ -33,7 +38,14 @@ from finance_agent.assistant.grounding import (
     render_fallback,
 )
 from finance_agent.assistant.ollama import OllamaError
-from finance_agent.assistant.tools import NoData, ToolNotAllowed, Turn, run, specs
+from finance_agent.assistant.tools import (
+    TOOLS,
+    NoData,
+    ToolNotAllowed,
+    Turn,
+    run,
+    specs,
+)
 from finance_agent.assistant.tools.propose import ProposalOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
@@ -67,6 +79,12 @@ _LINK = re.compile(
     r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}[/?]",
     re.IGNORECASE,
 )
+
+
+def _shown(reply: str) -> bool:
+    """A reply may reach the user only with no link and no tool call printed as
+    text (a failed generation, #143), whatever its figures."""
+    return not _LINK.search(reply) and not printed_tool_call(reply, frozenset(TOOLS))
 
 
 def _keep_last(
@@ -241,7 +259,7 @@ class Assistant:
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)
-        ok = res.grounded and not _LINK.search(d.reply)
+        ok = res.grounded and _shown(d.reply)
         if not d.failed and not ok:
             try:
                 again: Reply = self.model.chat(
@@ -253,7 +271,7 @@ class Assistant:
                 )
                 d.reply = again.content
                 res = check_grounding(d.reply, d.values, today=self.today)
-                ok = res.grounded and not _LINK.search(d.reply)
+                ok = res.grounded and _shown(d.reply)
             except (OllamaError, OSError):
                 d.failed = True
         if d.failed or not ok:
