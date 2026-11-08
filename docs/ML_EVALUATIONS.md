@@ -93,11 +93,26 @@ It loses on one Category, Coffee (0.079 against 0.057). That Category has no sea
 | Price rise | 1.00 (0.01) | 1.00 (1.00) | 1.00, 1.00 |
 | Category spike | 0.35 (0.07) | 1.00 (0.78) | 1.00, 1.00 |
 | Upcoming renewal | 1.00 (0.40) | 1.00 (1.00) | 1.00, 1.00 |
-| Payday shortfall | not run (0.04) | 0 (1.00) | #151 |
+| Payday shortfall | 1.00 (0.04) | 1.00 (1.00) | none cited, 1.00 |
 
 The Subscriptions rule is what lets a renewal be predicted from one or two charges. It depends on categorisation: an annual fee filed elsewhere is not flagged until it forms a series. Spike precision is unchanged from #147, and the threshold was not tuned on this set, which has only 18 spikes.
 
+**Shortfall risk (#151).** `engine.shortfall` projects the balance day by day to the day before the next payday: scheduled payments and income on their projected dates (`forecast.cash_flow`), and other spending at the user's own pace through a pay cycle (`payday_baseline`), so the heavy week after payday is not spread over the month. It warns when the median-cycle projection dips below zero, once per payday, with the projected deficit as impact (scored to within 25%: it is a forecast). It also reports `floor`, the bottom of the balance's band, with spending at the top of the ETS band where that is higher. Alerting on the floor instead dropped precision to 0.30 (14 false alarms): a one-off big expense comes back through its Category's seasonal forecast a year later. Alerting on the band's point gave 0.50. Below six complete pay cycles, or with no payday projected, it returns `Insufficient`; the forecast's own 12-month gate would have missed four of the six planted shortfalls, which fall in the first year. A shortfall cites no Transactions (it is a projection), so `evidence_valid` does not apply. Committed run: candidate v3.
+
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
+
+### Insight ranking (#150)
+
+`engine.ranking` scores an Insight as impact × confidence × relevance, where relevance is the mean of a Beta(1, 1) posterior per (Insight type, Category), updated only by an explicit thumbs-up (a success) and a thumbs-down or dismissal (a failure). Equal scores keep their given order. `evals/ranking.py` replays 14 monthly slates of 10 per synthetic user, with ratings on the logging policy's top 3. Committed run (seed 146, dataset v2):
+
+| Ranker | NDCG@3 | NDCG@5 |
+| --- | --- | --- |
+| £ impact (baseline) | 0.802 | 0.850 |
+| impact × confidence × Beta relevance | 0.838 | 0.877 |
+
+It wins on five of six users at @3 and all six at @5; history 3 loses at @3 (0.801 against 0.816). Probing outside the gate: impact × confidence alone (relevance flat) scores 0.829, so about a quarter of the gain is relevance; separate Beta posteriors per type and per Category, multiplied, score 0.865, because 42 ratings spread thin over the (type, Category) cells. That factorised form is the next step if real ratings stay this sparse.
+
+Confidences are still the detectors' fixed per-rule priors, not calibrated: calibration needs outcomes on real Insights, which only the user's feedback will give.
 
 ### Forecasting (#149)
 

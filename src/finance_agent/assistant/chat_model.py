@@ -1,9 +1,10 @@
 """The `ChatModel` seam (#135, docs/AI_DESIGN.md): typed messages and tool calls,
 and the scripted `FakeChatModel` that graph tests and CI run on."""
 
+import json
 import re
 from collections.abc import Iterator, Sequence
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
@@ -74,3 +75,33 @@ class FakeChatModel:
             yield Reply(content=word)
         if reply.tool_calls:
             yield Reply(tool_calls=reply.tool_calls)
+
+
+# --- the qwen tool-call printing bug (#143) ----------------------------------
+
+_MARKERS = re.compile(r"<\|?tool_call\|?>|<function=|<\|python_tag\|>")
+
+
+def _json_objects(text: str) -> Iterator[Any]:
+    decoder = json.JSONDecoder()
+    for m in re.finditer(r"\{", text):
+        try:
+            yield decoder.raw_decode(text, m.start())[0]
+        except ValueError:
+            continue
+
+
+def printed_tool_call(content: str, names: set[str] | frozenset[str]) -> bool:
+    """Whether a reply's text holds a tool call the model should have made as a
+    structured call: a tool-call marker, a {"name": <tool>, "arguments": ...}
+    object, or <tool>(...)."""
+    if _MARKERS.search(content):
+        return True
+    for obj in _json_objects(content):
+        if (
+            isinstance(obj, dict)
+            and obj.get("name") in names  # pyright: ignore[reportUnknownMemberType]
+            and ({"arguments", "parameters"} & obj.keys())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        ):
+            return True
+    return any(re.search(rf"\b{re.escape(n)}\s*\(", content) for n in names)

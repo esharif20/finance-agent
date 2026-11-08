@@ -62,3 +62,14 @@ def test_committed_results_are_reproducible_from_the_seed() -> None:
     assert {f"history_{i}.ndcg@3" for i in range(committed["histories"])} <= base[
         "metrics"
     ].keys()
+
+
+def test_the_relevance_ranker_beats_impact_alone() -> None:
+    """#150's gate: impact x confidence x Beta relevance beats £ impact at
+    both cut-offs on the committed run."""
+    models = json.loads(ranking.RESULTS.read_text())["models"]
+    cand, base = models["candidate"], models["baseline"]
+    assert cand["model"] == "beta-relevance"
+    for k in ranking.KS:
+        m = f"overall.ndcg@{k}"
+        assert cand["metrics"][m] > base["metrics"][m]

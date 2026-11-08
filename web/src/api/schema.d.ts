@@ -41,6 +41,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cash-flow/simulate-purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Simulate Purchase */
+        get: operations["simulate_purchase_api_cash_flow_simulate_purchase_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/categories": {
         parameters: {
             query?: never;
@@ -256,6 +273,87 @@ export interface paths {
         get: operations["health_api_health_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ranked
+         * @description The best `limit` Insights, by impact x confidence x relevance, less
+         *     those a constraint Memory rules out.
+         */
+        get: operations["ranked_api_insights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Feedback
+         * @description Wipe every rating and dismissal: relevance starts again from Beta(1, 1).
+         */
+        delete: operations["forget_feedback_api_insights_feedback_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/{insight_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss
+         * @description Hide the Insight; it counts as a thumbs-down for its type and Category.
+         */
+        post: operations["dismiss_api_insights__insight_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/{insight_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Feedback
+         * @description A thumbs-up or thumbs-down; a later one replaces it.
+         */
+        post: operations["feedback_api_insights__insight_id__feedback_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1100,6 +1198,21 @@ export interface components {
             /** On */
             on: string;
         };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /** Liked */
+            liked: boolean;
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Id */
+            id: number;
+            /**
+             * Signal
+             * @enum {string}
+             */
+            signal: "up" | "down" | "dismissed";
+        };
         /** FlagOut */
         FlagOut: {
             after: components["schemas"]["Pence"] | null;
@@ -1156,6 +1269,33 @@ export interface components {
         HealthOut: {
             /** App */
             app: string;
+        };
+        /** InsightOut */
+        InsightOut: {
+            /** Category */
+            category: string;
+            /** Confidence */
+            confidence: number;
+            /** Evidence */
+            evidence: number[];
+            /** Explanation */
+            explanation: string;
+            /** Id */
+            id: number;
+            /** Impact Minor */
+            impact_minor: number;
+            /** Key */
+            key: string;
+            /**
+             * Raised On
+             * Format: date
+             */
+            raised_on: string;
+            relevance: components["schemas"]["RelevanceOut"];
+            /** Signal */
+            signal: ("up" | "down" | "dismissed") | null;
+            /** Type */
+            type: string;
         };
         /** ItemOut */
         ItemOut: {
@@ -1455,12 +1595,40 @@ export interface components {
              */
             source: "bank" | "exchange" | "user";
         };
+        /** RelevanceOut */
+        RelevanceOut: {
+            /** Disliked */
+            disliked: number;
+            /** Liked */
+            liked: number;
+        };
         /** RevertOut */
         RevertOut: {
             /** Id */
             id: number;
             /** Ledger Version */
             ledger_version: number;
+        };
+        /** @enum {string} */
+        Risk: "none" | "below_buffer" | "below_zero";
+        /** SimulationOut */
+        SimulationOut: {
+            floor: components["schemas"]["Pence"] | null;
+            /** Have */
+            have: number | null;
+            minimum: components["schemas"]["Pence"] | null;
+            /** Need */
+            need: number | null;
+            /** On */
+            on: string | null;
+            /** Payday */
+            payday: string | null;
+            risk: components["schemas"]["Risk"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient";
         };
         /** SpendingOut */
         SpendingOut: {
@@ -1721,6 +1889,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_purchase_api_cash_flow_simulate_purchase_get: {
+        parameters: {
+            query: {
+                amount_minor: number;
+                on?: string | null;
+                buffer_minor?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2076,6 +2277,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    ranked_api_insights_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_feedback_api_insights_feedback_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
+    dismiss_api_insights__insight_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                insight_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_api_insights__insight_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                insight_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

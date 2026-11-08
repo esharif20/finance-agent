@@ -19,7 +19,8 @@ depend only on the multiset of rows, never on their order.
   Subscriptions charge with nothing from the Merchant for 300 days around it.
 
 The learned gates of ADR 0015 return `Insufficient` when no key clears them.
-Confidences are fixed priors per rule until the ranker (#150) calibrates them.
+Confidences are fixed priors per rule, not calibrated (#150: that needs
+outcomes on real Insights; see `engine.insights`).
 """
 
 from collections import defaultdict
@@ -43,7 +44,7 @@ from finance_agent.engine.baselines import (
 
 type Category = tuple[str, str]
 type InsightType = Literal[
-    "recurring", "price_increase", "category_spike", "upcoming_renewal"
+    "recurring", "price_increase", "category_spike", "upcoming_renewal", "shortfall"
 ]
 
 PER_YEAR = {"weekly": 52, "monthly": 12, "annual": 1}

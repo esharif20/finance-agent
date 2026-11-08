@@ -10,7 +10,7 @@ the user's planted care for its type and its Category (`History.care_type`,
 `History.care_category`), hidden from rankers. After each round the user sees
 the top `SHOWN` Insights of a fixed logging policy (£ impact) and rates each
 one, liked with probability care_type x care_category; a `Ranker` gets every
-earlier rating, as the Beta-Bernoulli relevance posterior (#150) will.
+earlier rating, as the Beta-Bernoulli relevance posterior (#150) does.
 """
 
 import random
@@ -21,6 +21,7 @@ from typing import Any, NamedTuple, Protocol
 
 import gate
 import synthetic_history as sh
+from finance_agent.engine import ranking
 from metrics import ndcg_at_k
 
 RESULTS = Path(__file__).parent / "results" / "ranking_baseline.json"
@@ -97,14 +98,16 @@ def baseline(slate: Sequence[Insight], feedback: Sequence[Feedback]) -> list[Ins
     return sorted(slate, key=lambda i: -i.impact)
 
 
-def stub(slate: Sequence[Insight], feedback: Sequence[Feedback]) -> list[Insight]:
-    """Placeholder until #150: the slate as given."""
-    return list(slate)
+def relevance(slate: Sequence[Insight], feedback: Sequence[Feedback]) -> list[Insight]:
+    """#150: impact x confidence x the Beta(1, 1) posterior mean per
+    (type, Category), from every earlier rating (`engine.ranking`)."""
+    cells = ranking.posteriors((f.type, f.category, f.liked) for f in feedback)
+    return ranking.rank(slate, cells)
 
 
 MODELS: dict[str, tuple[str, str, Ranker]] = {
     "baseline": ("impact", "1", baseline),
-    "candidate": ("stub", "0", stub),
+    "candidate": ("beta-relevance", "1", relevance),
 }
 
 

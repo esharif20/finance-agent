@@ -908,6 +908,42 @@
         "title": "EvidenceOut",
         "type": "object"
       },
+      "FeedbackIn": {
+        "properties": {
+          "liked": {
+            "title": "Liked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "liked"
+        ],
+        "title": "FeedbackIn",
+        "type": "object"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "signal": {
+            "enum": [
+              "up",
+              "down",
+              "dismissed"
+            ],
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "signal"
+        ],
+        "title": "FeedbackOut",
+        "type": "object"
+      },
       "FlagOut": {
         "properties": {
           "after": {
@@ -1081,6 +1117,84 @@
           "app"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "InsightOut": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "integer"
+          },
+          "evidence": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "impact_minor": {
+            "title": "Impact Minor",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "raised_on": {
+            "format": "date",
+            "title": "Raised On",
+            "type": "string"
+          },
+          "relevance": {
+            "$ref": "#/components/schemas/RelevanceOut"
+          },
+          "signal": {
+            "anyOf": [
+              {
+                "enum": [
+                  "up",
+                  "down",
+                  "dismissed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "key",
+          "category",
+          "raised_on",
+          "impact_minor",
+          "confidence",
+          "evidence",
+          "explanation",
+          "signal",
+          "relevance"
+        ],
+        "title": "InsightOut",
         "type": "object"
       },
       "ItemOut": {
@@ -1931,6 +2045,24 @@
         "title": "RateUsedOut",
         "type": "object"
       },
+      "RelevanceOut": {
+        "properties": {
+          "disliked": {
+            "title": "Disliked",
+            "type": "integer"
+          },
+          "liked": {
+            "title": "Liked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "liked",
+          "disliked"
+        ],
+        "title": "RelevanceOut",
+        "type": "object"
+      },
       "RevertOut": {
         "properties": {
           "id": {
@@ -1947,6 +2079,112 @@
           "ledger_version"
         ],
         "title": "RevertOut",
+        "type": "object"
+      },
+      "Risk": {
+        "enum": [
+          "none",
+          "below_buffer",
+          "below_zero"
+        ],
+        "type": "string"
+      },
+      "SimulationOut": {
+        "properties": {
+          "floor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "have": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Have"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "need": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Need"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          },
+          "payday": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payday"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Risk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "payday",
+          "minimum",
+          "on",
+          "risk",
+          "floor",
+          "have",
+          "need"
+        ],
+        "title": "SimulationOut",
         "type": "object"
       },
       "SpendingOut": {
@@ -2655,6 +2893,76 @@
         "summary": "Card Image"
       }
     },
+    "/api/cash-flow/simulate-purchase": {
+      "get": {
+        "operationId": "simulate_purchase_api_cash_flow_simulate_purchase_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "amount_minor",
+            "required": true,
+            "schema": {
+              "maximum": 10000000000000,
+              "minimum": 1,
+              "title": "Amount Minor",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          },
+          {
+            "in": "query",
+            "name": "buffer_minor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000000000000,
+              "minimum": 0,
+              "title": "Buffer Minor",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Simulate Purchase"
+      }
+    },
     "/api/categories": {
       "get": {
         "operationId": "categories_api_categories_get",
@@ -3102,6 +3410,166 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/insights": {
+      "get": {
+        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out.",
+        "operationId": "ranked_api_insights_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InsightOut"
+                  },
+                  "title": "Response Ranked Api Insights Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ranked"
+      }
+    },
+    "/api/insights/feedback": {
+      "delete": {
+        "description": "Wipe every rating and dismissal: relevance starts again from Beta(1, 1).",
+        "operationId": "forget_feedback_api_insights_feedback_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget Feedback"
+      }
+    },
+    "/api/insights/{insight_id}/dismiss": {
+      "post": {
+        "description": "Hide the Insight; it counts as a thumbs-down for its type and Category.",
+        "operationId": "dismiss_api_insights__insight_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Insight Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss"
+      }
+    },
+    "/api/insights/{insight_id}/feedback": {
+      "post": {
+        "description": "A thumbs-up or thumbs-down; a later one replaces it.",
+        "operationId": "feedback_api_insights__insight_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Insight Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feedback"
       }
     },
     "/api/local-model": {

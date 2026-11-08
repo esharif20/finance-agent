@@ -26,7 +26,7 @@
       "metrics": {
         "route_accuracy": 1.0,
         "tool_call_accuracy": 0.25,
-        "grounding_pass_rate": 0.6,
+        "grounding_pass_rate": 0.0,
         "refusal_correctness": 1.0,
         "printed_tool_call_rate": 0.75,
         "model_error_rate": 0.0
@@ -55,7 +55,16 @@
           "ask-net",
           "ask-refunds-fees",
           "ask-food-trend",
-          "ask-food-vs-usual"
+          "ask-food-vs-usual",
+          "ask-subscriptions",
+          "ask-bills",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split"
         ],
         "printed": [
           "ask-spent-january",
