@@ -93,6 +93,19 @@ def test_the_engine_beats_the_trivial_rules_and_says_true_things() -> None:
         assert got[f"{t}.recall"] >= base[f"{t}.recall"]
         assert got[f"{t}.evidence_valid"] == 1.0
         assert got[f"{t}.impact_consistent"] == 1.0
+    # #151: a projected deficit, warned of before the balance goes negative
+    t = "payday_shortfall"
+    assert got[f"{t}.precision"] > base[f"{t}.precision"]
+    assert got[f"{t}.recall"] >= base[f"{t}.recall"]
+    assert got[f"{t}.impact_consistent"] == 1.0
+
+
+def test_a_shortfall_deficit_is_judged_to_within_a_quarter() -> None:
+    e = E("payday_shortfall", D, 0, "", sh.NONE, 40_000, (1,))
+    near = Detection("payday_shortfall", D, "", 50_000)
+    assert detectors.impact_consistent(e, near)
+    assert not detectors.impact_consistent(e, near._replace(impact=50_001))
+    assert not detectors.impact_consistent(e, near._replace(impact=29_999))
 
 
 def test_the_candidate_flags_a_spike_against_the_personal_baseline() -> None:

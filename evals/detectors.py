@@ -5,7 +5,7 @@ planted event type on the synthetic histories, against a trivial-rule baseline.
     uv run python evals/detectors.py --write    # refresh (see gate.py)
 
 The candidate is `engine.detectors` (#147 spikes, #148 price increases and
-upcoming renewals); shortfall risk is #151's. A true positive is also scored
+upcoming renewals) and `engine.shortfall` (#151). A true positive is also scored
 on what it says (`evidence_valid`, `impact_consistent`). A detector sees
 only what the Ledger holds (`Row`), never the ground truth, and returns
 dated `Detection`s for the whole history. A detection matches an unmatched
@@ -20,14 +20,19 @@ import sys
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
 import gate
 import synthetic_history as sh
-from finance_agent.engine import detectors
+from finance_agent.engine import detectors, forecast, shortfall
+from finance_agent.engine.baselines import Insufficient
+from finance_agent.engine.forecast import CashFlow
+from finance_agent.ledger import Categorisation
 
 RESULTS = Path(__file__).parent / "results" / "detectors_baseline.json"
+SHORTFALL_HORIZON = 3  # months: the next payday can fall in the one after next
 WINDOWS = {
     "price_rise": (0, 35),
     "category_spike": (0, 40),
@@ -197,8 +202,12 @@ TYPES = {"price_increase": "price_rise", "upcoming_renewal": "forgotten_renewal"
 
 
 def candidate(rows: Sequence[Row]) -> list[Detection]:
+    return _detected(rows) + shortfalls(rows)
+
+
+def _detected(rows: Sequence[Row]) -> list[Detection]:
     """`engine.detectors` on the Ledger's Spending: salary and transfers (no
-    Category) are not Spending. Shortfall risk is #151's."""
+    Category) are not Spending."""
     found = detectors.detect(
         [
             detectors.Row(r.id, r.date, r.merchant, r.category, r.amount)
@@ -213,9 +222,62 @@ def candidate(rows: Sequence[Row]) -> list[Detection]:
     ]
 
 
+class _Txn(NamedTuple):
+    """A Row as `forecast.project` reads a Transaction."""
+
+    posted_on: date
+    amount: Decimal
+    description: str
+    categorisation: Categorisation | None
+
+
+def _txns(rows: Sequence[Row]) -> list[_Txn]:
+    """Salary is Income and the sweep a Transfer (no Category); Merchant ids
+    in order of first appearance."""
+    ids: dict[str, int] = {}
+    out: list[_Txn] = []
+    for r in rows:
+        if r.category == sh.NONE:
+            kind, cat, mid = ("Income" if r.amount > 0 else "Transfer"), None, None
+        else:
+            kind, cat = ("Spending" if r.amount < 0 else "Refund"), r.category
+            mid = ids.setdefault(r.merchant, len(ids) + 1)
+        c = Categorisation(kind, r.merchant, cat, "default", 1, mid)
+        out.append(_Txn(r.date, Decimal(r.amount) / 100, r.merchant, c))
+    return out
+
+
+def shortfalls(rows: Sequence[Row]) -> list[Detection]:
+    """`engine.shortfall` run at the end of each day with rows, on the balance
+    then, the cash flow forecast from that month and the pace as of the
+    latest credit; once per payday. Both change only at those, so are cached."""
+    txns = _txns(rows)
+    flows: dict[date, CashFlow] = {}
+    paces: dict[tuple[date, date | None], shortfall.Pace | Insufficient] = {}
+    out: list[Detection] = []
+    raised: set[str] = set()
+    credit: date | None = None
+    for i, r in enumerate(rows):
+        if r.amount > 0 and r.category == sh.NONE:
+            credit = r.date
+        if i + 1 < len(rows) and rows[i + 1].date == r.date:
+            continue  # the day's closing balance
+        start = r.date.replace(day=1)
+        if start not in flows:
+            flows[start] = forecast.project(txns, {}, start, SHORTFALL_HORIZON)
+        if (start, credit) not in paces:
+            paces[start, credit] = shortfall.pace(txns, flows[start], r.date)
+        spend = paces[start, credit]
+        found = shortfall.shortfall(r.balance, r.date, flows[start], spend)
+        if isinstance(found, detectors.Insight) and found.key not in raised:
+            raised.add(found.key)
+            out.append(Detection("payday_shortfall", r.date, "", found.impact))
+    return out
+
+
 MODELS: dict[str, tuple[str, str, Detector]] = {
     "baseline": ("trivial-rules", "1", baseline),
-    "candidate": ("engine-detectors", "2", candidate),
+    "candidate": ("engine-detectors", "3", candidate),
 }
 
 
@@ -231,11 +293,14 @@ def impact_consistent(e: sh.Event, d: Detection) -> bool:
     """A price rise (annualised) and a renewal (the fee) are known exactly, to
     within 5%. A spike is flagged on the day it crosses, so its impact is the
     excess so far: positive, and at most half again the planted excess (the
-    baseline's normal is an estimate of the planted one)."""
+    baseline's normal is an estimate of the planted one). A shortfall's is a
+    projected deficit: within a quarter of the one that came."""
     if d.impact is None:
         return False
     if e.type == "category_spike":
         return 0 < d.impact and 2 * d.impact <= 3 * e.impact
+    if e.type == "payday_shortfall":
+        return abs(d.impact - e.impact) * 4 <= e.impact
     return abs(d.impact - e.impact) * 20 <= e.impact
 
 

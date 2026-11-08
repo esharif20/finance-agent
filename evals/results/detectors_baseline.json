@@ -84,16 +84,16 @@
     },
     "candidate": {
       "model": "engine-detectors",
-      "model_version": "2",
+      "model_version": "3",
       "metrics": {
         "category_spike.precision": 0.346154,
         "category_spike.recall": 1.0,
         "forgotten_renewal.precision": 1.0,
         "forgotten_renewal.recall": 1.0,
-        "overall.precision": 0.514286,
-        "overall.recall": 0.857143,
-        "payday_shortfall.precision": 0.0,
-        "payday_shortfall.recall": 0.0,
+        "overall.precision": 0.552632,
+        "overall.recall": 1.0,
+        "payday_shortfall.precision": 1.0,
+        "payday_shortfall.recall": 1.0,
         "price_rise.precision": 1.0,
         "price_rise.recall": 1.0,
         "price_rise.evidence_valid": 1.0,
@@ -103,7 +103,7 @@
         "forgotten_renewal.evidence_valid": 1.0,
         "forgotten_renewal.impact_consistent": 1.0,
         "payday_shortfall.evidence_valid": 0.0,
-        "payday_shortfall.impact_consistent": 0.0
+        "payday_shortfall.impact_consistent": 1.0
       },
       "counts": {
         "category_spike": {
@@ -117,14 +117,14 @@
           "fn": 0
         },
         "overall": {
-          "tp": 36,
+          "tp": 42,
           "fp": 34,
-          "fn": 6
+          "fn": 0
         },
         "payday_shortfall": {
-          "tp": 0,
+          "tp": 6,
           "fp": 0,
-          "fn": 6
+          "fn": 0
         },
         "price_rise": {
           "tp": 6,
