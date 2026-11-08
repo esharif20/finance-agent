@@ -179,7 +179,7 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 
 ### Model benchmark (#143)
 
-`evals/assistant_bench.py` runs the whole graph on the golden set in `evals/assistant_golden.py`. Each case is a question, its route, the expected tool calls in order, and a grounded answer. v1 has 20 cases: Ask, Memory and Correct, plus five refusals (a payment, an unconfirmed bulk write, a figure as a Memory, a plan before M5, and investment advice). They run over the synthetic Ledger of `tests/synthetic_assistant.py`. Each case runs in a rolled-back transaction on a throwaway encrypted database, keyed in memory.
+`evals/assistant_bench.py` runs the whole graph on the golden set in `evals/assistant_golden.py`. Each case is a question, its route, the expected tool calls in order, and a grounded answer. v2 (#155) has 25 cases: Ask (with Insights), Plan (a what-if purchase, with and without a buffer, and the cash-flow forecast), Memory and Correct, plus six refusals (a payment, an unconfirmed bulk write, a figure as a Memory, a saving plan, a transfer asked of Plan, and investment advice). They run over the synthetic Ledger of `tests/synthetic_assistant.py`. Each case runs in a rolled-back transaction on a throwaway encrypted database, keyed in memory.
 
 | Metric | Passes when |
 | --- | --- |

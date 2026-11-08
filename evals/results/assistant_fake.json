@@ -1,11 +1,11 @@
 {
   "harness": "assistant",
   "dataset": "assistant_golden",
-  "dataset_version": 1,
-  "dataset_sha256": "00a304e179aadfcf58d9887ec682dbd6c429df4cdc8863968993472869feeb56",
-  "prompt_sha256": "8ca5e5a1c79415fb54ce92bbace7c4f700437e02abd56c40894557322049b600",
-  "cases": 20,
-  "refusal_cases": 5,
+  "dataset_version": 2,
+  "dataset_sha256": "d5d93b90823ed21f4f9a9c869a0e67d4b810c5573dc57fcf1d94e512c0ed9fe7",
+  "prompt_sha256": "264d3a26c5ce7cb4d6823c5d2b21e5f3b69d7f5b46c0b9cb4c9b4498c964f186",
+  "cases": 25,
+  "refusal_cases": 6,
   "models": {
     "fake_oracle": {
       "model": "FakeChatModel oracle",
@@ -25,10 +25,10 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.25,
-        "grounding_pass_rate": 0.6,
+        "tool_call_accuracy": 0.24,
+        "grounding_pass_rate": 0.526316,
         "refusal_correctness": 1.0,
-        "printed_tool_call_rate": 0.75,
+        "printed_tool_call_rate": 0.76,
         "model_error_rate": 0.0
       },
       "failures": {
@@ -41,6 +41,10 @@
           "ask-food-vs-usual",
           "ask-subscriptions",
           "ask-bills",
+          "ask-insights",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
           "memory-preference",
           "memory-goal",
           "memory-constraint",
@@ -55,7 +59,10 @@
           "ask-net",
           "ask-refunds-fees",
           "ask-food-trend",
-          "ask-food-vs-usual"
+          "ask-food-vs-usual",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast"
         ],
         "printed": [
           "ask-spent-january",
@@ -66,6 +73,10 @@
           "ask-food-vs-usual",
           "ask-subscriptions",
           "ask-bills",
+          "ask-insights",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
           "memory-preference",
           "memory-goal",
           "memory-constraint",
