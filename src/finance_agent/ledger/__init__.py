@@ -1472,6 +1472,19 @@ class Ledger:
                 balance_ts=acc.balance_ts,
             )
             return None
+        moved = self._moved(account_id, first.balance_ts, acc.balance_ts)
+        gap = balance - first.balance_minor - moved
+        if not gap:
+            return None
+        return SyncGap(
+            AffectedAccount(account_id, masked),
+            datetime.fromtimestamp(acc.balance_ts, UTC),
+            _decimal(gap),
+        )
+
+    def _moved(self, account_id: int, after_ts: int, upto_ts: int) -> int:
+        """ADR 0014: the sum of the Account's Ledger Transactions whose instant
+        is in (after_ts, upto_ts]."""
         t, k = schema.transaction, schema.synced_key
         moved = 0
         for r in self._db.execute(
@@ -1482,16 +1495,56 @@ class Ledger:
             instant = (
                 r.posted_ts if r.posted_ts is not None else _end_of_day_ts(r.posted_on)
             )
-            if first.balance_ts < instant <= acc.balance_ts:
+            if after_ts < instant <= upto_ts:
                 moved += r.amount_minor
-        gap = balance - first.balance_minor - moved
-        if not gap:
-            return None
-        return SyncGap(
-            AffectedAccount(account_id, masked),
-            datetime.fromtimestamp(acc.balance_ts, UTC),
-            _decimal(gap),
-        )
+        return moved
+
+    def _synced_balances(self) -> dict[int, tuple[int, int, int, int]]:
+        """{Account id: (bank, ledger, anchor ts, balance ts)} for every Account
+        with a sync anchor (#212): the latest sync's reported balance less its
+        pending rows (B_k), and B_1 plus the Transactions in (t_1, t_k], so
+        bank - ledger is the Reconciliation Gap as of the latest sync."""
+        anchor, a, si = schema.sync_anchor, schema.account, schema.statement_import
+        anchors = {
+            int(r.account_id): (int(r.balance_minor), int(r.balance_ts))
+            for r in self._db.execute(
+                self._db.select(
+                    anchor, anchor.c.account_id, anchor.c.balance_minor
+                ).add_columns(anchor.c.balance_ts)
+            )
+        }
+        if not anchors:
+            return {}
+        by_ref = {
+            str(r.provider_ref): int(r.id)
+            for r in self._db.execute(
+                self._db.select(a, a.c.id, a.c.provider_ref).where(
+                    a.c.provider_ref.is_not(None)
+                )
+            )
+        }
+        latest: dict[int, tuple[int, int]] = {}  # account -> (B_k, t_k)
+        # shortcut: re-parses stored responses, newest first, as the latest
+        # balance is kept only there; store it per sync if this gets slow
+        for raw in self._db.execute(
+            self._db.select(si, si.c.original_bytes)
+            .where(si.c.source == "simplefin")
+            .order_by(si.c.imported_at.desc(), si.c.id.desc())
+        ).scalars():
+            for acc in simplefin.parse(raw).accounts:
+                account_id = by_ref.get(keyed_ref("simplefin:" + acc.provider_id))
+                if account_id in anchors and account_id not in latest:
+                    latest[account_id] = (
+                        acc.balance_minor - acc.pending_minor,
+                        acc.balance_ts,
+                    )
+            if latest.keys() >= anchors.keys():
+                break
+        out: dict[int, tuple[int, int, int, int]] = {}
+        for account_id, (b1, t1) in anchors.items():
+            bk, tk = latest.get(account_id, (b1, t1))
+            out[account_id] = (bk, b1 + self._moved(account_id, t1, tk), t1, tk)
+        return out
 
     def spending_by_category(
         self, month: str, account_id: int | None = None
@@ -2584,7 +2637,7 @@ class Ledger:
             if a.currency == fx.GBP:
                 total = None if total is None else total + minor
                 continue
-            on = last[a.id]
+            on = last.get(a.id, date.max)  # a synced Account may hold no rows yet
             picked = fx.pick(rates, a.currency, on)
             c = (
                 None
@@ -2674,12 +2727,13 @@ class Ledger:
 
     def accounts(self) -> list[AccountBalance]:
         """Accounts with Bank and Ledger balances; an empty Account is skipped.
-        A CSV Account whose Bank gives no balance (HSBC) has None for both."""
+        A CSV Account whose Bank gives no balance (HSBC) has None for both.
+        An Account with a sync anchor, synced only or linked to a CSV one,
+        takes its figures from the sync (ADR 0014, #212)."""
         a = schema.account
         gaps = self.gaps()
+        synced = self._synced_balances()
         t = schema.transaction
-        # shortcut: synced-only Accounts stay hidden (they reconcile through
-        # sync_gaps(), ADR 0014) until the Accounts screen shows synced balances
         no_balance = set(
             self._db.execute(
                 self._db.select(t, t.c.account_id)
@@ -2717,13 +2771,28 @@ class Ledger:
             )
             .order_by(a.c.id)
         ).all():
+            mine = [g for g in gaps if g.account.id == r.id]
             rows = self._transactions_in_bank_order(r.id)
-            if rows:
-                opening = rows[0].running_balance_minor - rows[0].amount_minor
-                bank: Decimal | None = _decimal(rows[-1].running_balance_minor)
-                held: Decimal | None = _decimal(
-                    opening + sum(x.amount_minor for x in rows)
+            if r.id in synced:
+                bk, held_minor, t1, tk = synced[r.id]
+                bank: Decimal | None = _decimal(bk)
+                held: Decimal | None = _decimal(held_minor)
+                mine = (
+                    [
+                        Gap(
+                            AffectedAccount(r.id, r.masked_number),
+                            datetime.fromtimestamp(t1, simplefin.LONDON).date(),
+                            datetime.fromtimestamp(tk, simplefin.LONDON).date(),
+                            _decimal(bk - held_minor),
+                        )
+                    ]
+                    if bk != held_minor
+                    else []
                 )
+            elif rows:
+                opening = rows[0].running_balance_minor - rows[0].amount_minor
+                bank = _decimal(rows[-1].running_balance_minor)
+                held = _decimal(opening + sum(x.amount_minor for x in rows))
             elif r.id in no_balance:
                 bank = held = None
             else:
@@ -2737,7 +2806,7 @@ class Ledger:
                     r.currency,
                     bank,
                     held,
-                    [g for g in gaps if g.account.id == r.id],
+                    mine,
                     r.bank,
                     *latest.get(r.id, (None, "")),
                 )
