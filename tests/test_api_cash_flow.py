@@ -97,3 +97,29 @@ def test_another_users_history_never_answers_for_this_one(
     with TestClient(api.create_app(engine)) as c:
         body = c.get(URL, params={"amount_minor": 100}).json()
     assert body["status"] == "insufficient"  # not user 2's forecast
+
+
+def test_a_simulation_writes_nothing(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    """Verifier (#151): a what-if is a read. No row is written, whatever the
+    amount (no payment, no Proposal, no cached Insight)."""
+    from sqlalchemy import event
+
+    _load(engine, write_export, 1, 14)
+    writes: list[str] = []
+
+    def spy(*args: object) -> None:
+        sql = str(args[2]).lstrip().upper()
+        if sql.startswith(("INSERT", "UPDATE", "DELETE")):
+            writes.append(sql.split()[0])
+
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        with TestClient(api.create_app(engine)) as c:
+            for amount in (1, 10**6, 10**13):
+                r = c.get(URL, params={"amount_minor": amount})
+                assert r.status_code == 200, r.text
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+    assert writes == []

@@ -146,6 +146,47 @@ try {
     if (shots) await page.screenshot({ path: `${shots}/overview-${scheme}-${name}-private.png`, fullPage: true });
     await page.close();
   }
+  // the shell's navs (#214): nothing wraps onto a second line or spills past its bar, at any width
+  for (const width of [360, 768, 1024, 1440]) {
+    for (const scheme of ["light", "dark"]) {
+      const page = await browser.newPage({ colorScheme: scheme, viewport: { width, height: 860 } });
+      await page.goto(base);
+      await page.getByLabel("Net").waitFor();
+      await page.waitForTimeout(400);
+      const problems = await page.evaluate(() => {
+        const out = [];
+        const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+        const bars = [document.querySelector("header"), ...document.querySelectorAll("nav[aria-label]")].filter((b) => b && shown(b));
+        for (const bar of bars) {
+          const box = bar.getBoundingClientRect();
+          if (box.left < 0 || box.right > window.innerWidth + 0.5) out.push(`${bar.tagName} leaves the window`);
+          for (const el of bar.querySelectorAll("*")) {
+            if (!shown(el) || el.closest(".sr-only, [role=tooltip], [data-menu]")) continue;
+            const r = el.getBoundingClientRect();
+            if (r.width && (r.left < box.left - 0.5 || r.right > box.right + 0.5))
+              out.push(`"${(el.getAttribute("aria-label") ?? el.textContent).trim().slice(0, 30)}" spills past its ${bar.tagName}`);
+            for (const node of el.childNodes) {
+              if (node.nodeType !== 3 || !node.textContent.trim()) continue;
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              const tops = new Set([...range.getClientRects()].map((q) => Math.round(q.top)));
+              if (tops.size > 1) out.push(`"${node.textContent.trim()}" wraps onto ${tops.size} lines`);
+            }
+          }
+        }
+        return [...new Set(out)];
+      });
+      // an icon-only tab's tooltip must not be read as part of its name
+      if (width === 768 && !(await page.getByRole("link", { name: "Transactions", exact: true }).count()))
+        problems.push(`the Transactions tab is not named exactly "Transactions"`);
+      for (const p of problems) {
+        console.error(`FAIL nav ${width}px ${scheme}: ${p}`);
+        failed = true;
+      }
+      if (shots) await page.screenshot({ path: `${shots}/nav-${width}-${scheme}.png` });
+      await page.close();
+    }
+  }
   await browser.close();
 } finally {
   fa("stop");

@@ -78,6 +78,7 @@ def feasible[T](
     items: Iterable[T], subject: Callable[[T], str], constraint_tags: Iterable[str]
 ) -> list[T]:
     """`items` less those whose subject (its Merchant and Category) shares a
-    word with a constraint Memory's tag; order kept."""
-    tags = {t.casefold() for t in constraint_tags}
-    return [i for i in items if not (tags & _words(subject(i)))]
+    word with a constraint Memory's tag (a hyphenated tag: all its words);
+    order kept."""
+    tags = [w for t in constraint_tags if (w := _words(t))]
+    return [i for i in items if not any(t <= _words(subject(i)) for t in tags)]

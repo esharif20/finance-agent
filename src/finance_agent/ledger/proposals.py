@@ -319,8 +319,10 @@ class Proposals:
         self._cache.clear()  # DATA_POLICY: gone from caches too
 
     def forget_feedback(self) -> int:
-        """Wipe the feedback and the rejected Proposals it points at."""
+        """Wipe the feedback, the rejected Proposals it points at and every
+        Insight rating and dismissal (#150)."""
         f, p = schema.feedback, schema.proposal
         n = self._db.execute(self._db.delete(f)).rowcount
+        n += self._db.execute(self._db.delete(schema.insight_feedback)).rowcount
         self._db.execute(self._db.delete(p).where(p.c.status == "rejected"))
         return n

@@ -50,12 +50,12 @@ class Insights:
 
     def replace(self, found: Iterable[Found]) -> None:
         """Make the stored Insights exactly `found`."""
-        have = {
-            (r.type, r.key, r.raised_on): r.id
-            for r in self._db.execute(
-                self._db.select(_I, _I.c.id, _I.c.type, _I.c.key, _I.c.raised_on)
-            )
+        cols = ("category", "impact_minor", "confidence", "evidence")
+        stored = {
+            (r["type"], r["key"], r["raised_on"]): (r["id"], tuple(r[c] for c in cols))
+            for r in self._db.execute(self._db.select(_I)).mappings()
         }
+        have = {k: iid for k, (iid, _) in stored.items()}
         keep: set[int] = set()
         for f in found:
             values: dict[str, Any] = {
@@ -65,7 +65,9 @@ class Insights:
                 "evidence": json.dumps(list(f.evidence)),
             }
             iid = have.get(k := (f.type, f.key, f.raised_on))
-            if iid is None:
+            if iid is not None and stored.get(k, (0, ()))[1] == tuple(values.values()):
+                keep.add(iid)  # unchanged: no write, so a read takes no write lock
+            elif iid is None:
                 iid = have[k] = self._db.insert(
                     _I,
                     type=f.type,
