@@ -134,7 +134,7 @@ describe("ForecastChart", () => {
       </PrivacyProvider>,
     );
     expect(container.querySelectorAll("svg path").length).toBe(2);
-    expect(screen.getByRole("table", { name: "Balance forecast by month" })).toHaveTextContent("£600.00");
+    expect(screen.getByRole("table", { name: "Spending forecast by month" })).toHaveTextContent("£600.00");
     // every pound figure in the chart is a Money (.money), so one switch blurs axes, tooltip and table
     for (const el of container.querySelectorAll("*"))
       if (el.children.length === 0 && /£\d/.test(el.textContent ?? "") && !el.closest(".money"))

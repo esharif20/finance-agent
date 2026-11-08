@@ -102,6 +102,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cash-flow/forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Forecast
+         * @description Monthly money-out band for the chart, as `engine.forecast` computes it.
+         *     Empty while no Category has enough history to forecast.
+         */
+        get: operations["forecast_api_cash_flow_forecast_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cash-flow/simulate-purchase": {
         parameters: {
             query?: never;
@@ -1104,24 +1125,9 @@ export interface components {
             accounts: components["schemas"]["AccountGbpOut"][];
             total: components["schemas"]["Money"] | null;
         };
-        /** BandOut */
-        BandOut: {
-            /** Left Out */
-            left_out: number;
-            /** Lower Minor */
-            lower_minor: number;
-            /** Month */
-            month: string;
-            /** Point Minor */
-            point_minor: number;
-            /** Recurring Minor */
-            recurring_minor: number;
-            /** Upper Minor */
-            upper_minor: number;
-        };
         /** BriefingOut */
         BriefingOut: {
-            forecast: components["schemas"]["BandOut"] | null;
+            forecast: components["schemas"]["finance_agent__api__briefing__BandOut"] | null;
             /** Insights */
             insights: components["schemas"]["InsightOut"][];
             /** Insufficient */
@@ -1228,16 +1234,22 @@ export interface components {
         };
         /** CostOut */
         CostOut: {
+            /** Charge Count */
+            charge_count: number;
             /** Cost Note */
             cost_note: string | null;
             /** Counted */
             counted: boolean;
+            /** Display Name */
+            display_name: string;
             /** Flags */
             flags: components["schemas"]["FlagOut"][];
             /** Group */
             group: string;
             /** Interval */
             interval: string | null;
+            /** Interval Source */
+            interval_source: ("registry" | "detected" | "estimated" | "catalogue") | null;
             /** Kind */
             kind: string;
             /** Last Charge On */
@@ -1247,6 +1259,8 @@ export interface components {
             /** Merchant Id */
             merchant_id: number;
             monthly: components["schemas"]["Pence"] | null;
+            /** Next Due On */
+            next_due_on: string | null;
             /** Status */
             status: string;
             trial: components["schemas"]["TrialOut"] | null;
@@ -1261,6 +1275,7 @@ export interface components {
             items: components["schemas"]["CostOut"][];
             /** Rate Needed */
             rate_needed: number;
+            total: components["schemas"]["Total"];
             /** Totals */
             totals: components["schemas"]["KindTotal"][];
             /**
@@ -1742,6 +1757,8 @@ export interface components {
         Risk: "none" | "below_buffer" | "below_zero";
         /** SimulationOut */
         SimulationOut: {
+            /** As Of */
+            as_of: string;
             floor: components["schemas"]["Pence"] | null;
             /** Have */
             have: number | null;
@@ -1803,6 +1820,8 @@ export interface components {
             changed_at: string;
             /** Created At */
             created_at: string;
+            /** Display Name */
+            display_name: string;
             evidence: components["schemas"]["EvidenceOut"];
             /** Group */
             group: string | null;
@@ -1867,6 +1886,11 @@ export interface components {
             last_failure_at: string | null;
             /** Last Sync At */
             last_sync_at: string | null;
+        };
+        /** Total */
+        Total: {
+            annual: components["schemas"]["Pence"];
+            monthly: components["schemas"]["Pence"];
         };
         /** TransactionOut */
         TransactionOut: {
@@ -1941,6 +1965,32 @@ export interface components {
             superseded_at: string | null;
             /** Text */
             text: string;
+        };
+        /** BandOut */
+        finance_agent__api__briefing__BandOut: {
+            /** Left Out */
+            left_out: number;
+            /** Lower Minor */
+            lower_minor: number;
+            /** Month */
+            month: string;
+            /** Point Minor */
+            point_minor: number;
+            /** Recurring Minor */
+            recurring_minor: number;
+            /** Upper Minor */
+            upper_minor: number;
+        };
+        /** BandOut */
+        finance_agent__api__cash_flow__BandOut: {
+            /** Lower */
+            lower: number;
+            /** Month */
+            month: string;
+            /** Point */
+            point: number;
+            /** Upper */
+            upper: number;
         };
     };
     responses: never;
@@ -2107,6 +2157,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forecast_api_cash_flow_forecast_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["finance_agent__api__cash_flow__BandOut"][];
                 };
             };
         };

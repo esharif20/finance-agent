@@ -12,13 +12,14 @@ from keyring.errors import KeyringError
 from sqlalchemy import Engine
 
 from finance_agent import categorise
-from finance_agent.categorise import embedding
+from finance_agent.categorise import embedding, subscription_alerts
 from finance_agent.cli import gbp
 from finance_agent.cli.watch import TITLE, Notifier
 from finance_agent.ingest import simplefin
 from finance_agent.ledger import Ledger, SyncReport
 from finance_agent.ledger.sync import SYNC_LOCK as SYNC_LOCK  # noqa: PLC0414
 from finance_agent.ledger.sync import NotConnected, run_sync
+from finance_agent.notify import printed
 from finance_agent.storage import default_db_path, is_encrypted, keychain, open_db
 from finance_agent.storage.lock import Busy
 
@@ -221,6 +222,8 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
             with engine.begin() as conn:
                 categorise.run(conn, user_id)
             embedding.refresh_quietly(engine, user_id)
+        # every sync, so a trial converting soon is announced in time
+        subscription_alerts.run(engine, user_id, notify or printed)
     except NotConnected as e:
         return _err(str(e))
     except Busy:

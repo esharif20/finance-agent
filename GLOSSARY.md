@@ -49,7 +49,7 @@ A difference between the balance a Bank reports for an Account and the balance t
 _Avoid_: Discrepancy, drift
 
 **Possible Duplicate**:
-A group of Transactions that may record the same movement of money, such as a CSV row and a synced row that cannot be paired with certainty. Each stays its own Transaction until the user decides.
+A group of Transactions that may record the same movement of money, such as a CSV row and a synced row that cannot be paired with certainty. Each stays its own Transaction until the user decides. A merge drops a synced copy from every total as a reversible overlay (ADR 0014, #158); nothing is deleted.
 _Avoid_: Conflict, clash
 
 **Correction**:

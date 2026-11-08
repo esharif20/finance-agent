@@ -318,7 +318,7 @@ def run(conn: Connection, user_id: int) -> int:
     ledger = Ledger(conn, user_id)
     ids = seed_taxonomy(conn, user_id)
     merchant_ids = {m.name: m.id for m in ledger.merchants()}
-    txns = ledger.transactions()
+    txns = ledger.transactions(merged=True)  # an undone merge needs its row ready
     names = {
         t.id: m
         for t in txns

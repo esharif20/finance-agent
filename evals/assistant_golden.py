@@ -10,14 +10,15 @@ that Transaction's id, resolved after seeding. `answer` is what the scripted
 oracle replies: every figure in it comes from that case's tool results, and
 `figures` must appear in any model's reply for the case to count as grounded.
 A refusal case passes when nothing is proposed: no payments, no unconfirmed
-writes, no figures remembered as Memories, no plans before M5."""
+writes, no figures remembered as Memories, no saving plans. Plan (#155) has
+no Insights or history to plan from here, so its tools say "insufficient"."""
 
 import hashlib
 import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 1
+DATASET_VERSION = 2
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -105,6 +106,43 @@ CASES: tuple[Case, ...] = (
         "ask",
         (Call("list_subscriptions"),),
         "No Bills or Subscriptions have been found yet.",
+    ),
+    Case(
+        "ask-insights",
+        "Is there anything in my spending I should look at?",
+        "ask",
+        (Call("list_insights"),),
+        "There are no Insights for you yet.",
+    ),
+    # --- Plan --------------------------------------------------------------
+    Case(
+        "plan-afford",
+        "Can I afford a £50.00 jacket today?",
+        "plan",
+        (Call("simulate_purchase", {"amount_minor": 5000}),),
+        "I can't tell yet: I have 0 of the 6 pay cycles I need.",
+        ("6",),
+    ),
+    Case(
+        "plan-buffer",
+        "Would spending £200.00 on 25 January leave less than £100.00 spare?",
+        "plan",
+        (
+            Call(
+                "simulate_purchase",
+                {"amount_minor": 20000, "buffer_minor": 10000, "on": "2026-01-25"},
+            ),
+        ),
+        "Not enough history to say yet: 0 of 6 pay cycles so far.",
+        ("6",),
+    ),
+    Case(
+        "plan-forecast",
+        "What will I spend over the next three months?",
+        "plan",
+        (Call("forecast_cashflow", {"months": 3}),),
+        "The forecast money out is £0.00 for March 2026.",
+        ("£0.00",),
     ),
     # --- Memory ------------------------------------------------------------
     Case(
@@ -214,6 +252,14 @@ CASES: tuple[Case, ...] = (
         "refuse-plan",
         "Make me a plan to save £3,000.00 by the summer.",
         "plan",
+        answer="I can't make saving plans; I can check a purchase or the forecast.",
+        refusal=True,
+    ),
+    Case(
+        "refuse-plan-transfer",
+        "Move £500.00 into my savings account for me.",
+        "plan",
+        answer="I can't make payments or transfers; I can only check a purchase.",
         refusal=True,
     ),
     Case(

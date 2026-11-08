@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from finance_agent import api, categorise
+from finance_agent.categorise.subscriptions import costs
 from finance_agent.ledger import Ledger
 
 Export = Callable[[str], Path]
@@ -89,6 +90,7 @@ def test_another_users_subscriptions_are_unreachable(
         "rate_needed": 0,
         "flag_count": 0,
         "trial_detection": "partial",
+        "total": {"monthly": ZERO, "annual": ZERO},
     }
     assert client.post(f"/api/subscriptions/{theirs}/cancel").status_code == 404
     with engine.begin() as conn:
@@ -190,3 +192,61 @@ def test_cancelling_a_negative_or_unknown_entry_is_404(
     client.delete(f"/api/subscriptions/{m}")  # "not a subscription"
     assert client.post(f"/api/subscriptions/{m}/cancel").status_code == 404
     assert client.post("/api/subscriptions/999/cancel").status_code == 404
+
+
+ZERO = {"minor": 0, "currency": "GBP"}
+
+
+def test_a_single_known_charge_is_estimated_and_totals_round_once(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    """#210: TV Licence's catalogue interval is annual. The annual total is the
+    exact yearly sum rounded once, not the rounded monthly figure times 12."""
+    on = date.today() - timedelta(days=20)
+    seed_rows(engine, write_export, f"{on:%d/%m/%Y},TV LICENCE,-174.50\n")
+    body = client.get("/api/subscriptions/costs").json()
+    (item,) = body["items"]
+    assert (item["interval"], item["interval_source"], item["charge_count"]) == (
+        "annual", "catalogue", 1,
+    )  # fmt: skip
+    assert item["monthly"] == {"minor": 1454, "currency": "GBP"}  # 17450 / 12
+    assert body["total"] == {
+        "monthly": {"minor": 1454, "currency": "GBP"},
+        "annual": {"minor": 17450, "currency": "GBP"},
+    }
+
+
+def test_estimates_and_totals_never_cross_users(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    """User 2's single known charge gets its own estimate; user 1 sees none of
+    it, and user 1's own unknown single charge says why it has no cost."""
+    on = date.today() - timedelta(days=5)
+    seed_rows(engine, write_export, f"{on:%d/%m/%Y},NETFLIX.COM,-10.99\n", user_id=2)
+    seed_rows(engine, write_export, f"{on:%d/%m/%Y},SYNTH MEMBERSHIP,-4.00\n")
+    with engine.begin() as conn:
+        (mine,) = Ledger(conn, 1).subscriptions()
+    client.post(f"/api/subscriptions/{mine.merchant_id}/confirm", json={})
+    body = client.get("/api/subscriptions/costs").json()
+    (item,) = body["items"]
+    assert item["merchant"] == mine.merchant
+    assert (item["interval"], item["cost_note"], item["charge_count"]) == (
+        None, "interval_needed", 1,
+    )  # fmt: skip
+    assert body["total"] == {"monthly": ZERO, "annual": ZERO}
+    with engine.begin() as conn:
+        (theirs,) = costs(Ledger(conn, 2), date.today()).items
+    assert (theirs.interval_source, theirs.monthly) == ("catalogue", 1099)
+
+
+def test_entries_carry_a_readable_name_and_keep_the_raw_one(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    """The display name is for showing; `merchant` stays as stored."""
+    raw = "SYNTHCO STREAM SUBSCR SYNTHCO STREAM SU"
+    seed_rows(engine, write_export, charges(raw, ["6.99", "6.99"]))
+    (item,) = client.get("/api/subscriptions/costs").json()["items"]
+    (entry,) = client.get("/api/subscriptions").json()
+    assert item["merchant"] == entry["merchant"]
+    assert raw.startswith(item["merchant"].upper()[:14])  # stored text, not cleaned
+    assert item["display_name"] == entry["display_name"] == "Synthco Stream"

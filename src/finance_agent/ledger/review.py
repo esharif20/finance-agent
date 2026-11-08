@@ -11,7 +11,8 @@ removes it through that effect; an answer that is only a record ("keep both")
 hides the item while its inputs hash to the answered version. A skip sends the
 item to the end until its inputs change, and changes no figure, so it never
 bumps the ledger version (the answer cache's key, #140). Nothing here changes
-an amount, so queued items count in every figure.
+an amount, so queued items count in every figure; only a Possible Duplicate's
+"merge" (#158) takes a copy out of the totals, as a reversible overlay.
 """
 
 import hashlib
@@ -26,6 +27,7 @@ from sqlalchemy import Connection
 from finance_agent.ledger import (
     CATEGORISED_KINDS,
     UNCATEGORISED,
+    InvalidMerge,
     Ledger,
     Transaction,
     UnknownTarget,
@@ -187,31 +189,57 @@ class SubscriptionItems:
 
 
 class DuplicateItems:
-    """A Possible Duplicate (ADR 0014). "keep_both" is recorded; merging needs
-    the ADR's duplicate Correction, a later ticket."""
+    """A Possible Duplicate (ADR 0014). "keep_both" is recorded; "merge" with a
+    `transaction_id` drops that synced copy from every total (#158), and undo
+    reverts the merge. A group stays queued while two of its rows are unmerged;
+    its version then names the merged ones, so an earlier answer no longer
+    holds."""
 
     name = "possible_duplicate"
 
     def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
         groups = {tuple(sorted(g)) for g in led.possible_duplicates()}
+        merged = led.merged_ids()
         for ids in groups:
+            done = tuple(i for i in ids if i in merged)
+            if len(ids) - len(done) < 2:
+                continue  # nothing left counting twice
             key = ",".join(map(str, ids))
             yield Item(
                 self.name,
                 key,
-                _version(ids),
+                _version(ids, done) if done else _version(ids),
                 len(ids),
                 transaction_ids=ids,
-                choices=("keep_both",),
+                choices=("keep_both", "merge"),
             )
 
     def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
-        if answer != Answer(choice="keep_both"):
-            raise InvalidAnswer("a Possible Duplicate takes keep_both")
-        return None
+        if answer == Answer(choice="keep_both"):
+            return None
+        if answer.choice != "merge" or answer.category is not None:
+            raise InvalidAnswer("a Possible Duplicate takes keep_both or merge")
+        if answer.transaction_id is None:
+            # the rows of a group share one amount, so any synced copy will
+            # do: the newest one that may go
+            for t in sorted(item.transaction_ids, reverse=True):
+                try:
+                    return led.merge_duplicate(t)
+                except InvalidMerge:
+                    continue
+            raise InvalidAnswer("no copy in this group can be merged")
+        if answer.transaction_id not in item.transaction_ids:
+            raise InvalidAnswer("merge takes one of this item's Transactions")
+        try:
+            return led.merge_duplicate(answer.transaction_id)
+        except InvalidMerge as e:
+            raise InvalidAnswer(str(e)) from None
 
     def undo(self, led: Ledger, effect_id: int) -> None:
-        pass  # keep_both writes nothing
+        try:
+            led.revert_merge(effect_id)
+        except UnknownTarget:
+            raise AlreadyReverted from None
 
 
 def _merchants(txns: Sequence[Transaction]) -> dict[int, tuple[int | None, str]]:

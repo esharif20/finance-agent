@@ -213,3 +213,15 @@ def test_spacing_and_web_suffixes_still_match() -> None:
         assert known_service(n) is not None, n
     for n in ("B & T", "B T", "S*K*Y", "T.V. LICENCE", "NETFLIX\x00"):
         assert known_service(n) is None, n
+
+
+def test_noisy_bank_text_still_names_the_known_service() -> None:
+    # synthetic descriptors: SimpleFIN joins payee and description (#210)
+    claude = ("Anthropic", "subscription", "AI tools")
+    assert known_service("ANTHROPIC CLAUDE SUB ANTHROPIC CLAUDE") == claude
+    assert known_service("OPENAI CHATGPT SUBSCR OPENAI CHATGPT SU") is not None
+    assert known_service("NETFLIX LTD 4417") == ("Netflix", "subscription", "Streaming")
+    # cleaning only drops noise: other words still block a match
+    assert known_service("NETFLIX FAN SHOP LTD") is None
+    assert known_service("CLAUDE SMITH PLUMBING SUB") is None
+    assert known_service("NETFLİX LTD") is None  # non-ASCII still fails closed

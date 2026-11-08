@@ -231,3 +231,29 @@ export async function simulatePurchase(amountMinor: number, on: string, bufferMi
   }
   return (await res.json()) as Simulation;
 }
+
+// Forecast band, weekly briefing and regret review (#152), and what the app has learned (#154).
+export type ForecastBand = components["schemas"]["finance_agent__api__cash_flow__BandOut"];
+export type Briefing = components["schemas"]["BriefingOut"];
+export type RegretItem = components["schemas"]["RegretItemOut"];
+export type Memory = components["schemas"]["MemoryOut"];
+export const fetchForecast = () => get<ForecastBand[]>("/api/cash-flow/forecast");
+export const fetchBriefing = () => get<Briefing>("/api/briefing");
+export const fetchMemories = () => get<{ items: Memory[] }>("/api/memories").then((r) => r.items);
+
+async function wipe(url: string): Promise<void> {
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok) throw new Error("Couldn't reset that. Try again.");
+}
+export const answerRegret = async (txn: number, worthIt: boolean): Promise<void> => {
+  const res = await fetch(`/api/briefing/regret/${txn}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ worth_it: worthIt }),
+  });
+  if (!res.ok) throw new Error("Couldn't save that. Try again.");
+};
+export const resetInsightFeedback = () => wipe("/api/insights/feedback");
+export const resetRegretAnswers = () => wipe("/api/briefing/regret");
+export const resetAssistantFeedback = () => wipe("/api/feedback");
+export const forgetMemory = (id: number) => wipe(`/api/memories/${id}`);

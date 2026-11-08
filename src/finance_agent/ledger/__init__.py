@@ -267,6 +267,11 @@ ALWAYS_ASK_SOURCES = ("user", "suggestion")  # how the user set the flag
 SUGGEST_AFTER = 2  # distinct corrected Categories before "Always ask" is offered
 
 
+class InvalidMerge(ValueError):
+    """A merge ADR 0014 does not allow: not a synced row of a Possible
+    Duplicate, already merged, or the group's last unmerged row."""
+
+
 class AlwaysAskMerchant(ValueError):
     """An "Always ask" Merchant takes no Merchant-wide Correction."""
 
@@ -480,7 +485,7 @@ def _decimal(minor: int) -> Decimal:
 CURRENCY = fx.GBP  # every total is in GBP; foreign figures convert (#156)
 
 
-def _shares_in_gbp(
+def shares_in_gbp(
     shares: list[tuple[tuple[str, str], int]], amount_minor: int, gbp_minor: int
 ) -> list[tuple[tuple[str, str], int]]:
     """`shares` of a Transaction of `amount_minor` rescaled to its GBP figure:
@@ -769,9 +774,70 @@ class Ledger:
             skipped,
         )
 
-    def transactions(self) -> list[Transaction]:
-        """Every stored Transaction, oldest first."""
-        return self._transactions()
+    def transactions(self, *, merged: bool = False) -> list[Transaction]:
+        """Every stored Transaction, oldest first; a merged Possible Duplicate
+        (#158) only with `merged`, as when categorising every row."""
+        return self._transactions() if merged else self._transactions(self._live())
+
+    # --- Possible Duplicate merges (#158, ADR 0014) ---------------------------
+
+    def _live(self) -> ColumnElement[bool]:
+        """WHERE term leaving out every merged Possible Duplicate: an overlay
+        (ADR 0001), so every total reads Transactions through it."""
+        m = schema.duplicate_merge
+        return schema.transaction.c.id.not_in(
+            self._db.select(m, m.c.transaction_id).where(m.c.reverted_at.is_(None))
+        )
+
+    def merged_ids(self) -> set[int]:
+        """Transactions the user dropped as copies of a Possible Duplicate."""
+        m = schema.duplicate_merge
+        return set(
+            self._db.execute(
+                self._db.select(m, m.c.transaction_id).where(m.c.reverted_at.is_(None))
+            ).scalars()
+        )
+
+    def merge_duplicate(self, transaction_id: int) -> int:
+        """Drop a synced copy of a Possible Duplicate from every total; returns
+        the merge's id. A CSV row is the Bank's own list, so only a synced copy
+        goes, and every group holding it keeps at least one unmerged row."""
+        t = schema.transaction
+        origin = self._db.execute(
+            self._db.select(t, t.c.origin).where(t.c.id == transaction_id)
+        ).scalar()
+        if origin is None:
+            raise UnknownTarget("unknown Transaction")
+        groups = [g for g in self.possible_duplicates() if transaction_id in g]
+        merged = self.merged_ids()
+        if not groups:
+            raise InvalidMerge("not part of a Possible Duplicate")
+        if origin != "simplefin":
+            raise InvalidMerge("only a synced copy can be merged away")
+        if transaction_id in merged:
+            raise InvalidMerge("already merged")
+        if any(not (g - merged - {transaction_id}) for g in groups):
+            raise InvalidMerge("the group's last unmerged row stays")
+        merge_id = self._db.insert(
+            schema.duplicate_merge,
+            transaction_id=transaction_id,
+            created_at=datetime.now(UTC),
+        )
+        self._db.bump_ledger_version()
+        log.info("duplicate merged")  # never the amount or the description
+        return merge_id
+
+    def revert_merge(self, merge_id: int) -> None:
+        """Undo a merge; it stays in the history, marked reverted."""
+        m = schema.duplicate_merge
+        res = self._db.execute(
+            self._db.update(m)
+            .where(m.c.id == merge_id, m.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active merge")
+        self._db.bump_ledger_version()
 
     def transaction(self, transaction_id: int) -> Transaction | None:
         """One Transaction of this user, or None."""
@@ -793,7 +859,7 @@ class Ledger:
         substring of the description, the Merchant's name or a live note."""
         t, c, m = schema.transaction, schema.categorisation, schema.merchant
         n = schema.note
-        terms = _only(account_id)
+        terms = [*_only(account_id), self._live()]
         if month is not None:
             start, end = _month_bounds(month)
             terms += [t.c.posted_on >= start, t.c.posted_on < end]
@@ -1425,9 +1491,13 @@ class Ledger:
     def _merge(self, csv_id: int, synced_id: int) -> None:
         """A matched pair becomes one Transaction: the CSV one stays and takes the
         synced key and sources; the synced copy goes. Its Categorisation and
-        Transfer link are derived, so they go too and are rebuilt."""
+        Transfer link are derived, so they go too and are rebuilt. A merge
+        (#158) of the synced copy goes with it: its group now holds the CSV
+        row, and is queued again if that still leaves a copy counted twice."""
         t, tl, cat = schema.transaction, schema.transfer_link, schema.categorisation
         self._db.execute(self._db.delete(cat).where(cat.c.transaction_id == synced_id))
+        dm = schema.duplicate_merge
+        self._db.execute(self._db.delete(dm).where(dm.c.transaction_id == synced_id))
         self._db.execute(
             self._db.delete(tl).where(
                 (tl.c.from_transaction_id == synced_id)
@@ -1472,18 +1542,7 @@ class Ledger:
                 balance_ts=acc.balance_ts,
             )
             return None
-        t, k = schema.transaction, schema.synced_key
-        moved = 0
-        for r in self._db.execute(
-            self._db.select(t, t.c.posted_on, t.c.amount_minor, k.c.posted_ts)
-            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
-            .where(t.c.account_id == account_id)
-        ):
-            instant = (
-                r.posted_ts if r.posted_ts is not None else _end_of_day_ts(r.posted_on)
-            )
-            if first.balance_ts < instant <= acc.balance_ts:
-                moved += r.amount_minor
+        moved = self._moved(account_id, first.balance_ts, acc.balance_ts)
         gap = balance - first.balance_minor - moved
         if not gap:
             return None
@@ -1492,6 +1551,72 @@ class Ledger:
             datetime.fromtimestamp(acc.balance_ts, UTC),
             _decimal(gap),
         )
+
+    def _moved(self, account_id: int, after_ts: int, upto_ts: int) -> int:
+        """ADR 0014: the sum of the Account's Ledger Transactions whose instant
+        is in (after_ts, upto_ts]; a merged Possible Duplicate (#158) is none."""
+        t, k = schema.transaction, schema.synced_key
+        moved = 0
+        for r in self._db.execute(
+            self._db.select(t, t.c.posted_on, t.c.amount_minor, k.c.posted_ts)
+            .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
+            .where(t.c.account_id == account_id, self._live())
+        ):
+            instant = (
+                r.posted_ts if r.posted_ts is not None else _end_of_day_ts(r.posted_on)
+            )
+            if after_ts < instant <= upto_ts:
+                moved += r.amount_minor
+        return moved
+
+    def _synced_balances(self) -> dict[int, tuple[int, int, int, int]]:
+        """{Account id: (bank, ledger, anchor ts, balance ts)} for every Account
+        with a sync anchor (#212): the latest sync's reported balance less its
+        pending rows (B_k), and B_1 plus the Transactions in (t_1, t_k], so
+        bank - ledger is the Reconciliation Gap as of the latest sync."""
+        anchor, a, si = schema.sync_anchor, schema.account, schema.statement_import
+        anchors = {
+            int(r.account_id): (int(r.balance_minor), int(r.balance_ts))
+            for r in self._db.execute(
+                self._db.select(
+                    anchor, anchor.c.account_id, anchor.c.balance_minor
+                ).add_columns(anchor.c.balance_ts)
+            )
+        }
+        if not anchors:
+            return {}
+        by_ref = {
+            str(r.provider_ref): int(r.id)
+            for r in self._db.execute(
+                self._db.select(a, a.c.id, a.c.provider_ref).where(
+                    a.c.provider_ref.is_not(None)
+                )
+            )
+        }
+        latest: dict[int, tuple[int, int]] = {}  # account -> (B_k, t_k)
+        # shortcut: re-parses stored responses, newest first, as the latest
+        # balance is kept only there; store it per sync if this gets slow
+        for raw in self._db.execute(
+            self._db.select(si, si.c.original_bytes)
+            .where(si.c.source == "simplefin")
+            .order_by(si.c.imported_at.desc(), si.c.id.desc())
+        ).scalars():
+            for acc in simplefin.parse(raw).accounts:
+                if acc.conflicting_ids:  # rejected: apply_sync never reconciled it
+                    continue
+                account_id = by_ref.get(keyed_ref("simplefin:" + acc.provider_id))
+                if account_id in anchors and account_id not in latest:
+                    latest[account_id] = (
+                        acc.balance_minor - acc.pending_minor,
+                        acc.balance_ts,
+                    )
+            if latest.keys() >= anchors.keys():
+                break
+        out: dict[int, tuple[int, int, int, int]] = {}
+        for account_id, (b1, t1) in anchors.items():
+            bk, tk = latest.get(account_id, (b1, t1))
+            out[account_id] = (bk, b1 + self._moved(account_id, t1, tk), t1, tk)
+        return out
 
     def spending_by_category(
         self, month: str, account_id: int | None = None
@@ -1503,7 +1628,7 @@ class Ledger:
         for txn_id, c in self._categorisations().items():
             if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
                 own, gbp = amounts[txn_id]
-                for (top, sub), minor in _shares_in_gbp(_shares(c, own), own, gbp):
+                for (top, sub), minor in shares_in_gbp(_shares(c, own), own, gbp):
                     merchants = tree.setdefault(top, {}).setdefault(sub, {})
                     key = (c.merchant_id, c.merchant or "Unknown")
                     merchants[key] = merchants.get(key, 0) - minor
@@ -1599,7 +1724,7 @@ class Ledger:
                 refunds += _decimal(gbp)
                 # only the Uncategorised and To review shares: a split
                 # Refund's other parts are matched in their own Categories
-                for (top, _), minor in _shares_in_gbp(_shares(c, own), own, gbp):
+                for (top, _), minor in shares_in_gbp(_shares(c, own), own, gbp):
                     if top in unmatched:
                         unmatched[top] -= _decimal(minor)
         cats: list[Spend] = []
@@ -2504,10 +2629,10 @@ class Ledger:
 
     def foreign_in_gbp(self) -> dict[int, int | None]:
         """{Transaction id: GBP minor units} for every foreign-currency
-        Transaction; None is rate needed."""
+        Transaction not merged away (#158); None is rate needed."""
         return {
             i: None if c is None else c.gbp_minor
-            for i, (_, c) in self._conversions().items()
+            for i, (_, c) in self._conversions(self._live()).items()
         }
 
     @staticmethod
@@ -2527,9 +2652,16 @@ class Ledger:
     def _month_terms(
         self, month: str, account_id: int | None
     ) -> list[ColumnElement[bool]]:
+        """The month's Transactions that count: every month figure, Category
+        and Split share reads through these, so a merge (#158) reaches them."""
         start, end = _month_bounds(month)
         t = schema.transaction
-        return [t.c.posted_on >= start, t.c.posted_on < end, *_only(account_id)]
+        return [
+            t.c.posted_on >= start,
+            t.c.posted_on < end,
+            *_only(account_id),
+            self._live(),
+        ]
 
     def _in_gbp(self, month: str, account_id: int | None) -> dict[int, tuple[int, int]]:
         """{id: (amount in its own currency, in GBP)} for the month's
@@ -2584,7 +2716,7 @@ class Ledger:
             if a.currency == fx.GBP:
                 total = None if total is None else total + minor
                 continue
-            on = last[a.id]
+            on = last.get(a.id, date.max)  # a synced Account may hold no rows yet
             picked = fx.pick(rates, a.currency, on)
             c = (
                 None
@@ -2674,12 +2806,13 @@ class Ledger:
 
     def accounts(self) -> list[AccountBalance]:
         """Accounts with Bank and Ledger balances; an empty Account is skipped.
-        A CSV Account whose Bank gives no balance (HSBC) has None for both."""
+        A CSV Account whose Bank gives no balance (HSBC) has None for both.
+        An Account with a sync anchor, synced only or linked to a CSV one,
+        takes its figures from the sync (ADR 0014, #212)."""
         a = schema.account
         gaps = self.gaps()
+        synced = self._synced_balances()
         t = schema.transaction
-        # shortcut: synced-only Accounts stay hidden (they reconcile through
-        # sync_gaps(), ADR 0014) until the Accounts screen shows synced balances
         no_balance = set(
             self._db.execute(
                 self._db.select(t, t.c.account_id)
@@ -2717,13 +2850,28 @@ class Ledger:
             )
             .order_by(a.c.id)
         ).all():
+            mine = [g for g in gaps if g.account.id == r.id]
             rows = self._transactions_in_bank_order(r.id)
-            if rows:
-                opening = rows[0].running_balance_minor - rows[0].amount_minor
-                bank: Decimal | None = _decimal(rows[-1].running_balance_minor)
-                held: Decimal | None = _decimal(
-                    opening + sum(x.amount_minor for x in rows)
+            if r.id in synced:
+                bk, held_minor, t1, tk = synced[r.id]
+                bank: Decimal | None = _decimal(bk)
+                held: Decimal | None = _decimal(held_minor)
+                mine = (
+                    [
+                        Gap(
+                            AffectedAccount(r.id, r.masked_number),
+                            datetime.fromtimestamp(t1, simplefin.LONDON).date(),
+                            datetime.fromtimestamp(tk, simplefin.LONDON).date(),
+                            _decimal(bk - held_minor),
+                        )
+                    ]
+                    if bk != held_minor
+                    else []
                 )
+            elif rows:
+                opening = rows[0].running_balance_minor - rows[0].amount_minor
+                bank = _decimal(rows[-1].running_balance_minor)
+                held = _decimal(opening + sum(x.amount_minor for x in rows))
             elif r.id in no_balance:
                 bank = held = None
             else:
@@ -2737,7 +2885,7 @@ class Ledger:
                     r.currency,
                     bank,
                     held,
-                    [g for g in gaps if g.account.id == r.id],
+                    mine,
                     r.bank,
                     *latest.get(r.id, (None, "")),
                 )
