@@ -183,7 +183,7 @@ def test_the_review_queue_merges_and_undo_unmerges(ledger_for: LedgerFor) -> Non
     q = ReviewQueue(conn, 1)
     (dup,) = [i for i in q.items() if i.type == "possible_duplicate"]
     assert dup.choices == ("keep_both", "merge")
-    a, b, c = dup.transaction_ids
+    _, b, c = dup.transaction_ids
     q.answer(dup.id, dup.version, Answer(choice="merge", transaction_id=c))
     # two rows still unmerged: the group stays queued, as a changed item
     (again,) = [i for i in q.items() if i.type == "possible_duplicate"]

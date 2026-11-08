@@ -475,3 +475,28 @@ def test_csv_and_sync_through_the_cli_never_double_count(
         assert len(txns) == n
         total = sum(t.amount for t in txns)
         assert total == Decimal(sum(t.amount_minor for t in h.txns)).scaleb(-2)
+
+
+def test_sync_checks_subscription_alerts_printed_or_notified(
+    env: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#108: `fa sync` prints alerts; the scheduled `--notify` run notifies."""
+    from finance_agent.categorise import subscription_alerts
+    from finance_agent.cli import watch
+    from finance_agent.notify import printed
+
+    seen: list[object] = []
+
+    def record(_e: object, _u: int, notify: object, today: object = None) -> int:
+        seen.append(notify)
+        return 0
+
+    def no_backup(**_: object) -> int:
+        return 0
+
+    monkeypatch.setattr(subscription_alerts, "run", record)
+    monkeypatch.setattr("finance_agent.cli.backup.run", no_backup)
+    assert main(["connect"]) == 0
+    assert main(["sync"]) == 0
+    assert main(["sync", "--notify"]) == 0
+    assert seen == [printed, watch.osascript]
