@@ -734,6 +734,10 @@
       },
       "CostOut": {
         "properties": {
+          "charge_count": {
+            "title": "Charge Count",
+            "type": "integer"
+          },
           "cost_note": {
             "anyOf": [
               {
@@ -748,6 +752,10 @@
           "counted": {
             "title": "Counted",
             "type": "boolean"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
           },
           "flags": {
             "items": {
@@ -770,6 +778,23 @@
               }
             ],
             "title": "Interval"
+          },
+          "interval_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "registry",
+                  "detected",
+                  "estimated",
+                  "catalogue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Source"
           },
           "kind": {
             "title": "Kind",
@@ -804,6 +829,17 @@
               }
             ]
           },
+          "next_due_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due On"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -822,11 +858,15 @@
         "required": [
           "merchant_id",
           "merchant",
+          "display_name",
           "kind",
           "group",
           "status",
           "interval",
+          "interval_source",
+          "charge_count",
           "last_charge_on",
+          "next_due_on",
           "monthly",
           "cost_note",
           "counted",
@@ -860,6 +900,9 @@
             "title": "Rate Needed",
             "type": "integer"
           },
+          "total": {
+            "$ref": "#/components/schemas/Total"
+          },
           "totals": {
             "items": {
               "$ref": "#/components/schemas/KindTotal"
@@ -876,6 +919,7 @@
         },
         "required": [
           "items",
+          "total",
           "totals",
           "groups",
           "rate_needed",
@@ -2458,6 +2502,10 @@
             "title": "Created At",
             "type": "string"
           },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
           "evidence": {
             "$ref": "#/components/schemas/EvidenceOut"
           },
@@ -2514,6 +2562,7 @@
         "required": [
           "merchant_id",
           "merchant",
+          "display_name",
           "kind",
           "group",
           "status",
@@ -2697,6 +2746,22 @@
           "backup_warning"
         ],
         "title": "SyncStatusOut",
+        "type": "object"
+      },
+      "Total": {
+        "properties": {
+          "annual": {
+            "$ref": "#/components/schemas/Pence"
+          },
+          "monthly": {
+            "$ref": "#/components/schemas/Pence"
+          }
+        },
+        "required": [
+          "monthly",
+          "annual"
+        ],
+        "title": "Total",
         "type": "object"
       },
       "TransactionOut": {

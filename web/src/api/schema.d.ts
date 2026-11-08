@@ -1234,16 +1234,22 @@ export interface components {
         };
         /** CostOut */
         CostOut: {
+            /** Charge Count */
+            charge_count: number;
             /** Cost Note */
             cost_note: string | null;
             /** Counted */
             counted: boolean;
+            /** Display Name */
+            display_name: string;
             /** Flags */
             flags: components["schemas"]["FlagOut"][];
             /** Group */
             group: string;
             /** Interval */
             interval: string | null;
+            /** Interval Source */
+            interval_source: ("registry" | "detected" | "estimated" | "catalogue") | null;
             /** Kind */
             kind: string;
             /** Last Charge On */
@@ -1253,6 +1259,8 @@ export interface components {
             /** Merchant Id */
             merchant_id: number;
             monthly: components["schemas"]["Pence"] | null;
+            /** Next Due On */
+            next_due_on: string | null;
             /** Status */
             status: string;
             trial: components["schemas"]["TrialOut"] | null;
@@ -1267,6 +1275,7 @@ export interface components {
             items: components["schemas"]["CostOut"][];
             /** Rate Needed */
             rate_needed: number;
+            total: components["schemas"]["Total"];
             /** Totals */
             totals: components["schemas"]["KindTotal"][];
             /**
@@ -1811,6 +1820,8 @@ export interface components {
             changed_at: string;
             /** Created At */
             created_at: string;
+            /** Display Name */
+            display_name: string;
             evidence: components["schemas"]["EvidenceOut"];
             /** Group */
             group: string | null;
@@ -1875,6 +1886,11 @@ export interface components {
             last_failure_at: string | null;
             /** Last Sync At */
             last_sync_at: string | null;
+        };
+        /** Total */
+        Total: {
+            annual: components["schemas"]["Pence"];
+            monthly: components["schemas"]["Pence"];
         };
         /** TransactionOut */
         TransactionOut: {
