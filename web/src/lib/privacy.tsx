@@ -1,16 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-const KEY = "fa-private";
-
-// the public demo starts private (docs/FRONTEND.md); a visitor's own choice is kept after that
-const DEMO = import.meta.env.VITE_DEMO === "1";
+// Both builds start with values shown; a visitor's own choice is kept after that. The demo has
+// its own key: it used to start private and saved that, so the old key would keep it blurred.
+const KEY = import.meta.env.VITE_DEMO === "1" ? "fa-private-demo" : "fa-private";
 
 const read = (): boolean => {
   try {
-    const stored = localStorage.getItem(KEY);
-    return stored === null ? DEMO : stored === "1";
+    return localStorage.getItem(KEY) === "1";
   } catch {
-    return DEMO;
+    return false;
   }
 };
 

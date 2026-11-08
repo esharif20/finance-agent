@@ -1,6 +1,5 @@
-import { Ellipsis, Eye, EyeOff, Settings as SettingsIcon } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { Eye, EyeOff, Settings as SettingsIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { IconSwap } from "@/components/IconSwap";
 import { NavTabs, type Tab } from "@/components/NavTabs";
 import { SearchBox } from "@/components/SearchBox";
@@ -26,112 +25,70 @@ const eye = (hidden: boolean) => (
   <IconSwap on={hidden} a={<Eye className="size-[18px]" />} b={<EyeOff className="size-[18px]" />} />
 );
 
-/** Eye toggle for privacy mode; `H` does the same anywhere (PrivacyProvider). */
-function HideAmounts({ className = "" }: { className?: string }) {
+/** Privacy mode, labelled so it is easy to find: blurs or shows every amount. `H` does the same
+    anywhere (PrivacyProvider). The words say what a press does, so it needs no aria-pressed. */
+function HideAmounts() {
   const { hidden, toggle } = usePrivacy();
+  const verb = hidden ? "Show" : "Hide";
   return (
     <button
       type="button"
-      aria-label="Hide amounts"
-      aria-pressed={hidden}
+      // "values" shows from 640px; the name is fixed here and always starts with what shows
+      aria-label={`${verb} values`}
       aria-keyshortcuts="H"
-      data-tip={`${hidden ? "Show" : "Hide"} amounts · H`}
+      data-tip={`${verb} values · H`}
       data-tip-align="end"
       onClick={toggle}
-      className={`${iconButton} ${className}`}
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] [@media(hover:hover)]:hover:bg-active"
     >
       {eye(hidden)}
+      <span aria-hidden="true">
+        {verb}
+        <span className="max-sm:hidden"> values</span>
+      </span>
     </button>
   );
 }
 
-const row =
-  "flex min-h-11 items-center gap-3 rounded-[12px] px-3 text-sm font-semibold transition-colors [@media(hover:hover)]:hover:bg-active";
-
-/** Phones: Settings and Hide amounts fold into one menu so the bar keeps its single row. */
-function More({ settings }: { settings: boolean }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const id = useId();
-  const reduced = useReducedMotion();
-  const { hidden, toggle } = usePrivacy();
-
+/** Phones: the bar slides away while you scroll down and comes back on the way up. */
+function useHideOnScroll() {
+  const [hidden, setHidden] = useState(false);
   useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    let last = window.scrollY;
+    const scroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - last) < 8) return; // ignore jitter and the iOS bounce
+      setHidden(y > last && y > 80);
+      last = y;
     };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setOpen(false);
-      button.current?.focus();
-    };
-    document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-
-  return (
-    <div ref={box} className="relative sm:hidden">
-      <button
-        ref={button}
-        type="button"
-        aria-label="More"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen((o) => !o)}
-        className={`${iconButton} ${open ? "bg-active" : ""}`}
-      >
-        <Ellipsis className="size-[18px]" aria-hidden="true" />
-      </button>
-      {open && (
-        <motion.div
-          id={id}
-          data-float
-          initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -4 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: reduced ? 0.1 : 0.16, ease: [0.23, 1, 0.32, 1] }}
-          style={{ transformOrigin: "top right" }}
-          className="absolute top-full right-0 mt-3 flex w-52 flex-col rounded-[20px] border border-[var(--card-edge)] bg-card p-1.5 shadow-[var(--glass-shadow)]"
-        >
-          <button type="button" aria-pressed={hidden} onClick={toggle} className={row}>
-            {eye(hidden)}
-            Hide amounts
-          </button>
-          <a
-            href="#settings"
-            aria-current={settings ? "page" : undefined}
-            onClick={() => setOpen(false)}
-            className={`${row} ${settings ? "bg-active" : ""}`}
-          >
-            <SettingsIcon className="size-[18px]" aria-hidden="true" />
-            Settings
-          </a>
-        </motion.div>
-      )}
-    </div>
-  );
+    window.addEventListener("scroll", scroll, { passive: true });
+    return () => window.removeEventListener("scroll", scroll);
+  }, []);
+  return hidden;
 }
 
 /**
  * The app's one-row top bar (#214). Nothing in it ever wraps; it gives up text as width runs out:
- * phones keep the wordmark and fold Settings and Hide amounts into More (tabs live in the bottom
- * bar); from 640px the tabs join as icons with tooltips; from 1024px they are words; from 1280px
+ * phones keep the wordmark and search (tabs, Settings and Hide amounts live in the bottom bar);
+ * from 640px the tabs join as icons with tooltips; from 1024px they are words; from 1280px
  * words with icons.
  */
 export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: string; settings: boolean }) {
+  const away = useHideOnScroll();
+  // the demo has its landing page at `/`; locally `/` is the app, so the mark goes to Overview
+  const demo = import.meta.env.VITE_DEMO === "1";
   return (
-    <header className="glass sticky top-3 z-20 mb-6 flex items-center gap-1 rounded-full p-1.5 pl-3 whitespace-nowrap">
+    <header
+      data-away={away}
+      className="glass sticky top-3 z-20 mb-6 flex items-center gap-1 rounded-full p-1.5 pl-3 whitespace-nowrap transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none max-sm:data-[away=true]:-translate-y-[calc(100%+1rem)]"
+    >
       <a
-        href="#overview"
-        className="mr-1 flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-[scale] duration-150 ease-out active:scale-[0.97]"
+        href={demo ? "/" : "#overview"}
+        aria-label={demo ? "Finance Agent home" : undefined}
+        className="mr-1 flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-[scale,opacity] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:opacity-80"
       >
         <Mark />
-        <span className="text-base font-semibold sm:max-md:sr-only">Finance Agent</span>
+        <span className="text-base font-semibold max-[419px]:sr-only sm:max-md:sr-only">Finance Agent</span>
       </a>
       <NavTabs
         tabs={tabs}
@@ -154,8 +111,7 @@ export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: str
         >
           <SettingsIcon className="size-[18px]" aria-hidden="true" />
         </a>
-        <HideAmounts className="max-sm:hidden" />
-        <More settings={settings} />
+        <HideAmounts />
       </div>
     </header>
   );

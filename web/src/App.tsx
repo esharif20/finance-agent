@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Ambient } from "@/components/Ambient";
 import { MotionFx } from "@/components/MotionFx";
 import { BackupStatus } from "@/components/BackupStatus";
-import { NavTabs } from "@/components/NavTabs";
+import { BottomBar } from "@/components/BottomBar";
 import { TopBar } from "@/components/TopBar";
 import { PrivacyProvider } from "@/lib/privacy";
 import { useRoute } from "@/lib/route";
@@ -41,7 +41,7 @@ function Shell() {
     <>
       <Ambient />
       <MotionFx />
-      <div className="mx-auto w-full max-w-[1120px] px-4 pt-3 pb-28 sm:px-9 sm:pb-16">
+      <div className="mx-auto w-full max-w-[1120px] px-4 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-9 sm:pb-16">
         <TopBar tabs={TABS} tab={tab} settings={route.name === "settings"} />
         <motion.main
           // a short fade and lift on every screen change; reduced motion keeps only the fade
@@ -94,14 +94,7 @@ function Shell() {
             </>
           )}
         </motion.main>
-        <NavTabs
-          tabs={TABS}
-          tab={tab}
-          // phones: icons, and the current tab alone spells out its name (5 labels never fit at 360px)
-          className="glass fixed inset-x-2 bottom-3 z-20 flex justify-between rounded-full p-1 sm:hidden"
-          item="inline-flex min-h-11 min-w-12 items-center justify-center rounded-full px-3 text-sm font-semibold transition-[background-color,scale] duration-150 ease-out active:scale-[0.94]"
-          label="sr-only [[aria-current=page]_&]:not-sr-only"
-        />
+        <BottomBar tabs={TABS.filter((t) => t.id !== "subscriptions")} tab={tab} current={route.name} />
       </div>
     </>
   );
