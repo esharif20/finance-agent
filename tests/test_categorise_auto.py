@@ -7,7 +7,9 @@ Synthetic Merchants and the trigram stand-in embedder only."""
 import json
 import tempfile
 from collections.abc import Iterator, Mapping
+from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hypothesis import given, settings
@@ -349,3 +351,133 @@ def test_nothing_applies_below_threshold_corrections_win_undone_never_return(
                         assert scores[c.merchant] >= threshold
         finally:
             eng.dispose()
+
+
+# --- verifier (adversarial) -------------------------------------------------
+
+_OP = st.one_of(
+    st.just(("sync",)),
+    st.just(("undo",)),
+    st.just(("suspend",)),
+    st.tuples(st.just("threshold"), st.integers(0, OFF)),
+    st.tuples(st.just("merchant"), st.sampled_from(GUESSED), st.sampled_from(CATS)),
+    st.tuples(st.just("row"), st.sampled_from(GUESSED), st.sampled_from(CATS)),
+)
+
+type _Row = tuple[object, str, str | None, Decimal]
+
+
+def _state(conn: Connection) -> dict[int, _Row]:
+    return {
+        t.id: (c.category, c.source, c.merchant, t.amount)
+        for t in Ledger(conn, 1).transactions()
+        if (c := t.categorisation) is not None
+    }
+
+
+def _latest_batch(conn: Connection) -> set[str]:
+    names = {i: n for n, i in _ids(conn).items()}
+    sql = (
+        "SELECT merchant_id FROM category_prediction WHERE undone_at IS NULL"
+        " AND batch = (SELECT max(batch) FROM category_prediction"
+        " WHERE undone_at IS NULL AND batch IS NOT NULL)"
+    )
+    return {names[m] for m in conn.execute(text(sql)).scalars()}
+
+
+def _step(conn: Connection, op: tuple[Any, ...], before: Mapping[int, _Row]) -> None:
+    if op[0] == "sync":
+        categorise.run(conn, 1)
+    elif op[0] == "undo":
+        auto.undo(conn, 1)
+    elif op[0] == "suspend":
+        conn.execute(
+            text(
+                "INSERT OR IGNORE INTO model_suspension (user_id, model, decisions,"
+                " suspended_at) VALUES (1, :m, 0, '2026-01-05')"
+            ),
+            {"m": MODEL},
+        )
+    elif op[0] == "threshold":
+        auto.THRESHOLDS[MODEL] = op[1]
+    elif op[0] == "merchant":
+        _decide(conn, {op[1]: op[2]})
+    else:  # one row of the Merchant
+        tid = min(t for t, s in before.items() if s[2] == op[1])
+        Ledger(conn, 1).correct_transaction(tid, op[2])
+
+
+@settings(max_examples=15, deadline=None)
+@given(start=st.integers(0, OFF), ops=st.lists(_OP, min_size=1, max_size=8))
+def test_any_interleaving_of_syncs_corrections_undos_and_suspensions_holds(
+    start: int, ops: list[tuple[Any, ...]]
+) -> None:
+    """Verifier: after every step amounts and the total never move; no
+    Merchant newly auto-applies below the threshold, after its undo or once
+    the version is suspended; a Correction always shows; and an undo resets
+    its own batch's auto rows and nothing else."""
+    with pytest.MonkeyPatch.context() as mp, tempfile.TemporaryDirectory() as d:
+        mp.setitem(auto.THRESHOLDS, MODEL, start)
+        eng = open_db(Path(d) / "db" / "ledger.db")
+        try:
+            with eng.begin() as conn:
+                _setup(conn, Path(d))
+                amounts = {t: s[3] for t, s in _state(conn).items()}
+                total = sum(amounts.values(), Decimal(0))
+                undone: set[str] = set()
+                suspended = False
+                fixed: set[int] = set()
+                decided: set[str | None] = set()
+                for op in ops:
+                    before = _state(conn)
+                    was_auto = {s[2] for s in before.values() if s[1] == AUTO}
+                    batch = _latest_batch(conn) if op[0] == "undo" else set[str]()
+                    _step(conn, op, before)
+                    undone |= batch
+                    suspended |= op[0] == "suspend"
+                    if op[0] == "merchant":
+                        decided.add(op[1])
+                    elif op[0] == "row":
+                        fixed.add(min(t for t, s in before.items() if s[2] == op[1]))
+                    after, scores = _state(conn), _scores(conn)
+                    threshold = auto.THRESHOLDS[MODEL]
+                    assert {t: s[3] for t, s in after.items()} == amounts
+                    assert sum((s[3] for s in after.values()), Decimal(0)) == total
+                    for tid, (cat, src, m, _) in after.items():
+                        if tid in fixed or m in decided:
+                            assert src == "correction", (op, m)
+                        if src == AUTO:
+                            assert m not in undone, (op, m)
+                            if m not in was_auto:  # newly applied by this step
+                                assert not suspended, (op, m)
+                                assert m is not None and scores[m] >= threshold
+                        if op[0] == "undo" and m in batch:
+                            if before[tid][1] == AUTO:
+                                assert (cat, src) == (UNCAT, "default")
+                        elif op[0] == "undo":
+                            assert (cat, src) == before[tid][:2], (op, m)
+        finally:
+            eng.dispose()
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="verifier #247: the post-sync auto-apply changes Categories without"
+    " bumping ledger_version, so cached Assistant answers keyed on it go stale",
+)
+def test_a_post_sync_auto_apply_bumps_the_ledger_version(
+    engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with engine.begin() as c:
+        _setup(c, tmp_path)  # threshold OFF: nothing applied yet
+        before = Ledger(c, 1).ledger_version()
+
+    def no_new_vectors(*_: object) -> None:
+        return None
+
+    monkeypatch.setattr(embedding, "refresh_quietly", no_new_vectors)
+    _threshold(monkeypatch, 1)
+    auto.refresh_quietly(engine, 1)  # the separate transaction a sync runs
+    with engine.begin() as c:
+        assert any(src == AUTO for n in GUESSED for _, src in _by_merchant(c)[n])
+        assert Ledger(c, 1).ledger_version() > before
