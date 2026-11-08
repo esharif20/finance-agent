@@ -187,7 +187,7 @@ def run(conn: Connection, user_id: int) -> int:
     # never learn from them
     ask = {m.name for m in ledger.merchants() if m.always_ask}
     db.execute(db.delete(schema.categorisation))
-    txns = ledger.transactions()
+    txns = ledger.transactions(merged=True)  # an undone merge needs its row ready
     for t in txns:
         c = classify(
             t.description,
