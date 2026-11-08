@@ -56,3 +56,5 @@ Backup and restore are tested in CI against synthetic databases, temp directorie
 ## Synthetic data
 
 A generator produces realistic Lloyds, HSBC and Revolut CSVs (messy descriptors, overlaps, refunds, transfers, pending rows, foreign currency, injection attempts). Every synthetic file starts with a `# synthetic` header. A cloud model may help generate synthetic data; it never sees real data.
+
+- Official figures in `facts.json` are refreshed by a monthly GitHub Actions job (`scripts/facts_check.py`) that fetches an allowlist of gov.uk and FSCS pages and opens a PR; the app itself never fetches (ADR 0013).
