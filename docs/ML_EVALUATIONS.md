@@ -99,6 +99,19 @@ The Subscriptions rule is what lets a renewal be predicted from one or two charg
 
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
 
+### Insight ranking (#150)
+
+`engine.ranking` scores an Insight as impact × confidence × relevance, where relevance is the mean of a Beta(1, 1) posterior per (Insight type, Category), updated only by an explicit thumbs-up (a success) and a thumbs-down or dismissal (a failure). Equal scores keep their given order. `evals/ranking.py` replays 14 monthly slates of 10 per synthetic user, with ratings on the logging policy's top 3. Committed run (seed 146, dataset v2):
+
+| Ranker | NDCG@3 | NDCG@5 |
+| --- | --- | --- |
+| £ impact (baseline) | 0.802 | 0.850 |
+| impact × confidence × Beta relevance | 0.838 | 0.877 |
+
+It wins on five of six users at @3 and all six at @5; history 3 loses at @3 (0.801 against 0.816). Probing outside the gate: impact × confidence alone (relevance flat) scores 0.829, so about a quarter of the gain is relevance; separate Beta posteriors per type and per Category, multiplied, score 0.865, because 42 ratings spread thin over the (type, Category) cells. That factorised form is the next step if real ratings stay this sparse.
+
+Confidences are still the detectors' fixed per-rule priors, not calibrated: calibration needs outcomes on real Insights, which only the user's feedback will give.
+
 ### Forecasting (#149)
 
 `engine.forecast.forecast_category` is ETS(A,N,A) on log(1 + monthly spend), with the initial states estimated, an error variance divided by its degrees of freedom (residuals less the 14 estimated parameters) and a Student's t interval. `cash_flow` adds recurring payments, projected from their schedules (`categorise.recurring`, minus registry entries the user marked not a subscription or cancelled), to the Category forecasts; Category bounds add as if fully correlated, so the total band is conservative. Recurring income (Income credits from one payer, scheduled from its last six so an old pay rise does not hide a salary) is projected with its dates for the what-if (#151); one-off credits are not.
