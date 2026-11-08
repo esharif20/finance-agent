@@ -44,7 +44,7 @@ describe("Assistant", () => {
     await ask();
     expect(await screen.findByText(/Answered by: Cache/)).toBeInTheDocument();
     const fig = screen.getByText("£42.50");
-    expect(fig).toHaveClass("money");
+    expect(fig.closest(".money")).not.toBeNull();
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ message: "Groceries?" });
   });
 
@@ -61,13 +61,14 @@ describe("Assistant", () => {
 
   it("renders the fallback table as a table, with figures blurrable", async () => {
     const reply =
-      "I couldn't check my answer, so here are the figures it was based on.\n\n| Item | Value | Evidence |\n| --- | --- | --- |\n| Groceries | £42.50 | t1 |";
+      "I couldn't check my answer, so here are the figures it was based on.\n\n| Item | Value | Evidence |\n| --- | --- | --- |\n| spending_summary 2026-04 money_in | £42.50 | t1 |";
     fetchMock.mockResolvedValueOnce(stream({ path: "deterministic", proposal_id: null }, reply));
     ui();
     await ask();
     const table = await screen.findByRole("table");
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Item", "Value", "Evidence"]);
-    expect(within(table).getByText("£42.50")).toHaveClass("money");
+    expect(within(table).getByText("April 2026 · Money in")).toBeInTheDocument();
+    expect(within(table).getByText("£42.50").closest(".money")).not.toBeNull();
     expect(screen.getByText(/Answered by: Table/)).toBeInTheDocument();
   });
 

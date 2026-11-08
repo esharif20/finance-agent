@@ -5,7 +5,7 @@ import { Fragment, useEffect, useReducer, useRef, useState } from "react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card } from "@/components/ui/card";
-import { type Block, type Decision, type Message, initial, parseBlocks, parseSse, pathLabel, reduce } from "@/lib/chat";
+import { type Block, type Decision, type Message, friendlyLabel, initial, parseBlocks, parseSse, pathLabel, reduce } from "@/lib/chat";
 import { usePrivacy } from "@/lib/privacy";
 
 type Proposal = components["schemas"]["ProposalOut"];
@@ -19,8 +19,9 @@ export function Figures({ text }: { text: string }) {
     <>
       {text.split(FIGURE).map((part, i) =>
         i % 2 ? (
-          <span key={i} className="money whitespace-nowrap" aria-label={hidden ? "Amount hidden" : undefined}>
-            {part}
+          <span key={i} className="money whitespace-nowrap">
+            {hidden && <span className="sr-only">Amount hidden</span>}
+            <span aria-hidden={hidden || undefined}>{part}</span>
           </span>
         ) : (
           <Fragment key={i}>{part}</Fragment>
@@ -34,6 +35,7 @@ function ReplyTable({ block }: { block: Extract<Block, { kind: "table" }> }) {
   return (
     <div className="my-2 max-h-96 overflow-auto rounded-xl border border-border">
       <table className="w-full text-label">
+        <caption className="sr-only">Figures behind the answer</caption>
         <thead>
           <tr className="text-left text-muted-foreground">
             {block.head.map((h, i) => (
@@ -48,7 +50,7 @@ function ReplyTable({ block }: { block: Extract<Block, { kind: "table" }> }) {
             <tr key={r} className="border-t border-border align-top">
               {row.map((c, i) => (
                 <td key={i} className={`px-3 py-2 tabular-nums ${i === 1 ? "text-right font-medium" : ""} ${i === 2 ? "break-all text-muted-foreground" : ""}`}>
-                  <Figures text={c} />
+                  {i === 0 ? friendlyLabel(c) : <Figures text={c} />}
                 </td>
               ))}
             </tr>
@@ -232,7 +234,7 @@ export function Assistant() {
 
   return (
     <Card className="flex min-h-[60dvh] flex-col p-0 sm:p-0">
-      <ol aria-label="Conversation" aria-live="polite" className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
+      <ol aria-label="Conversation" aria-live="polite" aria-busy={chat.busy} className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
         {chat.messages.length === 0 && (
           <li className="m-auto max-w-sm py-16 text-center">
             <p className="text-heading">Ask about your money</p>
@@ -244,9 +246,9 @@ export function Assistant() {
         {chat.messages.map((m) => (
           <Bubble key={m.id} m={m} busy={chat.busy} decision={m.proposalId != null ? chat.decisions[m.proposalId] : undefined} onDecide={decide} />
         ))}
-        <div ref={end} />
       </ol>
-      <form onSubmit={send} className="sticky bottom-24 flex items-end gap-2 border-t border-border p-3 sm:bottom-0">
+      <div ref={end} className="scroll-mb-40 sm:scroll-mb-24" />
+      <form onSubmit={send} className="sticky bottom-24 flex items-end gap-2 rounded-b-card border-t border-border bg-card p-3 sm:bottom-0">
         <label htmlFor="chat-input" className="sr-only">
           Message the Assistant
         </label>
@@ -257,9 +259,9 @@ export function Assistant() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) send(e);
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) send(e);
           }}
-          placeholder="How much did I spend on groceries this month?"
+          placeholder="Ask about your money"
           className="max-h-32 min-h-11 flex-1 resize-none rounded-3xl bg-raised px-4 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <button

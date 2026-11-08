@@ -131,3 +131,40 @@ export function parseBlocks(reply: string): Block[] {
   flush();
   return out;
 }
+
+const FIELDS: Record<string, string> = {
+  month: "Month",
+  money_in: "Money in",
+  money_out: "Money out",
+  net: "Net",
+  spending: "Spending",
+  refunds: "Refunds",
+  fees: "Fees",
+  unmatched_refunds: "Unmatched refunds",
+  posted_on: "Posted",
+  amount: "Amount",
+  outflow: "Outflow",
+};
+const TOOLS = /^(spending_summary|find_transactions)\s+(.*)$/;
+const PERIOD = /^(\d{4})-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?\s+(.*)$/;
+
+/** A tool value's raw label ("spending_summary 2026-03 money_in") in plain words. Anything
+ * it does not recognise comes back unchanged, so a new tool field still shows its raw key. */
+export function friendlyLabel(raw: string): string {
+  const tool = TOOLS.exec(raw);
+  if (!tool) return raw;
+  const [, name, rest = ""] = tool;
+  if (name === "find_transactions" && rest === "total") return "Transactions found";
+  const p = PERIOD.exec(name === "find_transactions" ? rest.replace(/^rows\s+/, "") : rest);
+  if (!p) return raw;
+  const [, y, m, d, field = ""] = p;
+  const when = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d ?? 1))).toLocaleDateString("en-GB", {
+    timeZone: "UTC",
+    ...(d ? { day: "numeric" } : {}),
+    month: "long",
+    year: "numeric",
+  });
+  const cat = /^categories\s+(.+)\s+amount$/.exec(field);
+  const what = cat ? cat[1] : FIELDS[field];
+  return what ? `${when} · ${what}` : raw;
+}

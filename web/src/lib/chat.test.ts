@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Chat, initial, parseBlocks, parseSse, pathLabel, reduce } from "./chat";
+import { type Chat, friendlyLabel, initial, parseBlocks, parseSse, pathLabel, reduce } from "./chat";
 
 // synthetic
 const ev = (name: string, data: object) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -88,5 +88,29 @@ describe("parseBlocks", () => {
 
   it("a lone pipe line is text", () => {
     expect(parseBlocks("a | b")).toEqual([{ kind: "text", text: "a | b" }]);
+  });
+});
+
+describe("friendlyLabel", () => {
+  it("names a spending summary figure by month and field", () => {
+    expect(friendlyLabel("spending_summary 2026-03 money_in")).toBe("March 2026 · Money in");
+    expect(friendlyLabel("spending_summary 2026-04 unmatched_refunds")).toBe("April 2026 · Unmatched refunds");
+    expect(friendlyLabel("spending_summary 2026-04 month")).toBe("April 2026 · Month");
+  });
+
+  it("names a category amount by its category", () => {
+    expect(friendlyLabel("spending_summary 2026-03 categories Food & Drink amount")).toBe("March 2026 · Food & Drink");
+  });
+
+  it("names transaction rows by day and field", () => {
+    expect(friendlyLabel("find_transactions rows 2026-04-30 outflow")).toBe("30 April 2026 · Outflow");
+    expect(friendlyLabel("find_transactions rows 2026-04-30 posted_on")).toBe("30 April 2026 · Posted");
+    expect(friendlyLabel("find_transactions total")).toBe("Transactions found");
+  });
+
+  it("prints anything it does not recognise as it came", () => {
+    expect(friendlyLabel("something_else 2026-03 odd_field")).toBe("something_else 2026-03 odd_field");
+    expect(friendlyLabel("spending_summary 2026-03 brand_new_field")).toBe("spending_summary 2026-03 brand_new_field");
+    expect(friendlyLabel("spending_summary 2026-13 net")).toBe("spending_summary 2026-13 net");
   });
 });
