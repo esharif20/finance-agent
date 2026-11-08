@@ -1,0 +1,34 @@
+{
+  "id": "student-money",
+  "version": 1,
+  "topic": "student_money",
+  "principles": [
+    "Know what is coming in and going out each month, even if it is rough.",
+    "Early on, build the habit of saving something, however small.",
+    "Ask about student and young person discounts before you buy."
+  ],
+  "when": {
+    "all": [
+      {
+        "signal": "emergency_fund_months",
+        "op": ">=",
+        "value": 0.5
+      },
+      {
+        "signal": "emergency_fund_months",
+        "op": "<",
+        "value": 3
+      }
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Building your first buffer",
+      "body": "If you are a student or early in your career, a first buffer matters more than a big one. Yours covers about {emergency_fund_months} months of essentials at {essential_monthly_spend} a month, and each small top-up helps."
+    },
+    "blunt": {
+      "title": "Grow your first buffer",
+      "body": "Your savings cover {emergency_fund_months} months of essentials at {essential_monthly_spend} a month. Whether you are studying or just starting work, add to it every month, even if the amount is small."
+    }
+  }
+}
