@@ -86,6 +86,18 @@ _Avoid_: Pending, Uncategorised
 Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence (or one such payment with no Merchant), a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
 _Avoid_: Inbox, uncategorised
 
+**Registry entry**:
+A Merchant's place in the subscription registry (#103): its kind (Subscription or Bill), group, status, reason and the evidence it rests on. The registry is append-only: each change adds a row, the latest row per Merchant is the entry, and the earlier rows are its history. A decision by the user always beats detection.
+_Avoid_: Subscription record, listing
+
+**Reason** (of a registry entry):
+Why a Merchant is listed: **known_service** or **pattern** (detected), **user_added** (the user listed it by hand) or **user_confirmed** (the user said yes to a suggestion). Confirming an entry the user added keeps `user_added`: confirming changes the status, not the origin.
+_Avoid_: Source, cause
+
+**Negative entry** ("not a subscription"):
+A registry entry recording that the user rejected a Merchant, by dismissing a suggestion or removing a listed one, including a Merchant that was never listed. It has no kind, group or reason, it is never deleted, and detection never suggests that Merchant again. The user can undo it.
+_Avoid_: Blocklist, ignore
+
 **Subscription status**:
 Derived each time from a registry entry and its Merchant's last charge (#105): **active**; **overdue**, past the next expected charge plus a grace of 2 days (weekly), 5 (monthly) or 15 (annual); **lapsed**, two expected charges missed; **cancelled**, set only by the user; or **suggested**, still awaiting "is this a subscription?". Only active and overdue entries count in the monthly totals.
 _Avoid_: Expired, inactive

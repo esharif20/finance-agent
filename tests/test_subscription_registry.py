@@ -20,6 +20,7 @@ from finance_agent.ledger import (
     InvalidEntry,
     Ledger,
     UnknownTarget,
+    _Row,  # pyright: ignore[reportPrivateUsage]
 )
 from finance_agent.ledger.taxonomy import TAXONOMY
 from finance_agent.storage import open_db, schema
@@ -229,8 +230,10 @@ def test_a_detection_row_after_a_user_decision_never_wins(
     decided = led.subscription(m)
     assert decided is not None
     led._registry(  # pyright: ignore[reportPrivateUsage]
-        m, "detection", "subscription", "Streaming", "active", "pattern",
-        date(2026, 1, 1),
+        _Row(
+            m, "detection", "subscription", "Streaming", "active", "pattern",
+            date(2026, 1, 1),
+        )
     )  # fmt: skip
     led._db.conn.execute(  # pyright: ignore[reportPrivateUsage]
         schema.subscription_entry.update().values(created_at=decided.changed_at)
@@ -275,7 +278,7 @@ def test_detection_never_overrides_a_user_decision_with_reverts(
                         led.revert_subscription_decision(eid)
                     continue
                 if kind == "raced":  # a detection that checked before the user
-                    led._registry(m, "detection", k, g, *rest)  # pyright: ignore[reportPrivateUsage]
+                    led._registry(_Row(m, "detection", k, g, *rest))  # pyright: ignore[reportPrivateUsage]
                     continue
                 x = led.subscription(m)
                 if action in ("regroup", "confirm") and (
@@ -330,3 +333,68 @@ def test_a_regroup_keeps_when_the_status_began(ledger_for: LedgerFor) -> None:
     after = led.subscription(m)
     assert after is not None and after.status == "user_cancelled"
     assert after.status_since == cancelled.changed_at < after.changed_at
+
+
+def test_dismissing_a_never_listed_merchant_is_remembered(
+    ledger_for: LedgerFor,
+) -> None:
+    # decided by orchestrator (#132): a no to a Merchant never listed still
+    # writes a negative entry, so detection never suggests it again
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH NEVER LISTED")
+
+    led.not_a_subscription(m)
+
+    (e,) = led.subscriptions()
+    assert (e.merchant_id, e.status, e.source) == (m, "not_subscription", "user")
+    assert not led.record_detection(
+        m, "subscription", "Streaming", "pattern", "suggested", date.today()
+    )
+
+
+def test_deleting_a_merchant_removes_its_whole_registry_history(
+    ledger_for: LedgerFor,
+) -> None:
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH DELETED")
+    other = merchant(led, "SYNTH KEPT")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.not_a_subscription(m)
+    led.add_subscription(other, "subscription", "Streaming")
+    db = led._db  # pyright: ignore[reportPrivateUsage]
+
+    db.execute(db.delete(schema.merchant).where(schema.merchant.c.id == m))
+
+    rows = db.execute(
+        db.select(schema.subscription_entry, schema.subscription_entry.c.merchant_id)
+    ).all()
+    assert [r.merchant_id for r in rows] == [other]
+
+
+def test_confirming_a_user_added_entry_keeps_user_added(
+    ledger_for: LedgerFor,
+) -> None:
+    # decided by orchestrator (#132): confirming changes status, not origin
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH ADDED")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.cancel_subscription(m)
+
+    led.confirm_subscription(m)
+
+    e = led.subscription(m)
+    assert e is not None
+    assert (e.status, e.reason) == ("active", "user_added")
+
+
+def test_confirming_after_a_removal_is_user_confirmed(ledger_for: LedgerFor) -> None:
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH REMOVED")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.not_a_subscription(m)
+
+    led.confirm_subscription(m, "subscription", "Streaming")
+
+    e = led.subscription(m)
+    assert e is not None
+    assert e.reason == "user_confirmed"
