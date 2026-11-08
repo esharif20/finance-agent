@@ -66,25 +66,24 @@ def ranked(
     those a constraint Memory rules out."""
     user = current_user()
     insights.refresh(conn, user)
-    return [
-        InsightOut(
-            id=i.id,
-            type=i.type,
-            key=i.key,
-            category=i.category,
-            raised_on=i.raised_on,
-            impact_minor=i.impact,
-            confidence=i.confidence,
-            evidence=list(i.evidence),
-            explanation=insights.explain(i),
-            signal=i.signal,
-            relevance=RelevanceOut(
-                liked=r.relevance.liked, disliked=r.relevance.disliked
-            ),
-        )
-        for r in insights.ranked(conn, user)[:limit]
-        for i in (r.insight,)
-    ]
+    return [insight_out(r) for r in insights.ranked(conn, user)[:limit]]
+
+
+def insight_out(r: insights.Ranked) -> InsightOut:
+    i = r.insight
+    return InsightOut(
+        id=i.id,
+        type=i.type,
+        key=i.key,
+        category=i.category,
+        raised_on=i.raised_on,
+        impact_minor=i.impact,
+        confidence=i.confidence,
+        evidence=list(i.evidence),
+        explanation=insights.explain(i),
+        signal=i.signal,
+        relevance=RelevanceOut(liked=r.relevance.liked, disliked=r.relevance.disliked),
+    )
 
 
 def _give(conn: Connection, insight_id: int, signal: Signal) -> FeedbackOut:
