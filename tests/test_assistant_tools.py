@@ -82,7 +82,11 @@ def test_each_sub_graph_is_offered_only_its_own_tools() -> None:
         "propose_correction",
     }
     assert {s.name for s in specs("memory")} == {"list_memories", "propose_memory"}
-    assert {s.name for s in specs("plan")} == {"forecast_cashflow", "simulate_purchase"}
+    assert {s.name for s in specs("plan")} == {
+        "forecast_cashflow",
+        "simulate_purchase",
+        "allocation_plan",
+    }
 
 
 @pytest.mark.parametrize(
