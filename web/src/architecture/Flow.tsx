@@ -13,6 +13,7 @@ import {
   useTransform,
 } from "motion/react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { QuestionChart } from "./Diagrams";
 import { FLOW, GROUPS, SAMPLE } from "./nodes";
 import { Detail, EASE, NodeButton, StatusTag } from "./parts";
 
@@ -27,11 +28,14 @@ export function stopAt(t: number) {
   return t < 0 ? -1 : Math.min(N - 1, Math.floor(t));
 }
 
-function Head() {
+function Head({ live }: { live: boolean }) {
   return (
     <div className="ar-flow-head">
       <h2 id="ar-h-flow">{FLOW_GROUP?.title}</h2>
-      <p className="ar-lede">{FLOW_GROUP?.lede}</p>
+      <div className="ar-flow-side">
+        <p className="ar-lede">{FLOW_GROUP?.lede}</p>
+        <QuestionChart live={live} />
+      </div>
     </div>
   );
 }
@@ -39,7 +43,7 @@ function Head() {
 export default function Flow({ scene, wide, still, playKey }: { scene: boolean; wide: boolean; still: boolean; playKey: number }) {
   return (
     <section className="ar-chapter ar-flow" aria-labelledby="ar-h-flow" id="flow" data-scene={scene || undefined}>
-      <Head />
+      <Head live={scene} />
       {scene ? <Scene playKey={playKey} /> : <Steps wide={wide} still={still} playKey={playKey} />}
     </section>
   );
