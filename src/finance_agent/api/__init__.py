@@ -518,7 +518,9 @@ def create_app(
             if any(r.added for r in reports):  # same as `fa import`
                 with engine.begin() as conn:
                     categorise.run(conn, current_user())
-                auto.refresh_quietly(engine, current_user())
+            auto.refresh_quietly(
+                engine, current_user()
+            )  # every sync: Merchants may wait from before
             notify = request.app.state.notify or notifications.osascript
             subscription_alerts.run(engine, current_user(), notify)
         except Busy:
