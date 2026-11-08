@@ -139,6 +139,12 @@ export const skipReview = (item: ReviewItem) => review(itemUrl(item.id, "skip"),
 /** `count` undoes a whole batch (the `applied` a batch answer returned). */
 export const undoReview = (count = 1) => review(count > 1 ? `/api/review-queue/undo?count=${count}` : "/api/review-queue/undo");
 
+/** How many Merchants the latest auto-applied batch holds; 0 means there is none. */
+export const fetchAutoBatch = () => get<{ count: number }>("/api/review-queue/auto-batch");
+
+/** Takes back the latest auto-applied batch; its Merchants return to the queue. */
+export const undoAutoBatch = () => review("/api/review-queue/undo-auto");
+
 /** All or nothing: a stale item refuses the batch and the error names how many changed. */
 export const answerReviewBatch = (items: ReviewItem[], category: [string, string]) =>
   review("/api/review-queue/answers", {

@@ -308,6 +308,19 @@
         "title": "AnswerIn",
         "type": "object"
       },
+      "AutoBatchOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "AutoBatchOut",
+        "type": "object"
+      },
       "BalancesOut": {
         "properties": {
           "accounts": {
@@ -4778,6 +4791,25 @@
           }
         },
         "summary": "Answers"
+      }
+    },
+    "/api/review-queue/auto-batch": {
+      "get": {
+        "description": "What \"Auto-categorised N\" shows and `undo-auto` would take back (#215 B).",
+        "operationId": "auto_batch_api_review_queue_auto_batch_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auto Batch"
       }
     },
     "/api/review-queue/undo": {

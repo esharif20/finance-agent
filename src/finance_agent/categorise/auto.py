@@ -207,6 +207,21 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
     return done + new
 
 
+def latest_count(conn: Connection, user_id: int) -> int:
+    """How many Merchants the latest live auto-applied batch holds (what `undo`
+    would take back); 0 when there is none."""
+    db = Scoped(conn, user_id)
+    p = schema.category_prediction
+    live = (p.c.batch.is_not(None), p.c.undone_at.is_(None))
+    batch = db.execute(db.select(p, func.max(p.c.batch)).where(*live)).scalar()
+    if batch is None:
+        return 0
+    return int(
+        db.execute(db.select(p, func.count()).where(*live, p.c.batch == batch)).scalar()
+        or 0
+    )
+
+
 def undo(conn: Connection, user_id: int) -> int:
     """Take back the latest auto-applied batch: its Merchants go back to the
     Review Queue and are never auto-applied again. Returns how many Merchants."""
