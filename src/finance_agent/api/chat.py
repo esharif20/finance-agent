@@ -129,7 +129,9 @@ def _sse(
                 assistant = make(conn)
                 assistant.on_stage = lambda words: q.put(("stage", words))
                 q.put(("answer", work(assistant)))
-        except Exception:  # noqa: BLE001 - its text could quote data; never logged
+        # anything at all, so the stream never waits forever; its text could
+        # quote data, so it is never logged
+        except BaseException:  # noqa: BLE001
             q.put(("error", None))
 
     threading.Thread(target=run, daemon=True).start()
