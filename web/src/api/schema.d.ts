@@ -393,6 +393,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goals */
+        get: operations["goals_api_goals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guidance": {
         parameters: {
             query?: never;
@@ -1412,6 +1429,13 @@ export interface components {
             /** Subcategory */
             subcategory: string | null;
         };
+        /** CheckinOut */
+        CheckinOut: {
+            /** Body */
+            body: string;
+            /** Title */
+            title: string;
+        };
         /** ConfirmIn */
         ConfirmIn: {
             /** Group */
@@ -1632,6 +1656,50 @@ export interface components {
             from_date: string;
             /** To Date */
             to_date: string;
+        };
+        /** GoalOut */
+        GoalOut: {
+            /** Amount Minor */
+            amount_minor: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Estimated */
+            estimated: boolean;
+            /** Id */
+            id: number;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Planned Weekly Minor */
+            planned_weekly_minor: number | null;
+            /** Remaining Minor */
+            remaining_minor: number;
+            /** Saved Minor */
+            saved_minor: number;
+            /** Shortfall Minor */
+            shortfall_minor: number | null;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            status: components["schemas"]["Status"];
+            /** Text */
+            text: string;
+            /** Weekly Target Minor */
+            weekly_target_minor: number | null;
+            /** Weeks Left */
+            weeks_left: number | null;
+        };
+        /** GoalsOut */
+        GoalsOut: {
+            checkin: components["schemas"]["CheckinOut"] | null;
+            /** Goals */
+            goals: components["schemas"]["GoalOut"][];
+            /** Payday */
+            payday: boolean;
         };
         /** GroupIn */
         GroupIn: {
@@ -2150,6 +2218,11 @@ export interface components {
             /** Stale Ids */
             stale_ids: string[];
         };
+        /**
+         * Status
+         * @enum {string}
+         */
+        Status: "reached" | "overdue" | "at_risk" | "on_track" | "unchecked";
         /** SubscriptionOut */
         SubscriptionOut: {
             /** Changed At */
@@ -2995,6 +3068,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    goals_api_goals_get: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalsOut"];
                 };
             };
             /** @description Validation Error */

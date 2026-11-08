@@ -815,6 +815,24 @@
         "title": "CategoryTxnOut",
         "type": "object"
       },
+      "CheckinOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "CheckinOut",
+        "type": "object"
+      },
       "ConfirmIn": {
         "properties": {
           "group": {
@@ -1570,6 +1588,152 @@
           "amount"
         ],
         "title": "GapOut",
+        "type": "object"
+      },
+      "GoalOut": {
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "estimated": {
+            "title": "Estimated",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "planned_weekly_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Weekly Minor"
+          },
+          "remaining_minor": {
+            "title": "Remaining Minor",
+            "type": "integer"
+          },
+          "saved_minor": {
+            "title": "Saved Minor",
+            "type": "integer"
+          },
+          "shortfall_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortfall Minor"
+          },
+          "started_on": {
+            "format": "date",
+            "title": "Started On",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "weekly_target_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Target Minor"
+          },
+          "weeks_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weeks Left"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "amount_minor",
+          "due_on",
+          "started_on",
+          "linked_account_id",
+          "status",
+          "estimated",
+          "saved_minor",
+          "remaining_minor",
+          "weeks_left",
+          "weekly_target_minor",
+          "planned_weekly_minor",
+          "shortfall_minor"
+        ],
+        "title": "GoalOut",
+        "type": "object"
+      },
+      "GoalsOut": {
+        "properties": {
+          "checkin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckinOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalOut"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "payday": {
+            "title": "Payday",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "goals",
+          "payday",
+          "checkin"
+        ],
+        "title": "GoalsOut",
         "type": "object"
       },
       "GroupIn": {
@@ -3117,6 +3281,17 @@
         "title": "StaleOut",
         "type": "object"
       },
+      "Status": {
+        "enum": [
+          "reached",
+          "overdue",
+          "at_risk",
+          "on_track",
+          "unchecked"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
       "SubscriptionOut": {
         "properties": {
           "changed_at": {
@@ -4654,6 +4829,53 @@
           }
         },
         "summary": "Set Rate"
+      }
+    },
+    "/api/goals": {
+      "get": {
+        "operationId": "goals_api_goals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Goals"
       }
     },
     "/api/guidance": {
