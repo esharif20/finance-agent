@@ -462,3 +462,21 @@ def test_the_status_line_never_needs_a_network(ledger: Path) -> None:
 def test_the_cli_only_dials_local_ollama() -> None:
     assert models.OLLAMA == "http://localhost:11434"
     assert "urlopen" not in (ROOT / "src/finance_agent/cli/status.py").read_text()
+
+
+def test_status_reads_cloud_spend_only_from_an_existing_meter(
+    ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from finance_agent.cli import status
+    from finance_agent.storage import default_db_path, keychain, spend
+
+    now = datetime(2026, 11, 8, tzinfo=UTC)
+    meter = default_db_path().with_name(spend.FILENAME)
+    keychain.set_item(keychain.GEMINI_SERVICE, "fake-key", keychain.GEMINI_ACCOUNT)
+    try:
+        assert "nothing spent yet" in status.cloud_line(now)
+        assert not meter.exists()  # a status never creates the meter
+        spend.SpendStore(meter)
+        assert status.cloud_line(now).startswith("£0.00 of £9 this month")
+    finally:
+        keychain.delete_item(keychain.GEMINI_SERVICE, keychain.GEMINI_ACCOUNT)

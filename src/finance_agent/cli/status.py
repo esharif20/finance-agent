@@ -15,7 +15,7 @@ from finance_agent.cli import gbp, models
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.review import ReviewQueue
 from finance_agent.storage import backup as store
-from finance_agent.storage import default_db_path, keychain
+from finance_agent.storage import default_db_path, keychain, spend
 
 AI_GROUP = ("subscription", "AI tools")
 AI_CAP = Decimal(100)  # the user's AI subscriptions cap (#308)
@@ -81,6 +81,17 @@ def snapshot(engine: Engine, user_id: int, today: date) -> Snapshot:
         )
 
 
+def cloud_line(now: datetime) -> str:
+    """This month's metered cloud spend (#295) against the £9 cap; read only
+    when spend.sqlite already exists, so a status never creates it."""
+    path = default_db_path().with_name(spend.FILENAME)
+    if not path.is_file():
+        return f"key stored · nothing spent yet (cap £{CLOUD_CAP})"
+    rows = spend.SpendStore(path).month_status(now)
+    used = _pounds(sum(b.spent_pence + b.reserved_pence for b in rows))
+    return f"{gbp(used)} of £{CLOUD_CAP} this month  {bar(used, CLOUD_CAP, 12)}"
+
+
 def one_line(s: Snapshot, now: datetime) -> str:
     return (
         f"synced {_ago(s.last_sync_at, now)} · {s.accounts} accounts · "
@@ -99,11 +110,7 @@ def status(
     s = snapshot(engine, user_id, now.date())
     held = (held_models or loaded_models)()
     last_backup = store.status(default_db_path().parent, now).last_backup_at
-    cloud = (
-        f"key stored · spend meter arrives with #295 (cap £{CLOUD_CAP})"
-        if keychain.gemini_key()
-        else "off"
-    )
+    cloud = cloud_line(now) if keychain.gemini_key() else "off"
     rows = (
         ("Last sync", _ago(s.last_sync_at, now)),
         ("Accounts", str(s.accounts)),
