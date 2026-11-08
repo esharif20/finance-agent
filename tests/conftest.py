@@ -33,6 +33,19 @@ def _no_real_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _no_real_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A test never pops a macOS notification; one that wants them records."""
+    from finance_agent import notify
+    from finance_agent.cli import watch
+
+    def silent(_: str, __: str) -> None:
+        return None
+
+    monkeypatch.setattr(notify, "osascript", silent)
+    monkeypatch.setattr(watch, "osascript", silent)
+
+
+@pytest.fixture(autouse=True)
 def _never_touch_real_data(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:

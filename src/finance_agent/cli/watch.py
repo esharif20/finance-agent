@@ -12,29 +12,18 @@ from collections.abc import Callable
 from pathlib import Path
 
 from finance_agent import categorise
-from finance_agent.categorise import embedding
+from finance_agent.categorise import embedding, subscription_alerts
 from finance_agent.cli import LOCAL_USER
 from finance_agent.ledger import Ledger
+from finance_agent.notify import TITLE as TITLE
+from finance_agent.notify import Notifier as Notifier
+from finance_agent.notify import osascript as osascript
 from finance_agent.storage import DB_ENV, open_db
 
 LABEL = "com.finance-agent.watch"
 AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
-TITLE = "Finance Agent"
 
-Notifier = Callable[[str, str], None]
 Launchctl = Callable[[list[str]], None]
-
-_SCRIPT = (
-    "on run argv\n"
-    "display notification (item 2 of argv) with title (item 1 of argv)\n"
-    "end run"
-)
-
-
-def osascript(title: str, body: str) -> None:
-    subprocess.run(  # noqa: S603
-        ["/usr/bin/osascript", "-e", _SCRIPT, title, body], check=False
-    )
 
 
 def _launchctl(args: list[str]) -> None:
@@ -63,6 +52,7 @@ def run(folder: Path, notify: Notifier = osascript) -> int:
             r = Ledger(conn, LOCAL_USER).import_files(files)
             categorise.run(conn, LOCAL_USER)  # same as `fa import`
         embedding.refresh_quietly(engine, LOCAL_USER)  # no transaction held
+        subscription_alerts.run(engine, LOCAL_USER, notify)  # never raises
     except (OSError, ValueError, LookupError):
         notify(TITLE, "Import failed")
         return 1

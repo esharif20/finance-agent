@@ -267,6 +267,11 @@ ALWAYS_ASK_SOURCES = ("user", "suggestion")  # how the user set the flag
 SUGGEST_AFTER = 2  # distinct corrected Categories before "Always ask" is offered
 
 
+class InvalidMerge(ValueError):
+    """A merge ADR 0014 does not allow: not a synced row of a Possible
+    Duplicate, already merged, or the group's last unmerged row."""
+
+
 class AlwaysAskMerchant(ValueError):
     """An "Always ask" Merchant takes no Merchant-wide Correction."""
 
@@ -769,9 +774,70 @@ class Ledger:
             skipped,
         )
 
-    def transactions(self) -> list[Transaction]:
-        """Every stored Transaction, oldest first."""
-        return self._transactions()
+    def transactions(self, *, merged: bool = False) -> list[Transaction]:
+        """Every stored Transaction, oldest first; a merged Possible Duplicate
+        (#158) only with `merged`, as when categorising every row."""
+        return self._transactions() if merged else self._transactions(self._live())
+
+    # --- Possible Duplicate merges (#158, ADR 0014) ---------------------------
+
+    def _live(self) -> ColumnElement[bool]:
+        """WHERE term leaving out every merged Possible Duplicate: an overlay
+        (ADR 0001), so every total reads Transactions through it."""
+        m = schema.duplicate_merge
+        return schema.transaction.c.id.not_in(
+            self._db.select(m, m.c.transaction_id).where(m.c.reverted_at.is_(None))
+        )
+
+    def merged_ids(self) -> set[int]:
+        """Transactions the user dropped as copies of a Possible Duplicate."""
+        m = schema.duplicate_merge
+        return set(
+            self._db.execute(
+                self._db.select(m, m.c.transaction_id).where(m.c.reverted_at.is_(None))
+            ).scalars()
+        )
+
+    def merge_duplicate(self, transaction_id: int) -> int:
+        """Drop a synced copy of a Possible Duplicate from every total; returns
+        the merge's id. A CSV row is the Bank's own list, so only a synced copy
+        goes, and every group holding it keeps at least one unmerged row."""
+        t = schema.transaction
+        origin = self._db.execute(
+            self._db.select(t, t.c.origin).where(t.c.id == transaction_id)
+        ).scalar()
+        if origin is None:
+            raise UnknownTarget("unknown Transaction")
+        groups = [g for g in self.possible_duplicates() if transaction_id in g]
+        merged = self.merged_ids()
+        if not groups:
+            raise InvalidMerge("not part of a Possible Duplicate")
+        if origin != "simplefin":
+            raise InvalidMerge("only a synced copy can be merged away")
+        if transaction_id in merged:
+            raise InvalidMerge("already merged")
+        if any(not (g - merged - {transaction_id}) for g in groups):
+            raise InvalidMerge("the group's last unmerged row stays")
+        merge_id = self._db.insert(
+            schema.duplicate_merge,
+            transaction_id=transaction_id,
+            created_at=datetime.now(UTC),
+        )
+        self._db.bump_ledger_version()
+        log.info("duplicate merged")  # never the amount or the description
+        return merge_id
+
+    def revert_merge(self, merge_id: int) -> None:
+        """Undo a merge; it stays in the history, marked reverted."""
+        m = schema.duplicate_merge
+        res = self._db.execute(
+            self._db.update(m)
+            .where(m.c.id == merge_id, m.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active merge")
+        self._db.bump_ledger_version()
 
     def transaction(self, transaction_id: int) -> Transaction | None:
         """One Transaction of this user, or None."""
@@ -793,7 +859,7 @@ class Ledger:
         substring of the description, the Merchant's name or a live note."""
         t, c, m = schema.transaction, schema.categorisation, schema.merchant
         n = schema.note
-        terms = _only(account_id)
+        terms = [*_only(account_id), self._live()]
         if month is not None:
             start, end = _month_bounds(month)
             terms += [t.c.posted_on >= start, t.c.posted_on < end]
@@ -1425,9 +1491,13 @@ class Ledger:
     def _merge(self, csv_id: int, synced_id: int) -> None:
         """A matched pair becomes one Transaction: the CSV one stays and takes the
         synced key and sources; the synced copy goes. Its Categorisation and
-        Transfer link are derived, so they go too and are rebuilt."""
+        Transfer link are derived, so they go too and are rebuilt. A merge
+        (#158) of the synced copy goes with it: its group now holds the CSV
+        row, and is queued again if that still leaves a copy counted twice."""
         t, tl, cat = schema.transaction, schema.transfer_link, schema.categorisation
         self._db.execute(self._db.delete(cat).where(cat.c.transaction_id == synced_id))
+        dm = schema.duplicate_merge
+        self._db.execute(self._db.delete(dm).where(dm.c.transaction_id == synced_id))
         self._db.execute(
             self._db.delete(tl).where(
                 (tl.c.from_transaction_id == synced_id)
@@ -1484,13 +1554,13 @@ class Ledger:
 
     def _moved(self, account_id: int, after_ts: int, upto_ts: int) -> int:
         """ADR 0014: the sum of the Account's Ledger Transactions whose instant
-        is in (after_ts, upto_ts]."""
+        is in (after_ts, upto_ts]; a merged Possible Duplicate (#158) is none."""
         t, k = schema.transaction, schema.synced_key
         moved = 0
         for r in self._db.execute(
             self._db.select(t, t.c.posted_on, t.c.amount_minor, k.c.posted_ts)
             .outerjoin(k, self._db.on(k, k.c.transaction_id == t.c.id))
-            .where(t.c.account_id == account_id)
+            .where(t.c.account_id == account_id, self._live())
         ):
             instant = (
                 r.posted_ts if r.posted_ts is not None else _end_of_day_ts(r.posted_on)
@@ -2559,10 +2629,10 @@ class Ledger:
 
     def foreign_in_gbp(self) -> dict[int, int | None]:
         """{Transaction id: GBP minor units} for every foreign-currency
-        Transaction; None is rate needed."""
+        Transaction not merged away (#158); None is rate needed."""
         return {
             i: None if c is None else c.gbp_minor
-            for i, (_, c) in self._conversions().items()
+            for i, (_, c) in self._conversions(self._live()).items()
         }
 
     @staticmethod
@@ -2582,9 +2652,16 @@ class Ledger:
     def _month_terms(
         self, month: str, account_id: int | None
     ) -> list[ColumnElement[bool]]:
+        """The month's Transactions that count: every month figure, Category
+        and Split share reads through these, so a merge (#158) reaches them."""
         start, end = _month_bounds(month)
         t = schema.transaction
-        return [t.c.posted_on >= start, t.c.posted_on < end, *_only(account_id)]
+        return [
+            t.c.posted_on >= start,
+            t.c.posted_on < end,
+            *_only(account_id),
+            self._live(),
+        ]
 
     def _in_gbp(self, month: str, account_id: int | None) -> dict[int, tuple[int, int]]:
         """{id: (amount in its own currency, in GBP)} for the month's
