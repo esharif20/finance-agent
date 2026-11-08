@@ -85,7 +85,11 @@ def test_a_results_file_edited_to_claim_better_numbers_fails_ci(
 
     path = tmp_path / "detectors.json"
     claimed = json.loads(detectors.RESULTS.read_text())
-    claimed["models"]["candidate"]["metrics"]["overall.recall"] = 1.0
+    # claim 1.0 on a metric not already there, so the edit is never a no-op
+    # (recall reached 1.0 with #151 and silently made this test pass)
+    metrics = claimed["models"]["candidate"]["metrics"]
+    name = next(k for k in ("overall.recall", "overall.precision") if metrics[k] < 1)
+    metrics[name] = 1.0
     path.write_text(json.dumps(claimed))
     run = gate.run("detectors", detectors.evaluate, path, detectors.lower_is_better, [])
     assert run == 1

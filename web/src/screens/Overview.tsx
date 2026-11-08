@@ -10,6 +10,7 @@ import {
   fetchSpending,
   fetchSummary,
 } from "@/api/client";
+import { InsightsFeed } from "@/components/InsightsFeed";
 import { SubscriptionsCard } from "@/components/SubscriptionsCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -134,6 +135,7 @@ export function Overview({ account }: { account?: number }) {
             <TransfersLine summary={summary.data} combined={account === undefined} />
           </MonthCard>
           <SpendingDonut spending={spending.data} account={account} />
+          <InsightsFeed />
           <SubscriptionsCard />
           <motion.div key={view} {...settle}>
             <TopMerchants spending={spending.data} />
