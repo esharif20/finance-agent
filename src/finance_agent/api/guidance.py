@@ -1,10 +1,12 @@
 """Guidance cards (#259): the playbook cards whose Engine-evaluated conditions
 hold for `current_user`, each with the figures it names and why it is shown.
 A thin adapter over `assistant.tools.guidance.evaluate`, which the Assistant's
-tools share. Read-only; nothing here logs."""
+tools share. It writes only the exposure log (#261): each card shown, once a
+week. Nothing here logs to stdout."""
 
 from collections.abc import Iterator
 from datetime import date
+from fractions import Fraction
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -14,6 +16,9 @@ from sqlalchemy import Connection
 from finance_agent.assistant.tools.guidance import Tone, clauses, evaluate, shown_as
 from finance_agent.assistant.tools.read import Source
 from finance_agent.identity import current_user
+from finance_agent.ledger.exposure import Exposures, Shown
+
+CARD_POLICY = "cards-all-v1"  # every card whose condition holds
 
 
 class FigureOut(BaseModel):
@@ -61,7 +66,8 @@ router = APIRouter(prefix="/api/guidance")
 
 @router.get("")
 def guidance(conn: Conn, tone: Annotated[Tone, Query()] = "gentle") -> list[CardOut]:
-    g = evaluate(Source(conn, current_user(), date.today()), tone)
+    user, today = current_user(), date.today()
+    g = evaluate(Source(conn, user, today), tone)
     cards = {c.id: c for c in g.book.cards}
     out: list[CardOut] = []
     for s in g.shown:
@@ -99,4 +105,13 @@ def guidance(conn: Conn, tone: Annotated[Tone, Query()] = "gentle") -> list[Card
                 why=why,
             )
         )
+    # every applicable card is shown, so each has propensity 1 (#261)
+    Exposures(conn, user).log(
+        today,
+        CARD_POLICY,
+        (
+            Shown("card", c.id, k, len(out), Fraction(1), {"tone": c.tone})
+            for k, c in enumerate(out)
+        ),
+    )
     return out

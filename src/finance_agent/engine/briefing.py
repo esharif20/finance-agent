@@ -78,7 +78,8 @@ class Briefing:
 
 def build(conn: Connection, user_id: int, day: date) -> Briefing:
     """The briefing for `day`'s week. It refreshes the stored Insights as
-    `GET /api/insights` does (idempotent); nothing else is written."""
+    `GET /api/insights` does (idempotent) and logs its shown Insights in the
+    exposure log (#261); nothing else is written."""
     week = week_of(day)
     led = Ledger(conn, user_id)
     txns = led.transactions()
@@ -125,7 +126,7 @@ def build(conn: Connection, user_id: int, day: date) -> Briefing:
         missing.append("forecast")
     return Briefing(
         week,
-        feed[:TOP_INSIGHTS],
+        insights.shown(conn, user_id, TOP_INSIGHTS, day),
         band,
         min(paydays, default=None),
         renewals,

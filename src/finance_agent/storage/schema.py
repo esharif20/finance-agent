@@ -731,3 +731,88 @@ assistant_setting = Table(
         text("model IN ('fast', 'careful')"), name="ck_assistant_setting_model"
     ),
 )
+
+# The exposure log (#261, 0027, ADR 0015): every item shown to the user, once
+# per week, with its slate slot, the policy and the exact probability it had of
+# being shown (a Fraction, "num/den"), so later policies can be evaluated off
+# policy. `item` is an Insight id, a card id or a route; `context` is JSON of
+# ints and short codes only (for a route: features and cluster id, never the
+# question). `outcome` comes only from an explicit action, never an open.
+# Feedback, never a Memory: the user can wipe it, and rows go after 400 days.
+exposure = Table(
+    "exposure",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("kind", String(16), nullable=False),
+    Column("item", String(64), nullable=False),
+    Column("week", Date, nullable=False),  # its Monday
+    Column("slot", Integer, nullable=False),
+    Column("slate_size", Integer, nullable=False),
+    Column("policy", String(64), nullable=False),
+    Column("propensity", String(32), nullable=False),
+    Column("context", Text, nullable=False),
+    Column("shown_at", DateTime(timezone=True), nullable=False),
+    Column("outcome", String(16)),
+    Column("outcome_at", DateTime(timezone=True)),
+    CheckConstraint(
+        text("kind IN ('insight', 'card', 'model_route')"), name="ck_exposure_kind"
+    ),
+    CheckConstraint(
+        text(
+            "outcome IN ('accepted', 'rejected', 'dismissed', 'acted',"
+            " 'regret_worth_it', 'regret_not_worth_it')"
+        ),
+        name="ck_exposure_outcome",
+    ),
+    UniqueConstraint("user_id", "kind", "item", "week"),
+)
+
+# Pairwise preference questions and answers (#262, 0028): "which would you cut
+# first?" over two Categories, "which matters more?" over two cards or goals.
+# Each side is one of a Category, a goal Memory or a playbook card id, and the
+# row goes with its Category or Memory. A row is written when the pair is
+# asked (`a_won` NULL) and answered at most once; only an asked pair can be
+# answered. Feedback, never a Memory; the user can wipe it.
+pairwise_answer = Table(
+    "pairwise_answer",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("question", String(16), nullable=False),
+    *(
+        col
+        for side in ("a", "b")
+        for col in (
+            Column(
+                f"{side}_category_id",
+                Integer,
+                ForeignKey("category.id", ondelete="CASCADE"),
+            ),
+            Column(
+                f"{side}_memory_id",
+                Integer,
+                ForeignKey("memory.id", ondelete="CASCADE"),
+            ),
+            Column(f"{side}_card", String(64)),
+        )
+    ),
+    Column("a_won", Boolean),  # NULL: asked, not answered yet
+    Column("asked_at", DateTime(timezone=True), nullable=False),
+    Column("answered_at", DateTime(timezone=True)),
+    CheckConstraint(
+        text("question IN ('cut', 'matters')"), name="ck_pairwise_answer_question"
+    ),
+    *(
+        CheckConstraint(
+            text(
+                f"(({s}_category_id IS NOT NULL) + ({s}_memory_id IS NOT NULL)"
+                f" + ({s}_card IS NOT NULL)) = 1"
+            ),
+            name=f"ck_pairwise_answer_{s}_one_item",
+        )
+        for s in ("a", "b")
+    ),
+    Index("ix_pairwise_answer_user", "user_id", "question"),
+    sqlite_autoincrement=True,  # a replaced pair's id is never reused
+)
