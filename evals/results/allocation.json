@@ -1,8 +1,8 @@
 {
   "harness": "allocation",
   "dataset": "synthetic_allocation",
-  "dataset_version": 1,
-  "dataset_sha256": "61cf49b35896ca6e8ee3cd5d07464d82015622ee43c79cb6a34a716382cd0b17",
+  "dataset_version": 2,
+  "dataset_sha256": "4f6923404bff49d1ed29665b8c692d869a8356258481f071dbb5d7fe2b321bf0",
   "scenarios": 216,
   "feasible_scenarios": 144,
   "models": {
@@ -14,8 +14,8 @@
         "infeasible_reported": 1.0,
         "constraint_violations": 0,
         "sum_exact": 1.0,
-        "oracle_utility": 0.963868,
-        "deviation_from_recent": 0.115448,
+        "oracle_utility": 0.97036,
+        "deviation_from_recent": 0.112207,
         "instability": 1.0
       }
     },
@@ -23,12 +23,25 @@
       "model": "50/30/20 rule",
       "model_version": "baseline",
       "metrics": {
-        "feasibility_rate": 0.388889,
+        "feasibility_rate": 0.381944,
         "infeasible_reported": 0.333333,
-        "constraint_violations": 210,
+        "constraint_violations": 209,
         "sum_exact": 1.0,
-        "oracle_utility": 0.350967,
-        "deviation_from_recent": 0.330218,
+        "oracle_utility": 0.353,
+        "deviation_from_recent": 0.296304,
+        "instability": 1.0
+      }
+    },
+    "allocation_learned": {
+      "model": "engine.allocation + Bradley-Terry after 10 answers",
+      "model_version": "lp-1+bt-1",
+      "metrics": {
+        "feasibility_rate": 1.0,
+        "infeasible_reported": 1.0,
+        "constraint_violations": 0,
+        "sum_exact": 1.0,
+        "oracle_utility": 0.97447,
+        "deviation_from_recent": 0.112207,
         "instability": 1.0
       }
     }

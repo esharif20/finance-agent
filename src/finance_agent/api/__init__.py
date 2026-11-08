@@ -24,6 +24,7 @@ from finance_agent.api import (
     cash_flow,
     chat,
     fx,
+    guidance,
     insights,
     local_model,
     manage_links,
@@ -630,6 +631,7 @@ def create_app(
     app.include_router(proposals.router)
     app.include_router(chat.router)
     app.include_router(cash_flow.router)
+    app.include_router(guidance.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)
 

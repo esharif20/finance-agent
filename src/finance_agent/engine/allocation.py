@@ -20,8 +20,8 @@ hard constraint is re-checked in integers. A failed re-check is `Infeasible`.
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportMissingTypeStubs=false
 
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from scipy.optimize import linprog
@@ -62,7 +62,7 @@ class Goal:
     target_minor: int  # the month's contribution that keeps the goal on its date
     floor_minor: int = 0
     cap_minor: int | None = None
-    weight: float = 1.0  # from Memory priority (later, pairwise strengths)
+    weight: float = 1.0  # from Memory priority; `with_strengths` refines it
 
 
 @dataclass(frozen=True)
@@ -114,6 +114,40 @@ class _Flex:
     hi: int | None
     weight: float
     essential: bool = False
+
+
+MAX_STRENGTH = 5.0  # exp(5) is ~150x: a strong view, never an unbounded one
+
+
+def with_strengths(
+    inp: AllocationInput, fitted: Mapping[str, float]
+) -> AllocationInput:
+    """Weights from Bradley-Terry strengths (#269): a goal or Category named in
+    `fitted` gets weight exp(strength). Fit the strengths with the Memory
+    priority as the prior mean (log weight), so the two combine. Only weights
+    change, so floors, caps and the income sum are untouched; names not in
+    `fitted` keep their weight, and the buffer weight drops to half the lowest
+    line weight if that is lower. Strengths are clamped, and a
+    non-finite one is rejected."""
+    if not all(math.isfinite(v) for v in fitted.values()):
+        raise ValueError("strengths must be finite")
+
+    def w(name: str, old: float) -> float:
+        if name not in fitted:
+            return old
+        return math.exp(max(-MAX_STRENGTH, min(MAX_STRENGTH, fitted[name])))
+
+    goals = tuple(replace(g, weight=w(g.name, g.weight)) for g in inp.goals)
+    cats = tuple(replace(c, weight=w(c.name, c.weight)) for c in inp.categories)
+    # the buffer stays cheaper than every line, or spare money would be pushed
+    # into lines above their pattern instead of left spare
+    lowest = min((x.weight for x in (*goals, *cats)), default=math.inf)
+    return replace(
+        inp,
+        goals=goals,
+        categories=cats,
+        buffer_weight=min(inp.buffer_weight, lowest / 2),
+    )
 
 
 def _validate(inp: AllocationInput) -> None:

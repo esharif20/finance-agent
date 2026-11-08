@@ -1,0 +1,39 @@
+name: facts
+on:
+  schedule:
+    - cron: "0 7 1 * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write # an unparseable page opens an issue, which the two scopes alone cannot do
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check official pages
+        run: python3 scripts/facts_check.py > report.json
+      - name: Open issues and PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          r = json.load(open("report.json"))
+          for f in r["failures"]:
+              subprocess.run(["gh", "issue", "create", "--title", f"Facts: cannot read {f['id']}",
+                              "--body", f"{f['reason']} at {f['source']}. Update the parser or check the page."], check=True)
+          if r["changes"]:
+              lines = [f"- {c['id']}: {c['old']} -> {c['new']} pence ({c['source']}, {c['date']})" for c in r["changes"]]
+              branch = "facts/update-" + r["changes"][0]["date"]
+              for cmd in (["git", "config", "user.name", "github-actions"],
+                          ["git", "config", "user.email", "actions@github.com"],
+                          ["git", "checkout", "-b", branch],
+                          ["git", "add", "src/finance_agent/engine/playbook_data/facts.json"],
+                          ["git", "commit", "-m", "Facts: update official figures"],
+                          ["git", "push", "origin", branch],
+                          ["gh", "pr", "create", "--title", "Facts: official figure changed",
+                           "--body", "\n".join(lines)]):
+                  subprocess.run(cmd, check=True)
+          PY

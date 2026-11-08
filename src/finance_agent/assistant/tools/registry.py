@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import Connection
 
 from finance_agent.assistant.chat_model import ToolCall, ToolSpec
-from finance_agent.assistant.tools import insight, plan, propose, read
+from finance_agent.assistant.tools import guidance, insight, plan, propose, read
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.proposals import Proposals
@@ -96,6 +96,23 @@ TOOLS = {
             engine=True,
         ),
         Tool(
+            "list_guidance",
+            "The short guidance cards that apply to the user now, best first:"
+            " title and body as quoted text, each figure as a typed field." + _DATA,
+            guidance.ListGuidanceIn,
+            guidance.list_guidance,
+            engine=True,
+        ),
+        Tool(
+            "explain_card",
+            "Why one guidance card (the id in card:<id>) is shown: its condition,"
+            " the figures behind it and the dated facts it quotes. Fails for a card"
+            " that does not apply." + _DATA,
+            guidance.ExplainCardIn,
+            guidance.explain_card,
+            engine=True,
+        ),
+        Tool(
             "forecast_cashflow",
             "Money out and recurring money in for the coming months, with an 80%"
             " band, in minor units. left_out counts Categories with too little"
@@ -151,6 +168,8 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
         "list_subscriptions",
         "list_insights",
         "explain_insight",
+        "list_guidance",
+        "explain_card",
     ),
     "plan": ("forecast_cashflow", "simulate_purchase"),
     "correct": ("find_transactions", "propose_correction"),

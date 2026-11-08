@@ -1,10 +1,10 @@
 {
   "harness": "assistant",
   "dataset": "assistant_golden",
-  "dataset_version": 3,
-  "dataset_sha256": "bf7b2be77fe6dd740714cc8e386fc37e7e4ecadfdc2c72d9cecdb6a7baad121d",
+  "dataset_version": 4,
+  "dataset_sha256": "a96f85f1c6df8bbf92d9d12a4d574d55920d32e11fb07b22517e2d2ee5b937e5",
   "prompt_sha256": "3fd4d25e44de70edb6a333e17f5828f9230c1ca0027329e9b6c2f6bd7ea3c401",
-  "cases": 31,
+  "cases": 33,
   "refusal_cases": 6,
   "models": {
     "fake_oracle": {
@@ -26,11 +26,11 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.193548,
+        "tool_call_accuracy": 0.181818,
         "grounding_pass_rate": 0.0,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.806452,
+        "printed_tool_call_rate": 0.818182,
         "model_error_rate": 0.0
       },
       "failures": {
@@ -44,6 +44,8 @@
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
+          "ask-guidance",
+          "ask-why-subscription-card",
           "ask-fuel-last-month",
           "ask-petrol-word",
           "ask-transport-breakdown",
@@ -71,6 +73,8 @@
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
+          "ask-guidance",
+          "ask-why-subscription-card",
           "ask-fuel-last-month",
           "ask-petrol-word",
           "ask-transport-breakdown",
@@ -98,6 +102,8 @@
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
+          "ask-guidance",
+          "ask-why-subscription-card",
           "ask-fuel-last-month",
           "ask-petrol-word",
           "ask-transport-breakdown",
