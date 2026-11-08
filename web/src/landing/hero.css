@@ -16,8 +16,9 @@
 }
 .lp-hero .lp-flex[data-play] .lp-flex-word {
   --w: 0;
-  animation: hero-word 680ms var(--hero-ease) backwards;
-  animation-delay: calc(var(--hd, 0s) + var(--w) * 52ms);
+  animation: hero-word 640ms var(--hero-ease) backwards;
+  /* 0.45 s: the preloader's sheet clears the headline before the first word moves */
+  animation-delay: calc(var(--hd, 0s) + 0.45s + var(--w) * 70ms);
 }
 .lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word {
   --w: 6;
@@ -31,21 +32,21 @@
 .lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(3) { --w: 8; }
 .lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(4) { --w: 9; }
 .lp-hero .lp-flex[data-play] [data-l] {
-  animation: hero-settle 900ms var(--hero-ease) backwards;
-  animation-delay: calc(var(--hd, 0s) + 60ms + var(--i) * 9ms);
+  animation: hero-settle 820ms var(--hero-ease) backwards;
+  animation-delay: calc(var(--hd, 0s) + 0.5s + var(--i) * 18ms);
 }
 @keyframes hero-word {
   from {
-    transform: translate3d(0, 112%, 0) rotate(4deg);
+    transform: translate3d(0, 118%, 0) rotate(7deg);
     opacity: 0;
   }
-  40% {
+  35% {
     opacity: 1;
   }
 }
 @keyframes hero-settle {
   from {
-    font-variation-settings: "wght" 300, "wdth" 112;
+    font-variation-settings: "wght" 200, "wdth" 125;
   }
 }
 
@@ -55,11 +56,11 @@
   z-index: 1;
   left: 0;
   top: 0;
-  width: 900px;
-  height: 900px;
-  margin: -450px 0 0 -450px;
+  width: 1100px;
+  height: 1100px;
+  margin: -550px 0 0 -550px;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(154 225 135 / 0.13), rgb(147 241 247 / 0.05) 55%, transparent);
+  background: radial-gradient(closest-side, rgb(154 225 135 / 0.26), rgb(147 241 247 / 0.1) 50%, transparent);
   pointer-events: none;
   opacity: 0;
   transform: translate3d(var(--gx, -2000px), var(--gy, -2000px), 0);
@@ -67,10 +68,10 @@
 }
 .lp-glow-near {
   z-index: 2;
-  width: 520px;
-  height: 520px;
-  margin: -260px 0 0 -260px;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.04) 60%, transparent);
+  width: 560px;
+  height: 560px;
+  margin: -280px 0 0 -280px;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 0.42), rgb(220 255 240 / 0.12) 55%, transparent);
   mix-blend-mode: plus-lighter;
 }
 .lp-hero-pin:has(.lp-stage[data-lit]) .lp-glow {
@@ -89,6 +90,13 @@
   }
 }
 
+/* a bigger hand on desktop; Hero.tsx sizes the WebGL cards to match */
+@media (min-width: 720px) {
+  .lp-hero .lp-acard-slot {
+    width: min(28vw, 440px);
+  }
+}
+
 /* --- card lighting, layered over the WebGL card (and the CSS stand-in). The DOM slot tracks the
    WebGL card only approximately, so nothing here draws a hard edge: the sweep is a soft highlight
    kept off the rims, the edge light is a backlight behind the canvas. Fine pointers only. --- */
@@ -103,22 +111,22 @@
 .lp-acard-light::before {
   content: "";
   position: absolute;
-  inset: 8% auto 8% 0;
-  width: 42%;
+  inset: 4% auto 4% 0;
+  width: 50%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.08) 60%, transparent);
+  background: radial-gradient(closest-side, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.2) 55%, transparent);
   mix-blend-mode: plus-lighter;
   transform: translate3d(-110%, 0, 0) skewX(-16deg);
 }
 .lp-stage[data-play] .lp-acard-light::before {
-  animation: hero-sweep 7.2s var(--hero-ease) infinite;
-  animation-delay: calc(1.25s + var(--i) * 170ms);
+  animation: hero-sweep 6.4s var(--hero-ease) infinite;
+  animation-delay: calc(1.5s + var(--i) * 170ms);
 }
 @keyframes hero-sweep {
   0% {
     transform: translate3d(-110%, 0, 0) skewX(-16deg);
   }
-  18%,
+  22%,
   100% {
     transform: translate3d(260%, 0, 0) skewX(-16deg);
   }
@@ -129,10 +137,10 @@
   z-index: 0;
   left: 50%;
   top: 50%;
-  width: min(30vw, 470px);
-  aspect-ratio: 1.6;
+  width: min(38vw, 600px);
+  aspect-ratio: 1.55;
   border-radius: 50%;
-  background: radial-gradient(closest-side, oklch(0.8 0.12 var(--h) / 0.32), oklch(0.7 0.1 var(--h) / 0.1) 60%, transparent);
+  background: radial-gradient(closest-side, oklch(0.82 0.15 var(--h) / 0.6), oklch(0.72 0.13 var(--h) / 0.2) 58%, transparent);
   opacity: 0;
   pointer-events: none;
 }
@@ -142,7 +150,7 @@
   z-index: 0;
   left: 50%;
   top: 50%;
-  width: min(24vw, 380px);
+  width: min(30vw, 480px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(closest-side, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.35) 45%, transparent);
@@ -152,9 +160,9 @@
 .lp-acard-floor::after {
   content: "";
   position: absolute;
-  inset: 18%;
+  inset: 12%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(154 225 135 / 0.22), transparent);
+  background: radial-gradient(closest-side, oklch(0.8 0.14 var(--h) / 0.5), transparent);
   mix-blend-mode: plus-lighter;
   transform: translateY(-30%);
 }

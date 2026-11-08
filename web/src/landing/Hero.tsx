@@ -188,7 +188,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const size = () => {
       const r = el.getBoundingClientRect();
       const narrow = r.width < 720;
-      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.24, 380);
+      // a bigger hand on desktop; hero.css sizes the slots to match (min(28vw, 440px))
+      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.28, 440);
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
@@ -209,15 +210,19 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const { w, narrow } = dims;
       const now = performance.now();
       if (playing.current && !dealt) dealt = now;
-      const since = dealt ? now - dealt : 0;
+      // the deal waits out the preloader's sheet as it lifts off the top of the page
+      const since = dealt ? now - dealt - 450 : 0;
+      const pv = p.get();
+      // on idle the fan turns slowly in place, desktop and fine pointer only, and only while it is a fan
+      const sway = finePointer() && !narrow ? clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08)) : 0;
       const poses = ACCOUNTS.accounts.map((_, i) => {
-        const q = pose(i, p.get(), w, narrow, tilt);
+        const q0 = pose(i, pv, w, narrow, tilt);
+        const q = sway ? { ...q0, ry: q0.ry + Math.sin(now / 2600) * 9 * sway, rz: q0.rz + Math.sin(now / 3400 + i * 1.3) * 2.2 * sway, y: q0.y + Math.sin(now / 2100 + i) * 6 * sway } : q0;
         // a dealt card: thrown up from below and out of depth, spinning flat as it lands (quartic ease-out)
         const k = 1 - (1 - clamp01((since - 160 - i * 170) / 1400)) ** 4;
         const u = 1 - k;
         return { ...q, rest: q.y, deal: k, y: q.y + u * w * 2.1, z: q.z - u * 520, rz: q.rz * k + u * (14 - i * 14), rx: q.rx + u * 64, ry: q.ry + u * (i - 1) * 18, s: q.s * (0.78 + 0.22 * k) };
       });
-      const pv = p.get();
       // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
       if (rows.current) rows.current.style.transform = `translate3d(${tilt.x * -40}px, ${-pv * 22 + tilt.y * -24}vh, ${-260 - pv * 200}px)`;
       if (light.tx > -1e4) {
@@ -271,10 +276,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       }
       // the last card lands at 160 + 2 * 170 + 1400 ms; the WebGL sweep ends at 1100 + 1500 ms
       const dealing = !dealt || since < 2800;
+      const idling = sway > 0;
       const glowing = light.tx > -1e4 && Math.abs(light.tx - light.x) + Math.abs(light.ty - light.y) > 0.5;
       const moving = Math.abs(pv - lastP) > 0.00005;
       lastP = pv;
-      if (dealing || moving || settling || glowing || (scene && !drawn)) raf = requestAnimationFrame(frame);
+      if (dealing || idling || moving || settling || glowing || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
       if (!raf) raf = requestAnimationFrame(frame);
@@ -376,7 +382,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
               ))}
             </ul>
             {ACCOUNTS.accounts.map((a, i) => (
-              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" />
+              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
             ))}
             {ACCOUNTS.accounts.map((a, i) => (
               <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
