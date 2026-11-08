@@ -157,6 +157,18 @@ The backtest (`evals/forecast.py`, seed 146, dataset v2, origins from 13 months,
 
 ETS beats seasonal naive on overall MASE and coverage gap and on MASE in six of seven Categories; Groceries is the exception. On the untuned seeds 149 and 7, overall MASE is 0.803 against 0.823 and 0.785 against 0.814. The engine's seasonal-naive band pools month-to-month and same-month errors: from same-month errors alone (one at 13 months) it covered about 68% at 12 to 23 months, so the verifier of #179 widened it, and overall coverage moved from 0.741 to 0.815. Holidays, the lumpiest Category, now over-covers (0.876). Groceries loses on MASE on seed 146 but not on every seed: across seven seeds the ETS losses from 24 months are scattered (Groceries on 3, Online on 4, Coffee on 3) while ETS wins overall on every seed, so no Category falls back to seasonal naive. A constant training window has no MASE scale, so the harness scores that origin for coverage only (verifier #171).
 
+### The L0 profile (#327)
+
+`engine.profile` is what the Assistant always has in its prompt: Accounts, income and payday, bills and subscriptions, each Category's median month, trends, unusual recent payments, goals and Memories (ids and tags only) and the history window, all in minor units from the Engine. `evals/knowledge_profile.py` builds three demo Personas (13 months, `scripts/build_demo_db.py`) and re-derives every fact with its own code, before and after a Correction, so a stale profile counts as wrong. It also runs the grounding check on the rendered text against the profile's own tool values. Baseline: the same profile as JSON, what a tool-result dump would put in the prompt.
+
+| Metric | Profile | JSON baseline |
+| --- | --- | --- |
+| Fact accuracy (373 facts) | 1.0 | - |
+| Rendered text grounds (6 renders) | 1.0 | - |
+| Tokens, max / mean (target 800 or fewer) | 329 / 321.3 | 927 / 900.3 |
+
+Build times go to stderr only, since they don't reproduce, and the run fails over target: first scan under 30 s, refresh under 1 s. On an M1 Pro: first scan 0.30 s, refresh after a Correction 0.22 s. A refresh is a full rebuild keyed by the ledger version. Rebuilding only the months a change touched waits for the L1 tables (part 2), because at 0.2 s it isn't needed yet.
+
 ## Minimum-data gates (ADR 0015)
 
 A learned component runs live only when the user's own data clears its gate. Below the gate, the baseline or rules decide, and the "How well I know you" page says which gate is not yet met. Gates are starting values: each ticket confirms or tunes its gate in its evaluation.

@@ -1,0 +1,61 @@
+{
+  "harness": "knowledge_profile",
+  "dataset": "demo_personas",
+  "dataset_version": 1,
+  "dataset_sha256": "53a0a33b60fc4cb9e69f61df8d901d172a9b26c2ad8c80d6215e53493d9cbf45",
+  "personas": 3,
+  "months": 13,
+  "today": "2026-11-08",
+  "per_persona": {
+    "0": {
+      "facts": 121,
+      "fact_accuracy": 1.0,
+      "tokens": 314,
+      "accounts": 3,
+      "bills": 12,
+      "categories": 7,
+      "trends": 1,
+      "unusual": 0
+    },
+    "1": {
+      "facts": 127,
+      "fact_accuracy": 1.0,
+      "tokens": 329,
+      "accounts": 3,
+      "bills": 12,
+      "categories": 6,
+      "trends": 2,
+      "unusual": 1
+    },
+    "2": {
+      "facts": 125,
+      "fact_accuracy": 1.0,
+      "tokens": 321,
+      "accounts": 3,
+      "bills": 11,
+      "categories": 6,
+      "trends": 0,
+      "unusual": 2
+    }
+  },
+  "models": {
+    "profile": {
+      "model": "engine.profile",
+      "model_version": "1",
+      "metrics": {
+        "fact_accuracy": 1.0,
+        "render_grounded": 1.0,
+        "max_tokens": 329,
+        "mean_tokens": 321.3
+      }
+    },
+    "json_baseline": {
+      "model": "profile.model_dump_json",
+      "model_version": "1",
+      "metrics": {
+        "max_tokens": 927,
+        "mean_tokens": 900.3
+      }
+    }
+  }
+}
