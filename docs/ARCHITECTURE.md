@@ -36,9 +36,13 @@ flowchart TB
     OL[Ollama on localhost]
   end
 
+  subgraph Demo["Separate process: hosted demo (ADR 0016)"]
+    DEMO[demo: synthetic Visitor ledgers, signed cookie]
+  end
+
   subgraph Cloud["Outside the Mac (opt-in)"]
     GW[privacy gateway]
-    LLM[cloud model]
+    LLM[Gemini, one pinned host]
   end
 
   CSV --> ING
@@ -77,11 +81,16 @@ All under `src/finance_agent/`. Each module exposes a small typed interface (Pyd
 | `engine` | Personal baselines, detectors, forecasts, Insight ranking, preference models, Allocation Plans, model registry. `engine.forecast` (#149) fits ETS with `statsmodels` (with its `scipy`, `numpy` and `pandas`): the standard ETS with prediction intervals, not worth re-implementing. It is the one module outside the money rule allowed to use `float`, inside the model fit only; every output is rounded to integer pence (`tests/test_no_float.py`) | `ledger`, `categorise` (read-only: recurring detection; `categorise` never imports `engine`, import-linter contract), `memory` |
 | `memory` | Memories, Proposals, feedback, retention. Today in `ledger.proposals` (#138), because confirming a Correction Proposal must go through the Ledger's own Correction, Split and note paths; propose validates by running that confirm path in a savepoint that is always rolled back | `storage`, `ledger` |
 | `assistant` | The LangGraph graph (`langgraph` pinned; LangSmith tracing forced off on import, ADR 0008), tool allowlist, grounding check, answer cache (ADR 0010), and the `ChatModel` interface with `FakeChatModel` (scripted, for tests and CI) and `OllamaChatModel` (`http.client` to `localhost:11434` only: any other host, redirect or proxy is refused; malformed tool calls are rejected) (#135). Graph checkpoints are kept through `ledger.conversation` (rows in the encrypted database) and written on the connection's own thread (#139). | `engine`, `ledger` (read-only views), `memory` (propose and read; confirm and reject run only on the user's decision, through the API). Never `storage`, `ingest`, `api` or `cli` directly (import-linter contract) |
-| `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0013). No database access. | nothing except the payload it is handed |
+| `gateway` | Placeholder substitution, field allowlist, payload log, cost meter (ADR 0011, ADR 0013). No database access. `gateway.cloud` is the cloud client: the only caller of the pinned Gemini host, started only for a paid-tier key (ADR 0016). The cost meter keeps its totals in `spend.sqlite`, which holds no personal data. | nothing except the payload it is handed |
+| `demo` | The hosted demo (ADR 0016): `FA_DEMO=1` wiring, Personas and synthetic ledgers per Visitor in `FA_DEMO_DIR` (plain SQLite), the signed cookie and `demo.auth`, the optional GitHub login and the demo's only egress. No Keychain, card art, sync, import, Ollama or cloud | `ledger`, `engine`, `storage` (plain connection only) |
 | `api` | FastAPI routes, `current_user`, OpenAPI schema | all of the above |
 | `cli` | The `fa` command. `fa import`, `fa summary`, `fa connect` / `disconnect` / `sync` (SimpleFIN, ADR 0013/0014) and `fa watch` (watched-folder import) call the Ledger interface in process; `fa backup` / `fa restore` call `storage.backup`; `fa forget-embeddings` calls `categorise.embedding.forget` (the scheduled sync backs up after it succeeds); `fa sync --install`, `fa watch install` and `fa backup setup` write `launchd` agents; `fa` (open dashboard) talks to the running server | `ledger`, `categorise`, `storage` (opening the database, the Keychain), `ingest.simplefin` (fetching), `identity` (in-process); `api` only over HTTP |
 
 Dependency direction is enforced by an import-linter check in CI: nothing imports `assistant` except `api`, and `gateway` imports nothing from the core.
+
+## Two processes
+
+The local app (above) is the one that ever holds real data. The hosted demo is a second process, started with `FA_DEMO=1` and deployed on Vercel, serving the same API and React app over synthetic ledgers only (ADR 0016). They share code but not data: the demo never receives the data directory, the Keychain or the gateway, and the local app never serves the public.
 
 ## Ledger application interface
 
@@ -140,7 +149,7 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 
 ## Multi-user seams (ADR 0003)
 
-`user_id` everywhere, one data-access layer, Alembic migrations kept Postgres-compatible, one `current_user` dependency (returns the local user until the demo milestone), and the `ChatModel` interface. Nothing else is built for multiple users.
+`user_id` everywhere, one data-access layer, Alembic migrations kept Postgres-compatible, one `current_user` dependency (returns the local user; in the demo it returns the Visitor from the signed cookie, whose ledger is a separate SQLite file), and the `ChatModel` interface. Nothing else is built for multiple users.
 
 ## Repository layout
 

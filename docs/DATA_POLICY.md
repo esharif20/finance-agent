@@ -31,13 +31,18 @@ Status: draft for review.
 | Weekly briefing (#152) | Not stored: computed on request from the Ledger, the Insights and the forecast | Shown in the app only, never sent anywhere (no email or push) |
 | Assistant traces | 30 days, redacted | Automatic |
 | Gateway payload log | 90 days | Automatic |
+| Spend store (`spend.sqlite`, ADR 0016) | Monthly totals per service, kept for the cap and the 80% warning | Holds no personal data: service name, month and pence only. Deleted by removing the file; the meter restarts from zero |
 | Backups (external drive) | The newest copy of each of the 7 latest days, plus the newest copy of each of the 4 ISO weeks before those | Deleting data locally reaches the backups within 4 weeks, as older copies are pruned |
 
 A `fa forget` command lists and deletes Memories, summaries and feedback. Deletion is real: no model is trained in a way that would keep a copy (ADR 0009).
 
+## Hosted demo
+
+The hosted demo (ADR 0016) holds synthetic data only. Visitor ledgers are ephemeral: generated per visitor from a Persona, kept in `FA_DEMO_DIR`, and deleted when idle or on redeploy. The cookie holds only a visitor id and a Persona. The demo has no analytics, no third-party tracing and no import. Logs carry counts only, as in the local app. The only account it can know of is a GitHub login the visitor chooses, and nothing from it is stored beyond the session.
+
 ## Secrets
 
-SQLCipher key, the account-reference HMAC key, the SimpleFIN access token and API keys live in the macOS Keychain, never in files or environment variables committed anywhere. `.env` files are git-ignored. The backup recovery key (the SQLCipher and HMAC keys together) is shown once by `fa backup setup` for the user's password manager; it is never written to disk, logs or argv, and `fa restore --recovery-key` reads it from stdin.
+SQLCipher key, the account-reference HMAC key, the SimpleFIN access token and API keys (the Gemini key under its own service name, never set on Vercel) live in the macOS Keychain, never in files or environment variables committed anywhere. `.env` files are git-ignored. The backup recovery key (the SQLCipher and HMAC keys together) is shown once by `fa backup setup` for the user's password manager; it is never written to disk, logs or argv, and `fa restore --recovery-key` reads it from stdin.
 
 ## Backups
 

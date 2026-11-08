@@ -113,6 +113,20 @@ _Avoid_: Warning, alert
 A small first charge (£1 or less) from a known service that runs trials, with an expected conversion date from that service's usual trial length. Partial by design: read from posted charges only, so a trial that starts free stays unseen until the Mail signals (#80).
 _Avoid_: Intro offer
 
+## Hosted demo
+
+**Demo**:
+The public, hosted copy of the app (ADR 0016): a separate process that runs on synthetic data only and never touches the user's real Ledger.
+_Avoid_: Sandbox, staging
+
+**Visitor**:
+Someone using the Demo. Anonymous by default, identified only by a signed cookie holding a visitor id and a Persona; each Visitor has their own ephemeral synthetic Ledger.
+_Avoid_: User (the user is the owner of the real Ledger), guest
+
+**Persona**:
+A named synthetic financial profile a Visitor picks in the Demo, which decides the Accounts and Transactions generated for them.
+_Avoid_: Character, template, role
+
 ## Intelligence
 
 **Insight**:
