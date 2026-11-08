@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from finance_agent.api.subscription_costs import Pence
 from finance_agent.api.subscriptions import Led
 from finance_agent.engine.baselines import Insufficient
-from finance_agent.engine.forecast import in_gbp, project
+from finance_agent.engine.forecast import cash_flow, in_gbp, project
 from finance_agent.engine.shortfall import Risk, outlook, pace
 from finance_agent.ingest.simplefin import LONDON
 
@@ -117,3 +117,26 @@ def simulate_purchase(
         have=None,
         need=None,
     )
+
+
+class BandOut(BaseModel):
+    month: str  # YYYY-MM
+    point: int  # pence of money out, from engine.forecast
+    lower: int
+    upper: int
+
+
+@router.get("/forecast")
+def forecast(led: Led) -> list[BandOut]:
+    """Monthly money-out band for the chart, as `engine.forecast` computes it.
+    Empty while no Category has enough history to forecast."""
+    flow = cash_flow(led, date.today(), HORIZON)
+    left_out = sum(not f.months for f in flow.categories.values())
+    if left_out >= len(flow.categories):  # the briefing's rule (engine.briefing)
+        return []
+    return [
+        BandOut(
+            month=m.month, point=m.total.point, lower=m.total.lower, upper=m.total.upper
+        )
+        for m in flow.months
+    ]

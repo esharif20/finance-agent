@@ -102,6 +102,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cash-flow/forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Forecast
+         * @description Monthly money-out band for the chart, as `engine.forecast` computes it.
+         *     Empty while no Category has enough history to forecast.
+         */
+        get: operations["forecast_api_cash_flow_forecast_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cash-flow/simulate-purchase": {
         parameters: {
             query?: never;
@@ -1104,24 +1125,9 @@ export interface components {
             accounts: components["schemas"]["AccountGbpOut"][];
             total: components["schemas"]["Money"] | null;
         };
-        /** BandOut */
-        BandOut: {
-            /** Left Out */
-            left_out: number;
-            /** Lower Minor */
-            lower_minor: number;
-            /** Month */
-            month: string;
-            /** Point Minor */
-            point_minor: number;
-            /** Recurring Minor */
-            recurring_minor: number;
-            /** Upper Minor */
-            upper_minor: number;
-        };
         /** BriefingOut */
         BriefingOut: {
-            forecast: components["schemas"]["BandOut"] | null;
+            forecast: components["schemas"]["finance_agent__api__briefing__BandOut"] | null;
             /** Insights */
             insights: components["schemas"]["InsightOut"][];
             /** Insufficient */
@@ -1944,6 +1950,32 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** BandOut */
+        finance_agent__api__briefing__BandOut: {
+            /** Left Out */
+            left_out: number;
+            /** Lower Minor */
+            lower_minor: number;
+            /** Month */
+            month: string;
+            /** Point Minor */
+            point_minor: number;
+            /** Recurring Minor */
+            recurring_minor: number;
+            /** Upper Minor */
+            upper_minor: number;
+        };
+        /** BandOut */
+        finance_agent__api__cash_flow__BandOut: {
+            /** Lower */
+            lower: number;
+            /** Month */
+            month: string;
+            /** Point */
+            point: number;
+            /** Upper */
+            upper: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -2109,6 +2141,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forecast_api_cash_flow_forecast_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["finance_agent__api__cash_flow__BandOut"][];
                 };
             };
         };

@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, update
 
 from finance_agent import api, categorise
+from finance_agent.engine.forecast import cash_flow
 from finance_agent.ingest.simplefin import LONDON
 from finance_agent.ledger import Ledger
 from finance_agent.storage import schema
@@ -101,6 +102,38 @@ def test_another_users_history_never_answers_for_this_one(
     with TestClient(api.create_app(engine)) as c:
         body = c.get(URL, params={"amount_minor": 100}).json()
     assert body["status"] == "insufficient"  # not user 2's forecast
+
+
+FORECAST = "/api/cash-flow/forecast"
+
+
+def test_the_forecast_band_matches_the_engine_exactly(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    _load(engine, write_export, 1, 14)
+    with engine.begin() as conn:
+        flow = cash_flow(Ledger(conn, 1), date.today(), 3)
+    want = [
+        {
+            "month": m.month,
+            "point": m.total.point,
+            "lower": m.total.lower,
+            "upper": m.total.upper,
+        }
+        for m in flow.months
+    ]
+    with TestClient(api.create_app(engine)) as c:
+        got = c.get(FORECAST).json()
+    assert want and got == want
+    assert all(type(v) is int for row in got for k, v in row.items() if k != "month")
+
+
+def test_the_forecast_never_shows_another_users_history(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    _load(engine, write_export, 2, 14)  # someone else's full history
+    with TestClient(api.create_app(engine)) as c:
+        assert c.get(FORECAST).json() == []
 
 
 def test_a_simulation_writes_nothing(
