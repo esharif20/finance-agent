@@ -193,12 +193,12 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 | `peak_rss_gb`, `peak_ollama_size_gb`, `peak_memory_gb` | peak RSS of Ollama's runner process and peak `/api/ps` size, sampled every 0.25 s, and the larger of the two (real runs only) |
 
 - **CI** runs it on two scripted `FakeChatModel`s and requires `evals/results/assistant_fake.json` to reproduce (`gate.py`). The oracle does what each case expects and scores 1.0 everywhere. The negative control prints its tool calls as text, and must be flagged on every tool-using case: it scores 0.25 tool-call accuracy and a 0.75 printing rate.
-- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:4b`.
+- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:9b-q4_K_M`.
   - It talks only to localhost Ollama, at `num_ctx` 8192.
   - It merges the model's scores into `evals/results/assistant_local.json`, which CI never reads. The model digest is its `model_version`.
   - It unloads the model afterwards (`keep_alive` 0), even if the run fails.
   - Run it on an idle Mac.
-- **Choosing the model (#144):** the smallest model that passes the accuracy gates with `peak_memory_gb` of about 7 or less.
+- **Choosing the model (#144):** the smallest model that passes the accuracy gates with `peak_memory_gb` of about 7 or less. The gates have no numbers yet. #144 required refusal correctness 1.0, no printed tool calls and no errors, then compared tools and grounding. The chosen model and the results table are in `AI_DESIGN.md` ("Models").
 - **Known gap:** a printed tool call with no figures in it passes the grounding check, so the user sees it as the reply. The printing metric catches it here.
 
 ## Outcomes over time

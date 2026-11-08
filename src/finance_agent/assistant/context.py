@@ -38,8 +38,8 @@ SYSTEM = {
         " Insights.\n"
         "Examples: 'What did I spend on coffee in March?' ask. 'Can I afford a"
         " £20.00 dinner?' plan. 'What will my bills be next month?' plan."
-        " 'Would £80.00 on Friday leave me short?' plan. 'I'm saving for a car.' memory. 'The Amazon one"
-        " was a gift.' correct."
+        " 'Would £80.00 on Friday leave me short?' plan. 'I'm saving for a"
+        " car.' memory. 'The Amazon one was a gift.' correct."
     ),
     "common": (
         "You are a careful personal-finance assistant on the user's own Mac."

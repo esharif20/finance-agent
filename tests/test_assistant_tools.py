@@ -128,16 +128,19 @@ def test_every_argument_is_described_in_the_schema_the_model_sees() -> None:
     # description qwen3.5:4b sent £50.00 as amount_minor 50 and guessed Categories
     for sg in ("ask", "correct", "memory", "plan"):
         for s in specs(sg):
-            models = [s.parameters, *s.parameters.get("$defs", {}).values()]
+            schema: dict[str, Any] = s.parameters
+            models: list[dict[str, Any]] = [schema, *schema.get("$defs", {}).values()]
             for m in models:
-                for arg, prop in m.get("properties", {}).items():
+                props: dict[str, dict[str, Any]] = m.get("properties", {})
+                for arg, prop in props.items():
                     assert prop.get("description"), (s.name, arg)
-    money = {
-        p["description"]
-        for s in specs("plan")
-        for k, p in s.parameters["properties"].items()
-        if k.endswith("_minor")
-    }
+    money: set[str] = set()
+    for s in specs("plan"):
+        plan_schema: dict[str, Any] = s.parameters
+        plan_props: dict[str, dict[str, Any]] = plan_schema["properties"]
+        money |= {
+            p["description"] for k, p in plan_props.items() if k.endswith("_minor")
+        }
     assert money and all("5000" in d for d in money)
 
 
