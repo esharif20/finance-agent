@@ -95,3 +95,19 @@ def test_watched_folder_import_categorises_and_recognises(
     with caplog.at_level(logging.DEBUG):
         assert watch.run(folder, lambda title, body: None) == 0
     check(engine, caplog)
+
+
+def test_a_sync_with_no_new_rows_still_files_waiting_merchants(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reverted Corrections leave Merchants uncategorised with nothing new to
+    import; the next sync must still run the auto-categoriser (and its cap)."""
+    from finance_agent.categorise import auto
+
+    calls: list[int] = []
+    monkeypatch.setattr(auto, "refresh_quietly", lambda e, u: calls.append(u))
+    with TestClient(api.create_app(engine)) as c:
+        c.post("/api/sync")
+        assert c.post("/api/sync").json()["added"] == 0
+    assert main(["sync"]) == 0
+    assert len(calls) == 3
