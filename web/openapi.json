@@ -469,6 +469,76 @@
         "title": "BriefingOut",
         "type": "object"
       },
+      "CardOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "figures": {
+            "items": {
+              "$ref": "#/components/schemas/FigureOut"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "principles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Principles",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tone": {
+            "title": "Tone",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "why": {
+            "items": {
+              "$ref": "#/components/schemas/WhyOut"
+            },
+            "title": "Why",
+            "type": "array"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "id",
+          "topic",
+          "tone",
+          "title",
+          "body",
+          "principles",
+          "figures",
+          "facts",
+          "why"
+        ],
+        "title": "CardOut",
+        "type": "object"
+      },
       "CategoryDetailOut": {
         "properties": {
           "currency": {
@@ -1054,6 +1124,45 @@
         "title": "EvidenceOut",
         "type": "object"
       },
+      "FactOut": {
+        "properties": {
+          "checked_on": {
+            "format": "date",
+            "title": "Checked On",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "may_be_out_of_date": {
+            "title": "May Be Out Of Date",
+            "type": "boolean"
+          },
+          "shown": {
+            "title": "Shown",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "shown",
+          "source",
+          "checked_on",
+          "may_be_out_of_date"
+        ],
+        "title": "FactOut",
+        "type": "object"
+      },
       "FeedbackIn": {
         "properties": {
           "liked": {
@@ -1088,6 +1197,24 @@
           "signal"
         ],
         "title": "FeedbackOut",
+        "type": "object"
+      },
+      "FigureOut": {
+        "properties": {
+          "shown": {
+            "title": "Shown",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "shown"
+        ],
+        "title": "FigureOut",
         "type": "object"
       },
       "FlagOut": {
@@ -3161,6 +3288,34 @@
         "title": "VersionOut",
         "type": "object"
       },
+      "WhyOut": {
+        "properties": {
+          "actual": {
+            "title": "Actual",
+            "type": "string"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "op",
+          "threshold",
+          "actual"
+        ],
+        "title": "WhyOut",
+        "type": "object"
+      },
       "finance_agent__api__briefing__BandOut": {
         "properties": {
           "left_out": {
@@ -4044,6 +4199,54 @@
           }
         },
         "summary": "Set Rate"
+      }
+    },
+    "/api/guidance": {
+      "get": {
+        "operationId": "guidance_api_guidance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tone",
+            "required": false,
+            "schema": {
+              "default": "gentle",
+              "enum": [
+                "gentle",
+                "blunt"
+              ],
+              "title": "Tone",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardOut"
+                  },
+                  "title": "Response Guidance Api Guidance Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guidance"
       }
     },
     "/api/health": {

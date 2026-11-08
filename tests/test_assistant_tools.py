@@ -70,6 +70,8 @@ def test_each_sub_graph_is_offered_only_its_own_tools() -> None:
         "spending_summary",
         "category_trend",
         "category_detail",
+        "list_guidance",
+        "explain_card",
         "list_subscriptions",
         "list_insights",
         "explain_insight",

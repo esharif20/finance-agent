@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 3
+DATASET_VERSION = 4
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -116,6 +116,22 @@ CASES: tuple[Case, ...] = (
         "ask",
         (Call("list_insights"),),
         "There are no Insights for you yet.",
+    ),
+    # --- Ask: guidance cards (v4, #259). The synthetic Ledger is too short for
+    # any card's condition to hold, so none is listed and none may be cited.
+    Case(
+        "ask-guidance",
+        "Is there any money guidance for me right now?",
+        "ask",
+        (Call("list_guidance"),),
+        "There is no guidance for you right now.",
+    ),
+    Case(
+        "ask-why-subscription-card",
+        "Why am I seeing the subscription card?",
+        "ask",
+        (Call("explain_card", {"card_id": "subscription-creep"}),),
+        "That card doesn't apply to you, so there is nothing to explain.",
     ),
     # --- Ask: inside a Category (v3) ------------------------------------------
     Case(
