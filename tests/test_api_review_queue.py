@@ -112,3 +112,21 @@ def test_another_users_items_are_unreachable(
         after = ReviewQueue(conn, 2).items()
         assert [i.skipped for i in after] == [False, True]
         assert Scoped(conn, 1).ledger_version() == 0
+
+
+def test_undo_of_an_answer_reverted_elsewhere_returns_a_message(
+    engine: Engine, tmp_path: Path, client: TestClient
+) -> None:
+    seed(engine, tmp_path)
+    cafe = client.get("/api/review-queue").json()["items"][0]
+    body = {"version": cafe["version"], "category": ["Food & Drink", "Coffee"]}
+    client.post(f"/api/review-queue/{cafe['id']}/answer", json=body)
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        (k,) = led.corrections()
+        led.revert_correction(k.id)
+
+    r = client.post("/api/review-queue/undo")
+
+    assert r.status_code == 200 and "already" in r.json()["message"]
+    assert client.get("/api/review-queue").json()["message"] is None

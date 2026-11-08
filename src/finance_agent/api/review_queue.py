@@ -39,6 +39,9 @@ class QueueOut(BaseModel):
     items: list[ItemOut]
     remaining: int
     ledger_version: int
+    # set when an undo changed nothing because the answer's Correction was
+    # already reverted elsewhere; show it instead of "Undid the last change."
+    message: str | None = None
 
 
 class VersionIn(BaseModel):
@@ -82,10 +85,11 @@ def _item(i: Item) -> ItemOut:
     )
 
 
-def _out(q: ReviewQueue, change: Callable[[], None] | None = None) -> QueueOut:
+def _out(q: ReviewQueue, change: Callable[[], str | None] | None = None) -> QueueOut:
+    message = None
     try:
         if change is not None:
-            change()
+            message = change()
     except UnknownTarget:
         raise HTTPException(404, "no such item, Category or decision") from None
     except StaleItem as e:
@@ -93,7 +97,9 @@ def _out(q: ReviewQueue, change: Callable[[], None] | None = None) -> QueueOut:
     except InvalidAnswer as e:
         raise HTTPException(422, str(e)) from None
     items = [_item(i) for i in q.items()]
-    return QueueOut(items=items, remaining=len(items), ledger_version=q.version())
+    return QueueOut(
+        items=items, remaining=len(items), ledger_version=q.version(), message=message
+    )
 
 
 @router.get("")

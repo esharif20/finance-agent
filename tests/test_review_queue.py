@@ -6,6 +6,7 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -254,7 +255,7 @@ def test_another_user_can_neither_see_nor_answer_my_items() -> None:
         mine.skip(item.id, item.version)
         with pytest.raises(UnknownTarget):  # my skip is not theirs to undo
             theirs.undo()
-        assert led.corrections() == [] and led.ledger_version() == v + 1
+        assert led.corrections() == [] and led.ledger_version() == v
         assert [i.skipped for i in mine.items()] == [True]
 
 
@@ -324,13 +325,78 @@ def test_an_answer_racing_a_new_import_is_refused_as_stale() -> None:
         assert now.id == shown.id and now.weight == 3
 
 
+NO_MERCHANT = "0000 1234"  # normalises to nothing: no Merchant (#158)
+
+
+def test_uncategorised_rows_with_no_merchant_are_queued_one_by_one() -> None:
+    with ledger_with([(NO_MERCHANT, -500)] * 2) as (conn, led):
+        q = ReviewQueue(conn, 1)
+        items = category_items(q)
+        assert len(items) == 2
+        assert all(i.merchant_id is None and i.weight == 1 for i in items)
+        assert sorted(t for i in items for t in i.transaction_ids) == sorted(
+            t.id for t in led.transactions()
+        )
+        first, second = items
+
+        q.answer(first.id, first.version, Answer(category=("Travel", "Hotels")))
+
+        (k,) = led.corrections()
+        assert (k.transaction_id, k.merchant_id) == (first.transaction_ids[0], None)
+        assert category_items(q) == [second]
+
+
+def test_weight_counts_every_row_of_the_merchant() -> None:
+    with ledger_with([("SYNTH CAFE", -350)] * 3) as (conn, led):
+        q = ReviewQueue(conn, 1)
+        (item,) = category_items(q)
+        led.correct_transaction(item.transaction_ids[0], ("Travel", "Hotels"))
+
+        (left,) = category_items(q)
+        assert len(left.transaction_ids) == 2 and left.weight == 3
+
+
+def test_a_skip_and_its_undo_never_bump_the_ledger_version() -> None:
+    """The version keys the answer cache (#140); a skip changes no figure."""
+    with ledger_with([("SYNTH CAFE", -350)] * 2) as (conn, led):
+        q = ReviewQueue(conn, 1)
+        (item,) = q.items()
+        v = led.ledger_version()
+
+        q.skip(item.id, item.version)
+        assert led.ledger_version() == v
+        assert q.undo() is None
+        assert led.ledger_version() == v
+
+
+def test_undoing_an_answer_reverted_elsewhere_says_so() -> None:
+    with ledger_with([("SYNTH CAFE", -350)] * 2) as (conn, led):
+        q = ReviewQueue(conn, 1)
+        before, cats = q.items(), categories(led)
+        (item,) = before
+        q.answer(item.id, item.version, Answer(category=("Travel", "Hotels")))
+        (k,) = led.corrections()
+        led.revert_correction(k.id)
+
+        message = q.undo()
+
+        assert message is not None and "already" in message
+        assert (q.items(), categories(led)) == (before, cats)
+        with pytest.raises(UnknownTarget):  # the decision itself is undone
+            q.undo()
+
+
 # --- property tests -------------------------------------------------------
 
-ROWS = st.lists(
-    st.tuples(st.sampled_from([*UNKNOWN, KNOWN]), st.integers(-9000, -1)),
-    min_size=1,
-    max_size=25,
+SPEND = st.tuples(
+    st.sampled_from([*UNKNOWN, KNOWN, NO_MERCHANT]), st.integers(-9000, -1)
 )
+# a Refund from the same Merchant ("REFUND" is dropped when normalising)
+REFUND = st.tuples(
+    st.sampled_from([*UNKNOWN, KNOWN]).map(lambda d: f"{d} REFUND"),
+    st.integers(1, 9000),
+)
+ROWS = st.lists(SPEND | REFUND, min_size=1, max_size=25)
 LEAVES = [(top, sub) for top, subs in categorise.TAXONOMY.items() for sub in subs]
 STEP = st.tuples(
     st.sampled_from(["answer", "one", "skip", "undo"]),
@@ -340,7 +406,23 @@ STEP = st.tuples(
 
 
 def figures(led: Ledger) -> list[object]:
-    return [led.summarise_month(m) for m in led.months()]
+    """Every figure an answer must leave alone: month totals, the Refunds and
+    Fees that separate Money out from spending (ADR 0004), and reconciliation
+    (Bank and Ledger balances, Gaps)."""
+    months = led.months()
+    out: list[object] = [led.summarise_month(m) for m in months]
+    for m in months:
+        b = led.category_breakdown(m)
+        out.append(
+            (
+                b.refunds,
+                b.fees,
+                b.unmatched_refunds + sum((s.amount for s in b.categories), Decimal(0)),
+                b.spending_after_refunds,
+            )
+        )
+    out += [(a.id, a.bank_balance, a.ledger_balance, a.gaps) for a in led.accounts()]
+    return out + [led.gaps()]
 
 
 @settings(max_examples=40, deadline=None)

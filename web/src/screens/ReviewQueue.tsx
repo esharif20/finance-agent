@@ -66,7 +66,7 @@ export function ReviewQueue() {
     mutationFn: ({ call }: { call: () => Promise<ReviewQueueOut>; text: string }) => call(),
     onSuccess: (q, { text }) => {
       client.setQueryData(REVIEW_KEY, q);
-      setNote({ text });
+      setNote({ text: q.message ?? text }); // an undo that found nothing to undo says why
       setAll(true);
     },
     onError: (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
@@ -90,7 +90,7 @@ export function ReviewQueue() {
     const txn = justOne ? item.transaction_ids[0] : undefined;
     act.mutate({
       call: () => answerReview(item, { category: cat, ...(txn === undefined ? {} : { transaction_id: txn }) }),
-      text: `${item.title}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
+      text: `${item.title || "This payment"}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
     });
   };
   const choose = (choice: string) => {

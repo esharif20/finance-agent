@@ -9,8 +9,9 @@ it. Later features (splits, "Always ask") add a type there and nothing else.
 An answer whose effect resolves the item (a Correction, a registry decision)
 removes it through that effect; an answer that is only a record ("keep both")
 hides the item while its inputs hash to the answered version. A skip sends the
-item to the end until its inputs change. Nothing here changes an amount, so
-queued items count in every figure.
+item to the end until its inputs change, and changes no figure, so it never
+bumps the ledger version (the answer cache's key, #140). Nothing here changes
+an amount, so queued items count in every figure.
 """
 
 import hashlib
@@ -40,12 +41,16 @@ class InvalidAnswer(ValueError):
     """An answer this item's type does not take."""
 
 
+class AlreadyReverted(Exception):
+    """Undo found the answer's effect already reverted elsewhere."""
+
+
 @dataclass(frozen=True)
 class Item:
     type: str
-    key: str  # stable within the type: a Merchant id, or a group's row ids
+    key: str  # stable within the type: a Merchant id, "t<id>", or row ids
     version: str  # hash of the inputs; a decision holds while it matches
-    weight: int  # Transactions an answer touches: the Merchant's frequency
+    weight: int  # Transactions an answer touches: all the Merchant's rows
     title: str = ""  # the Merchant's name, if any
     merchant_id: int | None = None
     transaction_ids: tuple[int, ...] = ()
@@ -84,31 +89,37 @@ def _version(*parts: object) -> str:
 
 
 class CategoryItems:
-    """A Merchant whose Spending or Refunds are still Uncategorised."""
+    """A Merchant whose Spending or Refunds are still Uncategorised, or one
+    such Transaction with no Merchant (keyed "t<id>")."""
 
     name = "category"
 
     def items(self, led: Ledger, txns: Sequence[Transaction]) -> Iterable[Item]:
         rows: dict[int, list[int]] = {}
         names: dict[int, str] = {}
+        counts: dict[int, int] = {}  # every row of the Merchant, for `weight`
         for t in txns:
             c = t.categorisation
-            # shortcut: rows with no Merchant are left out; queue them by
-            # Transaction if real exports have many
+            if c is not None and c.merchant_id is not None:
+                counts[c.merchant_id] = counts.get(c.merchant_id, 0) + 1
             if (
                 c is not None
-                and c.merchant_id is not None
                 and c.kind in CATEGORISED_KINDS
                 and c.category == (UNCATEGORISED, UNCATEGORISED)
                 # the user chose Uncategorised, or split it (its own items)
                 and c.source not in ("correction", "split", "split_refund")
             ):
+                if c.merchant_id is None:
+                    yield Item(
+                        self.name, f"t{t.id}", _version(t.id), 1, "", None, (t.id,)
+                    )
+                    continue
                 rows.setdefault(c.merchant_id, []).append(t.id)
                 names[c.merchant_id] = c.merchant or ""
         for m, ids in rows.items():
             ids.sort()
             yield Item(
-                self.name, str(m), _version(ids), len(ids), names[m], m, tuple(ids)
+                self.name, str(m), _version(ids), counts[m], names[m], m, tuple(ids)
             )
 
     def answer(self, led: Ledger, item: Item, answer: Answer) -> int | None:
@@ -117,15 +128,19 @@ class CategoryItems:
         cat = (answer.category[0], answer.category[1])
         if answer.transaction_id is None and item.merchant_id is not None:
             return led.correct_merchant(item.merchant_id, cat).id
-        if answer.transaction_id not in item.transaction_ids:
+        txn = answer.transaction_id
+        if txn is None and item.merchant_id is None:
+            (txn,) = item.transaction_ids  # a row with no Merchant: just this one
+        if txn not in item.transaction_ids:
             raise InvalidAnswer("not one of this item's Transactions")
-        return led.correct_transaction(answer.transaction_id, cat).id
+        return led.correct_transaction(txn, cat).id
 
     def undo(self, led: Ledger, effect_id: int) -> None:
         try:
             led.revert_correction(effect_id)
         except UnknownTarget:
-            pass  # already reverted elsewhere: the state undo wants
+            # already the state undo wants, but the user should know why
+            raise AlreadyReverted from None
 
 
 class SubscriptionItems:
@@ -414,8 +429,9 @@ class ReviewQueue:
     def skip(self, item_id: str, version: str) -> None:
         self._record(self._current(item_id, version), "skip", None)
 
-    def undo(self) -> None:
-        """Undo the latest answer or skip that is not undone yet."""
+    def undo(self) -> str | None:
+        """Undo the latest answer or skip that is not undone yet. Returns a
+        message when the answer's Correction was already reverted elsewhere."""
         d = schema.review_decision
         r = self._db.execute(
             self._db.select(d, d.c.id, d.c.item_type, d.c.action, d.c.effect_id)
@@ -425,12 +441,18 @@ class ReviewQueue:
         ).first()
         if r is None:
             raise UnknownTarget("nothing to undo")
+        message = None
         if r.action == "answer" and r.effect_id is not None:
-            ITEM_TYPES[r.item_type].undo(self._led, r.effect_id)
+            try:
+                ITEM_TYPES[r.item_type].undo(self._led, r.effect_id)
+            except AlreadyReverted:
+                message = "That answer was already undone elsewhere; nothing changed."
         self._db.execute(
             self._db.update(d).where(d.c.id == r.id).values(undone_at=datetime.now(UTC))
         )
-        self._db.bump_ledger_version()
+        if r.action == "answer":
+            self._db.bump_ledger_version()
+        return message
 
     def _current(self, item_id: str, version: str) -> Item:
         item = next((i for i in self.items() if i.id == item_id), None)
@@ -473,4 +495,5 @@ class ReviewQueue:
             effect_id=effect,
             created_at=datetime.now(UTC),
         )
-        self._db.bump_ledger_version()
+        if action == "answer":
+            self._db.bump_ledger_version()

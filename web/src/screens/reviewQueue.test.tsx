@@ -117,6 +117,14 @@ describe("ReviewQueue", () => {
     await waitFor(() => expect(calls[1]?.url).toBe("/api/review-queue/undo"));
   });
 
+  it("says so when an undo finds the answer already undone elsewhere", async () => {
+    const message = "That answer was already undone elsewhere; nothing changed.";
+    setup(queue([A]), { ...queue([A]), message });
+    await screen.findByRole("heading", { name: "Tesco" });
+    await userEvent.keyboard("u");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(message));
+  });
+
   it("offers yes and no for a subscription", async () => {
     const { calls } = setup(queue([C]));
     await userEvent.click(await screen.findByRole("button", { name: /Yes/ }));
