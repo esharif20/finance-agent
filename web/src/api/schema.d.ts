@@ -1769,6 +1769,8 @@ export interface components {
         Risk: "none" | "below_buffer" | "below_zero";
         /** SimulationOut */
         SimulationOut: {
+            /** As Of */
+            as_of: string;
             floor: components["schemas"]["Pence"] | null;
             /** Have */
             have: number | null;

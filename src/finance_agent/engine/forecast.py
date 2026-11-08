@@ -23,7 +23,7 @@ import calendar
 import math
 import warnings
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Literal, Protocol
@@ -35,7 +35,14 @@ from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
 from finance_agent.categorise import normalise
 from finance_agent.categorise.recurring import CADENCES, Recurrence, detect_recurring
-from finance_agent.ledger import Categorisation, Ledger
+from finance_agent.ledger import (
+    Categorisation,
+    Ledger,
+    SplitPart,
+    Transaction,
+    shares_in_gbp,
+)
+from finance_agent.ledger.fx import GBP
 
 LEVEL = 0.8  # the prediction interval's coverage
 SEASON = 12
@@ -117,7 +124,37 @@ def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
     complete months before it. Read-only: the Ledger and registry are only read.
     See `project`."""
     registry = {e.merchant_id: e.status for e in led.subscriptions()}
-    return project(led.transactions(), registry, as_of, horizon)
+    return project(in_gbp(led), registry, as_of, horizon)
+
+
+def in_gbp(led: Ledger) -> list[Transaction]:
+    """The Ledger's Transactions with every amount in GBP (`gbp_rows`)."""
+    return gbp_rows(led.transactions(), led.foreign_in_gbp())
+
+
+def gbp_rows(
+    txns: Iterable[Transaction], gbp: Mapping[int, int | None]
+) -> list[Transaction]:
+    """`txns` in GBP: a foreign one at `gbp[id]` (minor units, from
+    `Ledger.foreign_in_gbp`, the one #156 rate), left out while it needs a
+    rate, never counted as pence of its own currency. A foreign Split's parts
+    are rescaled to GBP as the Ledger's totals do (`shares_in_gbp`)."""
+    out: list[Transaction] = []
+    for t in txns:
+        if t.currency == GBP:
+            out.append(t)
+        elif (minor := gbp.get(t.id)) is not None:
+            c = t.categorisation
+            if c is not None and c.parts:
+                own = [(p.category, p.amount_minor) for p in c.parts]
+                parts = shares_in_gbp(own, int(t.amount.scaleb(2)), minor)
+                c = replace(c, parts=tuple(SplitPart(m, k) for k, m in parts))
+            out.append(
+                replace(
+                    t, amount=Decimal(minor).scaleb(-2), currency=GBP, categorisation=c
+                )
+            )
+    return out
 
 
 def project(
