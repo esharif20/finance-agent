@@ -644,13 +644,6 @@ def test_a_cached_answer_is_dropped_once_the_ledger_changes(
     assert (a.path, a.reply) == ("local_model", "new")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="design-level (#142 report): the cache key is (route, tool calls,"
-    " Ledger version, day) and ignores the question, so a reply written for one"
-    " question, or steered by injected text, is served for any other question"
-    " that makes the same tool calls (ADR 0010 shortcut).",
-)
 def test_a_reply_to_one_question_is_not_served_for_another(
     engine: Engine, txns: dict[str, int]
 ) -> None:
