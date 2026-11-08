@@ -693,3 +693,17 @@ model_suspension = Table(
     Column("suspended_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("user_id", "model"),
 )
+
+# The Assistant's model per user (0024): "fast" or "careful"; no row is the
+# default in code (assistant.ollama.DEFAULT_CHOICE).
+assistant_setting = Table(
+    "assistant_setting",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False, unique=True),
+    Column("model", String(16), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(
+        text("model IN ('fast', 'careful')"), name="ck_assistant_setting_model"
+    ),
+)
