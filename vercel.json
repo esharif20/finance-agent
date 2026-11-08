@@ -6,7 +6,7 @@
   "functions": {
     "api/index.py": {
       "includeFiles": "{src/finance_agent/**,demo-data/personas/**}",
-      "excludeFiles": "{tests/**,evals/**,web/**,docs/**}"
+      "excludeFiles": "{tests/**,evals/**,web/**,docs/**,.venv/**,node_modules/**,demo-data/web/**}"
     }
   },
   "rewrites": [

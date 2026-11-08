@@ -137,3 +137,66 @@ def test_a_missing_visitor_file_is_never_created_empty(tmp_path: Path) -> None:
     with pytest.raises(OperationalError):
         engine.connect().close()
     assert not (tmp_path / "evicted.db").exists()
+
+
+# Vercel (#306): a read-only bundle, a writable /tmp, a per-deployment secret
+
+
+def test_on_vercel_the_demo_dir_defaults_to_tmp() -> None:
+    environ = {"FA_DEMO": "1", "FA_DEMO_SECRET": SECRET, "VERCEL": "1"}
+    assert guard.config(environ).dir == Path(guard.VERCEL_DIR).resolve()
+    with pytest.raises(guard.Refused):  # off Vercel there is no default
+        guard.config(environ | {"VERCEL": ""})
+
+
+def test_a_missing_secret_fails_closed_with_a_clear_error(tmp_path: Path) -> None:
+    with pytest.raises(guard.Refused, match="FA_DEMO_SECRET is missing"):
+        guard.config({"FA_DEMO": "1", "FA_DEMO_DIR": str(tmp_path), "VERCEL": "1"})
+
+
+@pytest.mark.parametrize(
+    "seed",
+    ["demo", "/var/demo/../..", "/", str(Path.home()), str(storage.DEFAULT_DB.parent)],
+)
+def test_a_seed_dir_gets_the_same_checks(tmp_path: Path, seed: str) -> None:
+    with pytest.raises(guard.Refused):
+        guard.config(env(tmp_path, FA_DEMO_SEED=seed))
+
+
+def test_seed_copies_read_only_personas_once(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    for n in (0, 1):
+        (bundle / f"{n}.db").write_bytes(f"persona {n}".encode())
+    bundle.chmod(0o555)  # like Vercel's bundle: nothing is written beside it
+    root = tmp_path / "tmp" / "fa-demo"  # not there yet: a cold start
+    try:
+        cfg = guard.config(env(root, FA_DEMO_SEED=str(bundle)))
+        guard.seed(cfg)
+        assert (root / "personas" / "1.db").read_bytes() == b"persona 1"
+        (root / "personas" / "0.db").write_bytes(b"in use")
+        guard.seed(cfg)  # a warm start keeps what is there
+        assert (root / "personas" / "0.db").read_bytes() == b"in use"
+        assert not list((root / "personas").glob("*.tmp"))
+    finally:
+        bundle.chmod(0o755)
+
+
+def test_a_seed_file_linked_outside_the_bundle_is_refused(tmp_path: Path) -> None:
+    bundle, root = tmp_path / "bundle", tmp_path / "root"
+    bundle.mkdir()
+    (tmp_path / "elsewhere.db").write_bytes(b"x")
+    (bundle / "0.db").symlink_to(tmp_path / "elsewhere.db")
+    with pytest.raises(guard.Refused):
+        guard.seed(guard.config(env(root, FA_DEMO_SEED=str(bundle))))
+    assert not (root / "personas" / "0.db").exists()
+
+
+def test_the_vercel_bundle_holds_the_personas_and_not_the_rest() -> None:
+    import json
+
+    fn = json.loads((Path(__file__).parent.parent / "vercel.json").read_text())
+    spec = fn["functions"]["api/index.py"]
+    assert "demo-data/personas/**" in spec["includeFiles"]
+    for heavy in ("tests/**", "web/**", ".venv/**", "node_modules/**"):
+        assert heavy in spec["excludeFiles"]

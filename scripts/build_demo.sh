@@ -6,9 +6,19 @@
 #   FA_DEMO=1 FA_DEMO_DIR=... FA_DEMO_SECRET=... uv run uvicorn finance_agent.demo.app:app
 #
 # Vercel runs the same two steps (vercel.json); there the static files are served
-# from web/dist-demo and only /api/* reaches the Python Function.
+# from web/dist-demo and only /api/* reaches the Python Function. The Personas
+# go to demo-data/personas, which the Function bundles read-only and copies to
+# /tmp on a cold start (api/index.py, docs/DEPLOY.md).
 set -eu
 cd "$(dirname "$0")/.."
+if [ -n "${VERCEL:-}" ]; then
+  FA_DEMO_DIR="$PWD/demo-data"
+  export FA_DEMO_DIR
+  if ! command -v uv >/dev/null; then
+    python3 -m pip install -q --user uv
+    PATH="$(python3 -m site --user-base)/bin:$PATH"
+  fi
+fi
 : "${FA_DEMO_DIR:?set FA_DEMO_DIR to an absolute directory for the demo}"
 
 pnpm --dir web run build:demo

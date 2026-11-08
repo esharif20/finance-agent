@@ -39,3 +39,4 @@ __pycache__/
 
 dist-demo/
 demo-data/
+.vercel/

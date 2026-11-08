@@ -248,6 +248,7 @@ async def _read(receive: Receive, headers: Headers) -> bytes | None:
 def build(environ: Mapping[str, str] = os.environ) -> FastAPI:
     cfg = guard.config(environ)
     guard.lock_keychain()
+    guard.seed(cfg)
     visitors = session.Visitors(cfg.dir)
     if [p.stem for p in visitors.personas] != [
         str(i) for i in range(len(visitors.personas))
