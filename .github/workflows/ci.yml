@@ -37,6 +37,8 @@ jobs:
           uv run python evals/baselines.py
           uv run python evals/ranking.py
           uv run python evals/forecast.py
+      - name: assistant benchmark on FakeChatModel (results reproduce)
+        run: uv run python evals/assistant_bench.py
       - uses: pnpm/action-setup@v4
         with:
           version: 10
