@@ -36,6 +36,7 @@ from finance_agent.assistant.tools import NoData, ToolNotAllowed, Turn, run, spe
 from finance_agent.assistant.tools.propose import ProposalOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
+from finance_agent.ledger.answer_cache import AnswerCache
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.proposals import Proposals
 
@@ -44,6 +45,7 @@ Path = Literal["cache", "local_model", "deterministic"]
 ROUTES: tuple[Route, ...] = ("ask", "plan", "memory", "correct")
 MAX_ROUNDS = 3  # model calls that may ask for tools in one turn
 MAX_CALLS = 4  # tool calls run per round
+CACHED = ("ask",)  # read-only answers; Proposals are never cached (ADR 0010)
 HISTORY = 12  # messages kept in the thread for the conversation slot
 PLAN_REPLY = (
     "Planning tools aren't available yet, so I can't plan or run a what-if."
@@ -87,6 +89,10 @@ class Draft:
     proposal_id: int | None = None
     messages: list[Message] = field(default_factory=list[Message])
     failed: bool = False
+    rounds: list[list[dict[str, Any]]] = field(
+        default_factory=list[list[dict[str, Any]]]
+    )
+    cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
 
 
 @dataclass
@@ -158,6 +164,9 @@ class Assistant:
 
     # --- the work ------------------------------------------------------------
 
+    def _cache(self) -> AnswerCache:
+        return AnswerCache(self.conn, current_user())
+
     def _turn(self, s: State) -> Turn:
         return Turn(turn_id=s["turn_id"], quote=s["message"], today=self.today)
 
@@ -180,6 +189,12 @@ class Assistant:
                 d.reply = r.content
                 return d
             calls = list(r.tool_calls[:MAX_CALLS])
+            d.rounds.append([c.model_dump() for c in calls])
+            if route in CACHED and len(d.rounds) == 1:
+                hit = self._cache().get(route, d.rounds[0], self.today)
+                if hit is not None:
+                    d.reply, d.cached = hit
+                    return d
             d.messages.append(
                 Message(role="assistant", content=r.content, tool_calls=tuple(calls))
             )
@@ -211,6 +226,8 @@ class Assistant:
         return out.model_dump_json()
 
     def _ground(self, route: Route, s: State, d: Draft) -> Update:
+        if d.cached is not None:
+            return {"reply": d.reply, "path": "cache", "evidence": list(d.cached)}
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)
@@ -234,6 +251,9 @@ class Assistant:
                 "proposal_id": d.proposal_id,
                 "evidence": sorted({v.evidence_id for v in d.values}),
             }
+        # one round only: the key (its tool calls) then holds everything read
+        if route in CACHED and len(d.rounds) == 1 and d.proposal_id is None:
+            self._cache().put(route, d.rounds[0], self.today, d.reply, res.evidence_ids)
         return {
             "reply": d.reply,
             "path": "local_model",

@@ -507,3 +507,18 @@ assistant_checkpoint_write = Table(
     Column("value", LargeBinary, nullable=False),
     Column("task_path", String(255), nullable=False),
 )
+
+# The answer cache (#140, ADR 0010): a grounded reply keyed by a hash of
+# (intent, tool calls with arguments, Ledger version, day). Derived, never the
+# only copy: rows of an older Ledger version are dropped on the next store, and
+# all of a user's go when a Memory changes.
+answer_cache = Table(
+    "answer_cache",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("key", String(64), primary_key=True),
+    Column("ledger_version", Integer, nullable=False),
+    Column("reply", Text, nullable=False),
+    Column("evidence", Text, nullable=False),  # JSON list of the reply's IDs
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
