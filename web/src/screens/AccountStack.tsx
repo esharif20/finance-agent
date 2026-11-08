@@ -101,6 +101,21 @@ const pageColour = () =>
   getComputedStyle(document.documentElement).getPropertyValue("--background").trim() || "#f3f5f7";
 
 const webgl = () => typeof WebGLRenderingContext !== "undefined";
+const PHONE = "(max-width: 639px)";
+/** Phones get a flat, snap-scrolling carousel instead of the 3D stack: a stack of ID-1 cards at
+    phone width is several screens tall, and WebGL costs frames there. */
+function usePhone() {
+  const query = () => typeof matchMedia === "function" && matchMedia(PHONE).matches;
+  const [phone, setPhone] = useState(query);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia(PHONE);
+    const change = () => setPhone(mq.matches);
+    mq.addEventListener?.("change", change);
+    return () => mq.removeEventListener?.("change", change);
+  }, []);
+  return phone;
+}
 const transform = (p: Pose) =>
   `translate3d(${p.x}px, ${p.y}px, ${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg) scale(${p.s})`;
 
@@ -120,6 +135,7 @@ export function AccountStack({
   onHot?: (id: number | undefined) => void; // a pointer or keyboard is on a card: light its share elsewhere
 }) {
   const reduce = useReducedMotion() ?? false;
+  const phone = usePhone();
   const all = useMemo(() => faces(accounts, balances), [accounts, balances]);
   const [hover, setHover] = useState<Hover | null>(null);
   const [rising, setRising] = useState<number | null>(null);
@@ -213,10 +229,10 @@ export function AccountStack({
     const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e?.contentRect.width ?? 0)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [phone]);
 
   // WebGL: one lazy-loaded canvas for the whole stack, never under reduced motion.
-  const wantGl = !reduce && webgl() && width > 0;
+  const wantGl = !reduce && !phone && webgl() && width > 0;
   const allH = layout.allH;
   const sceneFaces = useMemo<SceneFace[]>(
     () =>
@@ -281,7 +297,7 @@ export function AccountStack({
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
-  }, [accounts.length === 0]); // the stack mounts with the first account; the handler reads refs
+  }, [accounts.length === 0, phone]); // the stack mounts with the first account; the handler reads refs
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     swallow.current = false;
     if (e.button !== 0 || press.current) return; // one pointer at a time
@@ -350,6 +366,45 @@ export function AccountStack({
         <CardTitle id="accounts-title">Accounts</CardTitle>
         <CardDescription>Choose one to filter the Overview</CardDescription>
       </CardHeader>
+      {phone ? (
+        <div role="group" aria-label="Accounts" className="account-rail">
+          {all.map((f, i) => {
+            const on = f === current;
+            const image = f.art ? cssArt[f.art] : undefined;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onSelect(f.id)}
+                className="account-card account-slide text-left"
+                data-front="true"
+                data-selected={on}
+                data-all={f.id === undefined}
+                data-art={Boolean(image)}
+                style={
+                  {
+                    "--i": i,
+                    ...(f.hue === null ? {} : { "--h": f.hue }),
+                    ...(image ? { backgroundImage: image } : {}),
+                  } as CSSProperties
+                }
+              >
+                <span data-slot="title" className="min-w-0">
+                  <span className="block truncate text-row font-semibold">{f.title}</span>
+                  {f.masked ? <span className="block text-label opacity-80">{f.masked}</span> : null}
+                </span>
+                {f.balance ? <Money value={f.balance} className="account-balance font-semibold" /> : null}
+                {f.matches === false ? (
+                  <span data-slot="status" className="text-label font-semibold">
+                    <span className="rounded-full bg-warning px-3 py-1 text-warning-foreground">Find it</span>
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
       <div
         ref={stack}
         role="group"
@@ -464,6 +519,7 @@ export function AccountStack({
           );
         })}
       </div>
+      )}
       <p role="status" className="sr-only">
         Showing {current.masked ? `${current.title} ${current.masked}` : current.title}
       </p>

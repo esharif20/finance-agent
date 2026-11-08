@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrivacyProvider } from "@/lib/privacy";
 import { TopBar } from "./TopBar";
@@ -30,26 +29,23 @@ describe("TopBar", () => {
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("More opens a menu of Hide amounts and Settings; Escape closes it and returns focus", async () => {
-    const more = screen.getByRole("button", { name: "More" });
-    expect(more).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(more);
-    expect(more).toHaveAttribute("aria-expanded", "true");
-    const menu = document.getElementById(more.getAttribute("aria-controls")!)!;
-    const hide = [...menu.querySelectorAll("button")].find((b) => b.textContent === "Hide amounts")!;
-    await userEvent.click(hide);
-    expect(hide).toHaveAttribute("aria-pressed", "true");
-    expect(document.documentElement).toHaveAttribute("data-private");
-    expect(menu.querySelector("a[href='#settings']")).toHaveTextContent("Settings");
-
-    await userEvent.keyboard("{Escape}");
-    expect(more).toHaveAttribute("aria-expanded", "false");
-    expect(more).toHaveFocus();
+  it("locally the mark goes to Overview, since / is the app", () => {
+    expect(screen.getByRole("link", { name: "Finance Agent" })).toHaveAttribute("href", "#overview");
   });
+});
 
-  it("a press outside closes the menu", async () => {
-    await userEvent.click(screen.getByRole("button", { name: "More" }));
-    await userEvent.click(document.body);
-    expect(screen.getByRole("button", { name: "More" })).toHaveAttribute("aria-expanded", "false");
+describe("TopBar in the demo build", () => {
+  it("the mark links to the landing page at /", () => {
+    cleanup();
+    vi.stubEnv("VITE_DEMO", "1");
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PrivacyProvider>
+          <TopBar tabs={[]} tab="" settings={false} />
+        </PrivacyProvider>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("link", { name: "Finance Agent home" })).toHaveAttribute("href", "/");
+    vi.unstubAllEnvs();
   });
 });

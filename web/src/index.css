@@ -984,3 +984,66 @@ html[data-private] .money {
   }
 }
 
+
+/* Phones: the accounts as one row of short cards that snap, the next one peeking (#phone). */
+.account-rail {
+  display: flex;
+  gap: 12px;
+  margin-inline: -16px;
+  padding: 4px 16px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 16px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.account-rail::-webkit-scrollbar {
+  display: none;
+}
+.account-card.account-slide {
+  position: relative;
+  flex: 0 0 72%;
+  height: 168px;
+  scroll-snap-align: start;
+  will-change: auto;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+  transition: scale 160ms cubic-bezier(0.23, 1, 0.32, 1), outline-color 160ms ease-out;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.account-card.account-slide[data-art="true"] {
+  padding-top: 14px;
+}
+.account-card.account-slide .account-balance {
+  font-size: 1.625rem;
+  line-height: 1.1;
+}
+.account-card.account-slide[data-selected="true"] {
+  outline-color: var(--foreground);
+}
+.account-card.account-slide:active {
+  scale: 0.98;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .account-slide {
+    animation: slide-rise 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
+    animation-delay: calc(min(var(--i, 0), 4) * 50ms);
+  }
+}
+@keyframes slide-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* Phones: the tab bar runs edge to edge and clears the home indicator. */
+.bottom-bar {
+  border-radius: 0;
+  border-width: 1px 0 0;
+  box-shadow: none;
+  padding-bottom: max(env(safe-area-inset-bottom), 6px);
+}
+.bottom-bar.glass {
+  background: var(--card);
+}
