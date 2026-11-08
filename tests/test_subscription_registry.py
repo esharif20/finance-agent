@@ -324,3 +324,38 @@ def test_a_regroup_keeps_when_the_status_began(ledger_for: LedgerFor) -> None:
     after = led.subscription(m)
     assert after is not None and after.status == "user_cancelled"
     assert after.status_since == cancelled.changed_at < after.changed_at
+
+
+def test_dismissing_a_never_listed_merchant_is_remembered(
+    ledger_for: LedgerFor,
+) -> None:
+    # decided by orchestrator (#132): a no to a Merchant never listed still
+    # writes a negative entry, so detection never suggests it again
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH NEVER LISTED")
+
+    led.not_a_subscription(m)
+
+    (e,) = led.subscriptions()
+    assert (e.merchant_id, e.status, e.source) == (m, "not_subscription", "user")
+    assert not led.record_detection(
+        m, "subscription", "Streaming", "pattern", "suggested", date.today()
+    )
+
+
+def test_deleting_a_merchant_removes_its_whole_registry_history(
+    ledger_for: LedgerFor,
+) -> None:
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH DELETED")
+    other = merchant(led, "SYNTH KEPT")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.not_a_subscription(m)
+    led.add_subscription(other, "subscription", "Streaming")
+    db = led._db  # pyright: ignore[reportPrivateUsage]
+
+    db.execute(db.delete(schema.merchant).where(schema.merchant.c.id == m))
+
+    rows = db.execute(db.select(schema.subscription_entry, schema.subscription_entry.c.merchant_id)
+    ).all()
+    assert [r.merchant_id for r in rows] == [other]
