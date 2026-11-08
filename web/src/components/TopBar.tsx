@@ -33,16 +33,18 @@ function HideAmounts() {
   return (
     <button
       type="button"
+      // "values" shows from 640px; the name is fixed here and always starts with what shows
+      aria-label={`${verb} values`}
       aria-keyshortcuts="H"
       data-tip={`${verb} values · H`}
       data-tip-align="end"
       onClick={toggle}
-      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] [@media(hover:hover)]:hover:bg-active"
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] [@media(hover:hover)]:hover:bg-active"
     >
       {eye(hidden)}
-      <span>
-        {verb}{" "}
-        <span className="max-sm:sr-only">values</span>
+      <span aria-hidden="true">
+        {verb}
+        <span className="max-sm:hidden"> values</span>
       </span>
     </button>
   );
@@ -86,7 +88,7 @@ export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: str
         className="mr-1 flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-[scale,opacity] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:opacity-80"
       >
         <Mark />
-        <span className="text-base font-semibold sm:max-md:sr-only">Finance Agent</span>
+        <span className="text-base font-semibold max-[419px]:sr-only sm:max-md:sr-only">Finance Agent</span>
       </a>
       <NavTabs
         tabs={tabs}
