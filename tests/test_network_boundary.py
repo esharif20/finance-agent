@@ -28,6 +28,9 @@ ALLOWED = {
     "categorise/embedding.py": "local embeddings on localhost:11434 only (#113)",
     "gateway/cloud.py": "the one pinned Gemini host only (ADR 0016, #298)",
     "demo/app.py": "urllib.parse only, for the same-origin check (#296)",
+    "cli/models.py": "local Ollama on localhost:11434 only (#311)",
+    "cli/doctor.py": "urllib.parse only, to compare the bank host pin (#311)",
+    "cli/demo.py": "socket binds 127.0.0.1:0 once to find a free port (#311)",
 }
 
 

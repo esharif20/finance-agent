@@ -457,3 +457,8 @@ def test_the_status_line_never_needs_a_network(ledger: Path) -> None:
     finally:
         engine.dispose()
     assert "accounts" in line and "to review" in line
+
+
+def test_the_cli_only_dials_local_ollama() -> None:
+    assert models.OLLAMA == "http://localhost:11434"
+    assert "urlopen" not in (ROOT / "src/finance_agent/cli/status.py").read_text()
