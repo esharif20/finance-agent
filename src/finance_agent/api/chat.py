@@ -3,14 +3,22 @@ server-sent events, for `current_user` only.
 
 The reply streams only after the grounding check has passed (or the
 deterministic table has replaced it), so no unchecked figure ever reaches the
-screen. Events: `meta` (thread, which path answered, any confirm card), then
-`delta` chunks of the reply, then `done`. Bodies are parsed here rather than
-by FastAPI, so a refusal never echoes the user's text (#169)."""
+screen. Events: `meta` (thread, which path answered, any confirm card, and a
+cloud call's `cost_pence` and `payload_id`), then `delta` chunks of the reply,
+then `done`. Bodies are parsed here rather than by FastAPI, so a refusal never
+echoes the user's text (#169).
+
+`cloud: true` opts the thread in to the privacy gateway (#301). The opt-in is
+kept on the thread's checkpointed state, so it lasts for that conversation
+only and ends when it is deleted or purged; it needs a Gemini key in the
+Keychain, and the demo (#296) never has one."""
 
 import json
+import os
 import re
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -18,11 +26,15 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import Connection
 
 from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
+from finance_agent.assistant.cloud_route import CloudRoute
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
 from finance_agent.assistant.ollama import DEFAULT_CHOICE, MODELS
+from finance_agent.gateway.cloud import CloudChatModel, CloudError
 from finance_agent.identity import current_user
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.settings import CHOICES, Choice, Settings
+from finance_agent.storage import keychain
+from finance_agent.storage.spend import SpendStore
 
 MESSAGE_MAX = 2000
 IDLE = timedelta(days=1)  # a conversation lasts one session (DATA_POLICY)
@@ -55,7 +67,25 @@ def today() -> date:
     return date.today()
 
 
+def cloud_route(request: Request) -> CloudRoute | None:
+    """The gateway, or None: in the demo, with no key, or with no ledger file
+    for `spend.sqlite` to sit beside."""
+    if os.environ.get("FA_DEMO"):
+        return None
+    db = getattr(getattr(request.app.state.engine, "url", None), "database", None)
+    if not db or db == ":memory:":
+        return None
+    try:
+        key = keychain.gemini_key()
+        return CloudRoute(CloudChatModel(key or ""), SpendStore.beside(Path(db)))
+    except CloudError:  # no key, or a malformed one
+        return None
+    except Exception:  # a locked or broken Keychain (the demo) fails closed
+        return None
+
+
 Model = Annotated[ChatModel, Depends(chat_model)]
+Cloud = Annotated[CloudRoute | None, Depends(cloud_route)]
 Today = Annotated[date, Depends(today)]
 
 
@@ -87,6 +117,8 @@ def _sse(a: Answer) -> StreamingResponse:
             "path": a.path,
             "evidence": list(a.evidence),
             "proposal_id": a.proposal_id,
+            "cost_pence": a.cost_pence,
+            "payload_id": a.payload_id,
         }
         yield f"event: meta\ndata: {json.dumps(meta)}\n\n"
         for chunk in _WORD.findall(a.reply):
@@ -97,21 +129,30 @@ def _sse(a: Answer) -> StreamingResponse:
 
 
 @router.post("")
-def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingResponse:
+def chat(
+    request: Request, body: Body, model: Model, day: Today, gateway: Cloud
+) -> StreamingResponse:
     """One turn. Omit `thread_id` to start a conversation; the reply's `meta`
-    event carries the new one."""
+    event carries the new one. `cloud` (default false; omitted keeps the
+    thread's choice) sends this conversation's wording through the gateway."""
     message = body.get("message")
     if not isinstance(message, str) or not 1 <= len(message.strip()) <= MESSAGE_MAX:
         raise HTTPException(422, f"message is text of 1 to {MESSAGE_MAX} characters")
-    if set(body) - {"message", "thread_id"}:
-        raise HTTPException(422, "only message and thread_id are accepted")
+    if set(body) - {"message", "thread_id", "cloud"}:
+        raise HTTPException(422, "only message, thread_id and cloud are accepted")
+    cloud = body.get("cloud")
+    if cloud is not None and not isinstance(cloud, bool):
+        raise HTTPException(422, "cloud is true or false")
+    if cloud and gateway is None:
+        raise HTTPException(409, "the cloud gateway is not set up")
     with request.app.state.engine.begin() as conn:
         convo = Conversations(conn, current_user())
         convo.purge_idle(datetime.now(UTC) - IDLE)
         thread = body.get("thread_id")
         if thread is not None and not convo.has_thread(_thread(thread)):
             raise HTTPException(404, "no such conversation")
-        answer = ask(Assistant(model, conn, day), message, thread)
+        assistant = Assistant(model, conn, day, cloud=gateway)
+        answer = ask(assistant, message, thread, cloud)
     return _sse(answer)
 
 
