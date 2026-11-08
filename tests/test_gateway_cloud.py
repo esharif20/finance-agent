@@ -21,7 +21,7 @@ from finance_agent.gateway.cloud import (
 )
 
 RECORDINGS = Path(__file__).parent / "fixtures" / "synthetic" / "cloud"
-KEY = "synthetic-test-key-0123456789"  # new-format keys have no fixed prefix
+KEY = "fake-fake-fake"  # synthetic; new-format keys have no fixed prefix
 
 
 def _payload() -> GatewayPayload:

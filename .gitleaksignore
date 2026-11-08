@@ -1,0 +1,2 @@
+# synthetic test key in #298 (since replaced by a low-entropy value), not a secret
+78286a5a3455a737c409056373cf4377e6d59016:tests/test_gateway_cloud.py:generic-api-key:24
