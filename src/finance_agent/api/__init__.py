@@ -610,6 +610,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     app.include_router(local_model.router)
     app.include_router(proposals.router)
     app.include_router(chat.router)
+    app.include_router(cash_flow.router)
     app.include_router(insights.router)
     app.include_router(cash_flow.router)
 
