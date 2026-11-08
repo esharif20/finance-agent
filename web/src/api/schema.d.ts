@@ -1595,6 +1595,14 @@ export interface components {
         };
         /** MemoryCardOut */
         MemoryCardOut: {
+            /** Amount Minor */
+            amount_minor: number | null;
+            /** Due On */
+            due_on: string | null;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Priority */
+            priority: number | null;
             /** Quote */
             quote: string;
             /**
@@ -1611,13 +1619,21 @@ export interface components {
         };
         /** MemoryOut */
         MemoryOut: {
+            /** Amount Minor */
+            amount_minor: number | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Due On */
+            due_on: string | null;
             /** Id */
             id: number;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Priority */
+            priority: number | null;
             /** Quote */
             quote: string;
             /** Review On */

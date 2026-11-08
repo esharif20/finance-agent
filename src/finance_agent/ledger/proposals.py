@@ -41,6 +41,9 @@ _STRICT = ConfigDict(extra="forbid", frozen=True, strict=True)
 Tag = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]{0,23}$")]
 CategoryName = Annotated[str, StringConstraints(min_length=1, max_length=40)]
 Minor = Annotated[int, Field(ge=-(2**63 - 1), le=2**63 - 1)]
+Pence = Annotated[int, Field(gt=0, le=2**63 - 1)]
+Priority = Annotated[int, Field(ge=1, le=5)]  # 1 is the highest
+GOAL_FIELDS = ("amount_minor", "due_on", "priority", "linked_account_id")
 
 
 class InvalidProposal(ValueError):
@@ -66,6 +69,12 @@ class MemoryDraft(BaseModel):
     text: str = Field(min_length=1, max_length=MEMORY_MAX)
     tags: tuple[Tag, ...] = Field(default=(), max_length=5)
     provenance: Provenance
+    # goal and constraint only (#257), from the user's words, never inferred;
+    # `Proposals` checks which type may carry which, and the Account's owner
+    amount_minor: Pence | None = None
+    due_on: date | None = None
+    priority: Priority | None = None
+    linked_account_id: int | None = Field(default=None, ge=1, le=2**63 - 1)
 
 
 class CategoryChange(BaseModel):
@@ -129,6 +138,10 @@ class Memory:
     said_on: date
     review_on: date | None
     created_at: datetime
+    amount_minor: int | None = None
+    due_on: date | None = None
+    priority: int | None = None
+    linked_account_id: int | None = None
 
 
 def _check_text(text: str, what: str) -> None:
@@ -150,7 +163,26 @@ class Proposals:
     def propose_memory(self, draft: MemoryDraft) -> Proposal:
         _check_text(draft.text, "a Memory")
         _check_text(draft.provenance.quote, "a quote")
+        self._check_goal_fields(draft)
         return self._insert("memory", draft)
+
+    def _check_goal_fields(self, draft: MemoryDraft) -> None:
+        """Run on propose and again on confirm: the date or the Account may
+        have changed in between."""
+        given = {f for f in GOAL_FIELDS if getattr(draft, f) is not None}
+        if draft.type == "preference" and given:
+            raise InvalidProposal("a preference has no amount, date or priority")
+        if draft.type != "goal" and "linked_account_id" in given:
+            raise InvalidProposal("only a goal is linked to an Account")
+        if draft.due_on is not None and draft.due_on <= datetime.now(UTC).date():
+            raise InvalidProposal("the due date has to be in the future")
+        if draft.linked_account_id is not None:
+            a = schema.account
+            owned = self._db.execute(
+                self._db.select(a, a.c.id).where(a.c.id == draft.linked_account_id)
+            ).first()
+            if owned is None:
+                raise UnknownTarget("no such Account")
 
     def propose_correction(self, draft: CorrectionDraft) -> Proposal:
         """Refused (UnknownTarget, InvalidSplit, InvalidNote, ...) exactly when
@@ -210,6 +242,7 @@ class Proposals:
                 r.said_on,
                 r.review_on,
                 r.created_at,
+                *(getattr(r, f) for f in GOAL_FIELDS),
             )
             for r in rows
         ]
@@ -277,6 +310,7 @@ class Proposals:
         if isinstance(draft, MemoryDraft):
             if proposal_id is None:
                 raise InvalidProposal("a Memory is written only from a Proposal")
+            self._check_goal_fields(draft)
             return self._db.insert(
                 schema.memory,
                 proposal_id=proposal_id,
@@ -290,6 +324,7 @@ class Proposals:
                 if draft.type == "constraint"
                 else draft.provenance.said_on + REVIEW_AFTER,
                 created_at=datetime.now(UTC),
+                **{f: getattr(draft, f) for f in GOAL_FIELDS},
             )
         t, c = draft.transaction_id, draft.change
         match c:

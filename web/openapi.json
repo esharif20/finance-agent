@@ -1525,6 +1525,51 @@
       },
       "MemoryCardOut": {
         "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
           "quote": {
             "title": "Quote",
             "type": "string"
@@ -1555,21 +1600,70 @@
           "text",
           "tags",
           "quote",
-          "said_on"
+          "said_on",
+          "amount_minor",
+          "due_on",
+          "priority",
+          "linked_account_id"
         ],
         "title": "MemoryCardOut",
         "type": "object"
       },
       "MemoryOut": {
         "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
           },
           "quote": {
             "title": "Quote",
@@ -1621,7 +1715,11 @@
           "quote",
           "said_on",
           "review_on",
-          "created_at"
+          "created_at",
+          "amount_minor",
+          "due_on",
+          "priority",
+          "linked_account_id"
         ],
         "title": "MemoryOut",
         "type": "object"
