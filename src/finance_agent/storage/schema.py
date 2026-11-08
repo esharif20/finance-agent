@@ -816,3 +816,19 @@ pairwise_answer = Table(
     Index("ix_pairwise_answer_user", "user_id", "question"),
     sqlite_autoincrement=True,  # a replaced pair's id is never reused
 )
+
+# Monthly stories (#266): a month's structured recap (JSON, pence), the
+# fingerprint of the data it was built from and its wording (#276). Derived:
+# figures are recomputed on read, and the wording is reused only while the
+# fingerprint is unchanged. A trigger (migration 0029, not here) deletes a
+# month's story with any of its Transactions.
+monthly_story = Table(
+    "monthly_story",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("month", String(7), primary_key=True),  # YYYY-MM
+    Column("fingerprint", String(64), nullable=False),
+    Column("recap", Text, nullable=False),
+    Column("wording", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
