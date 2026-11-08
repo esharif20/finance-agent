@@ -70,8 +70,12 @@ def test_each_sub_graph_is_offered_only_its_own_tools() -> None:
         "category_trend",
         "list_subscriptions",
     }
-    assert {s.name for s in specs("correct")} == {"find_transactions"}
-    assert specs("memory") == []
+    assert {s.name for s in specs("correct")} == {
+        "find_transactions",
+        "propose_correction",
+    }
+    assert {s.name for s in specs("memory")} == {"list_memories", "propose_memory"}
+    assert specs("plan") == []
 
 
 @pytest.mark.parametrize(
@@ -111,7 +115,7 @@ def test_unknown_or_out_of_range_arguments_are_rejected(
 
 
 def test_every_schema_forbids_extra_fields() -> None:
-    for sg in ("ask", "correct"):
+    for sg in ("ask", "correct", "memory"):
         for s in specs(sg):
             assert s.parameters.get("additionalProperties") is False
 

@@ -412,3 +412,98 @@ merchant_embedding = Table(
     Column("dims", Integer, nullable=False),
     Column("vector", LargeBinary, nullable=False),
 )
+
+# Proposals (#138): the Assistant's only write. `payload` (JSON) is held only
+# while pending; deciding clears it to "{}", so a rejection leaves no trace of
+# what was proposed and a confirmed one's effect lives only where it was
+# written (`result_id`: the Memory, Correction or note id).
+proposal = Table(
+    "proposal",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("kind", String(16), nullable=False),
+    Column("payload", Text, nullable=False),
+    Column("status", String(16), nullable=False, server_default="pending"),
+    Column("result_id", Integer),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("decided_at", DateTime(timezone=True)),
+    CheckConstraint(text("kind IN ('memory', 'correction')"), name="ck_proposal_kind"),
+    CheckConstraint(
+        text("status IN ('pending', 'confirmed', 'rejected')"),
+        name="ck_proposal_status",
+    ),
+    Index("ix_proposal_user_status", "user_id", "status"),
+)
+
+# A Memory exists only through a confirmed Proposal (`proposal_id`, unique) and
+# carries its provenance: the turn, the user's own words and the date. Deleting
+# one is a hard delete of the row and its Proposal (`secure_delete` zeroes them).
+memory = Table(
+    "memory",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "proposal_id", Integer, ForeignKey("proposal.id"), nullable=False, unique=True
+    ),
+    Column("type", String(16), nullable=False),
+    Column("text", Text, nullable=False),
+    Column("tags", Text, nullable=False),  # JSON list of short words
+    Column("turn_id", String(64), nullable=False),
+    Column("quote", Text, nullable=False),
+    Column("said_on", Date, nullable=False),
+    Column("review_on", Date),  # constraints never expire
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(
+        text("type IN ('preference', 'goal', 'constraint')"), name="ck_memory_type"
+    ),
+    CheckConstraint(text("length(text) BETWEEN 1 AND 280"), name="ck_memory_text"),
+)
+
+# The learning signal (kept; the user can wipe it). Today: rejected Proposals,
+# by kind only, never what they said.
+feedback = Table(
+    "feedback",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("proposal_id", Integer, ForeignKey("proposal.id")),
+    Column("kind", String(16), nullable=False),
+    Column("signal", String(16), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+# Assistant graph checkpoints (#139, ADR 0008): LangGraph's saved state per
+# conversation thread, in this encrypted database only. They hold the session's
+# messages and replies, so they live for the session: deleted when the user ends
+# it and purged after a day idle (`secure_delete` zeroes the pages).
+assistant_checkpoint = Table(
+    "assistant_checkpoint",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("thread_id", String(64), primary_key=True),
+    Column("checkpoint_ns", String(255), primary_key=True),
+    Column("checkpoint_id", String(64), primary_key=True),
+    Column("parent_id", String(64)),
+    Column("checkpoint_type", String(32), nullable=False),
+    Column("checkpoint", LargeBinary, nullable=False),
+    Column("metadata_type", String(32), nullable=False),
+    Column("metadata", LargeBinary, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+assistant_checkpoint_write = Table(
+    "assistant_checkpoint_write",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("thread_id", String(64), primary_key=True),
+    Column("checkpoint_ns", String(255), primary_key=True),
+    Column("checkpoint_id", String(64), primary_key=True),
+    Column("task_id", String(64), primary_key=True),
+    Column("idx", Integer, primary_key=True),
+    Column("channel", String(255), nullable=False),
+    Column("value_type", String(32), nullable=False),
+    Column("value", LargeBinary, nullable=False),
+    Column("task_path", String(255), nullable=False),
+)
