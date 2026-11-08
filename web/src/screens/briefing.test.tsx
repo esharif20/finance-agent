@@ -8,6 +8,7 @@ import { App } from "@/App";
 const gbp = (minor: number) => ({ minor, currency: "GBP" });
 let calls: { url: string; method: string; body?: string }[];
 let answered: boolean | null;
+let pairId: number;
 let memories: { id: number; text: string; tags: string[] }[];
 
 const briefing = () => ({
@@ -39,6 +40,7 @@ const briefing = () => ({
 beforeEach(() => {
   calls = [];
   answered = null;
+  pairId = 0;
   memories = [{ id: 3, text: "Saving £200 a month for a bike", tags: ["goal"] }];
   window.location.hash = "#briefing";
   localStorage.clear();
@@ -48,6 +50,9 @@ beforeEach(() => {
       const method = init?.method ?? "GET";
       calls.push({ url, method, body: init?.body as string | undefined });
       if (method === "POST" && url.startsWith("/api/briefing/regret/")) answered = JSON.parse(init?.body as string).worth_it;
+      if (url.startsWith("/api/preferences/next-pair"))
+        return Response.json({ pair_id: ++pairId, question: "cut", prompt: "Which would you cut first?", a: { key: "category:1", label: "Eating out" }, b: { key: "category:2", label: "Streaming" } });
+      if (method === "POST" && url === "/api/preferences/answer") return Response.json({ pair_id: pairId, question: "cut" });
       if (url.startsWith("/api/briefing")) return method === "GET" ? Response.json(briefing()) : Response.json({});
       if (url.startsWith("/api/memories")) return Response.json({ items: memories });
       if (method === "DELETE") return Response.json({ deleted: 1 });
@@ -71,6 +76,21 @@ describe("weekly briefing", () => {
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/briefing/regret/7")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.method === "POST")?.body ?? "{}")).toEqual({ worth_it: false });
     await waitFor(() => expect(screen.getByRole("button", { name: "Not worth it" })).toHaveAttribute("aria-pressed", "true"));
+  });
+
+  it("the pair card posts the answer and asks for the next pair", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Streaming" }));
+    await waitFor(() => expect(calls.filter((c) => c.url.startsWith("/api/preferences/next-pair")).length).toBe(2));
+    const post = calls.find((c) => c.method === "POST" && c.url === "/api/preferences/answer");
+    expect(JSON.parse(post?.body ?? "{}")).toEqual({ pair_id: 1, choice: "category:2" });
+  });
+
+  it("skip records nothing", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    expect(screen.queryByText("Which would you cut first?")).toBeNull();
+    expect(calls.some((c) => c.url === "/api/preferences/answer")).toBe(false);
   });
 
   it("Hide amounts blurs every figure on both pages", async () => {

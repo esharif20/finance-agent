@@ -12,7 +12,9 @@ not yet due to be raised) waits for a later refresh. It is idempotent.
 (`engine.ranking`), then drops those a constraint Memory rules out. `shown`
 takes the week's slate from that feasible list, with the seeded exploration of
 `engine.ope` in its last slot, and logs each exposure with its propensity
-(#261, ADR 0015).
+(#261, ADR 0015). The bandit (`engine.bandit`, #272) runs in shadow there:
+each exposure also logs its context bucket, the bandit's slate and the
+bandit's probability of showing that item; the live ranker keeps serving.
 
 Confidences are the detectors' fixed per-rule priors, not calibrated: that
 needs outcomes on real Insights, which only the user's own feedback will
@@ -27,7 +29,7 @@ from fractions import Fraction
 from sqlalchemy import Connection
 
 from finance_agent.categorise.display_names import display_name
-from finance_agent.engine import detectors, ope, ranking
+from finance_agent.engine import bandit, detectors, ope, ranking
 from finance_agent.ledger import NOT_SUBSCRIPTION, Ledger
 from finance_agent.ledger.exposure import Exposures, Shown, week_of
 from finance_agent.ledger.insights import Found, Insights, StoredInsight
@@ -124,7 +126,9 @@ def shown(conn: Connection, user_id: int, k: int, day: date) -> list[Ranked]:
     adds one. Listing is not an outcome: nothing here teaches relevance."""
     feed = ranked(conn, user_id)
     slots = ope.slate(feed, k, ope.seed(user_id, week_of(day), ope.POLICY))
-    Exposures(conn, user_id).log(
+    log = Exposures(conn, user_id)
+    ctx, would = _shadow(conn, user_id, log, feed, k, day)
+    log.log(
         day,
         ope.POLICY,
         (
@@ -134,12 +138,55 @@ def shown(conn: Connection, user_id: int, k: int, day: date) -> list[Ranked]:
                 s.slot,
                 len(slots),
                 s.propensity,
-                {"type": s.item.insight.type, "day": day.day, "candidates": len(feed)},
+                {
+                    "type": s.item.insight.type,
+                    "day": day.day,
+                    "candidates": len(feed),
+                    "cat": bandit.code(s.item.insight.category),
+                    "tom": ctx.tom,
+                    "spend": ctx.spend,
+                    # the bandit's chance of showing it, over DRAWS + 1: OPE's target
+                    "ts_q": int(
+                        would.membership[str(s.item.insight.id)] * (bandit.DRAWS + 1)
+                    ),
+                }
+                | {f"ts{p.slot}": p.arm.item for p in would.slate},
             )
             for s in slots
         ),
     )
     return [s.item for s in slots]
+
+
+def _shadow(
+    conn: Connection,
+    user_id: int,
+    log: Exposures,
+    feed: list[Ranked],
+    k: int,
+    day: date,
+) -> tuple[bandit.Context, bandit.Decision]:
+    """What the bandit (#272) would show this week, in shadow: it learns from
+    the explicit outcomes on logged Insights, and serves nothing."""
+    spends = [(r.posted_on, r.amount) for r in rows(Ledger(conn, user_id))]
+    ctx = bandit.Context(bandit.time_of_month(day), bandit.spend_level(spends, day))
+    seen = [
+        bandit.Observed(
+            str(c["type"]),
+            str(c["cat"]),
+            bandit.Context(int(c["tom"]), int(c["spend"])),
+            e.outcome,
+        )
+        for e in log.logged("insight")
+        if e.outcome is not None
+        and {"type", "cat", "tom", "spend"} <= (c := e.context).keys()
+    ]
+    arms = [
+        bandit.Arm(str(r.insight.id), r.insight.type, bandit.code(r.insight.category))
+        for r in feed
+    ]
+    seed = ope.seed(user_id, week_of(day), bandit.POLICY)
+    return ctx, bandit.choose(arms, bandit.learn(seen), ctx, k, seed)
 
 
 def _pounds(pence: int) -> str:

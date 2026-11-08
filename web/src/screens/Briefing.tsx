@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type RegretItem, answerRegret, fetchBriefing } from "@/api/client";
 import { Explained } from "@/components/InsightsFeed";
 import { Money } from "@/components/Money";
+import { PairwiseCard } from "@/components/PairwiseCard";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { typeTitle } from "@/lib/insights";
@@ -164,6 +165,7 @@ export function Briefing() {
           </Card>
         </div>
       </div>
+      <PairwiseCard />
       <Card aria-labelledby="brief-regret">
         <CardHeader>
           <CardTitle id="brief-regret">Was it worth it?</CardTitle>
