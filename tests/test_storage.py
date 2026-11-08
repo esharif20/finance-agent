@@ -769,3 +769,45 @@ def test_migration_0025_adds_goal_fields_and_keeps_memories(tmp_path: Path) -> N
         with pytest.raises(Exception, match="CHECK"):  # the rebuild kept checks
             conn.execute(text("UPDATE memory SET type = 'fact'"))
     eng.dispose()
+
+
+def test_migration_0026_backfills_once_and_drops_only_the_search_index(
+    tmp_path: Path,
+) -> None:
+    """0026 (#253, M6 verifier): rows already present are indexed once per
+    round trip (no duplicate documents), every source row and constraint is
+    kept, and the downgrade leaves no FTS shadow table or trigger. The Memory
+    text is hostile FTS and SQL syntax, stored and indexed as plain data."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    hostile = 'synthetic NEAR("x" OR y*) \' ; DROP TABLE memory; --'
+    memory = (
+        "INSERT INTO memory (id, user_id, proposal_id, type, text, tags,"
+        " turn_id, quote, said_on, created_at, amount_minor) VALUES (:id, 1, 1,"
+        " 'goal', :t, '[]', 't', 'q', '2026-01-05', '2026-01-05', 300000)"
+    )
+    proposal = (
+        "INSERT OR IGNORE INTO proposal (id, user_id, kind, payload, status,"
+        " created_at) VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-05')"
+    )
+    eng = round_trip(tmp_path, "0025", "0026", {"text_embedding"}, (proposal,))
+    with eng.begin() as conn:
+        conn.execute(text(memory), {"id": 1, "t": hostile})
+        got = conn.execute(text("SELECT rowid, body FROM search_fts")).all()
+        # the Transaction and its Note (backfilled), the Memory (trigger), once each
+        assert sorted(b for _, b in got) == sorted(["SYNTH", "synthetic", hostile])
+        with pytest.raises(Exception, match="UNIQUE"):  # 0025's rebuild kept it
+            conn.execute(text(memory), {"id": 2, "t": "x"})
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.downgrade(cfg, "0025")
+        left = "SELECT name FROM sqlite_master WHERE name LIKE 'search%'"
+        assert conn.execute(text(left + " OR name = 'text_embedding'")).all() == []
+        assert conn.execute(text("SELECT text, amount_minor FROM memory")).all() == [
+            (hostile, 300000)
+        ]
+    eng.dispose()
