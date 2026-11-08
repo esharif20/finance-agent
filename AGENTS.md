@@ -22,6 +22,14 @@ Read `GLOSSARY.md` and the relevant `docs/adr/` before working. Design docs: `do
 - No new infrastructure, service or dependency without a reason in the ticket or an ADR.
 - Every PR must pass CI (ruff, pyright, pytest, gitleaks, fixture guard, OpenAPI type sync) before merging; `main` is protected.
 
+### Speed rules
+
+- CI is split into parallel jobs (`lint`, `python-tests`, `evals`, `web`, `smoke (webkit)`). The `checks` job aggregates them and is what branch protection requires.
+- Agents don't run the full suite locally. They run targeted tests, `ruff check .` and pyright; CI is the gate.
+- Agents wait for CI in the foreground. If the harness backgrounds a long watch, keep polling with short `gh pr checks <n>` calls, and never end the turn on a background job.
+- A PR that is only behind main, with no conflicts: `gh pr update-branch <n>` then `gh pr merge <n> --auto --merge`, instead of merging main in by hand. GitHub's merge queue isn't available for user-owned repos.
+- Tickets that need a migration in the same feature area can be bundled into one implementer and one verifier, with sequential migration numbers. Only one migration agent runs at a time.
+
 ## Model per ticket and verification
 
 `/to-tickets` labels each ticket with one model:
