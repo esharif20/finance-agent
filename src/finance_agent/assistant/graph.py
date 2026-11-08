@@ -24,11 +24,12 @@ from langgraph.types import Command, interrupt
 from pydantic import ValidationError
 from sqlalchemy import Connection
 
-from finance_agent.assistant import context
+from finance_agent.assistant import context, fast_path
 from finance_agent.assistant.chat_model import (
     ChatModel,
     Message,
     Reply,
+    ToolCall,
     printed_tool_call,
 )
 from finance_agent.assistant.checkpoints import LedgerSaver
@@ -50,12 +51,12 @@ from finance_agent.assistant.tools.propose import FigureInMemory, NotSaid, Propo
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
-from finance_agent.ledger.answer_cache import AnswerCache
+from finance_agent.ledger.answer_cache import AnswerCache, Hit
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.proposals import Proposals
 
 Route = Literal["ask", "plan", "memory", "correct"]
-Path = Literal["cache", "local_model", "deterministic"]
+Path = Literal["cache", "local_model", "deterministic", "planner"]
 ROUTES: tuple[Route, ...] = ("ask", "plan", "memory", "correct")
 MAX_ROUNDS = 3  # model calls that may ask for tools in one turn
 MAX_CALLS = 4  # tool calls run per round
@@ -64,6 +65,11 @@ CACHED = ("ask",)  # read-only answers; Proposals are never cached (ADR 0010)
 # spend_for_query answer depends on the thread's plan and must set it (#271)
 UNCACHED = frozenset({"list_insights", "explain_insight", "spend_for_query"})
 HISTORY = 12  # messages kept in the thread for the conversation slot
+PREFETCH_TOKENS = 1500  # retrieve-then-generate context cap, read in one prefill
+SEARCH_HITS = 5
+# the cache key of an answer to a thread's first message, looked up before any
+# model call: the question, Ledger version, day and Memories fix every input
+FIRST = ({"first_message": True},)
 MODEL_DOWN = "The local model isn't answering, so I can't help with that right now."
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
 NO_FIGURE_MEMORIES = (
@@ -154,6 +160,7 @@ class Draft:
     cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
     refusal: str | None = None  # a fixed reply that replaces the model's
     plan: QueryPlan | None = None  # this turn's last spend_for_query plan
+    prefetched: int = 0  # values[:prefetched] came from _prefetch
 
 
 @dataclass
@@ -161,12 +168,19 @@ class Assistant:
     model: ChatModel
     conn: Connection
     today: date
+    progress: Callable[[str], None] | None = None  # a tool name, or "model"
+    prefetch: bool = False  # retrieve-then-generate (the app turns it on)
     saver: LedgerSaver = field(init=False)
 
     # --- nodes ---------------------------------------------------------------
 
     def router(self, s: State) -> Update:
-        if (route := pre_route(s["message"])) is not None:
+        route = pre_route(s["message"])
+        if route is None and (
+            fast_path.parse(s["message"], self.today) or self._first_hit("ask", s)
+        ):
+            route = "ask"
+        if route is not None:
             return {"route": route, "proposal_id": None, "evidence": []}
         try:
             r = self.model.chat(
@@ -183,6 +197,8 @@ class Assistant:
 
     def subgraph(self, route: Route) -> Callable[[State], Update]:
         def node(s: State) -> Update:
+            if route == "ask" and (fast := self._fast(s)) is not None:
+                return fast
             d = self._tools(route, s)
             if d.failed and not d.values:
                 return {"reply": MODEL_DOWN, "path": "deterministic"}
@@ -240,9 +256,15 @@ class Assistant:
                 route, s["message"], memories, s.get("history", []), self.today
             )
         )
+        if (hit := self._first_hit(route, s)) is not None:
+            d.reply, d.cached = hit
+            return d
+        if route == "ask" and self.prefetch:
+            self._prefetch(s, d)
         budget = context.ToolBudget()
         offered = specs(route)
         for _ in range(MAX_ROUNDS):
+            self._say("model")
             try:
                 r = self.model.chat(d.messages, offered)
             except (OllamaError, OSError):
@@ -272,6 +294,85 @@ class Assistant:
         d.failed = True  # still asking for tools: no reply to check
         return d
 
+    def _first_hit(self, route: Route, s: State) -> Hit | None:
+        """A cached answer to this message as a thread's first, if any."""
+        if route not in CACHED or s.get("history"):
+            return None
+        return self._cache().get(route, s["message"], FIRST, self.today)
+
+    def _say(self, step: str) -> None:
+        if self.progress is not None:
+            self.progress(step)
+
+    def _fast(self, s: State) -> Update | None:
+        """A simple spending question with no model call: the planner's one
+        tool call and a template (fast_path), checked like any reply. Cached
+        by that call, as a model's answer to it would be."""
+        call = fast_path.parse(s["message"], self.today)
+        if call is None:
+            return None
+        calls = [call.model_dump()]
+        hit = self._cache().get("ask", s["message"], calls, self.today)
+        if hit is not None:
+            return {"reply": hit.reply, "path": "cache", "evidence": list(hit.evidence)}
+        d = Draft()
+        out = self._call("ask", call, s, d)
+        reply = fast_path.render(out) if out is not None else None
+        if (
+            reply is None
+            or not check_grounding(reply, d.values, today=self.today).grounded
+        ):
+            return None  # no data, or a template slip: the model answers
+        evidence = sorted({v.evidence_id for v in d.values})
+        self._cache().put("ask", s["message"], calls, self.today, reply, evidence)
+        return {"reply": reply, "path": "planner", "evidence": evidence}
+
+    def _prefetch(self, s: State, d: Draft) -> None:
+        """Retrieve-then-generate: the tool results an answer most likely
+        needs, fetched with no model call and shown as calls already made, so
+        one model call can word the answer (it may still call a tool).
+        Day-stable results come first, so the prompt's prefix repeats."""
+        wanted = [
+            ToolCall(name="spending_summary", arguments={}),
+            ToolCall(name="spending_summary", arguments={"month": _last(self.today)}),
+            ToolCall(name="get_story", arguments={}),
+        ]
+        if (guess := fast_path.guess(s["message"], self.today)) is not None:
+            wanted.append(guess)
+        query = " ".join(s["message"].split())[:100]
+        wanted.append(
+            ToolCall(name="search", arguments={"query": query, "limit": SEARCH_HITS})
+        )
+        left = PREFETCH_TOKENS * context.CHARS_PER_TOKEN
+        made: list[tuple[ToolCall, str]] = []
+        for call in wanted:
+            seen = len(d.values)
+            out = self._call("ask", call, s, d)
+            content = out.model_dump_json() if out is not None else ""
+            if out is None or len(content) > left:
+                del d.values[seen:]  # unseen, so not evidence
+                continue
+            left -= len(content)
+            made.append((call, content))
+        if made:
+            d.messages.append(
+                Message(role="assistant", tool_calls=tuple(c for c, _ in made))
+            )
+            d.messages += [
+                Message(role="tool", tool_name=c.name, content=text) for c, text in made
+            ]
+        d.prefetched = len(d.values)
+
+    def _call(self, route: Route, call: ToolCall, s: State, d: Draft) -> Any:
+        """Run a call the graph made itself; None when it gives nothing."""
+        self._say(call.name)
+        try:
+            out = run(route, call, self.conn, self._turn(s), _plan(s))
+        except (ToolNotAllowed, NoData, ValidationError, ValueError):
+            return None
+        d.values += tool_values(call.name, out)
+        return out
+
     @staticmethod
     def _cacheable(route: Route, d: Draft) -> bool:
         return route in CACHED and not any(
@@ -279,6 +380,7 @@ class Assistant:
         )
 
     def _run(self, route: Route, call: Any, s: State, d: Draft) -> str:
+        self._say(call.name)
         try:
             out = run(route, call, self.conn, self._turn(s), d.plan or _plan(s))
         except ToolNotAllowed:
@@ -328,16 +430,22 @@ class Assistant:
             except (OllamaError, OSError):
                 d.failed = True
         if d.failed or not ok:
+            shown = d.values[d.prefetched :] or d.values  # what the model asked for
             return {
-                "reply": render_fallback(d.values),
+                "reply": render_fallback(shown),
                 "path": "deterministic",
                 "proposal_id": d.proposal_id,
-                "evidence": sorted({v.evidence_id for v in d.values}),
+                "evidence": sorted({v.evidence_id for v in shown}),
             }
         # one round only: the key (its tool calls) then holds everything read
         if self._cacheable(route, d) and len(d.rounds) == 1 and d.proposal_id is None:
             self._cache().put(
                 route, s["message"], d.rounds[0], self.today, d.reply, res.evidence_ids
+            )
+        first = not s.get("history") and len(d.rounds) <= 1  # never multi-round
+        if first and self._cacheable(route, d) and d.proposal_id is None:
+            self._cache().put(
+                route, s["message"], FIRST, self.today, d.reply, res.evidence_ids
             )
         return {
             "reply": d.reply,
@@ -374,6 +482,11 @@ class Assistant:
 
 def _route(state: State) -> str:
     return state.get("route", "ask")
+
+
+def _last(today: date) -> str:
+    n = today.year * 12 + today.month - 2
+    return f"{n // 12}-{n % 12 + 1:02d}"
 
 
 def _plan(state: State) -> QueryPlan | None:

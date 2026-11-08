@@ -47,6 +47,7 @@ from finance_agent.assistant import (
     ToolCall,
     ToolSpec,
     context,
+    fast_path,
     graph,
 )
 from finance_agent.assistant.chat_model import printed_tool_call
@@ -67,6 +68,7 @@ GB = 1024**3
 
 PHASES = ("router", "tool_turn", "answer_turn", "regenerate")
 BY_ID = {c.id: c for c in golden.CASES}
+PREFETCH = True  # retrieve-then-generate, as the app runs it
 
 type Ids = dict[str, int]
 type Factory = Callable[[golden.Case, Ids], ChatModel]
@@ -82,10 +84,15 @@ class Recorder:
         self.printed = False
         self.errors = 0
         self.phases: dict[str, list[float]] = {p: [] for p in PHASES}
+        self.llm_calls = 0
+        self.prompt_chars = 0  # every message and tool spec sent, as JSON
 
     def chat(
         self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()
     ) -> Reply:
+        self.llm_calls += 1
+        self.prompt_chars += sum(len(m.model_dump_json()) for m in messages)
+        self.prompt_chars += sum(len(t.model_dump_json()) for t in tools)
         start = time.perf_counter()
         try:
             r = self.model.chat(messages, tools)
@@ -161,7 +168,14 @@ def routed(case: golden.Case) -> list[Reply]:
     return [] if graph.pre_route(case.question) else [Reply(content=case.route)]
 
 
+def planned(case: golden.Case) -> ToolCall | None:
+    """The fast path's call for a planner-parsable case: no model call then."""
+    return fast_path.parse(case.question, golden.TODAY)
+
+
 def _oracle_turn(case: golden.Case, ids: Ids) -> list[Reply]:
+    if planned(case):
+        return []
     script = routed(case)
     script += [
         Reply(tool_calls=(ToolCall(name=c.name, arguments=_resolve(c.args, ids)),))
@@ -194,9 +208,18 @@ def prints_tool_calls(case: golden.Case, ids: Ids) -> ChatModel:
     return FakeChatModel([*_before(case, ids), *routed(case), *tail, *tail, *tail])
 
 
+def from_context(case: golden.Case, ids: Ids) -> ChatModel:
+    """Retrieve-then-generate's best case: the expected answer in one call,
+    never a tool. Its grounding rate is how often the prefetched context
+    alone holds the figures; the rest need the tool loop."""
+    turn = [] if planned(case) else [*routed(case), *[Reply(content=case.answer)] * 2]
+    return FakeChatModel([*_before(case, ids), *turn])
+
+
 FAKES: dict[str, tuple[str, str, Factory]] = {
     "fake_oracle": ("FakeChatModel oracle", "1", oracle),
     "fake_prints_tool_calls": ("FakeChatModel printing bug", "1", prints_tool_calls),
+    "fake_from_context": ("FakeChatModel answering from context", "1", from_context),
 }
 
 # --- the run ------------------------------------------------------------------
@@ -239,6 +262,8 @@ def _score(
     }
     latencies: list[float] = []
     phases: dict[str, list[float]] = {p: [] for p in PHASES}
+    llm: dict[str, int] = {}  # model calls in each case's scored turn
+    prompt_chars = 0
     for case in cases:
         rec = Recorder(factory(case, ids))
         with engine.connect() as conn:
@@ -247,11 +272,19 @@ def _score(
                 thread = None
                 if case.after:  # the earlier turn of the conversation, unscored
                     first = BY_ID[case.after].question
-                    thread = ask(Assistant(rec, conn, golden.TODAY), first).thread_id
+                    thread = ask(
+                        Assistant(rec, conn, golden.TODAY, prefetch=PREFETCH), first
+                    ).thread_id
                     rec = Recorder(rec.model)
                 start = time.perf_counter()
-                a = ask(Assistant(rec, conn, golden.TODAY), case.question, thread)
+                a = ask(
+                    Assistant(rec, conn, golden.TODAY, prefetch=PREFETCH),
+                    case.question,
+                    thread,
+                )
                 latencies.append(time.perf_counter() - start)
+                llm[case.id] = rec.llm_calls
+                prompt_chars += rec.prompt_chars
                 for p in PHASES:
                     phases[p] += rec.phases[p]
             finally:
@@ -261,7 +294,9 @@ def _score(
         )
         checks = {
             "route": a.route == case.route,
-            "tool_calls": calls_match(case.calls, rec.calls, ids),
+            "tool_calls": calls_match(
+                case.calls, rec.calls or [c for c in [planned(case)] if c], ids
+            ),
             "printed": not rec.printed,
             "errors": not rec.errors,
         }
@@ -269,7 +304,7 @@ def _score(
             checks["refusal"] = not proposed  # the model never even asked
             checks["refusal_no_proposal"] = a.proposal_id is None  # nothing waits
         else:
-            checks["grounding"] = a.path == "local_model" and all(
+            checks["grounding"] = a.path in ("local_model", "planner") and all(
                 f in a.reply for f in case.figures
             )
         if dump := os.environ.get(
@@ -296,6 +331,12 @@ def _score(
         "refusal_no_proposal": rate("refusal_no_proposal", refusals),
         "printed_tool_call_rate": round(len(fails["printed"]) / n, 6),
         "model_error_rate": round(len(fails["errors"]) / n, 6),
+        # cost per question, deterministic on the fakes (tokens: 4 chars each)
+        "llm_calls_per_turn": round(sum(llm.values()) / n, 6),
+        "prompt_tokens_per_turn": round(prompt_chars / context.CHARS_PER_TOKEN / n, 1),
+        "planner_cases": sum(1 for c in cases if planned(c)),
+        # the gate is 0: a question the planner parses never waits on a model
+        "planner_llm_calls": sum(llm[c.id] for c in cases if planned(c)),
     }
     if timed:  # wall clock: real runs only, so CI's results stay reproducible
         ms = [t * 1000 for t in latencies]
@@ -354,7 +395,10 @@ def evaluate(
 
 
 def lower_is_better(name: str) -> bool:
-    return name.endswith(("_rate", "_ms", "_gb")) and name != "grounding_pass_rate"
+    return (
+        name.endswith(("_rate", "_ms", "_gb", "_per_turn", "_llm_calls"))
+        and name != "grounding_pass_rate"
+    )
 
 
 # --- the local run --------------------------------------------------------------

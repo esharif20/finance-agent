@@ -194,7 +194,9 @@ def first_round() -> Reply:
 def turn(engine: Engine, *script: Reply | str) -> tuple[Any, FakeChatModel]:
     m = FakeChatModel([Reply(content=s) if isinstance(s, str) else s for s in script])
     with engine.begin() as conn:
-        return ask(Assistant(m, conn, TODAY), "what did I spend in January?"), m
+        return ask(
+            Assistant(m, conn, TODAY), "what did I spend in January, all told?"
+        ), m
 
 
 @pytest.fixture
@@ -214,7 +216,7 @@ def test_a_repeated_question_is_answered_from_the_cache_until_the_ledger_changes
     assert a.path == "local_model"
     b, m = turn(engine, "ask", first_round())  # no third reply: never asked
     assert (b.path, b.reply) == ("cache", answer)
-    assert len(m.calls) == 2
+    assert m.calls == []  # a first message: found before any model call
     with engine.begin() as conn:  # a Correction bumps the Ledger version
         led = Ledger(conn, ME)
         led.correct_transaction(led.transactions()[1].id, EATING_OUT)
