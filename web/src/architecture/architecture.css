@@ -1,8 +1,8 @@
 /* The public /architecture page. It follows the landing page's world (colour chapters: one flat
-   field per chapter, Red Hat Display/Text) and the dark demo app (the question's path runs on
+   field per chapter, Bricolage Grotesque and Red Hat Text) and the dark demo app (the question's path runs on
    black). The values are copied rather than imported, so this page doesn't move when the landing
    page is restyled. No hue between 235 and 290. */
-@import "@fontsource-variable/red-hat-display";
+@import "@fontsource-variable/bricolage-grotesque/standard.css";
 @import "@fontsource-variable/red-hat-text";
 
 .ar {
@@ -19,7 +19,7 @@
   --ar-night-ink: #f4f6f2;
   --ar-night-soft: #c9cfc6;
 
-  --ar-display: "Red Hat Display Variable", ui-sans-serif, system-ui, sans-serif;
+  --ar-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
   --ar-text: "Red Hat Text Variable", ui-sans-serif, system-ui, sans-serif;
   --ar-step-small: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
   --ar-step-body: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
