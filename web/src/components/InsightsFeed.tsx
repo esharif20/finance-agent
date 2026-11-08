@@ -15,7 +15,7 @@ const round =
   "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:bg-active disabled:opacity-50";
 
 /** The explanation is written by code and quotes pounds; every one is blurred under Hide amounts. */
-function Explained({ text }: { text: string }) {
+export function Explained({ text }: { text: string }) {
   return (
     <>
       {text.split(/(£[\d,]+(?:\.\d{2})?)/).map((part, i) =>
@@ -115,13 +115,18 @@ export function InsightsFeed() {
         <h2 id="insights-title" className="text-heading">
           Insights
         </h2>
-        <button
-          type="button"
-          onClick={() => setAsking(true)}
-          className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline"
-        >
-          Check a purchase
-        </button>
+        <div className="flex items-center gap-4">
+          <a href="#briefing" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
+            Weekly briefing
+          </a>
+          <button
+            type="button"
+            onClick={() => setAsking(true)}
+            className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline"
+          >
+            Check a purchase
+          </button>
+        </div>
       </div>
       {data.length ? (
         <ul className="divide-y divide-border">
