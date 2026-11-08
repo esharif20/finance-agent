@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { components } from "@/api/schema";
@@ -96,7 +96,17 @@ describe("ReviewQueue", () => {
     });
     expect(await screen.findByRole("heading", { name: "Costa" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Tesco: Groceries");
-    expect(invalidate).toHaveBeenCalledWith();
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) }); // everything but the queue the reply replaced
+  });
+
+  it("a held or doubled key answers one item, not the next as well", async () => {
+    const { calls } = setup(queue([A, B]), queue([B]));
+    await screen.findByRole("button", { name: /Groceries/ });
+    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "1", repeat: true });
+    await screen.findByRole("heading", { name: "Costa" });
+    expect(calls).toHaveLength(1);
   });
 
   it("Apply to N similar can be switched to just this one", async () => {
