@@ -82,7 +82,7 @@ function Sinking({ next, children }: { next: RefObject<HTMLDivElement | null>; c
   // dims to 0.55 under a ground-coloured veil, so the card stays opaque over the one beneath it
   const veil = useTransform(scrollYProgress, [0, 1], [0, 0.45]);
   return (
-    <motion.article className="st-card" style={{ y, scale }}>
+    <motion.article className="st-card" data-ui="" style={{ y, scale }}>
       {children}
       <motion.span className="st-card-veil" style={{ opacity: veil }} aria-hidden="true" />
     </motion.article>
@@ -94,9 +94,12 @@ export function Pile({ still }: { still: boolean }) {
   return (
     <section className="st-pile" data-still={still ? "" : undefined} aria-labelledby="st-pile-title">
       <div className="lp-wrap st-pile-grid">
-        <h2 id="st-pile-title" className="lp-h2 st-pile-title">
-          The app itself, on a made-up ledger.
-        </h2>
+        <div className="st-pile-title">
+          <h2 id="st-pile-title" className="lp-h2">
+            The app itself.
+          </h2>
+          <p className="st-pile-note">The real screens, running on a made-up ledger. Pick a category in the queue: it is the app’s own editor.</p>
+        </div>
         <div className="st-pile-cards">
           {PILE.map(({ title, body: Body }, i) => {
             const next = slots[i + 1];
@@ -109,7 +112,7 @@ export function Pile({ still }: { still: boolean }) {
             return (
               <div key={title} ref={slots[i]} className="st-slot" data-layer={i} style={{ zIndex: i + 1 }}>
                 {still || !next || i === PILE.length - 1 ? (
-                  <article className="st-card">{content}</article>
+                  <article className="st-card" data-ui="">{content}</article>
                 ) : (
                   <Sinking next={next}>{content}</Sinking>
                 )}
