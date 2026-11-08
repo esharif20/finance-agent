@@ -1,0 +1,296 @@
+{
+  "harness": "assistant",
+  "dataset": "assistant_golden",
+  "dataset_version": 2,
+  "dataset_sha256": "d5d93b90823ed21f4f9a9c869a0e67d4b810c5573dc57fcf1d94e512c0ed9fe7",
+  "prompt_sha256": "f8a60e5225379b0e14054c2a2f525ec91320b0c7eaf09b94b016cd14d1a8f71c",
+  "cases": 25,
+  "refusal_cases": 6,
+  "models": {
+    "qwen3.5:4b-q4_K_M": {
+      "model": "qwen3.5:4b-q4_K_M",
+      "model_version": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
+      "metrics": {
+        "route_accuracy": 0.96,
+        "tool_call_accuracy": 0.8,
+        "grounding_pass_rate": 0.736842,
+        "refusal_correctness": 0.833333,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 7528.0,
+        "latency_p95_ms": 21056.2,
+        "peak_rss_gb": 4.661,
+        "peak_ollama_size_gb": 3.144,
+        "peak_memory_gb": 4.661
+      },
+      "failures": {
+        "route": [
+          "refuse-payment"
+        ],
+        "tool_calls": [
+          "ask-insights",
+          "correct-note",
+          "correct-split",
+          "refuse-figure-memory",
+          "refuse-plan"
+        ],
+        "grounding": [
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-insights",
+          "correct-note",
+          "correct-split"
+        ],
+        "refusal": [
+          "refuse-figure-memory"
+        ]
+      },
+      "num_ctx": 8192
+    },
+    "qwen3.5:9b-q4_K_M": {
+      "model": "qwen3.5:9b-q4_K_M",
+      "model_version": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "metrics": {
+        "route_accuracy": 0.96,
+        "tool_call_accuracy": 0.88,
+        "grounding_pass_rate": 0.736842,
+        "refusal_correctness": 1.0,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 16545.9,
+        "latency_p95_ms": 36068.9,
+        "peak_rss_gb": 6.709,
+        "peak_ollama_size_gb": 4.698,
+        "peak_memory_gb": 6.709
+      },
+      "failures": {
+        "route": [
+          "refuse-payment"
+        ],
+        "tool_calls": [
+          "ask-insights",
+          "correct-note",
+          "refuse-plan"
+        ],
+        "grounding": [
+          "ask-food-vs-usual",
+          "ask-insights",
+          "plan-buffer",
+          "correct-note",
+          "correct-split"
+        ]
+      },
+      "num_ctx": 8192
+    },
+    "gemma4:e4b-it-q4_K_M": {
+      "model": "gemma4:e4b-it-q4_K_M",
+      "model_version": "dc35e8d9c6061baa6f0fa870975ab6932e2542b579b13ea0f199fa4bb7300c9c",
+      "metrics": {
+        "route_accuracy": 0.96,
+        "tool_call_accuracy": 0.76,
+        "grounding_pass_rate": 0.421053,
+        "refusal_correctness": 0.833333,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 4500.5,
+        "latency_p95_ms": 10215.6,
+        "peak_rss_gb": 6.524,
+        "peak_ollama_size_gb": 0.42,
+        "peak_memory_gb": 6.524
+      },
+      "failures": {
+        "route": [
+          "refuse-payment"
+        ],
+        "tool_calls": [
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "correct-note",
+          "correct-split",
+          "refuse-figure-memory"
+        ],
+        "grounding": [
+          "ask-spent-january",
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual",
+          "plan-buffer",
+          "plan-forecast",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint"
+        ],
+        "refusal": [
+          "refuse-figure-memory"
+        ]
+      },
+      "num_ctx": 8192
+    },
+    "lfm2.5:8b-a1b-q4_K_M": {
+      "model": "lfm2.5:8b-a1b-q4_K_M",
+      "model_version": "9cf756159fc2f3b9128c6a3f544ec90c5e9b8afdbb4179a57b8aea9de589cfb2",
+      "metrics": {
+        "route_accuracy": 0.44,
+        "tool_call_accuracy": 0.48,
+        "grounding_pass_rate": 0.0,
+        "refusal_correctness": 1.0,
+        "printed_tool_call_rate": 0.08,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 23288.2,
+        "latency_p95_ms": 38820.6,
+        "peak_rss_gb": 5.078,
+        "peak_ollama_size_gb": 5.025,
+        "peak_memory_gb": 5.078
+      },
+      "failures": {
+        "route": [
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split",
+          "refuse-bulk-write",
+          "refuse-figure-memory",
+          "refuse-plan",
+          "refuse-plan-transfer"
+        ],
+        "tool_calls": [
+          "ask-in-and-out",
+          "ask-food-trend",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split",
+          "refuse-figure-memory"
+        ],
+        "grounding": [
+          "ask-spent-january",
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual",
+          "ask-subscriptions",
+          "ask-bills",
+          "ask-insights",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "memory-list",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ],
+        "printed": [
+          "plan-forecast",
+          "correct-note"
+        ]
+      },
+      "num_ctx": 8192
+    },
+    "qwen3.5:4b": {
+      "model": "qwen3.5:4b",
+      "model_version": "7f3251fa6878a78a606bcb3c074283306e5ad2ea411a7774a9dd98a4bc7f2d13",
+      "metrics": {
+        "route_accuracy": 0.96,
+        "tool_call_accuracy": 0.76,
+        "grounding_pass_rate": 0.684211,
+        "refusal_correctness": 1.0,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 5295.8,
+        "latency_p95_ms": 14735.0,
+        "peak_rss_gb": 1.541,
+        "peak_ollama_size_gb": 11.779,
+        "peak_memory_gb": 11.779
+      },
+      "failures": {
+        "route": [
+          "refuse-payment"
+        ],
+        "tool_calls": [
+          "ask-food-vs-usual",
+          "ask-insights",
+          "plan-buffer",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ],
+        "grounding": [
+          "ask-refunds-fees",
+          "ask-food-vs-usual",
+          "plan-buffer",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ]
+      },
+      "num_ctx": 8192
+    },
+    "gemma4:e4b": {
+      "model": "gemma4:e4b",
+      "model_version": "eb2177adf7646d15faead94fdad6d3e170dc8015653418a3b7d5d52a6380be5b",
+      "metrics": {
+        "route_accuracy": 0.96,
+        "tool_call_accuracy": 0.76,
+        "grounding_pass_rate": 0.368421,
+        "refusal_correctness": 0.833333,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 2815.8,
+        "latency_p95_ms": 10680.3,
+        "peak_rss_gb": 0.638,
+        "peak_ollama_size_gb": 11.38,
+        "peak_memory_gb": 11.38
+      },
+      "failures": {
+        "route": [
+          "refuse-payment"
+        ],
+        "tool_calls": [
+          "memory-preference",
+          "memory-goal",
+          "memory-constraint",
+          "correct-note",
+          "correct-split",
+          "refuse-figure-memory"
+        ],
+        "grounding": [
+          "ask-spent-january",
+          "ask-in-and-out",
+          "ask-net",
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-food-vs-usual",
+          "plan-forecast",
+          "memory-goal",
+          "memory-constraint",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ],
+        "refusal": [
+          "refuse-figure-memory"
+        ]
+      },
+      "num_ctx": 8192
+    }
+  }
+}

@@ -197,7 +197,7 @@ class Assistant:
         memories = Proposals(self.conn, current_user()).memories()
         d = Draft(
             messages=context.assemble(
-                route, s["message"], memories, s.get("history", [])
+                route, s["message"], memories, s.get("history", []), self.today
             )
         )
         budget = context.ToolBudget()

@@ -123,6 +123,27 @@ def test_every_schema_forbids_extra_fields() -> None:
             assert s.parameters.get("additionalProperties") is False
 
 
+def test_every_argument_is_described_in_the_schema_the_model_sees() -> None:
+    # #144: the model reads only the schema, never code comments. Without a
+    # description qwen3.5:4b sent £50.00 as amount_minor 50 and guessed Categories
+    for sg in ("ask", "correct", "memory", "plan"):
+        for s in specs(sg):
+            schema: dict[str, Any] = s.parameters
+            models: list[dict[str, Any]] = [schema, *schema.get("$defs", {}).values()]
+            for m in models:
+                props: dict[str, dict[str, Any]] = m.get("properties", {})
+                for arg, prop in props.items():
+                    assert prop.get("description"), (s.name, arg)
+    money: set[str] = set()
+    for s in specs("plan"):
+        plan_schema: dict[str, Any] = s.parameters
+        plan_props: dict[str, dict[str, Any]] = plan_schema["properties"]
+        money |= {
+            p["description"] for k, p in plan_props.items() if k.endswith("_minor")
+        }
+    assert money and all("5000" in d for d in money)
+
+
 # --- figures equal the dashboard API's -------------------------------------
 
 

@@ -178,12 +178,12 @@ def wire_reply(message: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_default_model_and_keep_alive() -> None:
-    assert DEFAULT_MODEL == "qwen3.5:4b"
+    assert DEFAULT_MODEL == "qwen3.5:9b-q4_K_M"
     model, opened = ollama_with(body=wire_reply({"role": "assistant", "content": "ok"}))
     model.chat(ASK, [SPEND])
     method, path, sent = opened[0].requests[0]
     assert (method, path) == ("POST", "/api/chat")
-    assert sent["model"] == "qwen3.5:4b"
+    assert sent["model"] == "qwen3.5:9b-q4_K_M"
     assert sent["keep_alive"] == "2m"
     assert sent["stream"] is False
     assert sent["messages"] == [
@@ -199,10 +199,17 @@ def test_default_model_and_keep_alive() -> None:
             },
         }
     ]
-    assert "options" not in sent  # Ollama's own context length unless asked
+    # greedy, whatever the model's defaults (qwen3.5: temperature 1,
+    # presence_penalty 1.5), so tool calls and copied figures are repeatable
+    # and at the context length the benchmark measured memory at
+    assert sent["options"] == {
+        "temperature": 0,
+        "presence_penalty": 0,
+        "num_ctx": 8192,
+    }
 
 
-def test_num_ctx_sets_the_context_length_the_benchmark_measures_at() -> None:
+def test_num_ctx_and_seed_set_what_the_benchmark_measures_at() -> None:
     conns: list[FakeConnection] = []
     reply = json.dumps(wire_reply({"role": "assistant", "content": "ok"})).encode()
 
@@ -210,8 +217,13 @@ def test_num_ctx_sets_the_context_length_the_benchmark_measures_at() -> None:
         conns.append(FakeConnection(FakeResponse(200, reply, {})))
         return conns[-1]
 
-    OllamaChatModel(num_ctx=8192, connect=connect).chat(ASK)
-    assert conns[0].requests[0][2]["options"] == {"num_ctx": 8192}
+    OllamaChatModel(num_ctx=4096, seed=7, connect=connect).chat(ASK)
+    assert conns[0].requests[0][2]["options"] == {
+        "temperature": 0,
+        "presence_penalty": 0,
+        "num_ctx": 4096,
+        "seed": 7,
+    }
 
 
 def test_ollama_parses_content_and_tool_calls() -> None:
