@@ -4,8 +4,10 @@ reaches beyond the visitor's own file (card art, sync, import, the local
 model, backups, the gateway) answering 404: only ALLOWED paths pass `Guard`."""
 
 import os
-from collections.abc import Mapping
+import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any, cast
 from urllib.parse import urlsplit
 
@@ -15,11 +17,15 @@ from sqlalchemy import Engine
 from starlette.datastructures import Headers
 from starlette.requests import HTTPConnection
 from starlette.responses import PlainTextResponse
+from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from finance_agent.api import chat, create_app
-from finance_agent.assistant import ChatModel
+from finance_agent.assistant import ChatModel, context
+from finance_agent.assistant.chat_model import Message as ChatMessage
+from finance_agent.assistant.chat_model import Reply, ToolCall, ToolSpec
 from finance_agent.demo import guard, session
+from finance_agent.ledger.taxonomy import TAXONOMY
 
 BODY_LIMIT = 64 * 1024
 SAFE = {"GET", "HEAD", "OPTIONS"}
@@ -63,19 +69,66 @@ def allowed(path: str) -> bool:
     )
 
 
-class NoModel:
-    """The demo has no ChatModel: every call fails, so the Assistant answers
-    on its deterministic path."""
+def _leaves() -> list[str]:
+    """Every Category name a question may name, longest first ("AI tools"
+    before "Software"), Subcategories before their top level."""
+    subs = {s for tops in TAXONOMY.values() for s in tops} - set(TAXONOMY)
+    return sorted(subs, key=len, reverse=True) + sorted(TAXONOMY, key=len, reverse=True)
 
-    def chat(self, *_: Any, **__: Any) -> Any:
-        raise OSError("the demo has no chat model")
+
+_NAMES = _leaves()
+
+
+def recorded_call(message: str, today: date) -> ToolCall:
+    """The read tool a question maps to, chosen by keywords: the recorded
+    stand-in for the model's tool choice. It names a tool and its arguments,
+    never a figure; every figure comes from the tool (ADR 0007)."""
+    text = message.lower()
+    month = None
+    if "last month" in text:
+        prev = today.replace(day=1) - timedelta(days=1)
+        month = f"{prev:%Y-%m}"
+    if re.search(r"subscription|recurring", text):
+        return ToolCall(name="list_subscriptions", arguments={})
+    if re.search(r"insight|unusual|notice|stand out", text):
+        return ToolCall(name="list_insights", arguments={})
+    for name in _NAMES:
+        singular = name.lower().removesuffix("s")
+        if re.search(rf"\b{re.escape(singular)}", text):
+            tool = "category_trend" if "trend" in text and name in TAXONOMY else None
+            return ToolCall(
+                name=tool or "category_detail",
+                arguments={"category": name, "month": month},
+            )
+    return ToolCall(name="spending_summary", arguments={"month": month})
+
+
+class RecordedModel:
+    """The demo's ChatModel, with no model behind it: the Router hears "ask",
+    the first tool round gets `recorded_call`, and the next round fails, so
+    the Assistant answers with its deterministic table of tool results."""
+
+    def chat(
+        self, messages: Sequence[ChatMessage], tools: Sequence[ToolSpec] = ()
+    ) -> Reply:
+        offered = {t.name for t in tools}
+        if not offered:
+            if messages and messages[0].content == context.SYSTEM["router"]:
+                return Reply(content="ask")
+            raise OSError("the demo has no chat model")
+        if messages[-1].role != "user":  # tool results are in: no wording
+            raise OSError("the demo has no chat model")
+        call = recorded_call(messages[-1].content, date.today())
+        if call.name not in offered:
+            raise OSError("the demo has no chat model")
+        return Reply(tool_calls=(call,))
 
     def stream(self, *_: Any, **__: Any) -> Any:
         raise OSError("the demo has no chat model")
 
 
-def _no_model() -> ChatModel:
-    return NoModel()
+def _recorded_model() -> ChatModel:
+    return RecordedModel()
 
 
 @dataclass
@@ -198,7 +251,7 @@ def build(environ: Mapping[str, str] = os.environ) -> FastAPI:
         raise guard.Refused("no personas: run scripts/build_demo_db.py first")
 
     app = create_app(cast(Engine, session.VisitorEngine()), web_dir=cfg.dir / "web")
-    app.dependency_overrides[chat.chat_model] = _no_model
+    app.dependency_overrides[chat.chat_model] = _recorded_model
 
     def visitor(request: Request) -> session.Visitor:
         return request.scope["fa_demo"].visitor
@@ -221,6 +274,9 @@ def build(environ: Mapping[str, str] = os.environ) -> FastAPI:
         visit.visitor, visit.fresh = new, True  # so Guard sends the new cookie
         return PersonaOut(persona=new.persona)
 
+    # create_app mounts the web build at "/" last; the routes above must precede
+    # it, or a POST to /api/demo/* reaches the static files (405)
+    app.router.routes.sort(key=lambda r: isinstance(r, Mount))
     app.add_middleware(Guard, secret=cfg.secret, visitors=visitors)
     return app
 

@@ -2,11 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 const KEY = "fa-private";
 
+// the public demo starts private (docs/FRONTEND.md); a visitor's own choice is kept after that
+const DEMO = import.meta.env.VITE_DEMO === "1";
+
 const read = (): boolean => {
   try {
-    return localStorage.getItem(KEY) === "1";
+    const stored = localStorage.getItem(KEY);
+    return stored === null ? DEMO : stored === "1";
   } catch {
-    return false;
+    return DEMO;
   }
 };
 

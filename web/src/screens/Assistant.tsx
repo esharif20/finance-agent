@@ -178,10 +178,14 @@ function Bubble({ m, decision, busy, onDecide }: { m: Message; decision?: Decisi
   );
 }
 
+// the public demo answers on the deterministic path only: no local model, no cloud
+const DEMO = import.meta.env.VITE_DEMO === "1";
+
 const refusal = (status: number) =>
   status === 404 ? "That conversation has ended. Ask again to start a new one."
   : status === 409 ? "Nothing is waiting for confirmation."
   : status === 422 ? "That message can't be sent. Keep it under 2,000 characters."
+  : DEMO ? "The Assistant isn't available right now. Try again in a moment."
   : "The Assistant isn't available right now. Check that the local model is running.";
 
 export function Assistant() {
@@ -193,7 +197,7 @@ export function Assistant() {
   // load the local model while the user types, so the first turn skips the load;
   // a beacon, not fetch: nothing waits on it and nothing is shown
   useEffect(() => {
-    navigator.sendBeacon?.("/api/chat/warm");
+    if (!DEMO) navigator.sendBeacon?.("/api/chat/warm"); // the demo has no model to warm
   }, []);
 
   useEffect(() => {
@@ -240,6 +244,9 @@ export function Assistant() {
 
   return (
     <Card className="flex min-h-[60dvh] flex-col p-0 sm:p-0">
+      {DEMO && (
+        <p className="px-4 pt-4 text-label text-muted-foreground sm:px-6 sm:pt-5">Answered from tables (demo)</p>
+      )}
       <ol aria-label="Conversation" aria-live="polite" aria-busy={chat.busy} className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
         {chat.messages.length === 0 && (
           <li className="m-auto max-w-sm py-16 text-center">
