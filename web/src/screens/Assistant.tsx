@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Check, X } from "lucide-react";
-import { Fragment, useEffect, useReducer, useRef, useState } from "react";
+import { ArrowUp, Check, ChevronDown, X } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
 import { Money } from "@/components/Money";
 import { Card } from "@/components/ui/card";
-import { type Block, type Decision, type Message, friendlyLabel, initial, parseBlocks, parseSse, pathLabel, reduce } from "@/lib/chat";
+import { type Block, type Counted, type Decision, type Message, friendlyLabel, parseBlocks, pathLabel } from "@/lib/chat";
+import { decide, send as sendMessage, useChat } from "@/lib/chatStore";
 import { usePrivacy } from "@/lib/privacy";
 
 type Proposal = components["schemas"]["ProposalOut"];
@@ -74,6 +75,40 @@ function Reply({ text }: { text: string }) {
         ),
       )}
     </>
+  );
+}
+
+const day = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" });
+
+/** The Transactions a figure counted, straight from the API's tool result (ADR 0007).
+ * They sum to the total exactly: the server builds both from the same shares. */
+function CountedList({ group }: { group: Counted }) {
+  const n = group.transactions.length;
+  return (
+    <details className="group mt-3 rounded-2xl bg-raised" data-testid="counted">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 text-label font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        Show transactions ({n})
+        <ChevronDown className="size-4 shrink-0 transition-transform duration-200 ease-out group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <ul className="max-h-80 overflow-auto px-4 pb-1 text-label" aria-label="Transactions counted">
+        {group.transactions.map((t) => (
+          <li key={t.id} className="flex items-baseline gap-3 border-t border-border py-2 first:border-t-0">
+            <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{day(t.posted_on)}</span>
+            <span className="min-w-0 flex-1 truncate">{t.merchant}</span>
+            <span className="tabular-nums font-medium" data-minor={t.amount_minor}>
+              <Money value={{ minor: t.amount_minor, currency: "GBP" }} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="flex justify-between gap-3 border-t border-border px-4 py-2 text-label font-semibold">
+        <span>Total</span>
+        <span className="tabular-nums">
+          <Money value={{ minor: group.total_minor, currency: "GBP" }} />
+        </span>
+      </p>
+    </details>
   );
 }
 
@@ -161,8 +196,15 @@ function Bubble({ m, decision, busy, onDecide }: { m: Message; decision?: Decisi
           <p className="whitespace-pre-wrap text-row">{m.text}</p>
         ) : (
           <>
-            {m.text ? <Reply text={m.text} /> : m.error ? null : <span className="text-label text-muted-foreground">Thinking…</span>}
+            {m.text ? (
+              <Reply text={m.text} />
+            ) : m.error ? null : (
+              <span className="text-label text-muted-foreground" data-testid="stage">
+                {m.stage ?? "Reading your question…"}
+              </span>
+            )}
             {m.error && <p className="text-label text-warning-foreground" role="alert">{m.error}</p>}
+            {!m.streaming && m.counted?.map((g) => <CountedList key={g.evidence_id} group={g} />)}
             {m.proposalId != null && !m.streaming && (
               <ProposalCard id={m.proposalId} decision={decision} disabled={busy} onDecide={(d) => onDecide(m.proposalId as number, d)} />
             )}
@@ -178,14 +220,8 @@ function Bubble({ m, decision, busy, onDecide }: { m: Message; decision?: Decisi
   );
 }
 
-const refusal = (status: number) =>
-  status === 404 ? "That conversation has ended. Ask again to start a new one."
-  : status === 409 ? "Nothing is waiting for confirmation."
-  : status === 422 ? "That message can't be sent. Keep it under 2,000 characters."
-  : "The Assistant isn't available right now. Check that the local model is running.";
-
 export function Assistant() {
-  const [chat, dispatch] = useReducer(reduce, initial);
+  const chat = useChat(); // lives above the router: a turn in flight survives a tab change
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
@@ -200,42 +236,9 @@ export function Assistant() {
     end.current?.scrollIntoView?.({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
   }, [chat.messages, reduceMotion]);
 
-  async function turn(url: string, body: object) {
-    try {
-      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok || !res.body) {
-        if (res.status === 404) dispatch({ type: "reset" });
-        return dispatch({ type: "fail", error: refusal(res.status) });
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let rest = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const parsed = parseSse(rest, dec.decode(value, { stream: true }));
-        rest = parsed.rest;
-        for (const event of parsed.events) dispatch({ type: "event", event });
-      }
-      dispatch({ type: "event", event: { name: "done", data: {} } });
-    } catch {
-      dispatch({ type: "fail", error: refusal(500) });
-    }
-  }
-
   function send(e: React.FormEvent) {
     e.preventDefault();
-    const text = draft.trim();
-    if (!text || chat.busy) return;
-    setDraft("");
-    dispatch({ type: "send", text });
-    void turn("/api/chat", chat.thread ? { message: text, thread_id: chat.thread } : { message: text });
-  }
-
-  function decide(proposalId: number, decision: Decision) {
-    if (!chat.thread || chat.busy) return;
-    dispatch({ type: "decide", proposalId, decision });
-    void turn(`/api/chat/${chat.thread}/resume`, { decision });
+    if (sendMessage(draft.trim())) setDraft("");
   }
 
   return (
