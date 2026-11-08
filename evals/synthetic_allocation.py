@@ -11,13 +11,17 @@ income, every floor within its cap, and the floors within what bills leave.
 """
 
 import hashlib
+import math
 import random
 from dataclasses import dataclass
 
+from finance_agent.engine import preferences as pref
 from finance_agent.engine.allocation import AllocationInput, Bill, Category, Goal
 
-DATASET_VERSION = 1
+DATASET_VERSION = 2
 SEED = 260
+TEMP = 1.0  # sharpness of simulated answers
+STATED = 0.5
 KINDS = (
     "surplus",
     "shortfall",
@@ -51,7 +55,11 @@ class Scenario:
     feasible: bool
 
 
-def _priority(w: float) -> float:
+def _priority(rng: random.Random, w: float) -> float:
+    """The Memory priority, stated for about half the lines (#269); the rest
+    keep the default weight, as in the app."""
+    if rng.random() < STATED:
+        return 1.0
     return float(min(3, max(1, round(w))))
 
 
@@ -92,9 +100,9 @@ def _scenario(kind: str, i: int) -> Scenario:
     for name, ref in zip(goals_used, refs, strict=False):
         floor = min(ref * rng.randrange(0, 80) // 100, floor_budget)
         floor_budget -= floor
-        w = rng.uniform(0.5, 3.0)
+        w = math.exp(rng.uniform(math.log(0.25), math.log(4.0)))
         true.append((name, w))
-        goals.append(Goal(name, ref, floor, None, _priority(w)))
+        goals.append(Goal(name, ref, floor, None, _priority(rng, w)))
     for (name, essential), ref in zip(cats_used, refs[len(goals_used) :], strict=True):
         floor = (
             min(ref * rng.randrange(50, 100) // 100, floor_budget) if essential else 0
@@ -103,9 +111,9 @@ def _scenario(kind: str, i: int) -> Scenario:
         cap = None
         if not essential and (kind == "caps" or rng.random() < 0.2):
             cap = ref * rng.randrange(40, 100) // 100
-        w = rng.uniform(0.5, 3.0)
+        w = math.exp(rng.uniform(math.log(0.25), math.log(4.0)))
         true.append((name, w))
-        cats.append(Category(name, ref, floor, cap, _priority(w), essential))
+        cats.append(Category(name, ref, floor, cap, _priority(rng, w), essential))
     if kind == "infeasible_floors":
         c = cats[0]
         cats[0] = Category(
@@ -155,3 +163,22 @@ def scenarios() -> list[Scenario]:
 
 def fingerprint(ss: list[Scenario]) -> str:
     return hashlib.sha256(repr(ss).encode()).hexdigest()
+
+
+def simulated_answers(s: Scenario, n: int) -> list[pref.Answer]:
+    """`n` answers to the picker's questions from the planted utilities:
+    a beats b with probability sigmoid(log w*_a - log w*_b) (#269). The prior
+    is the Memory priority, as the app would fit it."""
+    rng = random.Random(f"{SEED}-answers-{s.name}")  # noqa: S311 - synthetic data
+    true = dict(s.true_weights)
+    prior = {x.name: math.log(x.weight) for x in (*s.inp.goals, *s.inp.categories)}
+    items = sorted(prior)
+    out: list[pref.Answer] = []
+    for _ in range(n if len(items) > 1 else 0):
+        pair = pref.next_pair(items, out, prior)
+        if pair is None:
+            break
+        a, b = pair
+        p = 1.0 / (1.0 + math.exp(TEMP * (math.log(true[b]) - math.log(true[a]))))
+        out.append(pref.Answer(a, b) if rng.random() < p else pref.Answer(b, a))
+    return out
