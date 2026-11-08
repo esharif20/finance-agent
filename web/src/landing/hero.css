@@ -85,10 +85,6 @@
     display: none;
   }
 }
-/* the old repainting spotlight gives way to the transform-driven glow */
-.lp-hero .lp-spot {
-  display: none;
-}
 
 /* --- card lighting, layered over the WebGL card (and the CSS stand-in) --- */
 .lp-acard-light {

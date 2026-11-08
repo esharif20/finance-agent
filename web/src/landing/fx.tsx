@@ -187,13 +187,22 @@ export function Flex({
     let raf = 0;
     let px = -1e4;
     let py = -1e4;
+    // letter centres are read once and kept until a scroll or resize moves them, so a pointer
+    // move never forces a layout read per letter
+    let at: { x: number; y: number }[] | null = null;
+    const forget = () => void (at = null);
     const paint = () => {
       raf = 0;
-      for (const l of letters) {
+      at ??= letters.map((l) => {
         const b = l.getBoundingClientRect();
-        const f = Math.max(0, 1 - Math.hypot(b.left + b.width / 2 - px, b.top + b.height / 2 - py) / 340) ** 2;
-        l.style.fontVariationSettings = f > 0 ? `"wght" ${Math.round(560 + 240 * f)}, "wdth" ${Math.round(84 + 16 * f)}` : "";
-      }
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      });
+      letters.forEach((l, i) => {
+        const c = at?.[i];
+        const f = c ? Math.max(0, 1 - Math.hypot(c.x - px, c.y - py) / 340) ** 2 : 0;
+        const v = f > 0 ? `"wght" ${Math.round(560 + 240 * f)}` : "";
+        if (l.style.fontVariationSettings !== v) l.style.fontVariationSettings = v;
+      });
     };
     const move = (e: globalThis.PointerEvent) => {
       if (e.pointerType !== "mouse") return;
@@ -207,7 +216,11 @@ export function Flex({
     };
     host.addEventListener("pointermove", move);
     host.addEventListener("pointerleave", out);
+    window.addEventListener("scroll", forget, { passive: true });
+    window.addEventListener("resize", forget);
     return () => {
+      window.removeEventListener("scroll", forget);
+      window.removeEventListener("resize", forget);
       cancelAnimationFrame(raf);
       host.removeEventListener("pointermove", move);
       host.removeEventListener("pointerleave", out);
@@ -255,8 +268,20 @@ export function Flex({
     loops, transform only), held inside one chapter and tinted for it by `tone`, with grain and
     faint ledger lines. Reduced motion: the blobs hold still. */
 export function Field({ tone }: { tone: string }) {
+  // off screen the blobs pause, so only the chapters in view keep a compositor animation running
+  const el = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const n = el.current;
+    if (!n || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e?.isIntersecting) delete n.dataset.paused;
+      else n.dataset.paused = "";
+    });
+    io.observe(n);
+    return () => io.disconnect();
+  }, []);
   return (
-    <div className="ambient lp-amb" data-tone={tone} aria-hidden="true">
+    <div ref={el} className="ambient lp-amb" data-tone={tone} aria-hidden="true">
       <i />
       <i />
       <i />

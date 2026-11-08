@@ -145,10 +145,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const rows = useRef<HTMLUListElement>(null);
+  const spotEl = useRef<HTMLSpanElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
   const floors = useRef<(HTMLSpanElement | null)[]>([]);
-  const glows = useRef<(HTMLSpanElement | null)[]>([]);
+  const glow = useRef<HTMLSpanElement>(null);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
@@ -188,6 +189,10 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
+    // render on demand: the loop runs only while something moves, and sleeps when the scroll,
+    // the pointer tilt and the deal have all settled
+    let lastP = -1;
+    let drawn = false;
     const sizeScene = () => {
       dims = size();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
@@ -197,6 +202,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (!alive || !visible) return;
       tilt.x += (aim.x - tilt.x) * 0.08;
       tilt.y += (aim.y - tilt.y) * 0.08;
+      const settling = Math.abs(aim.x - tilt.x) + Math.abs(aim.y - tilt.y) > 0.0005;
       const { w, narrow } = dims;
       const now = performance.now();
       if (playing.current && !dealt) dealt = now;
@@ -214,7 +220,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (light.tx > -1e4) {
         light.x = light.x < -1e3 ? light.tx : light.x + (light.tx - light.x) * 0.14;
         light.y = light.y < -1e3 ? light.ty : light.y + (light.ty - light.y) * 0.14;
-        for (const g of glows.current) {
+        for (const g of [glow.current, spotEl.current]) {
           g?.style.setProperty("--gx", `${light.x.toFixed(1)}px`);
           g?.style.setProperty("--gy", `${light.y.toFixed(1)}px`);
         }
@@ -249,8 +255,17 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           poses.map(() => null),
         );
         scene.render();
+        if (!drawn) {
+          drawn = true;
+          el.dataset.drawn = ""; // the canvas fades in over the CSS cards only once it has a frame
+        }
       }
-      raf = requestAnimationFrame(frame);
+      // the last card lands at 160 + 2 * 170 + 1400 ms; the WebGL sweep ends at 1100 + 1500 ms
+      const dealing = !dealt || since < 2800;
+      const glowing = light.tx > -1e4 && Math.abs(light.tx - light.x) + Math.abs(light.ty - light.y) > 0.5;
+      const moving = Math.abs(pv - lastP) > 0.00005;
+      lastP = pv;
+      if (dealing || moving || settling || glowing || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
       if (!raf) raf = requestAnimationFrame(frame);
@@ -267,8 +282,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (!el.dataset.lit) el.dataset.lit = "";
       aim.x = e.clientX / window.innerWidth - 0.5;
       aim.y = e.clientY / window.innerHeight - 0.5;
+      kick();
     };
-    const resize = () => sizeScene();
+    const resize = () => {
+      sizeScene();
+      kick();
+    };
+    const offP = p.on("change", kick);
     window.addEventListener("pointermove", move);
     window.addEventListener("resize", resize);
     if (canvas.current && webgl()) {
@@ -282,12 +302,14 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
             "#000000",
           );
           setThree(true);
+          kick();
         })
         .catch(() => setThree(false)); // the CSS cards stay
     }
     kick();
     return () => {
       alive = false;
+      offP();
       cancelAnimationFrame(raf);
       io.disconnect();
       window.removeEventListener("pointermove", move);
@@ -302,7 +324,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         <Field tone="night" />
         <div className="lp-halo" aria-hidden="true" data-phase={phase} />
         <div className="lp-grain" aria-hidden="true" />
-        {!still && <span ref={(n) => void (glows.current[0] = n)} className="lp-glow" aria-hidden="true" />}
+        {!still && <span ref={glow} className="lp-glow" aria-hidden="true" />}
         <div className="lp-hero-copy" data-phase={phase}>
           <h1 id="lp-title" className="lp-display" style={{ "--hd": `${delay}s` } as React.CSSProperties}>
             <Flex lines={HEADLINE_LINES} label={HEADLINE} still={still} play={play} delay={delay} />
@@ -354,7 +376,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                 <span className="lp-acard-light" />
               </div>
             ))}
-            <span ref={(n) => void (glows.current[1] = n)} className="lp-glow lp-glow-near" />
+            <span ref={spotEl} className="lp-glow lp-glow-near" />
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
                 <p className="lp-acct-name">{a.name}</p>
