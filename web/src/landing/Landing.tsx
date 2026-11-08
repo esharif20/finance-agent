@@ -1,9 +1,9 @@
-import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Money } from "@/components/Money";
 import { Ask } from "./Ask";
 import { Magnetic, Rise, Roll, useStill } from "./fx";
-import { Hero } from "./Hero";
+import { Hero, restLevel } from "./Hero";
+import { Preloader } from "./Preloader";
 import { Promises } from "./Promises";
 import { Story } from "./story/Story";
 import { OVERVIEW } from "./story/story.fixture";
@@ -37,45 +37,6 @@ function Mark() {
   );
 }
 
-// Letters only, never digits: the intro must not look like it is making up figures.
-const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-/** The intro (natnael.space's departures-board load, made shorter): the name settles letter by
-    letter, then the curtain lifts off the hero. Once a session, never under reduced motion. */
-function Intro({ onDone }: { onDone: () => void }) {
-  const [text, setText] = useState(() => NAME.replace(/\S/g, "A"));
-  const [lift, setLift] = useState(false);
-  useEffect(() => {
-    const t0 = performance.now();
-    const id = window.setInterval(() => {
-      const settled = Math.floor((performance.now() - t0) / 26);
-      setText(
-        [...NAME].map((c, i) => (c === " " || i < settled ? c : ABC[Math.floor(Math.random() * ABC.length)])).join(""),
-      );
-      if (settled > NAME.length) {
-        window.clearInterval(id);
-        setLift(true);
-      }
-    }, 34);
-    return () => window.clearInterval(id);
-  }, []);
-  return (
-    <motion.div
-      className="lp-intro"
-      aria-hidden="true"
-      initial={{ clipPath: "inset(0% 0 0% 0)" }}
-      animate={lift ? { clipPath: "inset(0% 0 100% 0)" } : undefined}
-      transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1], delay: 0.04 }}
-      onAnimationComplete={() => lift && onDone()}
-    >
-      <p className="lp-intro-name">
-        <Mark />
-        {text}
-      </p>
-    </motion.div>
-  );
-}
-
 function seenIntro() {
   try {
     return sessionStorage.getItem("lp-intro") === "1";
@@ -86,19 +47,22 @@ function seenIntro() {
 
 export default function Landing() {
   const still = useStill();
-  const [intro, setIntro] = useState(() => !still && !seenIntro());
-  const [delay] = useState(() => (intro ? 0.42 : 0.05));
-  const done = () => {
-    setIntro(false);
+  // the tally plays once a session; a returning visitor goes straight to the hero
+  const [pre, setPre] = useState(() => !seenIntro());
+  const [risen] = useState(pre);
+  const [rest] = useState(restLevel);
+  const [play, setPlay] = useState(!pre);
+  const go = () => {
+    setPlay(true);
     try {
       sessionStorage.setItem("lp-intro", "1");
     } catch {
-      // private mode: the intro just plays again next time
+      // private mode: the tally just plays again next time
     }
   };
   return (
     <div className="lp">
-      {intro && <Intro onDone={done} />}
+      {pre && <Preloader still={still} rest={rest} onGo={go} onDone={() => setPre(false)} />}
       <a className="lp-skip" href="#lp-main">
         Skip to content
       </a>
@@ -123,7 +87,7 @@ export default function Landing() {
         </Magnetic>
       </header>
       <main id="lp-main">
-        <Hero delay={delay} />
+        <Hero delay={0.05} play={play} risen={risen} />
         <Ask />
         <Story />
         <section id="what" className="lp-what" aria-labelledby="lp-what-title">

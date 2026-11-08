@@ -66,18 +66,24 @@ function Card({ still, sink }: { still: boolean; sink: MotionValue<number> }) {
   );
 }
 
+/** Where the water rests on load, in % of the hero: lower on a phone. The preloader shares it. */
+export function restLevel() {
+  return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 720px)").matches ? 50 : 56;
+}
+
 /** The waterline hero: paper above, mint below, and the headline changes ink where it crosses. On
     load the water rises to the seam; on scroll it keeps rising, and the card goes under. */
-export function Hero({ delay = 0 }: { delay?: number }) {
+export function Hero({ delay = 0, play = true, risen = false }: { delay?: number; play?: boolean; risen?: boolean }) {
   const still = useStill();
   const ref = useRef<HTMLElement>(null);
-  const [rest] = useState(() => (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 720px)").matches ? 50 : 56));
-  const rise = useMotionValue(still ? 1 : 0);
+  const [rest] = useState(restLevel);
+  // after the preloader the water already stands at the seam, so it does not rise again
+  const rise = useMotionValue(still || risen ? 1 : 0);
   useEffect(() => {
-    if (still) return;
+    if (still || risen) return;
     const a = animate(rise, 1, { duration: 1.1, ease: [0.16, 1, 0.3, 1], delay });
     return () => a.stop();
-  }, [still, delay, rise]);
+  }, [still, risen, delay, rise]);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const lift = useSpring(scrollYProgress, { stiffness: 90, damping: 24, restDelta: 0.0005 });
   // seam in % of the hero, 100 = no water; rises to `rest` on load, then on toward the top on scroll
@@ -103,11 +109,11 @@ export function Hero({ delay = 0 }: { delay?: number }) {
     <motion.div className="lp-hero-type" style={still ? undefined : { y: typeY }}>
       {copy ? (
         <p className="lp-display" aria-hidden="true">
-          <Lines lines={HEADLINE_LINES} still={still} delay={delay + 0.1} onLoad />
+          <Lines lines={HEADLINE_LINES} still={still} delay={delay + 0.1} onLoad play={play} />
         </p>
       ) : (
         <h1 id="lp-title" className="lp-display">
-          <Lines lines={HEADLINE_LINES} label={HEADLINE} still={still} delay={delay + 0.1} onLoad />
+          <Lines lines={HEADLINE_LINES} label={HEADLINE} still={still} delay={delay + 0.1} onLoad play={play} />
         </h1>
       )}
     </motion.div>
@@ -143,7 +149,7 @@ export function Hero({ delay = 0 }: { delay?: number }) {
       <motion.div
         className="lp-hero-foot"
         initial={still ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={play ? { opacity: 1, y: 0 } : undefined}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: delay + 0.55 }}
       >
         <p className="lp-lede">{LINE}</p>

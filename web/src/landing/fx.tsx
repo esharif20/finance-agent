@@ -71,7 +71,8 @@ export function Lines({
   label,
   delay = 0,
   onLoad = false,
-}: { lines: string[]; still: boolean; label?: string; delay?: number; onLoad?: boolean }) {
+  play = true,
+}: { lines: string[]; still: boolean; label?: string; delay?: number; onLoad?: boolean; play?: boolean }) {
   if (still)
     return (
       <>
@@ -92,7 +93,7 @@ export function Lines({
           <motion.span
             className="lp-line-in"
             initial={{ y: "108%" }}
-            {...(onLoad ? { animate: shown } : { whileInView: shown, viewport: { once: true, margin: "0px 0px -12% 0px" } })}
+            {...(onLoad ? { animate: play ? shown : undefined } : { whileInView: shown, viewport: { once: true, margin: "0px 0px -12% 0px" } })}
             transition={{ duration: 0.9, ease: EXPO, delay: delay + i * 0.11 }}
           >
             {l}

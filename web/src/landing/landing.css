@@ -282,32 +282,108 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   height: 13px;
 }
 
-/* intro: the name settles, the curtain lifts */
-.lp-intro {
+/* preloader, the tally: the hero's first frame. Water rises with loading to the hero's seam
+   (--seam, in % of the sheet), the odometer settles on October's spend, then the figure lifts away */
+.pl {
+  --seam: var(--rest);
+  --pl-size: clamp(3.4rem, 1rem + 11vw, 10rem);
   position: fixed;
-  inset: 0;
+  inset: 0 0 auto;
+  height: max(100svh, 640px); /* the hero's own height, so the seams line up */
   z-index: 50;
-  display: grid;
-  place-items: center;
-  background: var(--lp-black);
-  color: var(--lp-mint);
+  overflow: clip;
+  background: var(--lp-paper);
+  color: var(--lp-paper-ink);
+  transition: opacity 0.4s var(--lp-ease-out) 0.25s;
 }
-.lp-intro-name {
+.pl[data-out] {
+  opacity: 0;
+  pointer-events: none;
+}
+.pl-water {
+  position: absolute;
+  inset: 0;
+  background: var(--lp-mint);
+  transform: translateY(calc(var(--seam) * 1%));
+}
+.pl-plane {
+  position: absolute;
+  inset: 0;
+  font-family: var(--lp-display);
+}
+.pl-above {
+  clip-path: inset(0 0 calc(100% - var(--seam) * 1%) 0);
+}
+.pl-below {
+  color: var(--lp-mint-deep);
+  clip-path: inset(calc(var(--seam) * 1%) 0 0 0);
+}
+.pl-mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* at rest the seam crosses the figure low, through the feet of the digits */
+  top: calc(var(--rest) * 1%);
+  translate: 0 -74%;
+  overflow: clip;
+  text-align: center;
+  padding: 0.06em 0;
+}
+.pl-count {
   display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-  font-size: clamp(2rem, 1rem + 4vw, 4.5rem);
+  font-size: var(--pl-size);
   font-weight: 900;
-  letter-spacing: -0.03em;
-  text-transform: uppercase;
+  line-height: 1;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
+  transition: translate 0.5s var(--lp-ease-in-out);
 }
-.lp-intro-name .lp-mark {
-  height: 0.8em;
-  gap: 0.08em;
+.pl[data-out] .pl-count {
+  translate: 0 -112%;
 }
-.lp-intro-name .lp-mark i {
-  width: 0.2em;
+.pl-wheel {
+  display: inline-block;
+  height: 1em;
+  overflow: clip;
+}
+.pl-wheel-in {
+  display: flex;
+  flex-direction: column;
+  /* natnael.space's reel curve: nearly all the travel at once, then a long settle */
+  transition: translate 0.55s cubic-bezier(0.3, 0, 0, 1);
+}
+.pl-wheel-in > span {
+  height: 1em;
+}
+.pl-wheel-in[data-on] {
+  translate: 0 calc(var(--to) * -1em);
+}
+.pl-note {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* below the feet of the figure: 26% of it hangs under the seam */
+  top: calc(var(--rest) * 1% + var(--pl-size) * 0.3 + 0.75rem);
+  margin: 0;
+  text-align: center;
+  font-family: var(--lp-text);
+  font-size: var(--lp-step-small);
+  font-weight: 600;
+  transition: opacity 0.25s;
+}
+.pl[data-out] .pl-note {
+  opacity: 0;
+}
+/* reduced motion: the settled frame, then a short fade */
+.pl[data-still] {
+  transition: opacity 0.3s ease;
+}
+.pl[data-still] .pl-count,
+.pl[data-still] .pl-wheel-in {
+  transition: none;
+}
+.pl[data-still][data-out] .pl-count {
+  translate: none;
 }
 
 /* nav sits on the hero's paper */
@@ -910,5 +986,12 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   }
   .lp-pill::before {
     transition: none;
+  }
+  .pl,
+  .pl * {
+    transition-property: opacity !important;
+  }
+  .pl-count {
+    translate: none !important;
   }
 }
