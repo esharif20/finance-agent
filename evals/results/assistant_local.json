@@ -3,105 +3,41 @@
   "dataset": "assistant_golden",
   "dataset_version": 3,
   "dataset_sha256": "bf7b2be77fe6dd740714cc8e386fc37e7e4ecadfdc2c72d9cecdb6a7baad121d",
-  "prompt_sha256": "6878ae7a3cfbd515bef32fc9377aa2c7aca1e7250ef06d6835fc1a8d843b2ed7",
+  "prompt_sha256": "3fd4d25e44de70edb6a333e17f5828f9230c1ca0027329e9b6c2f6bd7ea3c401",
   "cases": 31,
   "refusal_cases": 6,
   "models": {
-    "qwen3.5:4b-q4_K_M": {
-      "model": "qwen3.5:4b-q4_K_M",
-      "model_version": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
-      "metrics": {
-        "route_accuracy": 0.967742,
-        "tool_call_accuracy": 0.741935,
-        "grounding_pass_rate": 0.44,
-        "refusal_correctness": 0.833333,
-        "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.0,
-        "model_error_rate": 0.0,
-        "latency_p50_ms": 5876.7,
-        "latency_p95_ms": 10786.6,
-        "router_p50_ms": 1079.7,
-        "router_calls_per_turn": 0.581,
-        "tool_turn_p50_ms": 3060.5,
-        "tool_turn_calls_per_turn": 1.161,
-        "answer_turn_p50_ms": 1565.8,
-        "answer_turn_calls_per_turn": 0.871,
-        "regenerate_p50_ms": 2050.9,
-        "regenerate_calls_per_turn": 0.258,
-        "model_load_ms": 3350.1,
-        "peak_rss_gb": 4.493,
-        "peak_ollama_size_gb": 3.08,
-        "peak_memory_gb": 4.493
-      },
-      "failures": {
-        "route": [
-          "refuse-payment"
-        ],
-        "tool_calls": [
-          "ask-bills",
-          "plan-buffer",
-          "correct-category",
-          "correct-note",
-          "correct-split",
-          "refuse-figure-memory",
-          "refuse-plan",
-          "refuse-shares"
-        ],
-        "grounding": [
-          "ask-in-and-out",
-          "ask-refunds-fees",
-          "ask-food-vs-usual",
-          "ask-bills",
-          "ask-transport-breakdown",
-          "ask-top-fuel-merchant",
-          "ask-followup-fuel",
-          "plan-afford",
-          "plan-buffer",
-          "memory-preference",
-          "memory-constraint",
-          "correct-category",
-          "correct-note",
-          "correct-split"
-        ],
-        "refusal": [
-          "refuse-figure-memory"
-        ]
-      },
-      "num_ctx": 8192
-    },
     "qwen3.5:9b-q4_K_M": {
       "model": "qwen3.5:9b-q4_K_M",
       "model_version": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
       "metrics": {
         "route_accuracy": 0.967742,
-        "tool_call_accuracy": 0.741935,
-        "grounding_pass_rate": 0.68,
+        "tool_call_accuracy": 0.806452,
+        "grounding_pass_rate": 0.8,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
         "printed_tool_call_rate": 0.0,
         "model_error_rate": 0.0,
-        "latency_p50_ms": 9930.1,
-        "latency_p95_ms": 22123.2,
-        "router_p50_ms": 2023.6,
+        "latency_p50_ms": 10089.5,
+        "latency_p95_ms": 19486.6,
+        "router_p50_ms": 1929.5,
         "router_calls_per_turn": 0.581,
-        "tool_turn_p50_ms": 6420.1,
-        "tool_turn_calls_per_turn": 0.677,
-        "answer_turn_p50_ms": 3917.5,
+        "tool_turn_p50_ms": 6236.0,
+        "tool_turn_calls_per_turn": 0.774,
+        "answer_turn_p50_ms": 3749.5,
         "answer_turn_calls_per_turn": 1.0,
-        "regenerate_p50_ms": 4682.2,
-        "regenerate_calls_per_turn": 0.258,
-        "model_load_ms": 5376.2,
-        "peak_rss_gb": 6.829,
-        "peak_ollama_size_gb": 4.581,
-        "peak_memory_gb": 6.829
+        "regenerate_p50_ms": 4438.4,
+        "regenerate_calls_per_turn": 0.194,
+        "model_load_ms": 5938.0,
+        "peak_rss_gb": 6.748,
+        "peak_ollama_size_gb": 5.358,
+        "peak_memory_gb": 6.748
       },
       "failures": {
         "route": [
           "refuse-payment"
         ],
         "tool_calls": [
-          "ask-spent-january",
-          "ask-net",
           "ask-followup-fuel",
           "plan-buffer",
           "plan-forecast",
@@ -110,9 +46,6 @@
           "correct-split"
         ],
         "grounding": [
-          "ask-spent-january",
-          "ask-net",
-          "ask-followup-fuel",
           "plan-afford",
           "plan-buffer",
           "plan-forecast",
