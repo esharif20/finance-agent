@@ -71,6 +71,7 @@ class Plan(BaseModel):
     currency: str | None = None
     asks: Ask | None = None  # a balances Plan: which question about them
     labels: tuple[str, ...] = ()  # every resolution, shown with the answer
+    note: str = ""  # Merchants counted from other Categories, named
 
     @property
     def period(self) -> rs.Period:
@@ -153,6 +154,7 @@ def _from(r: rs.Resolution, kind: Kind, today: date) -> Plan:
         compare=r.compare,
         currency=r.currency,
         labels=tuple(r.labels),
+        note=r.note,
     )
 
 
@@ -236,6 +238,7 @@ def follow_up(
             "categories": new.categories,
             "merchant_ids": new.merchant_ids,
             "what": new.what,
+            "note": new.note,
         }
         labels = [lb for lb in new.labels if lb != new.period.label]
     out = prev.model_copy(update=upd)
@@ -462,6 +465,8 @@ def render(plan: Plan, fetched: Sequence[Fetched]) -> str | None:
         if verb == "came in"
         else f"You spent {total}{what} {_period_of(first, plan)}."
     )
+    if plan.note:
+        text += f" {plan.note}"
     for f in fetched[1:]:
         if isinstance(f.out, Median):
             text += f" Your 3-month median is {_money(f.out.median)}."
