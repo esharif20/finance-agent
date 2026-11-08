@@ -743,3 +743,15 @@ def test_earlier_user_turns_are_resolved_too_and_pence_are_kept() -> None:
     assert reply.content == "£###.## on Transport last month."  # replies untouched
     assert "Last month is" not in system.content
     assert "£2,500.00" in system.content and "pence" in system.content
+
+
+def test_an_amount_the_user_did_not_say_gets_a_clear_message(
+    engine: Engine, txns: dict[str, int]
+) -> None:
+    bad = {"type": "goal", "text": "a house", "amount_minor": 99900}
+    m = fake("memory", calls(("propose_memory", bad)), "Ok.")
+    a = turn(engine, m, "remember I want to save for a house")
+    assert a.proposal_id is None
+    sent_all = " ".join(x.content for x in sent(m))
+    assert "not in what the user said" in sent_all
+    assert "no such Transaction" not in sent_all
