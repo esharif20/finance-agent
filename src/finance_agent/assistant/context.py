@@ -58,7 +58,9 @@ SYSTEM = {
         "Find the Transaction with find_transactions, then propose the change"
         " with propose_correction using its txn:<id> number, giving exactly one"
         " of category, parts or note. Nothing changes"
-        " until the user confirms it on a card; say so."
+        " until the user confirms it on a card; say so. In the reply, never write"
+        ' the txn:<id>, and call the rest of a Split "the rest" rather than'
+        " working it out."
     ),
     "memory": (
         "When the user states a lasting preference, goal or constraint, propose"

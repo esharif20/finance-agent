@@ -95,6 +95,7 @@ class SimulatePurchaseOut(BaseModel):
     status: Literal["ok", "insufficient"]
     purchase: Money  # the user's own figures, echoed
     buffer: Money
+    on: date  # the purchase day, echoed
     payday: date | None  # the first payday after the purchase
     minimum: Money | None  # the lowest projected balance before it
     lowest_on: date | None  # the day it is first reached
@@ -134,6 +135,7 @@ def simulate_purchase(src: Source, inp: SimulatePurchaseIn) -> SimulatePurchaseO
         status="insufficient" if short else "ok",
         purchase=_gbp(inp.amount_minor),
         buffer=_gbp(inp.buffer_minor),
+        on=when,
         payday=None if short else o.payday,
         minimum=None if short else _gbp(o.minimum),
         lowest_on=None if short else o.on,

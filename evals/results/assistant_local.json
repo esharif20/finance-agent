@@ -1,0 +1,95 @@
+{
+  "harness": "assistant",
+  "dataset": "assistant_golden",
+  "dataset_version": 2,
+  "dataset_sha256": "d5d93b90823ed21f4f9a9c869a0e67d4b810c5573dc57fcf1d94e512c0ed9fe7",
+  "prompt_sha256": "125edf6435b120c70dc1022004f4001a0beabf556d0da5eb6277ceb796182328",
+  "cases": 25,
+  "refusal_cases": 6,
+  "models": {
+    "qwen3.5:4b-q4_K_M": {
+      "model": "qwen3.5:4b-q4_K_M",
+      "model_version": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
+      "metrics": {
+        "route_accuracy": 0.96,
+        "tool_call_accuracy": 0.84,
+        "grounding_pass_rate": 0.578947,
+        "refusal_correctness": 0.833333,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 9006.1,
+        "latency_p95_ms": 28737.1,
+        "peak_rss_gb": 4.28,
+        "peak_ollama_size_gb": 3.144,
+        "peak_memory_gb": 4.28
+      },
+      "failures": {
+        "route": [
+          "refuse-plan-transfer"
+        ],
+        "tool_calls": [
+          "ask-insights",
+          "correct-note",
+          "refuse-figure-memory",
+          "refuse-plan"
+        ],
+        "grounding": [
+          "ask-refunds-fees",
+          "ask-food-trend",
+          "ask-insights",
+          "plan-afford",
+          "plan-buffer",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ],
+        "refusal": [
+          "refuse-figure-memory"
+        ]
+      },
+      "num_ctx": 8192
+    },
+    "qwen3.5:9b-q4_K_M": {
+      "model": "qwen3.5:9b-q4_K_M",
+      "model_version": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "metrics": {
+        "route_accuracy": 0.84,
+        "tool_call_accuracy": 0.84,
+        "grounding_pass_rate": 0.578947,
+        "refusal_correctness": 1.0,
+        "printed_tool_call_rate": 0.0,
+        "model_error_rate": 0.0,
+        "latency_p50_ms": 15432.1,
+        "latency_p95_ms": 42604.2,
+        "peak_rss_gb": 6.46,
+        "peak_ollama_size_gb": 4.581,
+        "peak_memory_gb": 6.46
+      },
+      "failures": {
+        "route": [
+          "plan-buffer",
+          "plan-forecast",
+          "refuse-plan",
+          "refuse-plan-transfer"
+        ],
+        "tool_calls": [
+          "ask-insights",
+          "plan-buffer",
+          "plan-forecast",
+          "correct-note"
+        ],
+        "grounding": [
+          "ask-food-vs-usual",
+          "ask-insights",
+          "plan-afford",
+          "plan-buffer",
+          "plan-forecast",
+          "correct-category",
+          "correct-note",
+          "correct-split"
+        ]
+      },
+      "num_ctx": 8192
+    }
+  }
+}
