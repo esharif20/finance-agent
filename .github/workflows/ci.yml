@@ -40,6 +40,10 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
       - run: uv run pytest -n auto
 
   evals:
