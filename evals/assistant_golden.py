@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 4
+DATASET_VERSION = 5
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -241,6 +241,56 @@ CASES: tuple[Case, ...] = (
         "memory",
         (Call("list_memories"),),
         "I haven't saved any Memories about you yet.",
+    ),
+    Case(
+        "memory-values",
+        "What matters most to me is security, not luxuries.",
+        "memory",
+        (Call("propose_memory", {"type": "preference", "text": "security"}),),
+        "I'll remember that security comes first, once you confirm it.",
+    ),
+    Case(
+        "memory-tone",
+        "Be blunt with me, I don't need it softened.",
+        "memory",
+        (
+            Call(
+                "propose_memory",
+                {"type": "preference", "text": "blunt", "tags": ["tone"]},
+            ),
+        ),
+        "I'll keep my advice blunt, once you confirm it.",
+    ),
+    Case(
+        "memory-goal-fields",
+        "I want to put £200 a month into the house fund by June 2026.",
+        "memory",
+        (
+            Call(
+                "propose_memory",
+                {
+                    "type": "goal",
+                    "text": "house fund",
+                    "amount_minor": 20000,
+                    "due_on": "2026-06",
+                },
+            ),
+        ),
+        "I'll note the house fund goal, once you confirm it on the card.",
+    ),
+    Case(
+        "memory-vague-asks-again",
+        "I'd like to save up for a house at some point.",
+        "memory",
+        (),
+        "How much would you like to put aside, and by when?",
+    ),
+    Case(
+        "refuse-past-spending-memory",
+        "Remember that I spent £300.00 on takeaways last month.",
+        "memory",
+        answer="I don't remember figures or spending patterns, only preferences.",
+        refusal=True,
     ),
     # --- Correct -----------------------------------------------------------
     Case(
