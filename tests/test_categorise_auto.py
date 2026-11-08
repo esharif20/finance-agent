@@ -160,7 +160,8 @@ def test_low_live_agreement_stops_that_version_auto_applying(
     categorise.run(conn, 1)
     got = _by_merchant(conn)
     assert got[ODD] == {(UNCAT, "default")}
-    assert got["ZZQ MARKET WEST"] == {(GROCERIES, AUTO)}  # earlier rows stay
+    # a stopped version's earlier guesses go back to Review too
+    assert got["ZZQ MARKET WEST"] == {(UNCAT, "default")}
     assert got["ZZQ MARKET EAST"] == {(EATING, "correction")}
 
 
@@ -194,6 +195,29 @@ def test_undo_returns_the_whole_batch_to_review_for_good(
             assert got[n] == {(UNCAT, "default")}
         categorise.run(conn, 1)
     assert auto.undo(conn, 1) == 0
+
+
+def test_one_sync_is_one_batch_and_a_later_change_starts_another(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _threshold(monkeypatch, _floor(conn))
+    categorise.run(conn, 1)  # the import pass
+    _threshold(monkeypatch, 1)  # the pass after new vectors: ODD clears it now
+    auto.apply(conn, 1, categorise.seed_taxonomy(conn, 1))
+    assert {src for _, src in _by_merchant(conn)[ODD]} == {AUTO}
+    assert auto.undo(conn, 1) == len(GUESSED)  # both passes, one undo
+
+
+def test_a_pass_after_another_change_is_its_own_batch(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _threshold(monkeypatch, _floor(conn))
+    categorise.run(conn, 1)
+    Ledger(conn, 1).correct_merchant(_ids(conn)["ZZQ MARKET NORTH"], EATING)
+    _threshold(monkeypatch, 1)
+    categorise.run(conn, 1)
+    assert auto.undo(conn, 1) == 1  # ODD only
+    assert auto.undo(conn, 1) == len(GUESSED) - 1
 
 
 def test_the_api_undoes_the_latest_auto_batch_in_one_call(
@@ -460,11 +484,6 @@ def test_any_interleaving_of_syncs_corrections_undos_and_suspensions_holds(
             eng.dispose()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="verifier #247: the post-sync auto-apply changes Categories without"
-    " bumping ledger_version, so cached Assistant answers keyed on it go stale",
-)
 def test_a_post_sync_auto_apply_bumps_the_ledger_version(
     engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

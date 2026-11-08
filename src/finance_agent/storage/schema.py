@@ -657,7 +657,8 @@ subscription_alert = Table(
 # The embedding model's guess for a Category Review item (#215 B), one per
 # model version and Merchant, the live accuracy record: `decided_category_id`
 # filled from the user's Merchant-wide Correction, `batch` (the ledger version
-# it ran at) set when auto-applied, `undone_at` when the user undid that batch.
+# its latest pass left; one sync is one batch) set when auto-applied,
+# `undone_at` when the user undid that batch.
 # Ids, scores and the version only: never a descriptor or an amount.
 category_prediction = Table(
     "category_prediction",
@@ -681,7 +682,7 @@ category_prediction = Table(
 )
 
 # A model version the live accuracy monitor stopped (#215 B/G): it no longer
-# auto-applies; its earlier auto rows stay, undoable.
+# auto-applies, and its earlier auto rows go back to the Review Queue.
 model_suspension = Table(
     "model_suspension",
     metadata,

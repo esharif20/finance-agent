@@ -120,14 +120,20 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
     Run right after the rule chain (`categorise.run`) and after new vectors."""
     db = Scoped(conn, user_id)
     p = schema.category_prediction
+    _record_decisions(db)
+    suspended = {
+        m
+        for m in db.execute(db.select(p, p.c.model).distinct()).scalars()
+        if (t := THRESHOLDS.get(m.split("@")[0])) is not None and _suspended(db, m, t)
+    }
     done = 0
     for r in db.execute(
         db.select(p, p.c.merchant_id, p.c.category_id, p.c.model).where(
             p.c.batch.is_not(None), p.c.undone_at.is_(None)
         )
     ):
-        done += _set(db, r.merchant_id, r.category_id, SOURCE + r.model)
-    _record_decisions(db)
+        if r.model not in suspended:  # a stopped version's rows go back to Review
+            done += _set(db, r.merchant_id, r.category_id, SOURCE + r.model)
     found: dict[str, list[tuple[int, Category]]] = {}
     model: list[str | None] = [None]
 
@@ -147,7 +153,7 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
     if version is None:
         return done
     threshold = THRESHOLDS.get(version.split("@")[0])
-    live = threshold is not None and not _suspended(db, version, threshold)
+    live = threshold is not None and version not in suspended
     undone = set(
         db.execute(
             db.select(p, p.c.merchant_id).where(p.c.undone_at.is_not(None))
@@ -159,7 +165,14 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
             db.select(p, p.c.id, p.c.merchant_id).where(p.c.model == version)
         )
     }
-    batch = db.ledger_version()
+    # One sync is one batch: a pass joins the latest batch when nothing else
+    # changed the ledger since that batch's own bump (its id is the version it
+    # left), else it starts one. Either way it bumps when it applies anything.
+    now = db.ledger_version()
+    latest = db.execute(
+        db.select(p, func.max(p.c.batch)).where(p.c.undone_at.is_(None))
+    ).scalar()
+    new = 0
     for i in sorted(items, key=lambda i: i.key):
         m = i.merchant_id
         if i.key not in found or m is None or m in undone:
@@ -168,7 +181,7 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
         if cat not in ids:
             continue
         if live and threshold is not None and score >= threshold:
-            values = {"category_id": ids[cat], "score": score, "batch": batch}
+            values = {"category_id": ids[cat], "score": score, "batch": -1}
             if m in logged:
                 db.execute(db.update(p).where(p.c.id == logged[m]).values(**values))
             else:
@@ -176,14 +189,22 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
                     p, model=version, merchant_id=m, created_at=datetime.now(UTC),
                     **values,
                 )  # fmt: skip
-            done += _set(db, m, ids[cat], SOURCE + version)
+            new += _set(db, m, ids[cat], SOURCE + version)
         elif m not in logged:  # below the threshold: log the guess only
             db.insert(
                 p, model=version, merchant_id=m, category_id=ids[cat], score=score,
                 created_at=datetime.now(UTC),
             )  # fmt: skip
-    log.info("auto-apply rows=%d live=%s", done, live)
-    return done
+    pending = (p.c.batch == -1,)  # placed this pass, before it has an id
+    if db.execute(db.select(p, p.c.id).where(*pending).limit(1)).first():
+        db.bump_ledger_version()  # categories changed: caches keyed on it go stale
+        batch = db.ledger_version()
+        joined = (p.c.batch == latest, p.c.undone_at.is_(None))
+        if latest == now:
+            db.execute(db.update(p).where(*joined).values(batch=batch))
+        db.execute(db.update(p).where(*pending).values(batch=batch))
+    log.info("auto-apply rows=%d live=%s", done + new, live)
+    return done + new
 
 
 def undo(conn: Connection, user_id: int) -> int:
