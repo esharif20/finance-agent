@@ -35,6 +35,31 @@ describe("card stack snap", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  // The dropped click: mid-reshuffle the cards move under a still pointer, so the press goes
+  // down on one card and up on another, and the browser's click lands on the stack itself.
+  it("chooses the card a press went down on, even when it comes up over another", () => {
+    const { onSelect, card } = mount(1);
+    const pressed = card(/Bank 2/);
+    const under = card(/Bank 1/);
+    fireEvent.pointerDown(pressed, { pointerId: 1, button: 0, clientX: 100, clientY: 20 });
+    fireEvent.pointerUp(under, { pointerId: 1, button: 0, clientX: 100, clientY: 20 });
+    fireEvent.click(screen.getByRole("group", { name: "Accounts" }), { detail: 1 });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(2);
+  });
+
+  it("counts a press and its click as one choice, and still takes Enter after it", async () => {
+    const { onSelect, card } = mount(1);
+    const two = card(/Bank 2/);
+    fireEvent.pointerDown(two, { pointerId: 1, button: 0, clientX: 100, clientY: 20 });
+    fireEvent.pointerUp(two, { pointerId: 1, button: 0, clientX: 100, clientY: 20 });
+    fireEvent.click(two, { detail: 1 });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    await wait(10);
+    fireEvent.click(two, { detail: 0 }); // Enter or Space
+    expect(onSelect).toHaveBeenCalledTimes(2);
+  });
+
   it("does not snap while the card is still held", async () => {
     const { onSelect, card } = mount(1);
     drag(card(/Bank 1/), -0.6 * WIDTH, fireEvent, false);
