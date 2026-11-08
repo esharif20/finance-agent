@@ -521,3 +521,51 @@ answer_cache = Table(
     Column("reply", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
+
+# Insights (#150): the Engine's current findings, one per (type, key, day
+# raised), rewritten by each refresh. Derived: a refresh deletes the ones no
+# longer found. `evidence` is a JSON list of Transaction ids, `category` the
+# "Top / Sub" label relevance is learned under.
+insight = Table(
+    "insight",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("type", String(32), nullable=False),
+    Column("key", Text, nullable=False),  # the Merchant, or the Category label
+    Column("category", Text, nullable=False),
+    Column("raised_on", Date, nullable=False),
+    Column("impact_minor", Integer, nullable=False),
+    Column("confidence", Integer, nullable=False),  # percent
+    Column("evidence", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(
+        text(
+            "type IN ('recurring', 'price_increase', 'category_spike',"
+            " 'upcoming_renewal')"
+        ),
+        name="ck_insight_type",
+    ),
+    UniqueConstraint("user_id", "type", "key", "raised_on"),
+)
+
+# The user's explicit signal on an Insight (#150), one per Insight, the latest
+# kept: "up", "down" or "dismissed". It carries the (type, Category) it was
+# given under, so the relevance posterior keeps it after a refresh drops the
+# Insight (`insight_id` is then NULL). The user can wipe it.
+insight_feedback = Table(
+    "insight_feedback",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("insight_id", Integer, ForeignKey("insight.id"), unique=True),
+    Column("insight_type", String(32), nullable=False),
+    Column("category", Text, nullable=False),
+    Column("signal", String(16), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(
+        text("signal IN ('up', 'down', 'dismissed')"),
+        name="ck_insight_feedback_signal",
+    ),
+    Index("ix_insight_feedback_user", "user_id"),
+)
