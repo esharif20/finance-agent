@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm --dir web install --frozen-lockfile",
+  "buildCommand": "sh scripts/build_demo.sh",
+  "outputDirectory": "web/dist-demo",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{src/finance_agent/**,demo-data/personas/**}",
+      "excludeFiles": "{tests/**,evals/**,web/**,docs/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/app/(.*)", "destination": "/index.html" }
+  ]
+}

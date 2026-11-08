@@ -1,6 +1,7 @@
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { DemoShell } from "./demo/DemoShell";
 import "./index.css";
 
 export type View = "app" | "landing";
@@ -28,7 +29,7 @@ if (root) {
           <Landing />
         </Suspense>
       ) : (
-        <App />
+        DEMO ? <DemoShell /> : <App />
       )}
     </StrictMode>,
   );

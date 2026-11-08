@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { HardDrive, TriangleAlert } from "lucide-react";
 import { fetchSyncStatus } from "@/api/client";
 
+// the public demo keeps no backups
+const DEMO = import.meta.env.VITE_DEMO === "1";
 const DAY = 86_400_000;
 const rtf = new Intl.RelativeTimeFormat("en-GB", { numeric: "auto" });
 
@@ -14,7 +16,7 @@ export function ago(at: Date, now: Date): string {
 
 /** When the last backup ran (#95); a warning when a registered drive has no copy in 7 days. */
 export function BackupStatus({ now }: { now?: Date }) {
-  const { data } = useQuery({ queryKey: ["sync-status"], queryFn: fetchSyncStatus });
+  const { data } = useQuery({ queryKey: ["sync-status"], queryFn: fetchSyncStatus, enabled: !DEMO });
   if (!data || (!data.last_backup_at && !data.backup_warning)) return null;
   const when = data.last_backup_at ? ago(new Date(data.last_backup_at), now ?? new Date()) : null;
   if (data.backup_warning) {
