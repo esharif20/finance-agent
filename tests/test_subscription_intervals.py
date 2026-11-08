@@ -70,9 +70,17 @@ def test_a_single_charge_from_a_known_service_uses_the_catalogue() -> None:
     assert (tv.interval, tv.monthly) == ("annual", Fraction(17450, 12))
 
 
+def test_the_next_charge_is_due_one_interval_after_the_last() -> None:
+    c = one(entry(1, "monthly"), [(date(2026, 1, 31), 500)])
+    assert c.next_due_on == date(2026, 2, 28)  # clamped to the month end
+    tv = one(entry(2, merchant="TV LICENCE"), [(date(2026, 6, 1), 17450)])
+    assert tv.next_due_on == date(2027, 6, 1)
+
+
 def test_a_single_unknown_charge_says_only_one_charge() -> None:
     c = one(entry(1), [(date(2026, 6, 1), 1000)])
     assert (c.interval, c.interval_source, c.monthly) == (None, None, None)
+    assert c.next_due_on is None
     assert (c.cost_note, c.charge_count) == ("interval_needed", 1)
 
 

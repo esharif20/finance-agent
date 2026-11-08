@@ -240,6 +240,7 @@ class SubscriptionCost:
     trial: "Trial | None" = None
     interval_source: "IntervalSource | None" = None  # None when no interval
     charge_count: int = 0  # GBP charges seen, so the UI can say "only one"
+    next_due_on: date | None = None  # one interval after the last charge
 
 
 @dataclass(frozen=True)
@@ -360,6 +361,7 @@ def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> Subscript
         trial,
         source,
         len(gbp),
+        _due(last.posted_on, interval, 1) if last and interval else None,
     )
 
 

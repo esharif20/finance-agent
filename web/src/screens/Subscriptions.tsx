@@ -17,10 +17,16 @@ import { SUBS_KEY, SubscriptionPrompt } from "@/components/SubscriptionPrompt";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  type Band,
+  type Costs,
+  DEFAULT_FILTERS,
+  type Filters,
   type Flag,
+  KIND_TITLE,
   type Row,
-  type Section,
+  STATUSES,
   buildView,
+  costText,
   dayText,
   flagCount,
   reasonText,
@@ -28,6 +34,7 @@ import {
 
 const pill = "inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-label font-semibold";
 const action = `${pill} bg-active transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:opacity-50 [@media(hover:hover)]:hover:bg-raised`;
+const select = "min-h-11 max-w-full cursor-pointer rounded-full bg-active px-4 text-label font-semibold [@media(hover:hover)]:hover:bg-raised";
 
 const STATUS: Record<string, string> = {
   active: "Active",
@@ -35,11 +42,20 @@ const STATUS: Record<string, string> = {
   lapsed: "Lapsed",
   cancelled: "Cancelled by you",
 };
-const COST_NOTE: Record<string, string> = {
-  rate_needed: "Needs an exchange rate",
-  interval_needed: "Interval not known yet",
-  no_charge: "No charge seen yet",
+const STATUS_OPTION: Record<Filters["status"], string> = {
+  all: "All statuses",
+  active: "Active",
+  suggested: "Suggested",
+  overdue: "Overdue",
+  lapsed: "Lapsed",
+  cancelled: "Cancelled",
 };
+const SORT_OPTION: Record<Filters["sort"], string> = {
+  monthly: "Dearest first",
+  name: "Name, A to Z",
+  due: "Next due",
+};
+const INTERVAL: Record<string, string> = { weekly: "Weekly", monthly: "Monthly", annual: "Yearly" };
 
 function flagText(f: Flag, group: string): React.ReactNode {
   switch (f.code) {
@@ -110,6 +126,12 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
   });
   const busy = regroup.isPending || cancel.isPending || remove.isPending;
   const cancelled = row.status === "cancelled";
+  const note = costText(row);
+  const every = row.interval ? INTERVAL[row.interval] : null;
+  const due =
+    row.next_due_on && (row.status === "active" || row.status === "overdue")
+      ? `${every ? `${every}, ` : ""}${row.status === "overdue" ? "was due" : "next due"} ${dayText(row.next_due_on)}`
+      : null;
   return (
     <li className="py-4 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
@@ -123,16 +145,18 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
             </span>
           </p>
           <p className="text-label text-muted-foreground">{reasonText(row.entry)}</p>
+          {due && <p className="text-label text-muted-foreground">{due}</p>}
         </div>
         <p className="text-right">
           {row.monthly ? (
             <>
               <Money value={row.monthly} className={`text-heading tabular-nums ${row.counted ? "" : "text-muted-foreground"}`} />
               <span className="text-label text-muted-foreground"> a month</span>
+              {note && <span className="block text-label text-muted-foreground">{note}</span>}
               {!row.counted && <span className="block text-label text-muted-foreground">Not in the total</span>}
             </>
           ) : (
-            <span className="text-label text-muted-foreground">{COST_NOTE[row.cost_note ?? ""] ?? "No cost yet"}</span>
+            <span className="text-label text-muted-foreground">{note}</span>
           )}
         </p>
       </div>
@@ -166,37 +190,106 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
 
 type Note = { text: string; bad?: boolean; undo?: () => Promise<unknown> };
 
-function SectionCard({ section, onNote }: { section: Section; onNote: (n: Note) => void }) {
-  const id = `sub-${section.kind}`;
+const BAND_HINT: Record<Band["name"], string> = {
+  Active: "Charging as expected.",
+  "Needs a look": "Overdue, flagged, or without a cost yet.",
+  Ended: "Lapsed or cancelled. Not in the total.",
+};
+
+function BandCard({ band, onNote }: { band: Band; onNote: (n: Note) => void }) {
+  const id = `band-${band.name.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <Card aria-labelledby={id}>
       <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4">
         <h2 id={id} className="text-title">
-          {section.title}
+          {band.name}
         </h2>
-        <p>
-          <Money value={section.total} className="text-title tabular-nums" />
-          <span className="text-label text-muted-foreground"> a month</span>
+        <p className="text-label text-muted-foreground">
+          {band.rows.length} {band.rows.length === 1 ? "entry" : "entries"}. {BAND_HINT[band.name]}
         </p>
       </div>
-      <div className="flex flex-col gap-6">
-        {section.groups.map((g) => (
-          <section key={g.name} aria-label={`${g.name}, ${section.title}`}>
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h3 className="text-heading">{g.name}</h3>
-              <p className="text-label text-muted-foreground">
-                <Money value={g.total} /> a month
-              </p>
-            </div>
-            <ul className="divide-y divide-foreground/10">
-              {g.rows.map((r) => (
-                <Item key={r.merchant_id} row={r} onNote={onNote} />
-              ))}
-            </ul>
-          </section>
+      <ul className="divide-y divide-foreground/10">
+        {band.rows.map((r) => (
+          <Item key={r.merchant_id} row={r} onNote={onNote} />
         ))}
+      </ul>
+    </Card>
+  );
+}
+
+/** The API's totals for counted items: never summed here. */
+function Summary({ costs }: { costs: Costs }) {
+  const kinds = costs.totals.filter((t): t is typeof t & { kind: keyof typeof KIND_TITLE } => t.kind in KIND_TITLE);
+  if (!costs.total) return null;
+  return (
+    <Card aria-labelledby="sub-total">
+      <h2 id="sub-total" className="text-heading text-muted-foreground">
+        Active subscriptions and bills
+      </h2>
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+        <p>
+          <Money value={costs.total.monthly} className="text-hero tabular-nums" />
+          <span className="text-muted-foreground"> a month</span>
+          <span className="block text-muted-foreground">
+            <Money value={costs.total.annual} className="tabular-nums text-foreground" /> a year
+          </span>
+        </p>
+        {kinds.length > 0 && (
+          <dl className="flex flex-wrap gap-x-6 gap-y-1">
+            {kinds.map((t) => (
+              <div key={t.kind}>
+                <dt className="text-label text-muted-foreground">{KIND_TITLE[t.kind]}</dt>
+                <dd>
+                  <Money value={t.monthly} className="text-heading tabular-nums" />
+                  <span className="text-label text-muted-foreground"> a month</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
     </Card>
+  );
+}
+
+function FilterBar({ value, onChange }: { value: Filters; onChange: (f: Filters) => void }) {
+  return (
+    <div role="group" aria-label="Filter and sort" className="flex flex-wrap items-center gap-2">
+      <select
+        aria-label="Status"
+        value={value.status}
+        onChange={(e) => onChange({ ...value, status: e.target.value as Filters["status"] })}
+        className={select}
+      >
+        {STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {STATUS_OPTION[s]}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="Kind"
+        value={value.kind}
+        onChange={(e) => onChange({ ...value, kind: e.target.value as Filters["kind"] })}
+        className={select}
+      >
+        <option value="all">Subscriptions and bills</option>
+        <option value="subscription">Subscriptions only</option>
+        <option value="bill">Bills only</option>
+      </select>
+      <select
+        aria-label="Sort by"
+        value={value.sort}
+        onChange={(e) => onChange({ ...value, sort: e.target.value as Filters["sort"] })}
+        className={select}
+      >
+        {(Object.keys(SORT_OPTION) as Filters["sort"][]).map((s) => (
+          <option key={s} value={s}>
+            {SORT_OPTION[s]}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -260,10 +353,16 @@ export function Subscriptions() {
   const entries = useQuery({ queryKey: [...SUBS_KEY, "entries"], queryFn: fetchSubscriptions });
   const costs = useQuery({ queryKey: [...SUBS_KEY, "costs"], queryFn: fetchSubscriptionCosts });
   const [note, setNote] = useState<Note | null>(null);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const view = useMemo(
-    () => (entries.data && costs.data ? buildView(entries.data, costs.data) : null),
-    [entries.data, costs.data],
+    () => (entries.data && costs.data ? buildView(entries.data, costs.data, filters) : null),
+    [entries.data, costs.data, filters],
   );
+  const listed = useMemo(
+    () => (entries.data ?? []).some((e) => e.status === "active" || e.status === "user_cancelled"),
+    [entries.data],
+  );
+  const filtered = filters.status !== "all" || filters.kind !== "all";
   const taken = useMemo(
     () => new Set((entries.data ?? []).filter((e) => e.status !== "not_subscription").map((e) => e.merchant_id)),
     [entries.data],
@@ -322,16 +421,27 @@ export function Subscriptions() {
           </p>
         )}
       </div>
+      {listed && <Summary costs={costs.data} />}
+      {listed && <FilterBar value={filters} onChange={setFilters} />}
       <SubscriptionPrompt suggested={view.suggested} />
-      {view.sections.length === 0 ? (
+      {!listed ? (
         <Card>
           <h2 className="text-heading">Nothing on your list yet</h2>
           <p className="mt-2 text-muted-foreground">
             Known services appear after their first charge. Anything that repeats gets a question here, or add one yourself.
           </p>
         </Card>
+      ) : view.bands.length === 0 && view.suggested.length === 0 ? (
+        <Card>
+          <h2 className="text-heading">Nothing matches these filters</h2>
+          {filtered && (
+            <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className={`${action} mt-3 min-h-11 px-5 text-sm`}>
+              Show everything
+            </button>
+          )}
+        </Card>
       ) : (
-        view.sections.map((s) => <SectionCard key={s.kind} section={s} onNote={setNote} />)
+        view.bands.map((b) => <BandCard key={b.name} band={b} onNote={setNote} />)
       )}
       {costs.data.trial_detection === "partial" && (
         <p className="text-label text-muted-foreground">

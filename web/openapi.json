@@ -755,6 +755,17 @@
               }
             ]
           },
+          "next_due_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due On"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -780,6 +791,7 @@
           "interval_source",
           "charge_count",
           "last_charge_on",
+          "next_due_on",
           "monthly",
           "cost_note",
           "counted",

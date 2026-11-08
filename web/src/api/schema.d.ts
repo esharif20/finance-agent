@@ -1058,6 +1058,8 @@ export interface components {
             /** Merchant Id */
             merchant_id: number;
             monthly: components["schemas"]["Pence"] | null;
+            /** Next Due On */
+            next_due_on: string | null;
             /** Status */
             status: string;
             trial: components["schemas"]["TrialOut"] | null;

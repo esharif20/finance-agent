@@ -56,6 +56,7 @@ class CostOut(BaseModel):
     interval_source: IntervalSource | None
     charge_count: int  # GBP charges seen: 1 explains an interval_needed
     last_charge_on: str | None  # ISO date
+    next_due_on: str | None  # ISO date: one interval after the last charge
     monthly: Pence | None  # None with a cost_note
     cost_note: str | None  # rate_needed, interval_needed or no_charge
     counted: bool  # in the totals: active or overdue, with a cost
@@ -122,6 +123,7 @@ def subscription_costs(led: Led) -> CostsOut:
                 interval_source=c.interval_source,
                 charge_count=c.charge_count,
                 last_charge_on=c.last_charge_on and c.last_charge_on.isoformat(),
+                next_due_on=c.next_due_on and c.next_due_on.isoformat(),
                 monthly=None if c.monthly is None else Pence(minor=display(c.monthly)),
                 cost_note=c.cost_note,
                 counted=c.counted,
