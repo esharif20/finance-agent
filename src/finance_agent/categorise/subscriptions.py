@@ -52,6 +52,20 @@ KNOWN_SERVICES: dict[str, tuple[str, str]] = {
     "Deezer": (SUB, "Streaming"),
     "Tidal": (SUB, "Streaming"),
     "Audible": (SUB, "Streaming"),
+    "BritBox": (SUB, "Streaming"),
+    "Discovery Plus": (SUB, "Streaming"),
+    "ITVX": (SUB, "Streaming"),
+    "Crunchyroll": (SUB, "Streaming"),
+    "MUBI": (SUB, "Streaming"),
+    "Kindle Unlimited": (SUB, "Streaming"),
+    "Google Workspace": (SUB, "Software"),
+    "Zoom": (SUB, "Software"),
+    "Slack": (SUB, "Software"),
+    "Grammarly": (SUB, "Software"),
+    "Figma": (SUB, "Software"),
+    "Headspace": (SUB, "Software"),
+    "Perplexity": (SUB, "AI tools"),
+    "Cursor": (SUB, "AI tools"),
     "Microsoft 365": (SUB, "Software"),
     "Adobe": (SUB, "Software"),
     "GitHub": (SUB, "Software"),
@@ -95,18 +109,44 @@ def _key(name: str) -> str:
     return re.sub(r"\.CO(M|\.UK)$", "", " ".join(name.upper().split()))
 
 
-_BY_KEY = {k: n for n in KNOWN_SERVICES for k in (_key(n), _key(n).replace(" ", ""))}
+# Other whole names a known service's charges carry -> its catalogue name
+ALIASES: dict[str, str] = {
+    "Anthropic Claude": "Anthropic",
+    "Claude": "Anthropic",
+    "Claude AI": "Anthropic",
+    "OpenAI ChatGPT": "OpenAI",
+    "ChatGPT Plus": "ChatGPT",
+}
+# How a known service is shown, when not by its catalogue name
+SERVICE_DISPLAY: dict[str, str] = {
+    "Anthropic": "Claude (Anthropic)",
+    "OpenAI": "ChatGPT (OpenAI)",
+    "ChatGPT": "ChatGPT (OpenAI)",
+}
+
+_BY_KEY = {
+    k: ALIASES.get(n, n)
+    for n in (*KNOWN_SERVICES, *ALIASES)
+    for k in (_key(n), _key(n).replace(" ", ""))
+}
 
 
 def known_service(merchant: str) -> tuple[str, str, str] | None:
     """(service, kind, group) when the Merchant name is a known service and
     nothing else: "NETFLIX.COM" is, "NETFLIX FAN SHOP" is not. Non-ASCII
     names fail closed, so a lookalike letter cannot be stripped into a match.
-    shortcut: whole-name match only; add aliases if real descriptors carry tails."""
+    Bank noise (a repeated tail, SUB, LTD, a reference code) is dropped first,
+    so "ANTHROPIC CLAUDE SUB ANTHROPIC CLAUDE" is Anthropic (#210)."""
+    from finance_agent.categorise.display_names import cleaned  # it imports us
+
     if not merchant.isascii():
         return None
-    name = _BY_KEY.get(_key(merchant))
+    name = _BY_KEY.get(_key(merchant)) or _BY_KEY.get(_key(cleaned(merchant)))
     return (name, *KNOWN_SERVICES[name]) if name else None
+
+
+# The catalogue's billing interval: monthly unless named here (#210)
+CATALOGUE_INTERVAL: dict[str, str] = {"TV Licence": "annual"}
 
 
 # Descriptor patterns that ask "Is this a subscription?": (pattern, group)
@@ -205,6 +245,8 @@ class Charge:
     account_id: int = 0
 
 
+IntervalSource = Literal["registry", "detected", "estimated", "catalogue"]
+
 FlagCode = Literal[
     "overlap", "duplicate", "charged_after_cancel", "trial_converted", "price_rise"
 ]
@@ -232,6 +274,9 @@ class SubscriptionCost:
     counted: bool  # in the totals
     flags: tuple[Flag, ...] = ()
     trial: "Trial | None" = None
+    interval_source: "IntervalSource | None" = None  # None when no interval
+    charge_count: int = 0  # GBP charges seen, so the UI can say "only one"
+    next_due_on: date | None = None  # one interval after the last charge
 
 
 @dataclass(frozen=True)
@@ -271,12 +316,41 @@ def _monthly(minor: int, interval: str) -> Fraction:
     return Fraction(minor, 12) if interval == "annual" else Fraction(minor)
 
 
+# Loose cadence fit (#210): the median gap between distinct charge days is
+# within a third of a nominal cadence (weekly 5-9, monthly 20-40, annual
+# 244-486 days). Amounts are ignored, so a drifting bill still gets one.
+NOMINAL_DAYS = {"weekly": 7, "monthly": 30, "annual": 365}
+
+
+def _loose_interval(days: list[date]) -> str | None:
+    ds = sorted(set(days))
+    gaps = sorted((b - a).days for a, b in zip(ds, ds[1:], strict=False))
+    if not gaps:
+        return None
+    g = gaps[len(gaps) // 2]  # upper median, as recurring's
+    return next((c for c, n in NOMINAL_DAYS.items() if abs(g - n) * 3 <= n), None)
+
+
+def _interval(
+    e: SubscriptionEntry, gbp: list[tuple[date, int]]
+) -> tuple[str, IntervalSource] | tuple[None, None]:
+    """registry -> detector -> loose fit on 2+ charges -> catalogue default."""
+    if e.interval:
+        return e.interval, "registry"
+    if rec := detect_recurring(gbp, min_charges=2):
+        return rec.interval, "detected"
+    if loose := _loose_interval([d for d, _ in gbp]):
+        return loose, "estimated"
+    if known := known_service(e.merchant):
+        return CATALOGUE_INTERVAL.get(known[0], "monthly"), "catalogue"
+    return None, None
+
+
 def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> SubscriptionCost:
     last = max(charges, key=lambda c: (c.posted_on, c.currency, c.minor), default=None)
     # only GBP amounts are comparable: a charge still needing a rate stays out
     gbp = sorted((c.posted_on, c.minor) for c in charges if c.currency == "GBP")
-    rec = detect_recurring(gbp, min_charges=2)
-    interval = e.interval or (rec.interval if rec else None)
+    interval, source = _interval(e, gbp)
     status = {"user_cancelled": "cancelled", "suggested": "suggested"}.get(
         e.status, "active"
     )
@@ -321,6 +395,9 @@ def _cost(e: SubscriptionEntry, charges: list[Charge], today: date) -> Subscript
         status in COUNTED and monthly is not None,
         tuple(flags),
         trial,
+        source,
+        len(gbp),
+        _due(last.posted_on, interval, 1) if last and interval else None,
     )
 
 

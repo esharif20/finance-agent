@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel, Field
 
+from finance_agent.categorise.display_names import display_name
 from finance_agent.identity import current_user
 from finance_agent.ledger import InvalidEntry, Ledger, SubscriptionEntry, UnknownTarget
 
@@ -24,7 +25,8 @@ class EvidenceOut(BaseModel):
 
 class SubscriptionOut(BaseModel):
     merchant_id: int
-    merchant: str
+    merchant: str  # as stored: Manage links and matching use this
+    display_name: str  # readable, for showing only (#210)
     kind: str | None  # None for a negative entry
     group: str | None
     status: str  # suggested, active, user_cancelled or not_subscription
@@ -62,6 +64,7 @@ def _out(e: SubscriptionEntry) -> SubscriptionOut:
     return SubscriptionOut(
         merchant_id=e.merchant_id,
         merchant=e.merchant,
+        display_name=display_name(e.merchant),
         kind=e.kind,
         group=e.group,
         status=e.status,
