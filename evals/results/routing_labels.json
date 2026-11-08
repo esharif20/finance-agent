@@ -1,0 +1,34 @@
+{
+  "harness": "routing",
+  "dataset": "routing_v1",
+  "dataset_version": 1,
+  "dataset_sha256": "738178c2c926fcf59ae64796cf3e4a3a538ba7bfa27c0b0a181455f94921de6b",
+  "rows": 129,
+  "cases": 43,
+  "rows_by_stratum": {
+    "compound": 3,
+    "correct": 9,
+    "follow_up": 6,
+    "lookup": 51,
+    "memory": 24,
+    "plan": 15,
+    "refusal": 21
+  },
+  "rows_by_split": {
+    "test": 33,
+    "train": 96
+  },
+  "traffic": {
+    "lookup": 0.6,
+    "follow_up": 0.1,
+    "compound": 0.08,
+    "plan": 0.08,
+    "memory": 0.06,
+    "correct": 0.05,
+    "refusal": 0.03
+  },
+  "labels": {
+    "status": "pending"
+  },
+  "models": {}
+}
