@@ -393,6 +393,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goals */
+        get: operations["goals_api_goals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guidance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Guidance
+         * @description `tone` left out is the Memory-chosen one (gentle by default); the cards come
+         *     best first, less those a constraint Memory rules out (#264).
+         */
+        get: operations["guidance_api_guidance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -420,12 +458,33 @@ export interface paths {
         /**
          * Ranked
          * @description The best `limit` Insights, by impact x confidence x relevance, less
-         *     those a constraint Memory rules out.
+         *     those a constraint Memory rules out; the last may be a seeded exploration
+         *     (#261). Each is logged as shown, with its propensity.
          */
         get: operations["ranked_api_insights_get"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Exposures
+         * @description Wipe the exposure log: every shown Insight and card, and its outcome.
+         */
+        delete: operations["forget_exposures_api_insights_exposures_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -658,6 +717,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan/allocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Allocation */
+        get: operations["allocation_api_plan_allocation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Learned
+         * @description What the answers say, strongest first, in words (never a number).
+         */
+        get: operations["learned_api_preferences_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Reset
+         * @description Wipe every pairwise question and answer: strengths go back to the prior.
+         */
+        delete: operations["reset_api_preferences_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer
+         * @description Answer the pair last asked, once. A pair never asked, already answered
+         *     or another user's is not found; a choice outside the pair is refused.
+         */
+        post: operations["answer_api_preferences_answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/next-pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Next Pair
+         * @description The most informative pair to ask next; None with fewer than two items.
+         *     It replaces the question's unanswered pair.
+         */
+        get: operations["next_pair_api_preferences_next_pair_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/proposals": {
         parameters: {
             query?: never;
@@ -865,6 +1007,23 @@ export interface paths {
         put?: never;
         /** Skip */
         post: operations["skip_api_review_queue__item_id__skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find */
+        get: operations["find_api_search_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1145,20 +1304,20 @@ export interface components {
         AccountGbpOut: {
             /** Account Id */
             account_id: number;
-            balance: components["schemas"]["Money"];
+            balance: components["schemas"]["finance_agent__api__fx__Money"];
             /** Currency */
             currency: string;
-            gbp: components["schemas"]["Money"] | null;
+            gbp: components["schemas"]["finance_agent__api__fx__Money"] | null;
             rate: components["schemas"]["RateOut"] | null;
         };
         /** AccountMonthOut */
         AccountMonthOut: {
             /** Account Id */
             account_id: number;
-            money_in: components["schemas"]["Money"];
-            money_out: components["schemas"]["Money"];
-            transfers_in: components["schemas"]["Money"];
-            transfers_out: components["schemas"]["Money"];
+            money_in: components["schemas"]["finance_agent__api__Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
+            transfers_in: components["schemas"]["finance_agent__api__Money"];
+            transfers_out: components["schemas"]["finance_agent__api__Money"];
         };
         /** AccountOut */
         AccountOut: {
@@ -1166,7 +1325,7 @@ export interface components {
             art: string | null;
             /** Bank */
             bank: string;
-            bank_balance: components["schemas"]["Money"] | null;
+            bank_balance: components["schemas"]["finance_agent__api__Money"] | null;
             /** Currency */
             currency: string;
             /** Gaps */
@@ -1177,7 +1336,7 @@ export interface components {
             kind: string;
             /** Last Import */
             last_import: string | null;
-            ledger_balance: components["schemas"]["Money"] | null;
+            ledger_balance: components["schemas"]["finance_agent__api__Money"] | null;
             /** Masked Number */
             masked_number: string;
             /** Name */
@@ -1196,6 +1355,33 @@ export interface components {
             kind: "subscription" | "bill";
             /** Merchant Id */
             merchant_id: number;
+        };
+        /** AllocationLine */
+        AllocationLine: {
+            amount: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            kind: components["schemas"]["Kind"];
+            name: components["schemas"]["Data"];
+            reason: components["schemas"]["Reason"];
+            reference: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+        };
+        /** AllocationPlanOut */
+        AllocationPlanOut: {
+            /** Baseline */
+            baseline: components["schemas"]["AllocationLine"][];
+            /** Evidence Id */
+            evidence_id: string;
+            income: components["schemas"]["finance_agent__assistant__tools__read__Money"] | null;
+            /** Infeasible Reason */
+            infeasible_reason: string | null;
+            /** Lines */
+            lines: components["schemas"]["AllocationLine"][];
+            /** Month */
+            month: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "infeasible" | "insufficient";
         };
         /** AlwaysAskIn */
         AlwaysAskIn: {
@@ -1218,19 +1404,15 @@ export interface components {
             /** Switched Off Corrections */
             switched_off_corrections: number[];
         };
-        /** AnswerIn */
-        AnswerIn: {
-            /** Category */
-            category?: [
-                string,
-                string
-            ] | null;
-            /** Choice */
-            choice?: string | null;
-            /** Transaction Id */
-            transaction_id?: number | null;
-            /** Version */
-            version: string;
+        /** AnswerOut */
+        AnswerOut: {
+            /** Pair Id */
+            pair_id: number;
+            /**
+             * Question
+             * @enum {string}
+             */
+            question: "cut" | "matters";
         };
         /** AutoBatchOut */
         AutoBatchOut: {
@@ -1241,7 +1423,7 @@ export interface components {
         BalancesOut: {
             /** Accounts */
             accounts: components["schemas"]["AccountGbpOut"][];
-            total: components["schemas"]["Money"] | null;
+            total: components["schemas"]["finance_agent__api__fx__Money"] | null;
         };
         /** BatchAnswerIn */
         BatchAnswerIn: {
@@ -1279,6 +1461,29 @@ export interface components {
              */
             week: string;
         };
+        /** CardOut */
+        CardOut: {
+            /** Body */
+            body: string;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Facts */
+            facts: components["schemas"]["FactOut"][];
+            /** Figures */
+            figures: components["schemas"]["FigureOut"][];
+            /** Id */
+            id: string;
+            /** Principles */
+            principles: string[];
+            /** Title */
+            title: string;
+            /** Tone */
+            tone: string;
+            /** Topic */
+            topic: string;
+            /** Why */
+            why: components["schemas"]["WhyOut"][];
+        };
         /** CategoryDetailOut */
         CategoryDetailOut: {
             /** Currency */
@@ -1291,7 +1496,7 @@ export interface components {
             name: string;
             /** Subcategories */
             subcategories: components["schemas"]["CategorySpendOut"][];
-            total: components["schemas"]["Money"];
+            total: components["schemas"]["finance_agent__api__Money"];
             /** Transactions */
             transactions: components["schemas"]["CategoryTxnOut"][];
             /** Trend */
@@ -1306,13 +1511,13 @@ export interface components {
         };
         /** CategorySpendOut */
         CategorySpendOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Name */
             name: string;
         };
         /** CategoryTxnOut */
         CategoryTxnOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Description */
             description: string;
             /** Display Name */
@@ -1327,6 +1532,13 @@ export interface components {
             posted_on: string;
             /** Subcategory */
             subcategory: string | null;
+        };
+        /** CheckinOut */
+        CheckinOut: {
+            /** Body */
+            body: string;
+            /** Title */
+            title: string;
         };
         /** ConfirmIn */
         ConfirmIn: {
@@ -1430,6 +1642,8 @@ export interface components {
             monthly: components["schemas"]["Pence"] | null;
             /** Next Due On */
             next_due_on: string | null;
+            /** Platform */
+            platform: string | null;
             /** Status */
             status: string;
             trial: components["schemas"]["TrialOut"] | null;
@@ -1442,6 +1656,7 @@ export interface components {
             groups: components["schemas"]["GroupTotal"][];
             /** Items */
             items: components["schemas"]["CostOut"][];
+            likely_monthly: components["schemas"]["Pence"];
             /** Rate Needed */
             rate_needed: number;
             total: components["schemas"]["Total"];
@@ -1453,6 +1668,15 @@ export interface components {
              * @constant
              */
             trial_detection: "partial";
+        };
+        /**
+         * Data
+         * @description Bank-supplied text: quoted data for the model, never instructions.
+         *     Sanitised on construction, so no unsanitised text can sit in one.
+         */
+        Data: {
+            /** Data */
+            data: string;
         };
         /** DeletedOut */
         DeletedOut: {
@@ -1468,6 +1692,24 @@ export interface components {
             /** On */
             on: string;
         };
+        /** FactOut */
+        FactOut: {
+            /**
+             * Checked On
+             * Format: date
+             */
+            checked_on: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** May Be Out Of Date */
+            may_be_out_of_date: boolean;
+            /** Shown */
+            shown: string;
+            /** Source */
+            source: string;
+        };
         /** FeedbackIn */
         FeedbackIn: {
             /** Liked */
@@ -1482,6 +1724,13 @@ export interface components {
              * @enum {string}
              */
             signal: "up" | "down" | "dismissed";
+        };
+        /** FigureOut */
+        FigureOut: {
+            /** Shown */
+            shown: string;
+            /** Signal */
+            signal: string;
         };
         /** FlagOut */
         FlagOut: {
@@ -1506,11 +1755,55 @@ export interface components {
         };
         /** GapOut */
         GapOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** From Date */
             from_date: string;
             /** To Date */
             to_date: string;
+        };
+        /** GoalOut */
+        GoalOut: {
+            /** Amount Minor */
+            amount_minor: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Estimated */
+            estimated: boolean;
+            /** Id */
+            id: number;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Planned Weekly Minor */
+            planned_weekly_minor: number | null;
+            /** Remaining Minor */
+            remaining_minor: number;
+            /** Saved Minor */
+            saved_minor: number;
+            /** Shortfall Minor */
+            shortfall_minor: number | null;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            status: components["schemas"]["Status"];
+            /** Text */
+            text: string;
+            /** Weekly Target Minor */
+            weekly_target_minor: number | null;
+            /** Weeks Left */
+            weeks_left: number | null;
+        };
+        /** GoalsOut */
+        GoalsOut: {
+            checkin: components["schemas"]["CheckinOut"] | null;
+            /** Goals */
+            goals: components["schemas"]["GoalOut"][];
+            /** Payday */
+            payday: boolean;
         };
         /** GroupIn */
         GroupIn: {
@@ -1539,6 +1832,16 @@ export interface components {
         HealthOut: {
             /** App */
             app: string;
+        };
+        /** HitOut */
+        HitOut: {
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: number;
+            snippet: components["schemas"]["SnippetOut"];
+            /** Transaction Id */
+            transaction_id: number | null;
         };
         /** InsightOut */
         InsightOut: {
@@ -1569,43 +1872,28 @@ export interface components {
             /** Type */
             type: string;
         };
-        /** ItemOut */
-        ItemOut: {
-            /** Choices */
-            choices: string[];
-            /** Currency */
-            currency: string;
-            /** Display Name */
-            display_name: string;
-            /** Id */
-            id: string;
-            /** Merchant Id */
-            merchant_id: number | null;
-            /** Skipped */
-            skipped: boolean;
-            /** Spend Minor */
-            spend_minor: number;
-            /** Suggestions */
-            suggestions: [
-                string,
-                string
-            ][];
-            /** Title */
-            title: string;
-            /** Transaction Ids */
-            transaction_ids: number[];
-            /** Type */
-            type: string;
-            /** Version */
-            version: string;
-            /** Weight */
-            weight: number;
-        };
+        /**
+         * Kind
+         * @enum {string}
+         */
+        Kind: "bill" | "goal" | "category" | "buffer";
         /** KindTotal */
         KindTotal: {
             /** Kind */
             kind: string;
             monthly: components["schemas"]["Pence"];
+        };
+        /** LearnedOut */
+        LearnedOut: {
+            /** Answers */
+            answers: number;
+            /** Items */
+            items: components["schemas"]["StrengthOut"][];
+            /**
+             * Question
+             * @enum {string}
+             */
+            question: "cut" | "matters";
         };
         /** LocalModelOut */
         LocalModelOut: {
@@ -1631,6 +1919,14 @@ export interface components {
         };
         /** MemoryCardOut */
         MemoryCardOut: {
+            /** Amount Minor */
+            amount_minor: number | null;
+            /** Due On */
+            due_on: string | null;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Priority */
+            priority: number | null;
             /** Quote */
             quote: string;
             /**
@@ -1647,13 +1943,21 @@ export interface components {
         };
         /** MemoryOut */
         MemoryOut: {
+            /** Amount Minor */
+            amount_minor: number | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Due On */
+            due_on: string | null;
             /** Id */
             id: number;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Priority */
+            priority: number | null;
             /** Quote */
             quote: string;
             /** Review On */
@@ -1692,7 +1996,7 @@ export interface components {
         };
         /** MerchantSpendOut */
         MerchantSpendOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Display Name */
             display_name: string;
             /** Merchant Id */
@@ -1707,19 +2011,12 @@ export interface components {
             /** Ledger Version */
             ledger_version: number;
         };
-        /** Money */
-        Money: {
-            /** Currency */
-            currency: string;
-            /** Minor */
-            minor: number;
-        };
         /** MonthTotalsOut */
         MonthTotalsOut: {
             /** Currency */
             currency: string;
-            money_in: components["schemas"]["Money"];
-            money_out: components["schemas"]["Money"];
+            money_in: components["schemas"]["finance_agent__api__Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
         };
@@ -1745,6 +2042,20 @@ export interface components {
             text: string;
             /** Transaction Id */
             transaction_id: number;
+        };
+        /** PairOut */
+        PairOut: {
+            a: components["schemas"]["finance_agent__api__preferences__ItemOut"];
+            b: components["schemas"]["finance_agent__api__preferences__ItemOut"];
+            /** Pair Id */
+            pair_id: number;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Question
+             * @enum {string}
+             */
+            question: "cut" | "matters";
         };
         /** PartIn */
         PartIn: {
@@ -1823,7 +2134,7 @@ export interface components {
              */
             applied: number;
             /** Items */
-            items: components["schemas"]["ItemOut"][];
+            items: components["schemas"]["finance_agent__api__review_queue__ItemOut"][];
             /** Ledger Version */
             ledger_version: number;
             /** Message */
@@ -1880,6 +2191,12 @@ export interface components {
              */
             source: "bank" | "exchange" | "user";
         };
+        /**
+         * Reason
+         * @description Why a line has its amount, for the explanation.
+         * @enum {string}
+         */
+        Reason: "fixed_bill" | "on_pattern" | "goal_floor" | "constraint" | "priority" | "leftover" | "baseline";
         /** RegretAnswerIn */
         RegretAnswerIn: {
             /** Worth It */
@@ -1894,7 +2211,7 @@ export interface components {
         };
         /** RegretItemOut */
         RegretItemOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__fx__Money"];
             /** Description */
             description: string;
             /** Display Name */
@@ -1943,6 +2260,11 @@ export interface components {
         };
         /** @enum {string} */
         Risk: "none" | "below_buffer" | "below_zero";
+        /** SearchOut */
+        SearchOut: {
+            /** Hits */
+            hits: components["schemas"]["HitOut"][];
+        };
         /** SimulationOut */
         SimulationOut: {
             /** As Of */
@@ -1964,21 +2286,26 @@ export interface components {
              */
             status: "ok" | "insufficient";
         };
+        /** SnippetOut */
+        SnippetOut: {
+            /** Data */
+            data: string;
+        };
         /** SpendingOut */
         SpendingOut: {
             /** Categories */
             categories: components["schemas"]["CategorySpendOut"][];
             /** Currency */
             currency: string;
-            fees: components["schemas"]["Money"];
+            fees: components["schemas"]["finance_agent__api__Money"];
             /** Merchants */
             merchants: components["schemas"]["CategorySpendOut"][];
-            money_out: components["schemas"]["Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
-            refunds: components["schemas"]["Money"];
-            total: components["schemas"]["Money"];
-            unmatched_refunds: components["schemas"]["Money"];
+            refunds: components["schemas"]["finance_agent__api__Money"];
+            total: components["schemas"]["finance_agent__api__Money"];
+            unmatched_refunds: components["schemas"]["finance_agent__api__Money"];
         };
         /** SplitIn */
         SplitIn: {
@@ -2008,6 +2335,22 @@ export interface components {
             message: string;
             /** Stale Ids */
             stale_ids: string[];
+        };
+        /**
+         * Status
+         * @enum {string}
+         */
+        Status: "reached" | "overdue" | "at_risk" | "on_track" | "unchecked";
+        /** StrengthOut */
+        StrengthOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Rank */
+            rank: number;
+            /** Words */
+            words: string;
         };
         /** SubscriptionOut */
         SubscriptionOut: {
@@ -2041,13 +2384,13 @@ export interface components {
             currency: string;
             /** Gaps */
             gaps: components["schemas"]["GapOut"][];
-            money_in: components["schemas"]["Money"];
-            money_out: components["schemas"]["Money"];
+            money_in: components["schemas"]["finance_agent__api__Money"];
+            money_out: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
-            net: components["schemas"]["Money"];
-            transfers_in: components["schemas"]["Money"];
-            transfers_out: components["schemas"]["Money"];
+            net: components["schemas"]["finance_agent__api__Money"];
+            transfers_in: components["schemas"]["finance_agent__api__Money"];
+            transfers_out: components["schemas"]["finance_agent__api__Money"];
         };
         /** SyncOut */
         SyncOut: {
@@ -2091,7 +2434,7 @@ export interface components {
         TransactionOut: {
             /** Account Id */
             account_id: number;
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Category */
             category: string[] | null;
             /** Description */
@@ -2120,7 +2463,7 @@ export interface components {
         };
         /** TrendPointOut */
         TrendPointOut: {
-            amount: components["schemas"]["Money"];
+            amount: components["schemas"]["finance_agent__api__Money"];
             /** Month */
             month: string;
         };
@@ -2163,6 +2506,24 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** WhyOut */
+        WhyOut: {
+            /** Actual */
+            actual: string;
+            /** Op */
+            op: string;
+            /** Signal */
+            signal: string;
+            /** Threshold */
+            threshold: string;
+        };
+        /** Money */
+        finance_agent__api__Money: {
+            /** Currency */
+            currency: string;
+            /** Minor */
+            minor: number;
+        };
         /** BandOut */
         finance_agent__api__briefing__BandOut: {
             /** Left Out */
@@ -2188,6 +2549,80 @@ export interface components {
             point: number;
             /** Upper */
             upper: number;
+        };
+        /** Money */
+        finance_agent__api__fx__Money: {
+            /** Currency */
+            currency: string;
+            /** Minor */
+            minor: number;
+        };
+        /** AnswerIn */
+        finance_agent__api__preferences__AnswerIn: {
+            /** Choice */
+            choice: string;
+            /** Pair Id */
+            pair_id: number;
+        };
+        /** ItemOut */
+        finance_agent__api__preferences__ItemOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** AnswerIn */
+        finance_agent__api__review_queue__AnswerIn: {
+            /** Category */
+            category?: [
+                string,
+                string
+            ] | null;
+            /** Choice */
+            choice?: string | null;
+            /** Transaction Id */
+            transaction_id?: number | null;
+            /** Version */
+            version: string;
+        };
+        /** ItemOut */
+        finance_agent__api__review_queue__ItemOut: {
+            /** Choices */
+            choices: string[];
+            /** Currency */
+            currency: string;
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /** Merchant Id */
+            merchant_id: number | null;
+            /** Skipped */
+            skipped: boolean;
+            /** Spend Minor */
+            spend_minor: number;
+            /** Suggestions */
+            suggestions: [
+                string,
+                string
+            ][];
+            /** Title */
+            title: string;
+            /** Transaction Ids */
+            transaction_ids: number[];
+            /** Type */
+            type: string;
+            /** Version */
+            version: string;
+            /** Weight */
+            weight: number;
+        };
+        /** Money */
+        finance_agent__assistant__tools__read__Money: {
+            /** Currency */
+            currency: string;
+            /** Minor */
+            minor: number;
         };
     };
     responses: never;
@@ -2835,6 +3270,68 @@ export interface operations {
             };
         };
     };
+    goals_api_goals_get: {
+        parameters: {
+            query?: {
+                on?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guidance_api_guidance_get: {
+        parameters: {
+            query?: {
+                tone?: ("gentle" | "blunt") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -2882,6 +3379,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_exposures_api_insights_exposures_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
                 };
             };
         };
@@ -3273,6 +3790,141 @@ export interface operations {
             };
         };
     };
+    allocation_api_plan_allocation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllocationPlanOut"];
+                };
+            };
+        };
+    };
+    learned_api_preferences_get: {
+        parameters: {
+            query?: {
+                question?: "cut" | "matters";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_api_preferences_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
+    answer_api_preferences_answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["finance_agent__api__preferences__AnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    next_pair_api_preferences_next_pair_get: {
+        parameters: {
+            query?: {
+                question?: "cut" | "matters";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pending_api_proposals_get: {
         parameters: {
             query?: never;
@@ -3530,7 +4182,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AnswerIn"];
+                "application/json": components["schemas"]["finance_agent__api__review_queue__AnswerIn"];
             };
         };
         responses: {
@@ -3576,6 +4228,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_api_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
                 };
             };
             /** @description Validation Error */

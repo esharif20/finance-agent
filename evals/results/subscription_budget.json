@@ -1,0 +1,39 @@
+{
+  "harness": "subscription_budget",
+  "dataset": "synthetic subscription portfolios (in this file)",
+  "dataset_version": 1,
+  "dataset_sha256": "dd75f0bea5789a0848a4b0b2c31dfd229369e9bfcb98386bcd53bad9ab9d8da0",
+  "portfolios": 240,
+  "nothing_fits_portfolios": 39,
+  "models": {
+    "advisor": {
+      "model": "engine.subscription_budget exhaustive subset search",
+      "model_version": "subset-1",
+      "metrics": {
+        "cap_respected": 1.0,
+        "consolidate_duplicates": 0,
+        "figures_consistent": 1.0,
+        "nothing_fits_reported": 1.0,
+        "false_nothing_fits": 0,
+        "value_kept": 0.965497,
+        "value_kept_best": 0.973999
+      }
+    },
+    "cancel_most_expensive": {
+      "model": "cancel most expensive",
+      "model_version": "baseline",
+      "metrics": {
+        "cap_respected": 1.0,
+        "value_kept": 0.878146
+      }
+    },
+    "cancel_newest": {
+      "model": "cancel newest",
+      "model_version": "baseline",
+      "metrics": {
+        "cap_respected": 1.0,
+        "value_kept": 0.764076
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "harness": "allocation",
+  "dataset": "synthetic_allocation",
+  "dataset_version": 2,
+  "dataset_sha256": "9f954ca6056d5a9cac1bdfccd5dc5bf41ecb5502d72467de8c4a36143c775c11",
+  "scenarios": 216,
+  "feasible_scenarios": 144,
+  "models": {
+    "allocation": {
+      "model": "engine.allocation linprog (HiGHS)",
+      "model_version": "lp-1",
+      "metrics": {
+        "feasibility_rate": 1.0,
+        "infeasible_reported": 1.0,
+        "constraint_violations": 0,
+        "sum_exact": 1.0,
+        "oracle_utility": 0.97036,
+        "deviation_from_recent": 0.112207,
+        "instability": 1.0
+      }
+    },
+    "fifty_thirty_twenty": {
+      "model": "50/30/20 rule",
+      "model_version": "baseline",
+      "metrics": {
+        "feasibility_rate": 0.381944,
+        "infeasible_reported": 0.333333,
+        "constraint_violations": 209,
+        "sum_exact": 1.0,
+        "oracle_utility": 0.353,
+        "deviation_from_recent": 0.296304,
+        "instability": 1.0
+      }
+    },
+    "allocation_learned": {
+      "model": "engine.allocation + Bradley-Terry after 10 answers",
+      "model_version": "lp-1+bt-1",
+      "metrics": {
+        "feasibility_rate": 1.0,
+        "infeasible_reported": 1.0,
+        "constraint_violations": 0,
+        "sum_exact": 1.0,
+        "oracle_utility": 0.97447,
+        "deviation_from_recent": 0.112207,
+        "instability": 1.0
+      }
+    }
+  }
+}

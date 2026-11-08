@@ -52,7 +52,8 @@ class CostOut(BaseModel):
     display_name: str  # readable, for showing only
     kind: str
     group: str
-    status: str  # active, overdue, lapsed, cancelled or suggested
+    status: str  # active, overdue, lapsed, cancelled, suggested or likely (#310)
+    platform: str | None  # paid through Google, Apple, PayPal or Square, say
     interval: str | None
     # registry or detected; estimated (loose fit) or catalogue (known service)
     interval_source: IntervalSource | None
@@ -85,6 +86,8 @@ class CostsOut(BaseModel):
     total: Total
     totals: list[KindTotal]  # per kind: the exact sum of its counted items
     groups: list[GroupTotal]
+    # likely (#310) items a month, never in `total`: a guess until confirmed
+    likely_monthly: Pence
     rate_needed: int  # items left out of totals until an FX rate exists
     flag_count: int  # every flag on every item, for the Overview card
     # posted charges show only a small first charge from a known service:
@@ -122,6 +125,7 @@ def subscription_costs(led: Led) -> CostsOut:
                 kind=c.entry.kind or "",
                 group=c.entry.group or "",
                 status=c.status,
+                platform=s.platforms.get(c.entry.merchant_id),
                 interval=c.interval,
                 interval_source=c.interval_source,
                 charge_count=c.charge_count,
@@ -148,6 +152,7 @@ def subscription_costs(led: Led) -> CostsOut:
             GroupTotal(kind=k, group=g, monthly=Pence(minor=display(v)))
             for (k, g), v in sorted(s.group_totals.items())
         ],
+        likely_monthly=Pence(minor=display(s.likely_monthly)),
         rate_needed=s.rate_needed,
         flag_count=sum(len(c.flags) for c in s.items),
     )

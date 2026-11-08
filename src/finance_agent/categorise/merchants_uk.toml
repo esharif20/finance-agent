@@ -96,6 +96,8 @@ merchants = [
   { name = "Perplexity", match = ["PERPLEXITY"] },
   { name = "Midjourney", match = ["MIDJOURNEY"], whole = true },
   { name = "Cursor", match = ["^CURSOR", "ANYSPHERE"] },
+  { name = "Google AI Pro", match = ["^GOOGLE AI PRO", "^AI PRO", "^GEMINI", "^GOOGLE GEMINI"] },
+  { name = "Google Colab", match = ["^COLAB", "^GOOGLE COLAB"] },
 ]
 
 [[sub_brand]]

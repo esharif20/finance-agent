@@ -64,7 +64,8 @@ def check(engine: Engine, caplog: pytest.LogCaptureFixture) -> None:
             for t in led.transactions()
             if t.categorisation and t.categorisation.merchant
         }
-    assert subs["NETFLIX"].status == "active"
+    # one charge: likely until a second (#310)
+    assert subs["NETFLIX"].status == "likely"
     assert cats["TESCO"] == ("Food & Drink", "Groceries")
     for word in ("netflix", "tesco", "10.99", "25.00"):
         assert word not in caplog.text.lower()
@@ -95,3 +96,23 @@ def test_watched_folder_import_categorises_and_recognises(
     with caplog.at_level(logging.DEBUG):
         assert watch.run(folder, lambda title, body: None) == 0
     check(engine, caplog)
+
+
+def test_a_sync_with_no_new_rows_still_files_waiting_merchants(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reverted Corrections leave Merchants uncategorised with nothing new to
+    import; the next sync must still run the auto-categoriser (and its cap)."""
+    from finance_agent.categorise import auto
+
+    calls: list[int] = []
+
+    def spy(_engine: Engine, user_id: int) -> None:
+        calls.append(user_id)
+
+    monkeypatch.setattr(auto, "refresh_quietly", spy)
+    with TestClient(api.create_app(engine)) as c:
+        c.post("/api/sync")
+        assert c.post("/api/sync").json()["added"] == 0
+    assert main(["sync"]) == 0
+    assert len(calls) == 3

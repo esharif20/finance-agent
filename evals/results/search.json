@@ -1,0 +1,101 @@
+{
+  "harness": "search",
+  "dataset": "synthetic_search",
+  "dataset_version": 1,
+  "dataset_sha256": "8250af339b3083bf43fc4ce18f8f155d4e8d384957209fee6856a0a010709703",
+  "seed": 253,
+  "ledgers": 3,
+  "queries": {
+    "exact": 33,
+    "misspelling": 39,
+    "paraphrase": 36,
+    "note": 33,
+    "split": 33,
+    "memory": 24
+  },
+  "embedder": "hashed-trigrams-v1",
+  "k": 60,
+  "models": {
+    "fts": {
+      "model": "fts-hashed-trigrams-v1",
+      "model_version": "1",
+      "metrics": {
+        "overall.recall@5": 0.95202,
+        "overall.recall@10": 0.997475,
+        "overall.mrr": 0.87601,
+        "exact.recall@5": 1.0,
+        "exact.recall@10": 1.0,
+        "exact.mrr": 1.0,
+        "misspelling.recall@5": 0.846154,
+        "misspelling.recall@10": 0.987179,
+        "misspelling.mrr": 0.660256,
+        "paraphrase.recall@5": 0.902778,
+        "paraphrase.recall@10": 1.0,
+        "paraphrase.mrr": 0.713889,
+        "note.recall@5": 1.0,
+        "note.recall@10": 1.0,
+        "note.mrr": 1.0,
+        "split.recall@5": 1.0,
+        "split.recall@10": 1.0,
+        "split.mrr": 0.969697,
+        "memory.recall@5": 1.0,
+        "memory.recall@10": 1.0,
+        "memory.mrr": 1.0
+      }
+    },
+    "vector": {
+      "model": "vector-hashed-trigrams-v1",
+      "model_version": "1",
+      "metrics": {
+        "overall.recall@5": 0.977273,
+        "overall.recall@10": 0.989899,
+        "overall.mrr": 0.959139,
+        "exact.recall@5": 1.0,
+        "exact.recall@10": 1.0,
+        "exact.mrr": 1.0,
+        "misspelling.recall@5": 1.0,
+        "misspelling.recall@10": 1.0,
+        "misspelling.mrr": 1.0,
+        "paraphrase.recall@5": 0.875,
+        "paraphrase.recall@10": 0.944444,
+        "paraphrase.mrr": 0.803042,
+        "note.recall@5": 1.0,
+        "note.recall@10": 1.0,
+        "note.mrr": 1.0,
+        "split.recall@5": 1.0,
+        "split.recall@10": 1.0,
+        "split.mrr": 0.969697,
+        "memory.recall@5": 1.0,
+        "memory.recall@10": 1.0,
+        "memory.mrr": 1.0
+      }
+    },
+    "hybrid": {
+      "model": "hybrid-hashed-trigrams-v1",
+      "model_version": "1",
+      "metrics": {
+        "overall.recall@5": 0.982323,
+        "overall.recall@10": 1.0,
+        "overall.mrr": 0.9675,
+        "exact.recall@5": 1.0,
+        "exact.recall@10": 1.0,
+        "exact.mrr": 1.0,
+        "misspelling.recall@5": 1.0,
+        "misspelling.recall@10": 1.0,
+        "misspelling.mrr": 1.0,
+        "paraphrase.recall@5": 0.902778,
+        "paraphrase.recall@10": 1.0,
+        "paraphrase.mrr": 0.84903,
+        "note.recall@5": 1.0,
+        "note.recall@10": 1.0,
+        "note.mrr": 1.0,
+        "split.recall@5": 1.0,
+        "split.recall@10": 1.0,
+        "split.mrr": 0.969697,
+        "memory.recall@5": 1.0,
+        "memory.recall@10": 1.0,
+        "memory.mrr": 1.0
+      }
+    }
+  }
+}

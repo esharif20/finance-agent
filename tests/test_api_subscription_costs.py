@@ -87,6 +87,7 @@ def test_another_users_subscriptions_are_unreachable(
         "items": [],
         "totals": [],
         "groups": [],
+        "likely_monthly": ZERO,
         "rate_needed": 0,
         "flag_count": 0,
         "trial_detection": "partial",
@@ -210,6 +211,13 @@ def test_a_single_known_charge_is_estimated_and_totals_round_once(
         "annual", "catalogue", 1,
     )  # fmt: skip
     assert item["monthly"] == {"minor": 1454, "currency": "GBP"}  # 17450 / 12
+    # one charge is likely (#310): its own total, not the main one, until confirmed
+    assert (item["status"], item["counted"]) == ("likely", False)
+    assert body["likely_monthly"] == {"minor": 1454, "currency": "GBP"}
+    assert body["total"]["monthly"] == ZERO
+    client.post(f"/api/subscriptions/{item['merchant_id']}/confirm", json={})
+    body = client.get("/api/subscriptions/costs").json()
+    assert body["likely_monthly"] == ZERO
     assert body["total"] == {
         "monthly": {"minor": 1454, "currency": "GBP"},
         "annual": {"minor": 17450, "currency": "GBP"},

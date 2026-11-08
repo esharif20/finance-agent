@@ -1,94 +1,220 @@
 {
   "harness": "playbook",
   "dataset": "synthetic_personas",
-  "dataset_version": 1,
-  "dataset_sha256": "5406978efe7cf0ad73d12447c531e29d0c3333fadfe252e1ca3299a69225f8de",
-  "personas": 10,
+  "dataset_version": 3,
+  "dataset_sha256": "9044a3af272243aed2c6e69eece5742eab3a429dcd19998f5c8978a8c6ba1f9c",
+  "personas": 14,
   "gold": {
     "student": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "small-daily-spends",
+      "student-money"
     ],
     "early career": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "student-money"
     ],
     "subscription creeper": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends",
       "subscription-creep"
     ],
     "credit-card revolver": [
-      "emergency-fund"
+      "credit-cards",
+      "emergency-fund",
+      "payday-checkin",
+      "payday-planning"
     ],
     "payday-tight": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "payday-planning"
     ],
-    "goal saver": [],
+    "goal saver": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends"
+    ],
     "no history": [],
     "mixed": [
       "emergency-fund",
+      "payday-checkin",
+      "student-money",
       "subscription-creep"
     ],
-    "annual blip": [],
+    "annual blip": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends"
+    ],
     "no subscriptions": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "payday-planning"
+    ],
+    "refunded subscription": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends"
+    ],
+    "one month of history": [],
+    "three months of history": [
+      "emergency-fund",
+      "payday-checkin",
+      "student-money"
+    ],
+    "other currencies": [
+      "emergency-fund",
+      "payday-checkin",
+      "small-daily-spends",
+      "student-money"
     ]
   },
   "shown": {
     "student": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "small-daily-spends",
+      "student-money"
     ],
     "early career": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "student-money"
     ],
     "subscription creeper": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends",
       "subscription-creep"
     ],
     "credit-card revolver": [
-      "emergency-fund"
+      "credit-cards",
+      "emergency-fund",
+      "payday-checkin",
+      "payday-planning"
     ],
     "payday-tight": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "payday-planning"
     ],
-    "goal saver": [],
+    "goal saver": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends"
+    ],
     "no history": [],
     "mixed": [
       "emergency-fund",
+      "payday-checkin",
+      "student-money",
       "subscription-creep"
     ],
-    "annual blip": [],
+    "annual blip": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends"
+    ],
     "no subscriptions": [
-      "emergency-fund"
+      "emergency-fund",
+      "payday-checkin",
+      "payday-planning"
+    ],
+    "refunded subscription": [
+      "payday-checkin",
+      "saving-for-goal",
+      "small-daily-spends"
+    ],
+    "one month of history": [],
+    "three months of history": [
+      "emergency-fund",
+      "payday-checkin",
+      "student-money"
+    ],
+    "other currencies": [
+      "emergency-fund",
+      "payday-checkin",
+      "small-daily-spends",
+      "student-money"
     ]
   },
-  "numbers_checked": 68,
+  "numbers_checked": 203,
   "models": {
     "playbook": {
       "model": "engine.playbook conditions",
-      "model_version": "cards-a718acbb4254",
+      "model_version": "cards-1ea725d15220",
       "metrics": {
+        "credit-cards.precision": 1.0,
+        "credit-cards.recall": 1.0,
         "emergency-fund.precision": 1.0,
         "emergency-fund.recall": 1.0,
+        "payday-checkin.precision": 1.0,
+        "payday-checkin.recall": 1.0,
+        "payday-planning.precision": 1.0,
+        "payday-planning.recall": 1.0,
+        "saving-for-goal.precision": 1.0,
+        "saving-for-goal.recall": 1.0,
+        "small-daily-spends.precision": 1.0,
+        "small-daily-spends.recall": 1.0,
+        "student-money.precision": 1.0,
+        "student-money.recall": 1.0,
         "subscription-creep.precision": 1.0,
         "subscription-creep.recall": 1.0,
         "false_condition_shown": 0,
-        "figures_from_engine": 1.0
+        "figures_from_engine": 1.0,
+        "tone_match": 1.0,
+        "ndcg_at_3": 0.973638,
+        "constraint_violations": 0
       }
     },
     "show_all": {
       "model": "show every card",
       "model_version": "baseline",
       "metrics": {
-        "emergency-fund.precision": 0.6,
+        "credit-cards.precision": 0.071429,
+        "credit-cards.recall": 1.0,
+        "emergency-fund.precision": 0.571429,
         "emergency-fund.recall": 1.0,
-        "subscription-creep.precision": 0.2,
+        "payday-checkin.precision": 0.857143,
+        "payday-checkin.recall": 1.0,
+        "payday-planning.precision": 0.214286,
+        "payday-planning.recall": 1.0,
+        "saving-for-goal.precision": 0.285714,
+        "saving-for-goal.recall": 1.0,
+        "small-daily-spends.precision": 0.428571,
+        "small-daily-spends.recall": 1.0,
+        "student-money.precision": 0.357143,
+        "student-money.recall": 1.0,
+        "subscription-creep.precision": 0.142857,
         "subscription-creep.recall": 1.0,
-        "false_condition_shown": 12
+        "false_condition_shown": 71,
+        "tone_match": 0.785714,
+        "ndcg_at_3": 0.822651,
+        "constraint_violations": 1
       }
     },
     "show_none": {
       "model": "show no card",
       "model_version": "baseline",
       "metrics": {
+        "credit-cards.precision": 1.0,
+        "credit-cards.recall": 0.0,
         "emergency-fund.precision": 1.0,
         "emergency-fund.recall": 0.0,
+        "payday-checkin.precision": 1.0,
+        "payday-checkin.recall": 0.0,
+        "payday-planning.precision": 1.0,
+        "payday-planning.recall": 0.0,
+        "saving-for-goal.precision": 1.0,
+        "saving-for-goal.recall": 0.0,
+        "small-daily-spends.precision": 1.0,
+        "small-daily-spends.recall": 0.0,
+        "student-money.precision": 1.0,
+        "student-money.recall": 0.0,
         "subscription-creep.precision": 1.0,
         "subscription-creep.recall": 0.0,
         "false_condition_shown": 0

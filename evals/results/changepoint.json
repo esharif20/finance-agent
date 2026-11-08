@@ -1,0 +1,85 @@
+{
+  "harness": "changepoint",
+  "dataset": "synthetic_life_changes",
+  "dataset_version": 1,
+  "dataset_sha256": "3f8e9be661890a1834dc5f7391e2c3651acc4c4905a10b94c23a356558c08c68",
+  "seed": 256,
+  "histories": 24,
+  "months": 36,
+  "planted": {
+    "pay_rise": 8,
+    "job_loss": 8,
+    "rent_rise": 6,
+    "childcare": 9,
+    "spike": 49
+  },
+  "max_delay": 6,
+  "models": {
+    "baseline": {
+      "model": "mean3-vs-mean12-20pct",
+      "model_version": "1",
+      "metrics": {
+        "pay_rise.recall": 0.0,
+        "pay_rise.delay": 7,
+        "job_loss.recall": 1.0,
+        "job_loss.delay": 1.0,
+        "rent_rise.recall": 0.0,
+        "rent_rise.delay": 7,
+        "childcare.recall": 1.0,
+        "childcare.delay": 0.222222,
+        "bills.precision": 0.257143,
+        "income.precision": 0.5,
+        "rent.precision": 0.0,
+        "overall.recall": 0.548387,
+        "overall.precision": 0.2125,
+        "overall.delay": 0.588235,
+        "false_alarms_per_series_year": 0.28125,
+        "spike_alarm_rate": 0.938776
+      }
+    },
+    "bocpd": {
+      "model": "bocpd-gaussian",
+      "model_version": "1",
+      "metrics": {
+        "pay_rise.recall": 0.875,
+        "pay_rise.delay": 2.0,
+        "job_loss.recall": 0.625,
+        "job_loss.delay": 1.8,
+        "rent_rise.recall": 1.0,
+        "rent_rise.delay": 2.0,
+        "childcare.recall": 1.0,
+        "childcare.delay": 1.333333,
+        "bills.precision": 0.6,
+        "income.precision": 1.0,
+        "rent.precision": 1.0,
+        "overall.recall": 0.870968,
+        "overall.precision": 0.771429,
+        "overall.delay": 1.740741,
+        "false_alarms_per_series_year": 0.035714,
+        "spike_alarm_rate": 0.081633
+      }
+    },
+    "candidate": {
+      "model": "cusum-clipped",
+      "model_version": "1",
+      "metrics": {
+        "pay_rise.recall": 1.0,
+        "pay_rise.delay": 2.0,
+        "job_loss.recall": 1.0,
+        "job_loss.delay": 2.0,
+        "rent_rise.recall": 1.0,
+        "rent_rise.delay": 2.0,
+        "childcare.recall": 1.0,
+        "childcare.delay": 2.0,
+        "bills.precision": 0.529412,
+        "income.precision": 1.0,
+        "rent.precision": 1.0,
+        "overall.recall": 1.0,
+        "overall.precision": 0.775,
+        "overall.delay": 2.0,
+        "false_alarms_per_series_year": 0.040179,
+        "spike_alarm_rate": 0.0
+      }
+    }
+  }
+}

@@ -19,7 +19,7 @@
     },
     "blunt": {
       "title": "Your safety net is thin",
-      "body": "Your savings of {savings_balance} cover {emergency_fund_months} months of essentials at {essential_monthly_spend} a month. One surprise bill could push you into debt. Set up an automatic transfer on payday into easy-access savings; a cash ISA takes up to {fact:isa_allowance} a year tax-free, and deposits up to {fact:fscs_deposit_limit} per bank are protected."
+      "body": "Your savings of {savings_balance} cover {emergency_fund_months} months of essentials at {essential_monthly_spend} a month. One surprise bill could push you into debt. On payday, set aside a fixed amount in easy-access savings; a cash ISA takes up to {fact:isa_allowance} a year tax-free, and deposits up to {fact:fscs_deposit_limit} per bank are protected."
     }
   }
 }

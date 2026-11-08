@@ -13,6 +13,7 @@ export function SubscriptionsCard() {
   const subs = total("subscription");
   const bills = total("bill");
   const flags = flagCount(data);
+  const likely = data.likely_monthly?.minor ? data.likely_monthly : null; // #310: kept apart from the total
   if (!data.items.length)
     return (
       <Card aria-labelledby="subs-card">
@@ -44,6 +45,11 @@ export function SubscriptionsCard() {
       {bills && (
         <p className="mt-2 text-label text-muted-foreground">
           Bills <Money value={bills} /> a month
+        </p>
+      )}
+      {likely && (
+        <p className="text-label text-muted-foreground">
+          Likely (new) <Money value={likely} /> a month, not in the total
         </p>
       )}
       {flags !== null && (

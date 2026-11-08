@@ -25,13 +25,18 @@ from finance_agent.api import (
     chat,
     corrections,
     fx,
+    goals,
+    guidance,
     insights,
     local_model,
     manage_links,
     merchants,
     notes,
+    plan,
+    preferences,
     proposals,
     review_queue,
+    search,
     splits,
     subscription_costs,
     subscriptions,
@@ -518,7 +523,9 @@ def create_app(
             if any(r.added for r in reports):  # same as `fa import`
                 with engine.begin() as conn:
                     categorise.run(conn, current_user())
-                auto.refresh_quietly(engine, current_user())
+            auto.refresh_quietly(
+                engine, current_user()
+            )  # every sync: Merchants may wait from before
             notify = request.app.state.notify or notifications.osascript
             subscription_alerts.run(engine, current_user(), notify)
         except Busy:
@@ -632,8 +639,13 @@ def create_app(
     app.include_router(proposals.router)
     app.include_router(chat.router)
     app.include_router(cash_flow.router)
+    app.include_router(plan.router)
+    app.include_router(goals.router)
+    app.include_router(search.router)
+    app.include_router(guidance.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)
+    app.include_router(preferences.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():

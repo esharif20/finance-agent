@@ -1,0 +1,36 @@
+{
+  "harness": "ope",
+  "dataset": "synthetic_history",
+  "dataset_version": 2,
+  "dataset_sha256": "d36833c4c58203794a1dedf9ab79bd400797b39fe30013fda7e8395e542715b6",
+  "seed": 146,
+  "histories": 6,
+  "weeks": 2000,
+  "slate": 10,
+  "shown": 3,
+  "error_bound": 0.06,
+  "models": {
+    "candidate": {
+      "model": "seeded epsilon slate (engine.ope)",
+      "model_version": "rank-eps-v1",
+      "metrics": {
+        "ips_error": 9.8e-05,
+        "snips_error": 0.000807,
+        "ess": 201.763512,
+        "support": 1.0,
+        "true_value": 0.274265
+      }
+    },
+    "baseline": {
+      "model": "deterministic ranker",
+      "model_version": "rank-v1",
+      "metrics": {
+        "ips_error": 0.233098,
+        "snips_error": 0.001035,
+        "ess": 1808.0,
+        "support": 0.150667,
+        "true_value": 0.274265
+      }
+    }
+  }
+}

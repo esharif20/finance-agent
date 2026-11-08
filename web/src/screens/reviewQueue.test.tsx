@@ -6,7 +6,7 @@ import type { components } from "@/api/schema";
 import { ReviewQueue } from "./ReviewQueue";
 
 type Queue = components["schemas"]["QueueOut"];
-type Item = components["schemas"]["ItemOut"];
+type Item = components["schemas"]["finance_agent__api__review_queue__ItemOut"];
 
 // the shown name follows the stored title unless a test says otherwise
 const withShown = (i: Omit<Item, "display_name"> & { display_name?: string }): Item => ({ ...i, display_name: i.display_name ?? i.title });
