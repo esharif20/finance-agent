@@ -142,6 +142,17 @@ def undo(q: Queue, count: Annotated[int, Query(ge=1, le=MAX_BATCH)] = 1) -> Queu
     return _out(q, lambda: q.undo(count))
 
 
+class AutoBatchOut(BaseModel):
+    count: int  # Merchants in the latest auto-applied batch; 0: nothing to undo
+
+
+@router.get("/auto-batch")
+def auto_batch(request: Request) -> AutoBatchOut:
+    """What "Auto-categorised N" shows and `undo-auto` would take back (#215 B)."""
+    with request.app.state.engine.begin() as conn:
+        return AutoBatchOut(count=auto.latest_count(conn, current_user()))
+
+
 @router.post("/undo-auto")
 def undo_auto(request: Request) -> QueueOut:
     """Take back the latest batch the model auto-applied (#215 B): its

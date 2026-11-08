@@ -232,6 +232,9 @@ def test_the_api_undoes_the_latest_auto_batch_in_one_call(
         _threshold(monkeypatch, 1)
         categorise.run(c, 1)
     with TestClient(api.create_app(engine)) as client:
+        assert client.get("/api/review-queue/auto-batch").json() == {
+            "count": len(GUESSED)
+        }
         r = client.post("/api/review-queue/undo-auto")
         assert r.status_code == 200
         body = r.json()
@@ -240,6 +243,7 @@ def test_the_api_undoes_the_latest_auto_batch_in_one_call(
         assert got == set(GUESSED)
         r = client.post("/api/review-queue/undo-auto")
         assert (r.json()["applied"], r.json()["message"]) == (0, "Nothing to undo.")
+        assert client.get("/api/review-queue/auto-batch").json() == {"count": 0}
 
 
 def test_a_correction_beats_an_auto_applied_category(

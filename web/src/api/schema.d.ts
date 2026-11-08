@@ -727,6 +727,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review-queue/auto-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auto Batch
+         * @description What "Auto-categorised N" shows and `undo-auto` would take back (#215 B).
+         */
+        get: operations["auto_batch_api_review_queue_auto_batch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review-queue/undo": {
         parameters: {
             query?: never;
@@ -1162,6 +1182,11 @@ export interface components {
             transaction_id?: number | null;
             /** Version */
             version: string;
+        };
+        /** AutoBatchOut */
+        AutoBatchOut: {
+            /** Count */
+            count: number;
         };
         /** BalancesOut */
         BalancesOut: {
@@ -3241,6 +3266,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_batch_api_review_queue_auto_batch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoBatchOut"];
                 };
             };
         };

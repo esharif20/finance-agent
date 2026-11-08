@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight, CircleCheck, SkipForward, Undo2 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import {
   type ReviewItem,
   type ReviewQueueOut,
   answerReview,
+  fetchAutoBatch,
   fetchCategories,
   fetchReviewQueue,
   skipReview,
+  undoAutoBatch,
   undoReview,
 } from "@/api/client";
 import { Card } from "@/components/ui/card";
@@ -17,6 +20,7 @@ import { BulkReview } from "./BulkReview";
 import { AlwaysAskExtras, SplitRecheck, SplitRefund } from "./ReviewSplitItems";
 
 export const REVIEW_KEY = ["review-queue"] as const;
+const AUTO_KEY = ["review-queue", "auto-batch"] as const;
 
 type Cat = [string, string];
 const TYPE_LABEL: Record<string, string> = {
@@ -56,6 +60,54 @@ function suggestions(groups: { name: string; subs: string[] }[], model: Cat[] = 
     .slice(0, 3);
 }
 
+/** After a sync: what the model filed by itself, with one way back. The count is the API's. */
+function AutoApplied() {
+  const client = useQueryClient();
+  const reduce = useReducedMotion();
+  const batch = useQuery({ queryKey: AUTO_KEY, queryFn: fetchAutoBatch });
+  const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
+  const undo = useMutation({
+    mutationFn: undoAutoBatch,
+    onSuccess: (q) => {
+      client.setQueryData(REVIEW_KEY, q);
+      const back = `${q.applied} ${q.applied === 1 ? "merchant" : "merchants"}`;
+      setNote({ text: q.applied ? `Put ${back} back in the queue.` : (q.message ?? "Nothing to undo.") });
+    },
+    onError: (e) => setNote({ text: `${e.message} Nothing was changed.`, bad: true }),
+    onSettled: () => client.invalidateQueries(), // like an import: lists and totals may have changed
+  });
+  const n = batch.data?.count ?? 0;
+  const fade = reduce ? { duration: 0 } : { duration: 0.2, ease: [0.23, 1, 0.32, 1] as const };
+  return (
+    <AnimatePresence initial={false}>
+      {(n > 0 || note) && (
+        <motion.div
+          key="auto-applied"
+          initial={{ opacity: 0, y: reduce ? 0 : -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.14 } }}
+          transition={fade}
+          className="mx-auto flex w-full max-w-xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1"
+        >
+          <p
+            role="status"
+            aria-live="polite"
+            className={`text-sm ${note?.bad ? "rounded-[10px] bg-warning px-3 py-1.5 text-warning-foreground" : "text-muted-foreground"}`}
+          >
+            {note?.text ?? `Auto-categorised ${n} ${n === 1 ? "merchant" : "merchants"}`}
+          </p>
+          {n > 0 && (
+            <button type="button" aria-label="Undo all auto-categorising" disabled={undo.isPending} onClick={() => undo.mutate()} className={`${btn} glass`}>
+              <Undo2 className="size-4" aria-hidden="true" />
+              Undo all
+            </button>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 /** Bulk by default when a queue is mostly suggested Category rows; one at a time otherwise, or by choice. */
 export function ReviewQueue() {
   const queue = useQuery({ queryKey: REVIEW_KEY, queryFn: fetchReviewQueue });
@@ -65,6 +117,7 @@ export function ReviewQueue() {
   const view = mode ?? (eligible ? "bulk" : "single");
   return (
     <div className="flex flex-col gap-4">
+      <AutoApplied />
       {(eligible || mode === "single") && (
         <div role="group" aria-label="View" className="mx-auto flex gap-1 self-center rounded-full bg-raised p-1">
           {(
