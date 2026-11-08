@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
+from finance_agent import notify as notifications
 from finance_agent.api import (
     briefing,
     card_art,
@@ -34,7 +35,7 @@ from finance_agent.api import (
     subscription_costs,
     subscriptions,
 )
-from finance_agent.categorise import embedding
+from finance_agent.categorise import embedding, subscription_alerts
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -373,10 +374,16 @@ def _known(led: Ledger, account_id: int | None) -> None:
         raise HTTPException(404, "No such account.")
 
 
-def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
+def create_app(
+    engine: Engine,
+    web_dir: Path | None = None,
+    notify: notifications.Notifier | None = None,
+) -> FastAPI:
     app = FastAPI(title="Finance Agent", docs_url=None, redoc_url=None)
 
     app.state.engine = engine
+    # subscription alerts after a sync (#108); None is macOS notifications
+    app.state.notify = notify
 
     @app.get("/api/health")
     def health() -> HealthOut:  # the launcher uses this to tell our server apart
@@ -502,6 +509,8 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
                 with engine.begin() as conn:
                     categorise.run(conn, current_user())
                 embedding.refresh_quietly(engine, current_user())
+            notify = request.app.state.notify or notifications.osascript
+            subscription_alerts.run(engine, current_user(), notify)
         except Busy:
             raise HTTPException(409, "A sync is already running.") from None
         except NotConnected:

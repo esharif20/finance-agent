@@ -147,7 +147,7 @@ cfg.set_main_option("script_location", str(storage._MIGRATIONS))
 with eng.begin() as c:
     cfg.attributes["connection"] = c
     command.upgrade(cfg, "head")
-for script in (["plan"], ["ask", "No figures here."]):
+for script in (["plan", "No figures here."], ["ask", "No figures here."]):
     with eng.begin() as c:
         m = FakeChatModel([Reply(content=s) for s in script])
         a = ask(Assistant(m, c, datetime.date(2026, 1, 1)), "hello")

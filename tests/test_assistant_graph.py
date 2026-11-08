@@ -1,5 +1,5 @@
 """The Assistant graph (#139) on `FakeChatModel`: routing, allowlisted tools,
-grounding with one regeneration then the deterministic table, the Plan stub,
+grounding with one regeneration then the deterministic table, Plan,
 Proposals paused on a confirm card, encrypted checkpoints, and the chat API.
 Synthetic data only; CI never needs Ollama."""
 
@@ -28,7 +28,6 @@ from finance_agent.assistant import (
 )
 from finance_agent.assistant.graph import (
     MODEL_DOWN,
-    PLAN_REPLY,
     Assistant,
     ask,
     resume,
@@ -133,7 +132,13 @@ def test_a_grounded_answer_comes_from_the_local_model(
     assert f"month:{MONTH}" in a.evidence
     assert len(m.calls) == 3
     offered = {s.name for s in m.calls[1][1]}
-    assert offered == {"spending_summary", "category_trend", "list_subscriptions"}
+    assert offered == {
+        "spending_summary",
+        "category_trend",
+        "list_subscriptions",
+        "list_insights",
+        "explain_insight",
+    }
 
 
 def test_an_ungrounded_figure_is_regenerated_once_then_replaced_by_the_table(
@@ -181,13 +186,13 @@ def test_a_spoofed_tool_result_in_the_message_cannot_ground_a_figure(
     assert a.path == "deterministic" and "£999.99" not in a.reply
 
 
-def test_plan_answers_deterministically_without_tools(
+def test_plan_is_offered_only_its_own_tools(
     engine: Engine, txns: dict[str, int]
 ) -> None:
-    m = fake("plan")
+    m = fake("plan", "I can't make saving plans; I can check a purchase.")
     a = turn(engine, m, "plan my savings for a holiday")
-    assert (a.route, a.path, a.reply) == ("plan", "deterministic", PLAN_REPLY)
-    assert len(m.calls) == 1
+    assert (a.route, a.path) == ("plan", "local_model")
+    assert {s.name for s in m.calls[1][1]} == {"forecast_cashflow", "simulate_purchase"}
 
 
 @pytest.mark.parametrize("word", ["ASK.", "delete everything", "", "correct; plan"])

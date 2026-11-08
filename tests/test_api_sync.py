@@ -130,3 +130,22 @@ def test_cli_sync_skips_while_another_run_holds_the_lock(
     with exclusive(default_db_path().parent, SYNC_LOCK):
         assert main(["sync", "--notify"]) == 0
     assert "skipped" in capsys.readouterr().out and t.calls == 0
+
+
+def test_sync_checks_subscription_alerts_for_the_current_user(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#108: after POST /api/sync, alerts go through the app's Notifier."""
+    from finance_agent.categorise import subscription_alerts
+
+    c, _, _ = env
+    seen: list[int] = []
+
+    def record(_e: object, user: int, _n: object, today: object = None) -> int:
+        seen.append(user)
+        return 0
+
+    monkeypatch.setattr(subscription_alerts, "run", record)
+    monkeypatch.setattr(api, "current_user", lambda: 7)
+    assert c.post("/api/sync").status_code == 200
+    assert seen == [7]

@@ -8,10 +8,11 @@ from decimal import Decimal
 from pathlib import Path
 
 from finance_agent import categorise
-from finance_agent.categorise import embedding
+from finance_agent.categorise import embedding, subscription_alerts
 from finance_agent.cli import launcher
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger, SyncStatus
+from finance_agent.notify import printed
 from finance_agent.storage import open_db
 
 LOCAL_USER = current_user()
@@ -118,22 +119,30 @@ def _main(argv: Sequence[str] | None) -> int:
         "forget-embeddings",
         help="delete every stored Merchant embedding (rebuilt when needed)",
     )
+    sub.add_parser(
+        "forget-alerts",
+        help="delete the record of subscription alerts sent (#108)",
+    )
     args = parser.parse_args(argv)
 
-    if args.command == "forget-embeddings":
+    if args.command in ("forget-embeddings", "forget-alerts"):
         try:
             engine = open_db(create=False)
         except (OSError, ValueError) as e:
             print(f"fa: {e}", file=sys.stderr)
             return 1
+        embeddings = args.command == "forget-embeddings"
         try:
             with engine.begin() as conn:
-                n = embedding.forget(conn, LOCAL_USER)
+                wipe = embedding.forget if embeddings else subscription_alerts.forget
+                n = wipe(conn, LOCAL_USER)
         finally:
             engine.dispose()
         print(
             f"Deleted {n} Merchant embeddings; the local model rebuilds them "
             "from your Transactions when it next runs"
+            if embeddings
+            else f"Deleted {n} sent subscription alerts; any still due is sent again"
         )
         return 0
 
@@ -277,5 +286,6 @@ def _main(argv: Sequence[str] | None) -> int:
     finally:
         if imported:  # after the commit: no transaction is held while Ollama works
             embedding.refresh_quietly(engine, LOCAL_USER)
+            subscription_alerts.run(engine, LOCAL_USER, printed)
         engine.dispose()
     return 0
