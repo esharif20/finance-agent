@@ -1,6 +1,7 @@
-"""#215 F: the gate evaluation. Whatever the signals, the confident tier it
-calibrates keeps >= 95% precision on them, and the committed run covers every
-Merchant the rules leave. Synthetic labels only."""
+"""#215 F: the gate evaluation. No model guess is confident (#287); the low
+tier files a guess for every Merchant with a signal, its held-out tallies are
+consistent, and the committed run covers every Merchant the rules leave.
+Synthetic labels only."""
 
 import json
 from typing import Any
@@ -25,32 +26,36 @@ merchant = st.fixed_dictionaries(
 )
 
 
-@settings(max_examples=300, deadline=None)
+@settings(max_examples=200, deadline=None)
 @given(st.dictionaries(st.text("xyz", min_size=1, max_size=4), merchant, max_size=40))
-def test_the_confident_tier_keeps_95_percent_on_any_signals(
+def test_the_low_tier_guesses_whenever_there_is_a_signal(
     signals: dict[str, dict[str, Any]],
 ) -> None:
     t = g.tiers(signals)
-    picked = [
-        (got[1] == s["gold"], s["rows"])
-        for s in signals.values()
-        if (got := t["confident"](s)) is not None
-    ]
-    n = sum(r for _, r in picked)
-    if n:
-        assert sum(ok * r for ok, r in picked) * 100 >= 95 * n
+    for s in signals.values():
+        got = t["low"](s)
+        has = s["knn"] is not None or s["llm"] not in (None, "unsure")
+        assert (got is not None) == has
+        if got is not None:
+            assert got[1] in LABELS
 
 
 @settings(max_examples=15, deadline=None)
 @given(st.dictionaries(st.text("xyz", min_size=1, max_size=4), merchant, max_size=15))
-def test_the_chosen_margin_keeps_95_percent_on_held_out_merchants(
+def test_held_out_tallies_count_every_guessed_row_once_per_repeat(
     signals: dict[str, dict[str, Any]],
 ) -> None:
-    """#287 verifier: precision is measured on Merchants the thresholds were
-    not fit on, never in-sample."""
-    margin, (hits, n, _) = g.choose(signals)
-    assert margin in g.MARGINS
-    assert n == 0 or hits * 100 >= 95 * n
+    """#287 verifier: accuracy is measured on Merchants the tier was not fit
+    on; each guessed row is scored once per repeat, never in-sample twice."""
+    held = g.held_out(signals)
+    guessed = sum(
+        s["rows"]
+        for s in signals.values()
+        if s["knn"] is not None or s["llm"] not in (None, "unsure")
+    )
+    right, n = held.get("all", [0, 0])
+    assert n == guessed * g.REPEATS and 0 <= right <= n
+    assert sum(v[1] for k, v in held.items() if k != "all") == n
 
 
 def test_the_committed_run_has_signals_for_every_residual_merchant() -> None:

@@ -11,60 +11,46 @@
   "residual_merchants": 125,
   "missing_signals": [],
   "calibration": {
-    "knn_threshold": 920,
-    "agree_threshold": 1061,
-    "llm_alone": false,
+    "confident_models": [],
     "low_prefers": "llm",
     "low_confidence": {
-      "agree": 77,
+      "agree": 78,
       "knn": 0,
       "llm": 66
     },
-    "margin": 200,
     "folds": 5,
-    "repeats": 20,
-    "held_out": {
-      "precision": 0.968254,
-      "coverage": 0.019565,
-      "wilson_lower_95": 0.52576,
-      "overall_precision": 0.993701,
-      "overall_coverage": 0.754831
-    }
+    "repeats": 20
   },
   "review": {
     "cap": 10,
-    "low_tier_merchants": 121,
+    "low_tier_merchants": 125,
     "no_signal_merchants": 0,
     "items_per_sync_575": 10
   },
-  "low_tier_accuracy": 0.724359,
   "groceries_share": {
     "gold": 0.072,
-    "low_guesses": 0.076923
+    "low_guesses": 0.074534
   },
   "models": {
     "gate": {
-      "model": "rules+knn+llm agreement gate",
+      "model": "rules confident; knn+llm filed auto-low",
       "model_version": "nomic-embed-text@0a109f422b47+qwen3.5:4b-q4_K_M@d8b0f5",
       "metrics": {
-        "rules.precision": 0.993865,
-        "rules.coverage": 0.75,
-        "rules.accuracy": 0.745399,
-        "rules+knn.precision": 0.993927,
-        "rules+knn.coverage": 0.757669,
-        "rules+knn.accuracy": 0.753067,
+        "confident.precision": 0.993865,
+        "confident.coverage": 0.75,
+        "confident.accuracy": 0.745399,
+        "rules+knn.precision": 0.881538,
+        "rules+knn.coverage": 0.996933,
+        "rules+knn.accuracy": 0.878834,
         "rules+llm.precision": 0.932099,
         "rules+llm.coverage": 0.993865,
         "rules+llm.accuracy": 0.92638,
-        "gate_confident.precision": 0.993927,
-        "gate_confident.coverage": 0.757669,
-        "gate_confident.accuracy": 0.753067,
-        "gate_all_tiers.precision": 0.929231,
-        "gate_all_tiers.coverage": 0.996933,
-        "gate_all_tiers.accuracy": 0.92638,
-        "gate_confident_held_out.precision": 0.993701,
-        "gate_confident_held_out.coverage": 0.754831,
-        "gate_confident_held_out.residual_precision": 0.968254,
+        "all_tiers.precision": 0.929231,
+        "all_tiers.coverage": 0.996933,
+        "all_tiers.accuracy": 0.92638,
+        "low_held_out.accuracy": 0.732919,
+        "all_tiers_held_out.precision": 0.929231,
+        "all_tiers_held_out.coverage": 0.996933,
         "confident.Bills \u203a Council tax.precision": 1.0,
         "confident.Bills \u203a Energy.precision": 1.0,
         "confident.Bills \u203a Insurance.precision": 1.0,

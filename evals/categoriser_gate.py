@@ -3,16 +3,13 @@
 Merchant-level: what Corrections, rules and the UK base leave Uncategorised
 on the synthetic categoriser set (v4, with its long tail) is scored by the
 embedding kNN (nomic-embed-text), the local LLM with retrieval few-shot, and
-the gate that files every guess in two tiers:
-
-- confident (`auto`): the kNN alone at or above its threshold, or the kNN and
-  the LLM agreeing at or above the agreement threshold (or the LLM alone,
-  only if it clears 95% by itself). Calibrated here for >= 95% precision.
-- low (`auto-low`): every other Merchant with any signal gets its best guess;
-  its accuracy is reported as it is, because it is what the user sees.
+the gate. The confident tier (`auto`) is Corrections, rules and the UK base
+only: held out, no model setting kept 95% precision (#287), so every kNN or
+LLM guess files `auto-low`, silent and undoable. Its accuracy is reported
+held out (cross-validation over Merchants), because it is what the user sees.
 
     uv run python evals/categoriser_gate.py                 # CI: results reproduce
-    uv run python evals/categoriser_gate.py --collect --llm qwen3.5:9b-q4_K_M [--write]
+    uv run python evals/categoriser_gate.py --collect --llm qwen3.5:4b-q4_K_M [--write]
         # local only: nomic-embed-text and the LLM on Ollama, synthetic
         # descriptors only; waits until no other chat model is loaded and
         # unloads the LLM afterwards
@@ -45,9 +42,7 @@ from metrics import per_category
 
 HERE = Path(__file__).parent
 CAP = auto.REVIEW_CAP
-TARGET = 950  # permille: the confident tier's held-out precision bar
 FOLDS, REPEATS = 5, 20  # cross-validation over Merchants
-MARGINS = (*range(0, 201, 5), 2001)  # thousandths; the last admits nothing
 REAL_MERCHANTS = 575  # the user's first sync (#215, a count only)
 type Category = tuple[str, str]
 type Signals = dict[str, dict[str, Any]]
@@ -143,73 +138,17 @@ def collect(
 # --- the gate, from signals ------------------------------------------------------
 
 
-def _rows(signals: Signals, pick: "Pick") -> list[tuple[int, bool, str, str]]:
-    """(score, correct, guess, gold) per residual *row* for Merchants `pick`
-    gives a (score, guess) for."""
-    out: list[tuple[int, bool, str, str]] = []
-    for s in signals.values():
-        got = pick(s)
-        if got is not None:
-            score, guess = got
-            out += [(score, guess == s["gold"], guess, s["gold"])] * s["rows"]
-    return out
-
-
 def _llm(s: Mapping[str, Any]) -> str | None:
     a = s["llm"]
     return a if a and a != llm.UNSURE else None
 
 
-def _calibrate(scored: Sequence[tuple[int, bool]], target: int) -> int:
-    """`cz.calibrate` at `target` permille: the lowest score at which every
-    band from there up keeps that precision; above any score when none does."""
-    best = embedding.SIMILARITY + 1
-    hits = n = 0
-    for score in sorted({sc for sc, _ in scored}, reverse=True):
-        band = [ok for sc, ok in scored if sc == score]
-        hits, n = hits + sum(band), n + len(band)
-        if hits * 1000 < target * n:
-            break
-        best = score
-    return best
-
-
-def tiers(signals: Signals, margin: int = 0, target: int = TARGET) -> dict[str, Any]:
-    """Calibrate the confident tier at `target` permille on `signals`, raised
-    by `margin` (thousandths, chosen by held-out cross-validation), choose the
-    low tier's best guess, and say which tier each Merchant lands in."""
-    t_knn = margin + _calibrate(
-        [(sc, ok) for sc, ok, _, _ in _rows(signals, lambda s: s["knn"])], target
-    )
-
-    def agree(s: Mapping[str, Any]) -> tuple[int, str] | None:
-        k = s["knn"]
-        return (k[0], k[1]) if k and k[0] < t_knn and _llm(s) == k[1] else None
-
-    t_agree = margin + _calibrate(
-        [(sc, ok) for sc, ok, _, _ in _rows(signals, agree)], target
-    )
-    alone = _rows(signals, lambda s: (llm.ANSWERED, a) if (a := _llm(s)) else None)
-    # the LLM alone has no score a margin could raise: any margin stops it
-    llm_alone_ok = (
-        margin == 0
-        and bool(alone)
-        and sum(ok for _, ok, _, _ in alone) * 1000 >= target * len(alone)
-    )
-
-    def confident(s: Mapping[str, Any]) -> tuple[str, str] | None:
-        k, a = s["knn"], _llm(s)
-        if k and k[0] >= t_knn:
-            return "knn", k[1]
-        if k and a == k[1] and k[0] >= t_agree:
-            return "agree", k[1]
-        if a and llm_alone_ok:
-            return "llm", a
-        return None
-
-    rest = {m: s for m, s in signals.items() if confident(s) is None}
+def tiers(signals: Signals) -> dict[str, Any]:
+    """Fit the low tier on `signals`: which guess to believe on a
+    disagreement, and how often each kind of guess is right. No model guess
+    is confident (#287): every one files `auto-low`."""
     hits = Counter[str]()
-    for s in rest.values():
+    for s in signals.values():
         k, a = s["knn"], _llm(s)
         if a and k and a != k[1]:  # a disagreement: which one to believe
             hits["llm"] += (a == s["gold"]) * s["rows"]
@@ -226,22 +165,7 @@ def tiers(signals: Signals, margin: int = 0, target: int = TARGET) -> dict[str, 
             return "knn", k[1]
         return None
 
-    kinds: dict[str, list[bool]] = {}
-    for s in rest.values():
-        if (g := low(s)) is not None:
-            kinds.setdefault(g[0], []).extend([g[1] == s["gold"]] * s["rows"])
-    confidence = {
-        k: (sum(v) * 100 // len(v) if v else 0) for k, v in sorted(kinds.items())
-    }
-    return {
-        "knn_threshold": t_knn,
-        "agree_threshold": t_agree,
-        "llm_alone": llm_alone_ok,
-        "low_prefers": prefer,
-        "low_confidence": confidence,  # percent right, per kind of low guess
-        "confident": confident,
-        "low": low,
-    }
+    return {"low_prefers": prefer, "low": low}
 
 
 def _folds(names: Sequence[str], seed: int) -> list[set[str]]:
@@ -250,43 +174,24 @@ def _folds(names: Sequence[str], seed: int) -> list[set[str]]:
     return [set(order[f::FOLDS]) for f in range(FOLDS)]
 
 
-def held_out(signals: Signals, margin: int) -> tuple[int, int, int]:
+def held_out(signals: Signals) -> dict[str, list[int]]:
     """Cross-validation over Merchants (FOLDS folds, REPEATS seeded splits):
-    thresholds calibrated (plus `margin`) on the other folds, the confident tier
-    scored on the held-out Merchants. Returns pooled (right rows, confident
-    rows, all rows), every row counted once per repeat."""
-    hits = n = total = 0
+    the low tier fitted on the other folds, its guesses scored on the
+    held-out Merchants. Returns [right rows, guessed rows] per kind of guess
+    and "all", pooled (each row counted once per repeat)."""
+    out: dict[str, list[int]] = {}
     for seed in range(REPEATS):
         for fold in _folds(list(signals), seed):
-            cal = {m: v for m, v in signals.items() if m not in fold}
-            t = tiers(cal, margin)
+            t = tiers({m: v for m, v in signals.items() if m not in fold})
             for m in fold:
                 v = signals[m]
-                total += v["rows"]
-                if (got := t["confident"](v)) is not None:
-                    n += v["rows"]
-                    hits += (got[1] == v["gold"]) * v["rows"]
-    return hits, n, total
-
-
-def choose(signals: Signals) -> tuple[int, tuple[int, int, int]]:
-    """The smallest margin over the in-sample thresholds whose pooled held-out
-    precision is at least 95%; at the largest, nothing is confident."""
-    for margin in MARGINS:
-        hits, n, total = held_out(signals, margin)
-        if n == 0 or hits * 1000 >= TARGET * n:
-            return margin, (hits, n, total)
-    raise AssertionError("unreachable: the last margin admits nothing")
-
-
-def wilson_lower(hits: int, n: int, z: float = 1.645) -> float:
-    """One-sided 95% lower bound on a proportion (0 when n is 0)."""
-    if n == 0:
-        return 0.0
-    p = hits / n
-    centre = p + z * z / (2 * n)
-    margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
-    return (centre - margin) / (1 + z * z / n)
+                if (got := t["low"](v)) is None:
+                    continue
+                for kind in (got[0], "all"):
+                    tally = out.setdefault(kind, [0, 0])
+                    tally[0] += (got[1] == v["gold"]) * v["rows"]
+                    tally[1] += v["rows"]
+    return out
 
 
 def _stage(
@@ -310,8 +215,8 @@ def evaluate(
     left = residual(rows)
     missing = sorted(set(left) - set(signals))
     sig = {m: signals[m] for m in sorted(left) if m in signals}
-    margin, (ho_hits, ho_n, ho_total) = choose(sig)
-    t = tiers(sig, margin)  # the app's thresholds: all Merchants, chosen margin
+    t = tiers(sig)  # the app's low tier: fitted on all Merchants
+    held = held_out(sig)
     merchants = [_merchant(r) for r in test]
 
     def fill(pick: Pick) -> list[str | None]:
@@ -321,57 +226,44 @@ def evaluate(
             out.append(p if p is not None else (got[1] if got else None))
         return out
 
-    knn = fill(
-        lambda s: (
-            (0, s["knn"][1]) if s["knn"] and s["knn"][0] >= t["knn_threshold"] else None
-        )
-    )
+    knn = fill(lambda s: (0, s["knn"][1]) if s["knn"] else None)
     alone = fill(lambda s: (0, a) if (a := _llm(s)) else None)
-    confident = fill(t["confident"])
-    filed = fill(lambda s: t["confident"](s) or t["low"](s))
-    lowonly = [
-        (g, f)
-        for g, c, f in zip(gold, confident, filed, strict=True)
-        if c is None and f is not None
-    ]
-    no_signal = [
-        m for m, s in sig.items() if t["confident"](s) is None and t["low"](s) is None
-    ]
-    low_merchants = [
-        m
-        for m, s in sig.items()
-        if t["confident"](s) is None and t["low"](s) is not None
-    ]
+    filed = fill(t["low"])
+    no_signal = [m for m, s in sig.items() if t["low"](s) is None]
     share = len(no_signal) / len(sig) if sig else 0.0
     ruled = sum(p is not None for p in base)
     ruled_right = sum(p == g for p, g in zip(base, gold, strict=True))
+    right, guessed_rows = held.get("all", [0, 0])
     per = REPEATS  # held-out rows were counted once per repeat
-    held = {
-        "precision": round(ho_hits / ho_n, 6) if ho_n else 0.0,
-        "coverage": round(ho_n / ho_total, 6) if ho_total else 0.0,  # of residual
-        "wilson_lower_95": round(wilson_lower(ho_hits // per, ho_n // per), 6),
-        "overall_precision": round(
-            (ruled_right + ho_hits / per) / (ruled + ho_n / per), 6
-        )
-        if ruled + ho_n
-        else 0.0,
-        "overall_coverage": round((ruled + ho_n / per) / len(gold), 6),
-    }
+
+    def rate(tally: Sequence[int]) -> float:
+        return round(tally[0] / tally[1], 6) if tally[1] else 0.0
+
     stages = {
-        "rules": _stage(test, gold, base),
+        "confident": _stage(test, gold, base),  # rules, base, Corrections only
         "rules+knn": _stage(test, gold, knn),
         "rules+llm": _stage(test, gold, alone),
-        "gate_confident": _stage(test, gold, confident),
-        "gate_all_tiers": _stage(test, gold, filed),
+        "all_tiers": _stage(test, gold, filed),
+    }
+    held_metrics = {
+        "low_held_out.accuracy": rate(held.get("all", [0, 0])),
+        "all_tiers_held_out.precision": round(
+            (ruled_right + right / per) / (ruled + guessed_rows / per), 6
+        )
+        if ruled + guessed_rows
+        else 0.0,
+        "all_tiers_held_out.coverage": round(
+            (ruled + guessed_rows / per) / len(gold), 6
+        ),
     }
     per_sub = {
         f"{name}.{label}.precision": round(p, 6)
-        for name, preds in (("confident", confident), ("all_tiers", filed))
+        for name, preds in (("confident", base), ("all_tiers", filed))
         for label, (p, _) in sorted(per_category(gold, preds).items())
         if any(x == label for x in preds)
     }
-    guessed = Counter(
-        f for c, f in zip(confident, filed, strict=True) if c is None and f
+    low_guessed = Counter(
+        f for b, f in zip(base, filed, strict=True) if b is None and f
     )
     groceries = "Food & Drink › Groceries"
     by_case: dict[str, list[bool]] = {}
@@ -388,43 +280,41 @@ def evaluate(
         "residual_merchants": len(sig),
         "missing_signals": missing,
         "calibration": {
-            **{k: v for k, v in t.items() if k not in ("confident", "low")},
-            "margin": margin,
+            "confident_models": [],  # by decision (#287): rules, base, Corrections
+            "low_prefers": t["low_prefers"],
+            # held out, percent right per kind of low guess: auto.LOW_CONFIDENCE
+            "low_confidence": {
+                k: v[0] * 100 // v[1] for k, v in sorted(held.items()) if k != "all"
+            },
             "folds": FOLDS,
             "repeats": REPEATS,
-            "held_out": held,
         },
         "review": {
             "cap": CAP,
-            "low_tier_merchants": len(low_merchants),
+            "low_tier_merchants": len(sig) - len(no_signal),
             "no_signal_merchants": len(no_signal),
             # a sync of about 4,000 rows from 575 Merchants, all of them left by
             # the rules (the worst case): Merchants with no guess count inside
             # the cap, so it is the cap unless more than that have none
             "items_per_sync_575": max(CAP, math.ceil(share * REAL_MERCHANTS)),
         },
-        "low_tier_accuracy": round(sum(g == f for g, f in lowonly) / len(lowonly), 6)
-        if lowonly
-        else 0.0,
         "groceries_share": {
             "gold": round(
                 sum(s["gold"] == groceries for s in sig.values()) / len(sig), 6
             )
             if sig
             else 0.0,
-            "low_guesses": round(guessed[groceries] / sum(guessed.values()), 6)
-            if guessed
+            "low_guesses": round(low_guessed[groceries] / sum(low_guessed.values()), 6)
+            if low_guessed
             else 0.0,
         },
         "models": {
             "gate": {
-                "model": "rules+knn+llm agreement gate",
+                "model": "rules confident; knn+llm filed auto-low",
                 "model_version": header.get("model_version", ""),
                 "metrics": {
                     **{f"{s}.{k}": v for s, m in stages.items() for k, v in m.items()},
-                    "gate_confident_held_out.precision": held["overall_precision"],
-                    "gate_confident_held_out.coverage": held["overall_coverage"],
-                    "gate_confident_held_out.residual_precision": held["precision"],
+                    **held_metrics,
                     **per_sub,
                 },
                 "by_case": {

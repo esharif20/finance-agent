@@ -201,11 +201,7 @@ def test_the_app_gate_constants_are_the_committed_synthetic_calibration(
     for f in files:
         r = json.loads(f.read_text())
         cal = r["calibration"]
-        gate = auto._name(r["model_version"])  # pyright: ignore[reportPrivateUsage]
-        assert auto.THRESHOLDS[gate] == cal["agree_threshold"]
-        assert auto.THRESHOLDS[r["embedder"].split("@")[0]] == cal["knn_threshold"]
-        # the bar is held out: thresholds fit on other Merchants (#287 verifier)
-        assert cal["held_out"]["precision"] >= 0.95
+        assert cal["confident_models"] == [] and auto.THRESHOLDS == {}  # #287
         if r["llm"].split("@")[0] == llm.PREFIX + llm.MODEL:  # the app's model
             assert auto.LOW_PREFERS == cal["low_prefers"]
             assert auto.LOW_CONFIDENCE == cal["low_confidence"]

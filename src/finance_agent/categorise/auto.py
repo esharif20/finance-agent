@@ -1,10 +1,11 @@
-"""Confident auto-apply right after sync (#215 B, ADR 0005 as amended).
+"""Model guesses filed right after sync (#215 B/F, ADR 0005 as amended).
 
-After rules and the UK merchant base, a Category Review item's embedding
-guess is applied as source `auto:<model version>` when its score is at or
-above THRESHOLDS[model name], the lowest similarity that keeps >= 95%
-precision on the synthetic #112 eval (evals/results/categoriser_*.json,
-"calibration"). A model without a calibrated threshold never auto-applies.
+After rules and the UK merchant base, a Category Review item's kNN or LLM
+guess is filed `auto-low:<model version>` (silent, undoable, monitored),
+except the REVIEW_CAP Merchants worth asking. The confident `auto:` path
+exists only for a version in THRESHOLDS, which is empty: held out, no model
+kept 95% precision (#287), so confident rows come from rules, the base and
+Corrections alone.
 
 Every guess is logged per model version (`embedding.stored_model`: name and
 digest), and the user's Merchant-wide answer is recorded against it: a live
@@ -33,13 +34,13 @@ from finance_agent.storage import Scoped, schema
 
 log = logging.getLogger(__name__)  # counts only
 
-# model name -> threshold in similarity thousandths, copied from the committed
-# synthetic calibration (a test keeps them equal)
-THRESHOLDS: dict[str, int] = {
-    "nomic-embed-text": 920,  # held out (#287): the in-sample 720 leaked errors
-    "hashed-trigrams-v1": 611,
-    "nomic-embed-text+qwen3.5:4b-q4_K_M": 1061,  # agreement: none held out at 95%
-}
+# Model version name -> confident (`auto:`) threshold in similarity thousandths.
+# Empty by decision (#287): held out on the synthetic set, no model setting
+# (kNN alone, kNN+LLM agreement, LLM alone) kept 95% precision on enough rows,
+# so the confident tier is rules, the UK base and Corrections only, and every
+# model guess files as `auto-low:`. A version listed here would apply
+# confidently again; it needs a held-out calibration first.
+THRESHOLDS: dict[str, int] = {}
 MIN_DECISIONS = 50
 PRECISION = 95  # percent
 SOURCE = "auto:"
@@ -51,7 +52,7 @@ LOW_FLOOR = 50  # percent: a low-tier version under this (eval: 57-64) is stoppe
 # equal): which guess to file on a disagreement, and how often each kind of
 # low guess is right (percent), for spend x (1 - confidence).
 LOW_PREFERS = "llm"
-LOW_CONFIDENCE: dict[str, int] = {"agree": 77, "knn": 0, "llm": 66}
+LOW_CONFIDENCE: dict[str, int] = {"agree": 78, "knn": 0, "llm": 66}
 
 type Category = tuple[str, str]
 UNCATEGORISED = (_NONE, _NONE)
@@ -63,14 +64,16 @@ def _ids(conn: Connection, user_id: int) -> dict[Category, int]:
     return seed_taxonomy(conn, user_id)
 
 
-def _suspended(db: Scoped, model: str, threshold: int) -> bool:
+def _suspended(db: Scoped, model: str, threshold: int | None) -> bool:
     """The live accuracy monitor (#215 G): once the user has answered at least
     MIN_DECISIONS of `model`'s guesses at or above the threshold and fewer
     than PRECISION% agree, the version stops auto-applying, for good. It only
     measures until then; it never holds anything back."""
     p, ms = schema.category_prediction, schema.model_suspension
     if db.execute(db.select(ms, ms.c.id).where(ms.c.model == model)).first():
-        return True
+        return True  # a stopped version stays stopped, threshold or not
+    if threshold is None:
+        return False
     judged = db.execute(
         db.select(p, p.c.category_id, p.c.decided_category_id).where(
             p.c.model == model,
@@ -208,9 +211,8 @@ def apply(
 ) -> int:
     """Re-apply live auto rows, then decide each Category Review item (#215 F):
 
-    - confident (`auto:`): the kNN alone at its threshold, or the kNN and the
-      LLM agreeing at the agreement threshold, or the LLM alone where it has
-      a calibrated threshold of its own;
+    - confident (`auto:`): only for a version with a THRESHOLDS entry (none
+      today): the kNN alone, the kNN and the LLM agreeing, or the LLM alone;
     - `final` only (the pass after the LLM has answered): every other
       Merchant with a guess is filed `auto-low:`, except the REVIEW_CAP
       Merchants with the most expected impact (spend x (1 - confidence)),
@@ -227,7 +229,7 @@ def apply(
         if (
             _low_suspended(db, m)
             if m.startswith(LOW_MODEL)
-            else (t := threshold(m)) is not None and _suspended(db, m, t)
+            else _suspended(db, m, threshold(m))
         )
     }
 
