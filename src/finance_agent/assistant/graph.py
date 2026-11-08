@@ -24,7 +24,7 @@ from langgraph.types import Command, interrupt
 from pydantic import ValidationError
 from sqlalchemy import Connection
 
-from finance_agent.assistant import context, fast_path
+from finance_agent.assistant import context, fast_path, planner, resolve
 from finance_agent.assistant.chat_model import (
     ChatModel,
     Message,
@@ -51,7 +51,10 @@ from finance_agent.assistant.tools import (
 )
 from finance_agent.assistant.tools.propose import FigureInMemory, NotSaid, ProposalOut
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
-from finance_agent.assistant.tools.read import _category  # pyright: ignore[reportPrivateUsage]
+from finance_agent.assistant.tools.read import (
+    Source,
+    _category,  # pyright: ignore[reportPrivateUsage]
+)
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
@@ -139,6 +142,8 @@ TOOL_STAGE = {
     "simulate_purchase": "Checking that purchase against your plan…",
 }
 CHECKING = "Checking every figure…"
+WRITING = "Writing your answer…"
+TOPICS = 12  # turns whose Plan topics feed the rolling summary
 
 
 def tool_stage(name: str, args: dict[str, Any]) -> str:
@@ -173,6 +178,10 @@ def _keep_last(
     return (a + b)[-HISTORY:]
 
 
+def _keep_topics(a: list[str], b: list[str]) -> list[str]:
+    return (a + b)[-TOPICS:]
+
+
 class State(TypedDict):
     message: str
     turn_id: str
@@ -189,6 +198,11 @@ class State(TypedDict):
     payload_id: NotRequired[str | None]
     # the last spend_for_query plan (#271): selectors and ids, never figures
     query_plan: NotRequired[dict[str, Any] | None]
+    # this turn's planner Plan (#317): selectors and labels, never figures;
+    # the next turn's follow-up patches it
+    turn_plan: NotRequired[dict[str, Any] | None]
+    resolved: NotRequired[list[str]]  # what code resolved, shown with the reply
+    topics: NotRequired[Annotated[list[str], _keep_topics]]  # one per turn
 
 
 type Update = dict[str, Any]  # the keys of State a node sets
@@ -225,6 +239,8 @@ class Assistant:
     # Transactions behind each spending total this turn, by evidence ID;
     # shown to the user only, never checkpointed (ADR 0007)
     counted: dict[str, Evidence] = field(default_factory=dict[str, Evidence])
+    # this turn's Plan or clarifying question, found by the router (#317)
+    _now: planner.Plan | planner.Clarify | None = field(default=None, init=False)
 
     def _stage(self, words: str) -> None:
         if self.on_stage is not None:
@@ -233,6 +249,13 @@ class Assistant:
     # --- nodes ---------------------------------------------------------------
 
     def router(self, s: State) -> Update:
+        self._now = None if self._cloud_on(s) else self._plan_turn(s)
+        if self._now is not None:
+            now = self._now
+            deep = isinstance(now, planner.Plan) and now.kind == "in_depth"
+            now_route: Route = "plan" if deep else "ask"
+            self._stage(ROUTE_STAGE[now_route])
+            return {"route": now_route, **_NEW_TURN}
         route = pre_route(s["message"])
         fast = not self._cloud_on(s) and fast_path.parse(s["message"], self.today)
         if route is None and (fast or self._first_hit("ask", s)):
@@ -257,6 +280,9 @@ class Assistant:
     def subgraph(self, route: Route) -> Callable[[State], Update]:
         def node(s: State) -> Update:
             # a thread opted in to cloud wording keeps it (#301)
+            if self._now is not None and route in ("ask", "plan"):
+                if (done := self._planned(route, s, self._now)) is not None:
+                    return done
             fast = None if self._cloud_on(s) else self._fast(s)
             if route == "ask" and fast is not None:
                 return fast
@@ -273,11 +299,13 @@ class Assistant:
         return node
 
     def finish(self, s: State) -> Update:
+        plan = s.get("turn_plan") or {}
         return {
             "history": [
                 {"role": "user", "content": s["message"]},
                 {"role": "assistant", "content": s.get("reply", "")},
-            ]
+            ],
+            "topics": [str(plan.get("what") or plan.get("kind") or "")],
         }
 
     def confirm(self, s: State) -> Update:
@@ -369,6 +397,112 @@ class Assistant:
     def _cloud_on(self, s: State) -> bool:
         return bool(s.get("cloud")) and self.cloud is not None
 
+    # --- the planner (#317) ------------------------------------------------
+
+    def _plan_turn(self, s: State) -> planner.Plan | planner.Clarify | None:
+        """This turn's Plan with no model call: a follow-up patching the last
+        one, an open or in-depth question, or a figure question the fast path
+        does not take. None: the fast path or the model."""
+        msg, led = s["message"], Ledger(self.conn, current_user())
+        mems = Proposals(self.conn, current_user()).memories()
+        prev = _turn_plan(s)
+        if prev is not None:
+            fu = planner.follow_up(prev, msg, self.today, led, mems)
+            if fu is not None:
+                return fu
+        if (kind := planner.classify(msg)) is not None:
+            return planner.open_plan(kind, msg, self.today, led, mems)
+        if fast_path.parse(msg, self.today) is not None:
+            return None
+        return planner.figure(msg, self.today, led, mems)
+
+    def _planned(
+        self, route: Route, s: State, now: planner.Plan | planner.Clarify
+    ) -> Update | None:
+        if isinstance(now, planner.Clarify):
+            return {"reply": now.question, "path": "planner", "evidence": []}
+        if now.kind in ("open", "in_depth"):
+            return self._write(route, s, now)
+        return self._figure(s, now)
+
+    def _figure(self, s: State, plan: planner.Plan) -> Update | None:
+        """A figure Plan from a template: no model call."""
+        led = Ledger(self.conn, current_user())
+        self._stage(ROUTE_STAGE["ask"])
+        try:
+            got = planner.execute(plan, Source(self.conn, current_user(), self.today))
+        except (NoData, ValueError):
+            return None
+        values = planner.values(plan, led)
+        for f in got:
+            values += tool_values(f.name, f.out)
+            if (ev := counted(led, f.out)) is not None:
+                self.counted[ev.evidence_id] = ev
+        reply = planner.render(plan, got)
+        if reply is None or not _shown(reply):
+            return None
+        res = check_grounding(reply, values, today=self.today)
+        if not res.grounded:
+            return None  # a template slip: the model answers
+        return {
+            "reply": reply,
+            "path": "planner",
+            "evidence": _shown_evidence(v.evidence_id for v in values),
+            "turn_plan": plan.model_dump(mode="json"),
+            "resolved": list(plan.labels),
+        }
+
+    def _write(self, route: Route, s: State, plan: planner.Plan) -> Update:
+        """An open or in-depth question: one fetch round of at most
+        planner.MAX_FETCHES Engine reads, then one writer call with no tool
+        schemas. Grounding as ever: one regeneration, then the table."""
+        led = Ledger(self.conn, current_user())
+        memories = Proposals(self.conn, current_user()).memories()
+        d = Draft(
+            messages=context.writer(
+                s["message"],
+                memories,
+                s.get("history", []),
+                self.today,
+                s.get("topics", []),
+            )
+        )
+        d.values += planner.values(plan, led)
+        left = PREFETCH_TOKENS * context.CHARS_PER_TOKEN
+        made = ["[resolved]\n" + "\n".join(plan.labels)] if plan.labels else []
+        # shortcut: the round runs one call after another on the turn's one
+        # connection (SQLite reads take milliseconds); thread it if the bench
+        # shows the fetch round past 1 s
+        calls = planner.fetches(plan)
+        d.rounds.append([c.model_dump() for _, c in calls])  # caching rules see them
+        for r, call in calls:
+            seen = len(d.values)
+            out = self._call(r, call, s, d)
+            content = context.facts(call.name, out) if out is not None else ""
+            if out is None or len(content) > left:
+                del d.values[seen:]  # unseen, so not evidence
+                continue
+            left -= len(content)
+            made.append(content)
+        made.append(context.LENGTH[plan.kind])
+        body = "\n".join(made)
+        d.messages.insert(-1, Message(role="system", content=context.FACTS + body))
+        self._stage(WRITING)
+        try:
+            d.reply = self.model.chat(d.messages).content
+        except (OllamaError, OSError):
+            d.failed = True
+        if d.failed and not d.values:
+            return {"reply": MODEL_DOWN, "path": "deterministic"}
+        if not d.reply.strip():
+            d.failed = True
+        out = self._ground_local(route, s, d)
+        out["evidence"] = _shown_evidence(out.get("evidence") or ())
+        return out | {
+            "turn_plan": plan.model_dump(mode="json"),
+            "resolved": list(plan.labels),
+        }
+
     def _fast(self, s: State) -> Update | None:
         """A simple spending question with no model call: the planner's one
         tool call and a template (fast_path), checked like any reply. Not
@@ -386,7 +520,12 @@ class Assistant:
         ):
             return None  # no data, or a template slip: the model answers
         evidence = sorted({v.evidence_id for v in d.values})
-        return {"reply": reply, "path": "planner", "evidence": evidence}
+        done: Update = {"reply": reply, "path": "planner", "evidence": evidence}
+        led = Ledger(self.conn, current_user())
+        plan = planner.figure(s["message"], self.today, led)
+        if isinstance(plan, planner.Plan):  # so a follow-up can patch it
+            done |= {"turn_plan": plan.model_dump(mode="json"), "resolved": []}
+        return done
 
     def _prefetch(self, s: State, d: Draft) -> None:
         """Retrieve-then-generate: the tool results an answer most likely
@@ -592,7 +731,22 @@ _NEW_TURN: Update = {
     "evidence": [],
     "cost_pence": None,
     "payload_id": None,
+    "turn_plan": None,
+    "resolved": [],
 }
+
+
+def _turn_plan(state: State) -> planner.Plan | None:
+    raw = state.get("turn_plan")
+    try:
+        return planner.Plan.model_validate(raw) if raw else None
+    except ValidationError:
+        return None
+
+
+def _shown_evidence(ids: Any) -> list[str]:
+    """Evidence IDs for the panel: the resolver's own values are not one."""
+    return sorted({e for e in ids if e != resolve.EVIDENCE})
 
 
 def _plan(state: State) -> QueryPlan | None:
@@ -617,6 +771,7 @@ class Answer:
     cost_pence: int | None = None  # a cloud call this turn (#301)
     payload_id: str | None = None
     counted: tuple[Evidence, ...] = ()  # Transactions behind its totals
+    resolved: tuple[str, ...] = ()  # what code resolved the question to (#317)
 
 
 def _answer(assistant: Assistant, thread: str, out: dict[str, Any]) -> Answer:
@@ -633,6 +788,7 @@ def _answer(assistant: Assistant, thread: str, out: dict[str, Any]) -> Answer:
         cost_pence=out.get("cost_pence"),
         payload_id=out.get("payload_id"),
         counted=tuple(assistant.counted[e] for e in evidence if e in assistant.counted),
+        resolved=tuple(out.get("resolved") or ()),
     )
 
 
