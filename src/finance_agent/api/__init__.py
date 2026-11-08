@@ -18,6 +18,7 @@ from sqlalchemy import Connection, Engine
 
 from finance_agent import categorise
 from finance_agent.api import (
+    briefing,
     card_art,
     chat,
     fx,
@@ -610,6 +611,7 @@ def create_app(engine: Engine, web_dir: Path | None = None) -> FastAPI:
     app.include_router(proposals.router)
     app.include_router(chat.router)
     app.include_router(insights.router)
+    app.include_router(briefing.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
