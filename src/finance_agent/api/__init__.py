@@ -45,6 +45,7 @@ from finance_agent.api import (
     subscription_costs,
     subscriptions,
 )
+from finance_agent.assistant import semantic
 from finance_agent.categorise import auto, subscription_alerts
 from finance_agent.categorise.display_names import display_name
 from finance_agent.engine import profile
@@ -410,6 +411,7 @@ def sync_once(
     # profile built in between before warming the next one
     profile.forget(user_id)
     profile.start(engine, user_id)
+    semantic.start(engine, user_id)  # after the Merchant vectors above
     return reports
 
 
@@ -679,6 +681,7 @@ def create_app(
 def serve(port: int = DEFAULT_PORT) -> None:
     engine = open_db(create=False)
     profile.start(engine, current_user())  # the first scan, each time `fa` opens
+    semantic.start(engine, current_user())
     scheduler.Scheduler(
         engine, current_user(), lambda: _scheduled_sync(engine, current_user())
     ).start()

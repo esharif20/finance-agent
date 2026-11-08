@@ -462,9 +462,11 @@ class Assistant:
             return bal
         if (kind := planner.classify(msg)) is not None:
             return planner.open_plan(kind, msg, self.today, led, mems)
+        plan = planner.figure(msg, self.today, led, mems)
         if fast_path.parse(msg, self.today) is not None:
-            return None
-        return planner.figure(msg, self.today, led, mems)
+            # the fast path, unless the planner counts Merchants filed elsewhere
+            return plan if isinstance(plan, planner.Plan) and plan.note else None
+        return plan
 
     def _planned(
         self, route: Route, s: State, now: planner.Plan | planner.Clarify
@@ -668,6 +670,7 @@ class Assistant:
         )
 
     def _run(self, route: Route, call: Any, s: State, d: Draft) -> str:
+        call = _pinned(call, s["message"], self.today)
         try:
             with self._phase("fetch"):
                 out = run(route, call, self.conn, self._turn(s), d.plan or _plan(s))
@@ -871,6 +874,16 @@ def profile_context(
     version) and its figures for grounding."""
     text, prof = profile.profile_context(conn, user_id, today)
     return text, tool_values("profile", prof)
+
+
+def _pinned(call: Any, message: str, today: date) -> Any:
+    """A spend query's range is the period code read in the message, never the
+    model's reading of it ("this year" is 1 January to today)."""
+    p = resolve.one_period(message, today)
+    if p is None or getattr(call, "name", "") != "spend_for_query":
+        return call
+    args = {**call.arguments, "since": f"{p.since:%Y-%m}", "until": f"{p.until:%Y-%m}"}
+    return call.model_copy(update={"arguments": args})
 
 
 def miss(reason: str) -> Update:
