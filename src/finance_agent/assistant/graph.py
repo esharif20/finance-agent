@@ -8,6 +8,7 @@ encrypted database (`LedgerSaver`).
 The checkpointed state holds the turn's message, reply and route, never tool
 results. Nothing here logs message, reply or tool text."""
 
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -55,7 +56,16 @@ MODEL_DOWN = "The local model isn't answering, so I can't help with that right n
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
 REGENERATE = (
     "Some figures in that reply are not in this turn's tool results. Rewrite it"
-    " using only figures copied exactly from the tool results, or none."
+    " using only figures copied exactly from the tool results, or none, and"
+    " with no links."
+)
+# A link, image or address in a reply could carry the user's data off the device
+# when rendered or followed (#142), so such a reply is never shown or cached.
+_LINK = re.compile(
+    r"\b[a-z][a-z0-9+.-]*://|//|\bwww\.|\]\(|</?[a-z]+[\s>/]"
+    r"|\b(?:mailto|javascript|file)\s*:|\bdata:\s*[a-z]+/"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}[/?]",
+    re.IGNORECASE,
 )
 
 
@@ -231,7 +241,8 @@ class Assistant:
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)
-        if not d.failed and not res.grounded:
+        ok = res.grounded and not _LINK.search(d.reply)
+        if not d.failed and not ok:
             try:
                 again: Reply = self.model.chat(
                     [
@@ -242,9 +253,10 @@ class Assistant:
                 )
                 d.reply = again.content
                 res = check_grounding(d.reply, d.values, today=self.today)
+                ok = res.grounded and not _LINK.search(d.reply)
             except (OllamaError, OSError):
                 d.failed = True
-        if d.failed or not res.grounded:
+        if d.failed or not ok:
             return {
                 "reply": render_fallback(d.values),
                 "path": "deterministic",
