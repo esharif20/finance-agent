@@ -177,6 +177,49 @@ def _merchant_spending(led: Ledger) -> dict[int, list[Transaction]]:
     return by_merchant
 
 
+@dataclass(frozen=True)
+class Detection:
+    kind: str
+    group: str
+    reason: str  # a DETECTED_REASONS value
+    status: str  # a DETECTED_STATUSES value
+    charge_count: int | None
+    interval: str | None
+
+
+def judge(
+    merchant: str,
+    descriptions: Iterable[str],
+    charges: Iterable[tuple[date, int]],
+    category: tuple[str, str] | None = None,
+) -> Detection | None:
+    """Pure recognition for one Merchant: its name, its rows' raw descriptors,
+    its GBP charges (posted date, minor units, money out) and its Category."""
+    rec = detect_recurring(charges)
+    known = known_service(merchant)
+    group = next((g for d in descriptions if (g := pattern_group(d))), None)
+    if known:
+        _, kind, group = known
+        reason, status = "known_service", "active"
+    elif group:
+        kind, reason, status = SUB, "pattern", "suggested"
+    elif rec:
+        top, leaf = category or ("", "")
+        kind = _KIND_OF_TOP.get(top, SUB)
+        group = leaf if top in _KIND_OF_TOP else "Other subscriptions"
+        reason, status = "pattern", "suggested"
+    else:
+        return None
+    return Detection(
+        kind,
+        group,
+        reason,
+        status,
+        rec.charge_count if rec else None,
+        rec.interval if rec else None,
+    )
+
+
 def recognise(led: Ledger) -> int:
     """Record a detection for every Merchant whose Spending is recognised;
     returns how many registry entries were written."""
@@ -190,30 +233,23 @@ def recognise(led: Ledger) -> int:
         c = ts[0].categorisation
         if c is None or c.merchant is None:  # filtered above; for the type checker
             continue
-        rec = detect_recurring(gbp.get(merchant_id, []))
-        known = known_service(c.merchant)
-        group = next((g for t in ts if (g := pattern_group(t.description))), None)
-        if known:
-            _, kind, group = known
-            reason, status = "known_service", "active"
-        elif group:
-            kind, reason, status = SUB, "pattern", "suggested"
-        elif rec:
-            top, leaf = c.category or ("", "")
-            kind = _KIND_OF_TOP.get(top, SUB)
-            group = leaf if top in _KIND_OF_TOP else "Other subscriptions"
-            reason, status = "pattern", "suggested"
-        else:
+        d = judge(
+            c.merchant,
+            [t.description for t in ts],
+            gbp.get(merchant_id, []),
+            c.category,
+        )
+        if d is None:
             continue
         written += led.record_detection(
             merchant_id,
-            kind,
-            group,
-            reason,
-            status,
+            d.kind,
+            d.group,
+            d.reason,
+            d.status,
             max(t.posted_on for t in ts),
-            rec.charge_count if rec else None,
-            rec.interval if rec else None,
+            d.charge_count,
+            d.interval,
         )
     log.info("subscriptions_recognised written=%d", written)
     return written
