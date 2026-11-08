@@ -163,3 +163,29 @@ it("frees everything when unmounted while the context is lost, and a late restor
   expect(live()).toHaveLength(0);
   expect(made[0]!.dispose).toHaveBeenCalledTimes(1);
 });
+
+it("creates no canvas and no WebGL context at phone width or on touch (the iOS memory crash)", async () => {
+  let resize: ResizeObserverCallback = () => {};
+  vi.stubGlobal("WebGLRenderingContext", class {});
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(cb: ResizeObserverCallback) { resize = cb; }
+    observe() {} disconnect() {} unobserve() {}
+  });
+  vi.stubGlobal("matchMedia", (q: string) => ({
+    matches: /max-width: 899px|pointer: coarse/.test(q), // a touch screen past the phone breakpoint: the stack, not the mini cards
+    media: q,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext");
+  createCardScene.mockClear();
+  render(<AccountStack accounts={[account]} onSelect={() => {}} />);
+  act(() => resize([{ contentRect: { width: 360 } } as ResizeObserverEntry], {} as ResizeObserver));
+  await new Promise((r) => setTimeout(r, 50));
+
+  expect(document.querySelector("canvas")).toBeNull();
+  expect(createCardScene).not.toHaveBeenCalled();
+  expect(getContext.mock.calls.some(([kind]) => String(kind).startsWith("webgl"))).toBe(false);
+  expect(screen.getByRole("group", { name: "Accounts" })).toHaveAttribute("data-gl", "false"); // CSS faces
+  getContext.mockRestore();
+});

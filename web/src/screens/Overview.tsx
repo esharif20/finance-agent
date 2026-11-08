@@ -17,7 +17,7 @@ import { SubscriptionsCard } from "@/components/SubscriptionsCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { groupSpending } from "@/lib/categories";
-import { accountHref } from "@/lib/route";
+import { accountHref, goHash } from "@/lib/route";
 import { AccountStack, SELECT_SPRING } from "./AccountStack";
 import { AccountDetails, AccountShares, TopMerchants, TransfersLine } from "./AccountView";
 import { MonthBars, newestQuery, seriesQuery } from "./MonthBars";
@@ -90,7 +90,7 @@ export function Overview({ account }: { account?: number }) {
   // a hash naming an Account that isn't there (any more) shows All accounts
   const known = accounts.data?.some((a) => a.id === account) ? account : undefined;
   const select = (id: number | undefined) => {
-    window.location.hash = accountHref(id); // a history entry: Back returns to the last card
+    goHash(accountHref(id)); // a history entry, no navigation: Back returns to the last card
   };
   const stale = accounts.data !== undefined && account !== undefined && known === undefined;
   useEffect(() => {
