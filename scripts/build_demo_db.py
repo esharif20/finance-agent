@@ -37,7 +37,7 @@ from finance_agent.demo import guard  # noqa: E402
 from finance_agent.demo.session import plain_engine  # noqa: E402
 from finance_agent.identity import current_user  # noqa: E402
 from finance_agent.ingest import lloyds  # noqa: E402
-from finance_agent.ledger import Ledger  # noqa: E402
+from finance_agent.ledger import Ledger, UnknownTarget  # noqa: E402
 from finance_agent.ledger.proposals import (  # noqa: E402
     MemoryDraft,
     MemoryType,
@@ -250,7 +250,10 @@ def _settle(conn: Connection, h: sh.History) -> None:
     )
     for name in subs[1:]:
         if name in ids:
-            led.confirm_subscription(ids[name])
+            try:
+                led.confirm_subscription(ids[name])
+            except UnknownTarget:  # not detected in this history: nothing to confirm
+                pass
 
 
 def _remember(conn: Connection, n: int, today: date) -> None:
