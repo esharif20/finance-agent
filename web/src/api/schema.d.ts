@@ -550,6 +550,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/know-you": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_know_you_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/know-you/bandit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Reset Bandit */
+        delete: operations["reset_bandit_api_know_you_bandit_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/know-you/life-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Reset Life Changes */
+        delete: operations["reset_life_changes_api_know_you_life_changes_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/know-you/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Reset Map */
+        delete: operations["reset_map_api_know_you_map_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/local-model": {
         parameters: {
             query?: never;
@@ -1443,6 +1511,15 @@ export interface components {
             accounts: components["schemas"]["AccountGbpOut"][];
             total: components["schemas"]["finance_agent__api__fx__Money"] | null;
         };
+        /** BanditOut */
+        BanditOut: {
+            /** Live Pct */
+            live_pct: number | null;
+            /** Rated */
+            rated: number;
+            /** Shadow Pct */
+            shadow_pct: number | null;
+        };
         /** BatchAnswerIn */
         BatchAnswerIn: {
             /** Category */
@@ -1913,6 +1990,14 @@ export interface components {
             kind: string;
             monthly: components["schemas"]["Pence"];
         };
+        /** KnowYouOut */
+        KnowYouOut: {
+            bandit: components["schemas"]["BanditOut"];
+            /** Life Changes */
+            life_changes: components["schemas"]["LifeChangeOut"][];
+            /** Map Edges */
+            map_edges: number;
+        };
         /** LearnedOut */
         LearnedOut: {
             /** Answers */
@@ -1924,6 +2009,13 @@ export interface components {
              * @enum {string}
              */
             question: "cut" | "matters";
+        };
+        /** LifeChangeOut */
+        LifeChangeOut: {
+            /** Month */
+            month: string;
+            /** Series */
+            series: string;
         };
         /** LocalModelOut */
         LocalModelOut: {
@@ -3579,6 +3671,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    summary_api_know_you_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowYouOut"];
+                };
+            };
+        };
+    };
+    reset_bandit_api_know_you_bandit_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
+    reset_life_changes_api_know_you_life_changes_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
+    reset_map_api_know_you_map_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
                 };
             };
         };

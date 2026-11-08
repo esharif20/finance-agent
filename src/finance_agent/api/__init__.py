@@ -28,6 +28,7 @@ from finance_agent.api import (
     goals,
     guidance,
     insights,
+    know_you,
     local_model,
     manage_links,
     merchants,
@@ -648,6 +649,7 @@ def create_app(
     app.include_router(insights.router)
     app.include_router(briefing.router)
     app.include_router(preferences.router)
+    app.include_router(know_you.router)
 
     dist = web_dir or WEB_DIST
     if dist.is_dir():
