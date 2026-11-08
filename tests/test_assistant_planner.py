@@ -217,6 +217,53 @@ def test_an_in_depth_question_fetches_one_round_then_writes(seeded: Engine) -> N
     assert a.route == "plan" and "[forecast_cashflow]" in model.calls[0][0][-2].content
 
 
+def test_an_open_answer_that_fails_its_check_falls_back_to_guidance(
+    seeded: Engine,
+) -> None:
+    from finance_agent.ledger.insights import Found, Insights
+
+    with seeded.begin() as conn:
+        Insights(conn, ME).replace(
+            [
+                Found(
+                    "price_increase",
+                    "SYNTH STREAM",
+                    "Subscriptions",
+                    TODAY,
+                    300,
+                    80,
+                    (),
+                )
+            ]
+        )
+    bad = "Cut back and save £999.99."
+    [a], _ = run(seeded, [bad, bad], "Where can I save?")
+    assert a.path == "planner"
+    assert a.reply.startswith("Here's what your Guidance and Insights point to:")
+    assert "|" not in a.reply and "£999.99" not in a.reply
+    assert "£3.00" in a.reply and a.evidence and a.evidence[0].startswith("insight:")
+
+
+def test_the_fetch_round_runs_its_reads_at_once(
+    seeded: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    from finance_agent.assistant import graph
+
+    real = graph.run
+
+    def slow(*a: Any, **k: Any) -> Any:
+        time.sleep(0.2)
+        return real(*a, **k)
+
+    monkeypatch.setattr(graph, "run", slow)
+    [a], model = run(seeded, ["Here is your plan."], "Plan my next 3 months")
+    facts = model.calls[0][0][-2].content
+    assert "[forecast_cashflow]" in facts and "[list_guidance]" in facts
+    assert a.timing["phases"]["fetch"] < 450  # three 200 ms reads, overlapped
+
+
 def test_overdraft_is_answered_from_the_bank_balance(
     engine: Engine, tmp_path: Path
 ) -> None:

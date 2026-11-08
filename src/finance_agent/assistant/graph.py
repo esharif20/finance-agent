@@ -14,6 +14,7 @@ import time
 import uuid
 from collections import Counter
 from collections.abc import Callable, Generator, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
@@ -245,6 +246,7 @@ class Draft:
     plan: QueryPlan | None = None  # this turn's last spend_for_query plan
     prefetched: int = 0  # values[:prefetched] came from _prefetch
     relevant: list[ToolValue] | None = None  # the Plan's own facts, if planned
+    advice: tuple[str, list[str]] | None = None  # an open answer's code fallback
 
 
 @dataclass
@@ -553,15 +555,17 @@ class Assistant:
         d.values += planner.values(plan, led) + profile_values
         left = PREFETCH_TOKENS * context.CHARS_PER_TOKEN
         made = ["[resolved]\n" + "\n".join(plan.labels)] if plan.labels else []
-        # shortcut: the round runs one call after another on the turn's one
-        # connection (SQLite reads take milliseconds); thread it if the bench
-        # shows the fetch round past 1 s
         calls = planner.fetches(plan)
         d.rounds.append([c.model_dump() for _, c in calls])  # caching rules see them
         main = len(d.values)
-        for i, (r, call) in enumerate(calls):
+        outs = self._fetch_round(calls, s)
+        took: list[Any] = []
+        for i, ((r, call), got) in enumerate(zip(calls, outs, strict=True)):
             seen = len(d.values)
-            out = self._call(r, call, s, d)
+            out = self._took(call, got, d) if got is not None else None
+            if got is _AGAIN:  # the parallel read failed: on the turn's own
+                out = self._call(r, call, s, d)
+            took.append(out)
             if i == 0:
                 d.relevant = d.values[:main] + d.values[seen:]
             content = context.facts(call.name, out) if out is not None else ""
@@ -578,6 +582,9 @@ class Assistant:
                 near = map_tool.block(map_tool.map_context(src, nodes))
             if near and len(near) <= left:
                 made.append(near)
+        d.advice = planner.advice(took)
+        if d.advice is None and plan.kind == "open":  # never a figures table
+            d.advice = (NO_ADVICE, [])
         made.append(context.LENGTH[plan.kind])
         body = "\n".join(made)
         d.messages.insert(-1, Message(role="system", content=context.FACTS + body))
@@ -659,9 +666,38 @@ class Assistant:
                 out = run(route, call, self.conn, self._turn(s), _plan(s))
         except (ToolNotAllowed, NoData, ValidationError, ValueError):
             return None
+        return self._took(call, out, d)
+
+    def _took(self, call: ToolCall, out: Any, d: Draft) -> Any:
+        if out is _AGAIN:
+            return out
         self._evidence(Ledger(self.conn, current_user()), out)
         d.values += tool_values(call.name, out)
         return out
+
+    def _fetch_round(
+        self, calls: Sequence[tuple[Route, ToolCall]], s: State
+    ) -> list[Any]:
+        """The round's read-only Engine calls at once, each on its own pooled
+        connection (SQLite serves readers side by side). A call that gives
+        nothing is None; one that fails on its connection is _AGAIN, run
+        again on the turn's own."""
+        engine, turn, plan = self.conn.engine, self._turn(s), _plan(s)
+
+        def one(rc: tuple[Route, ToolCall]) -> Any:
+            try:
+                with engine.connect() as c:
+                    return run(rc[0], rc[1], c, turn, plan)
+            except (ToolNotAllowed, NoData, ValidationError, ValueError):
+                return None
+            except Exception:  # noqa: BLE001  # a locked or private database
+                return _AGAIN
+
+        if len(calls) < 2 or engine.url.database in (None, "", ":memory:"):
+            return [_AGAIN] * len(calls)  # nothing to overlap, or one shared database
+        self._stage(tool_stage(calls[0][1].name, calls[0][1].arguments))
+        with self._phase("fetch"), ThreadPoolExecutor(len(calls)) as pool:
+            return list(pool.map(one, calls))
 
     @staticmethod
     def _cacheable(route: Route, d: Draft) -> bool:
@@ -762,6 +798,9 @@ class Assistant:
                 ok = res.grounded and _shown(d.reply)
             except (OllamaError, OSError):
                 d.failed = True
+        if (d.failed or not ok) and d.advice is not None:
+            reply, ids = d.advice
+            return {"reply": reply, "path": "planner", "evidence": ids}
         if d.failed or not ok:
             # only facts that answer this question: the Plan's own read, or
             # what the model asked for; never the whole prefetched context
@@ -874,6 +913,13 @@ def profile_context(
     version) and its figures for grounding."""
     text, prof = profile.profile_context(conn, user_id, today)
     return text, tool_values("profile", prof)
+
+
+NO_ADVICE = (
+    "I couldn't check an answer to that, and your Guidance and Insights have"
+    " nothing on it yet."
+)
+_AGAIN = object()  # a parallel read to run again on the turn's connection
 
 
 def _pinned(call: Any, message: str, today: date) -> Any:

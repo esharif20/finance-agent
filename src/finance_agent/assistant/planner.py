@@ -32,6 +32,8 @@ from finance_agent.assistant.grounding import (
     ToolValue,
     format_figure,
 )
+from finance_agent.assistant.tools.guidance import ListGuidanceOut
+from finance_agent.assistant.tools.insight import ListInsightsOut
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
 from finance_agent.assistant.tools.query import spend as spend
 from finance_agent.assistant.tools.read import (
@@ -511,6 +513,30 @@ def open_plan(
     r = rs.resolve(message, today, led, memories)
     r.question = None  # an open question defaults; it never asks
     return _from(r, kind, today)
+
+
+ADVICE_ROWS = 3
+
+
+def advice(outs: Sequence[object]) -> tuple[str, list[str]] | None:
+    """When the writer's answer fails its check: what the user's own Guidance
+    and Insights say, worded by code (#317), never a figures table. (reply,
+    evidence ids), or None when neither has anything to say."""
+    lines: list[str] = []
+    ids: list[str] = []
+    for out in outs:
+        if isinstance(out, ListGuidanceOut):
+            for c in out.rows[:ADVICE_ROWS]:
+                lines.append(f"- {c.title.data}: {c.body.data}")
+                ids.append(c.evidence_id)
+        elif isinstance(out, ListInsightsOut):
+            for i in out.rows[:ADVICE_ROWS]:
+                said = i.template.replace("{key}", i.key.data)
+                lines.append("- " + said.replace("{impact}", _money(i.impact)))
+                ids.append(i.evidence_id)
+    if not lines:
+        return None
+    return "Here's what your Guidance and Insights point to:\n" + "\n".join(lines), ids
 
 
 def fetches(plan: Plan) -> list[tuple[Literal["ask", "plan"], ToolCall]]:
