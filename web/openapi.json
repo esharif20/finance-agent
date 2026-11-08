@@ -2073,6 +2073,22 @@
         "title": "ManageLinkOut",
         "type": "object"
       },
+      "MapEdgeCardOut": {
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/NodeOut"
+          },
+          "b": {
+            "$ref": "#/components/schemas/NodeOut"
+          }
+        },
+        "required": [
+          "a",
+          "b"
+        ],
+        "title": "MapEdgeCardOut",
+        "type": "object"
+      },
       "MemoriesOut": {
         "properties": {
           "items": {
@@ -2568,6 +2584,30 @@
         "title": "NewsSourceOut",
         "type": "object"
       },
+      "NodeOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "merchant",
+              "category",
+              "goal",
+              "life_change"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "NodeOut",
+        "type": "object"
+      },
       "NoteIn": {
         "properties": {
           "text": {
@@ -2821,7 +2861,8 @@
           "kind": {
             "enum": [
               "memory",
-              "correction"
+              "correction",
+              "map_edge"
             ],
             "title": "Kind",
             "type": "string"
@@ -2829,6 +2870,16 @@
           "ledger_version": {
             "title": "Ledger Version",
             "type": "integer"
+          },
+          "map_edge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapEdgeCardOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "memory": {
             "anyOf": [

@@ -77,7 +77,10 @@ export function Briefing() {
           {data.next_payday && <> · next payday {day(data.next_payday)}</>}
         </p>
         <span className="flex gap-4">
-          <a href="#goals" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
+          <a href="#story" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
+            Your month
+          </a>
+          <a href="#goals"className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
             Goals
           </a>
           <a href="#know" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">

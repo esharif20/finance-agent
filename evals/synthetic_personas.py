@@ -312,3 +312,119 @@ def fingerprint(ps: list[Persona]) -> str:
         for p in ps
     ]
     return hashlib.sha256(repr(stable).encode()).hexdigest()
+
+
+# --- the personal map (#275) ----------------------------------------------
+# Planted relationships per persona, set by hand, never by running the Engine.
+# A goal names the Categories its tags name and relates to the Merchants
+# listed, some of which only a reader of the name would know ("MOTORWISE
+# GARAGE" and the car goal). A confirmed life change relates to the Merchants
+# and Categories of its series. Extra rows plant Merchants a persona's history
+# lacks, and a near miss: "CARDIFF BAKERY" holds "car" but is not the car.
+# Separate from `fingerprint`, so the playbook's dataset is unchanged.
+MAP_VERSION = 1
+RENT = ("Bills", "Rent or mortgage")
+HOLIDAYS = ("Travel", "Holidays")
+
+
+@dataclass(frozen=True)
+class PlantedGoal:
+    tags: tuple[str, ...]
+    categories: frozenset[tuple[str, str]]  # the Categories its tags name
+    merchants: frozenset[str]  # the Merchants it relates to
+
+
+@dataclass(frozen=True)
+class MapCase:
+    name: str
+    rows: tuple[Row, ...]
+    goals: tuple[PlantedGoal, ...]
+    life_changes: tuple[str, ...]  # the series of each confirmed change
+
+
+def _g(tags: tuple[str, ...], cats: set[tuple[str, str]], ms: set[str]) -> PlantedGoal:
+    return PlantedGoal(tags, frozenset(cats), frozenset(ms))
+
+
+def _row(day: int, merchant: str, category: tuple[str, str], pence: int) -> Row:
+    return Row(0, sh.on_day(L, day), merchant, category, pence)
+
+
+MAP: dict[str, tuple[tuple[PlantedGoal, ...], tuple[str, ...], tuple[Row, ...]]] = {
+    "student": (
+        (_g(("holiday",), {HOLIDAYS}, {"PINEWOOD LODGE", "SUNTRAIL HOLIDAYS"}),),
+        ("rent",),
+        (),
+    ),
+    "goal saver": (
+        (_g(("car",), set(), {"MOTORWISE GARAGE", "CAR WASH CENTRAL"}),),
+        ("bills",),
+        (
+            _row(6, "MOTORWISE GARAGE", ("Transport", "Fuel"), -6_450),
+            _row(9, "CAR WASH CENTRAL", ("Transport", "Parking"), -800),
+            _row(11, "CARDIFF BAKERY", ("Food & Drink", "Eating out"), -420),
+        ),
+    ),
+    "mixed": (
+        (_g(("fitness",), {("Health", "Fitness")}, {"IRONWORKS GYM"}),),
+        ("groceries",),
+        (),
+    ),
+    "subscription creeper": (
+        (
+            _g(
+                ("electronics",),
+                {("Shopping", "Electronics")},
+                {"VOLTSPARK ELECTRONICS"},
+            ),
+        ),
+        (),
+        (),
+    ),
+    "early career": (
+        (
+            _g(
+                ("home-repair",),
+                set(),
+                {"HOMEFIX EMERGENCY REPAIR", "FIXRIGHT PLUMBING"},
+            ),
+        ),
+        ("rent", "groceries"),
+        (),
+    ),
+    "no history": ((_g(("holiday",), {HOLIDAYS}, set()),), (), ()),
+}
+
+
+def in_series(category: tuple[str, str], series: str) -> bool:
+    """How the personas were built: rent is its own Category, bills the rest
+    of Bills, groceries the Groceries Category (money out only, no income)."""
+    if series == "rent":
+        return category == RENT
+    if series == "bills":
+        return category[0] == "Bills" and category != RENT
+    return series == "groceries" and category == GROCERIES
+
+
+def map_cases() -> list[MapCase]:
+    by_name = {p.name: p for p in personas()}
+    out: list[MapCase] = []
+    for name, (goals, changes, extra) in MAP.items():
+        rows = by_name[name].rows
+        nid = max((r.id for r in rows), default=0) + 1
+        rows += tuple(r._replace(id=nid + i) for i, r in enumerate(extra))
+        out.append(MapCase(name, rows, goals, changes))
+    return out
+
+
+def map_fingerprint(cs: list[MapCase]) -> str:
+    stable = [
+        (
+            c.name,
+            c.rows,
+            [(g.tags, sorted(g.categories), sorted(g.merchants)) for g in c.goals],
+            c.life_changes,
+        )
+        for c in cs
+    ]
+    return hashlib.sha256(repr(stable).encode()).hexdigest()

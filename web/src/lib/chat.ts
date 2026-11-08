@@ -25,6 +25,10 @@ export function parseSse(buffer: string, chunk: string): { events: SseEvent[]; r
   return { events, rest };
 }
 
+/** A Transaction a spending total counted, from the API (ADR 0007): never the model's. */
+export type CountedTxn = { id: number; posted_on: string; merchant: string; amount_minor: number };
+export type Counted = { evidence_id: string; total_minor: number; transactions: CountedTxn[] };
+
 export type Message = {
   id: number;
   role: "user" | "assistant";
@@ -33,6 +37,8 @@ export type Message = {
   costPence?: number | null;
   proposalId?: number | null;
   streaming?: boolean;
+  stage?: string; // progress words while the turn runs
+  counted?: Counted[];
   error?: string;
 };
 export type Decision = "confirm" | "reject";
@@ -79,7 +85,12 @@ export function reduce(s: Chat, a: Action): Chat {
       if (name === "meta") {
         const thread = typeof data.thread_id === "string" ? data.thread_id : s.thread;
         const proposalId = typeof data.proposal_id === "number" ? data.proposal_id : null;
-        return last({ ...s, thread }, (m) => ({ ...m, path: data.path as Path, proposalId, costPence: typeof data.cost_pence === "number" ? data.cost_pence : null }));
+        const counted = parseCounted(data.counted);
+        return last({ ...s, thread }, (m) => ({ ...m, path: data.path as Path, proposalId, counted, costPence: typeof data.cost_pence === "number" ? data.cost_pence : null, stage: undefined }));
+      }
+      if (name === "stage" && typeof data.text === "string") {
+        const stage = data.text;
+        return last(s, (m) => ({ ...m, stage }));
       }
       if (name === "delta" && typeof data.text === "string") {
         const text = data.text;
@@ -90,6 +101,24 @@ export function reduce(s: Chat, a: Action): Chat {
     }
   }
 }
+
+const isInt = (v: unknown): v is number => Number.isSafeInteger(v);
+
+/** The meta event's `counted`, keeping only well-formed groups. */
+export function parseCounted(raw: unknown): Counted[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((g: Record<string, unknown> | null) => {
+    if (!g || typeof g.evidence_id !== "string" || !isInt(g.total_minor) || !Array.isArray(g.transactions)) return [];
+    const transactions = (g.transactions as (Record<string, unknown> | null)[]).filter(
+      (t): t is CountedTxn =>
+        !!t && isInt(t.id) && isInt(t.amount_minor) && typeof t.posted_on === "string" && typeof t.merchant === "string",
+    );
+    return transactions.length ? [{ evidence_id: g.evidence_id, total_minor: g.total_minor, transactions }] : [];
+  });
+}
+
+/** Integer minor units, so the listed rows add up exactly (never floats). */
+export const sumMinor = (rows: CountedTxn[]) => rows.reduce((n, t) => n + t.amount_minor, 0);
 
 export function pathLabel(path: Path, reply: string): string {
   if (path === "cache") return "Cache";

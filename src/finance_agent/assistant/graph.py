@@ -33,6 +33,7 @@ from finance_agent.assistant.chat_model import (
 )
 from finance_agent.assistant.checkpoints import LedgerSaver
 from finance_agent.assistant.cloud_route import CloudRoute, Name, named_in, names
+from finance_agent.assistant.evidence import Evidence, counted
 from finance_agent.assistant.grounding import (
     ToolValue,
     check_grounding,
@@ -49,12 +50,14 @@ from finance_agent.assistant.tools import (
 )
 from finance_agent.assistant.tools.propose import FigureInMemory, NotSaid, ProposalOut
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
+from finance_agent.assistant.tools.read import _category  # pyright: ignore[reportPrivateUsage]
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.answer_cache import AnswerCache
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.proposals import Proposals
+from finance_agent.ledger.taxonomy import TAXONOMY
 
 Route = Literal["ask", "plan", "memory", "correct"]
 Path = Literal["cache", "local_model", "cloud", "deterministic"]
@@ -111,6 +114,45 @@ def pre_route(message: str) -> Route | None:
     if _MEMORY.search(message):
         return "memory"
     return "ask" if _ASK.search(message) else None
+
+
+ROUTE_STAGE: dict[str, str] = {
+    "ask": "Looking through your ledger…",
+    "plan": "Running the numbers…",
+    "memory": "Noting that down…",
+    "correct": "Finding that transaction…",
+}
+TOOL_STAGE = {
+    "spending_summary": "Adding up your month…",
+    "compare_months": "Comparing your months…",
+    "find_transactions": "Searching your transactions…",
+    "search": "Searching your transactions…",
+    "list_subscriptions": "Checking your subscriptions…",
+    "subscription_advice": "Checking your subscriptions…",
+    "forecast_cashflow": "Forecasting the coming months…",
+    "simulate_purchase": "Checking that purchase against your plan…",
+}
+CHECKING = "Checking every figure…"
+
+
+def tool_stage(name: str, args: dict[str, Any]) -> str:
+    """Progress words for a tool call. A Category is named only when it is a
+    taxonomy name, so no model or bank text is echoed back."""
+    if name in ("category_detail", "spend_for_query", "category_trend"):
+        raw = args.get("category")
+        cats = args.get("categories")
+        if raw is None and isinstance(cats, list) and cats:
+            raw = cast(list[Any], cats)[0]
+        if isinstance(raw, str):
+            top, sub = _category(raw)
+            subs = TAXONOMY.get(top, ())
+            leaf = next(
+                (x for x in subs if sub and x.casefold() == sub.casefold()), None
+            )
+            if top in TAXONOMY and (leaf or not sub):
+                return f"Finding your {(leaf or top).lower()} spending…"
+        return "Finding that spending…"
+    return TOOL_STAGE.get(name, "Checking your ledger…")
 
 
 def _shown(reply: str) -> bool:
@@ -171,11 +213,20 @@ class Assistant:
     today: date
     saver: LedgerSaver = field(init=False)
     cloud: CloudRoute | None = None  # None: no key, or the demo (#296)
+    on_stage: Callable[[str], None] | None = None  # progress words, no data
+    # Transactions behind each spending total this turn, by evidence ID;
+    # shown to the user only, never checkpointed (ADR 0007)
+    counted: dict[str, Evidence] = field(default_factory=dict[str, Evidence])
+
+    def _stage(self, words: str) -> None:
+        if self.on_stage is not None:
+            self.on_stage(words)
 
     # --- nodes ---------------------------------------------------------------
 
     def router(self, s: State) -> Update:
         if (route := pre_route(s["message"])) is not None:
+            self._stage(ROUTE_STAGE[route])
             return {"route": route, **_NEW_TURN}
         try:
             r = self.model.chat(
@@ -188,6 +239,7 @@ class Assistant:
         except (OllamaError, OSError, IndexError):
             word = ""
         route = next((r for r in ROUTES if r == word), "ask")
+        self._stage(ROUTE_STAGE[route])
         return {"route": route, **_NEW_TURN}
 
     def subgraph(self, route: Route) -> Callable[[State], Update]:
@@ -266,11 +318,14 @@ class Assistant:
                 hit = self._cache().get(route, s["message"], d.rounds[0], self.today)
                 if hit is not None:
                     d.reply, d.cached = hit
+                    for call in calls:  # re-read only for the Transactions shown
+                        self._run(route, call, s, d)
                     return d
             d.messages.append(
                 Message(role="assistant", content=r.content, tool_calls=tuple(calls))
             )
             for call in calls:
+                self._stage(tool_stage(call.name, call.arguments))
                 seen = len(d.values)
                 content = budget.take(self._run(route, call, s, d))
                 if content == context.TOO_LARGE:  # unseen, so not evidence
@@ -310,6 +365,8 @@ class Assistant:
             d.proposal_id = out.proposal_id
         if isinstance(out, SpendForQueryOut):
             d.plan = out.plan
+        if (ev := counted(Ledger(self.conn, current_user()), out)) is not None:
+            self.counted[ev.evidence_id] = ev
         d.values += tool_values(call.name, out)
         if self.cloud is not None:
             d.names += names(out)
@@ -356,6 +413,7 @@ class Assistant:
     def _ground_local(self, route: Route, s: State, d: Draft) -> Update:
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
+        self._stage(CHECKING)
         res = check_grounding(d.reply, d.values, today=self.today)
         ok = res.grounded and _shown(d.reply)
         if not d.failed and not ok:
@@ -450,20 +508,23 @@ class Answer:
     proposal_id: int | None  # a confirm card is waiting for this Proposal
     cost_pence: int | None = None  # a cloud call this turn (#301)
     payload_id: str | None = None
+    counted: tuple[Evidence, ...] = ()  # Transactions behind its totals
 
 
-def _answer(thread: str, out: dict[str, Any]) -> Answer:
+def _answer(assistant: Assistant, thread: str, out: dict[str, Any]) -> Answer:
     pending = out.get("__interrupt__") or ()
+    evidence = tuple(out.get("evidence") or ())
     return Answer(
         thread_id=thread,
         turn_id=out.get("turn_id", ""),
         route=out.get("route", "ask"),
         reply=out.get("reply", ""),
         path=out.get("path", "deterministic"),
-        evidence=tuple(out.get("evidence") or ()),
+        evidence=evidence,
         proposal_id=out.get("proposal_id") if pending else None,
         cost_pence=out.get("cost_pence"),
         payload_id=out.get("payload_id"),
+        counted=tuple(assistant.counted[e] for e in evidence if e in assistant.counted),
     )
 
 
@@ -485,7 +546,7 @@ def ask(
     if cloud is not None:
         turn["cloud"] = cloud
     out = assistant.invoke(turn, thread)
-    return _answer(thread, out)
+    return _answer(assistant, thread, out)
 
 
 def waiting_for(assistant: Assistant, thread_id: str) -> int | None:
@@ -499,4 +560,6 @@ def waiting_for(assistant: Assistant, thread_id: str) -> int | None:
 def resume(
     assistant: Assistant, thread_id: str, decision: Literal["confirm", "reject"]
 ) -> Answer:
-    return _answer(thread_id, assistant.invoke(Command(resume=decision), thread_id))
+    return _answer(
+        assistant, thread_id, assistant.invoke(Command(resume=decision), thread_id)
+    )

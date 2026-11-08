@@ -1,0 +1,28 @@
+{
+  "harness": "map",
+  "dataset": "synthetic_personas.MAP",
+  "dataset_version": 1,
+  "dataset_sha256": "7ede4d109fee06399fcbdfa7feb7f90eaf3f1a44988fbc6efb42f1c1c03ccf06",
+  "personas": 6,
+  "planted_goal_merchants": 8,
+  "models": {
+    "map": {
+      "model": "engine.map derived and candidates",
+      "model_version": "map-1",
+      "metrics": {
+        "derived_precision": 1.0,
+        "derived_recall": 1.0,
+        "proposed_precision": 1.0,
+        "proposed_recall": 0.625
+      }
+    },
+    "cooccurrence": {
+      "model": "tag word in the Merchant name",
+      "model_version": "baseline",
+      "metrics": {
+        "proposed_precision": 0.666667,
+        "proposed_recall": 0.5
+      }
+    }
+  }
+}

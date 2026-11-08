@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sumMinor } from "@/lib/chat";
+import { INTERRUPTED, resetChatStore } from "@/lib/chatStore";
 import { PrivacyProvider } from "@/lib/privacy";
 import { Assistant } from "./Assistant";
 
@@ -29,6 +31,8 @@ beforeEach(() => {
   // the cloud toggle reads /api/spend on mount (#304); these tests count only chat calls
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (url === "/api/spend" ? Promise.resolve(new Response("[]")) : (fetchMock as unknown as (...a: unknown[]) => Promise<Response>)(url, init)));
   localStorage.clear();
+  sessionStorage.clear();
+  resetChatStore();
   document.documentElement.removeAttribute("data-private");
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -106,6 +110,100 @@ describe("Assistant", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Confirmed"));
     expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(`/api/chat/${"a".repeat(32)}/resume`, expect.anything());
+  });
+
+  it("keeps the question and the pending answer across a screen change, then finishes", async () => {
+    let push!: (s: string) => void;
+    let close!: () => void;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        const enc = new TextEncoder();
+        push = (s) => c.enqueue(enc.encode(s));
+        close = () => c.close();
+      },
+    });
+    fetchMock.mockResolvedValueOnce(new Response(body, { status: 200 }));
+    const first = ui();
+    await ask("How much did I spend on fuel last month?");
+    push(ev("stage", { text: "Finding your fuel spending…" }));
+    expect(await screen.findByText("Finding your fuel spending…")).toBeInTheDocument();
+    first.unmount(); // the router swaps in the Review screen
+
+    push(ev("meta", { thread_id: "b".repeat(32), path: "local_model", proposal_id: null }));
+    push(ev("delta", { text: "You spent £84.00 on fuel." }));
+    close();
+
+    ui(); // back to the Assistant
+    expect(screen.getByText("How much did I spend on fuel last month?")).toBeInTheDocument();
+    expect(await screen.findByText("£84.00")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1); // the same request, not a second one
+  });
+
+  it("restores the conversation after a reload, and marks a cut-off turn", async () => {
+    fetchMock.mockResolvedValueOnce(stream({ path: "local_model", proposal_id: null }, "Hello."));
+    const first = ui();
+    await ask("one");
+    await screen.findByText("Hello.");
+    first.unmount();
+    resetChatStore(); // as a reload: state re-read from sessionStorage
+    ui();
+    expect(screen.getByText("one")).toBeInTheDocument();
+    expect(screen.getByText("Hello.")).toBeInTheDocument();
+
+    const saved = JSON.parse(sessionStorage.getItem("fa.assistant.chat")!);
+    saved.messages.push({ id: 99, role: "assistant", text: "", streaming: true });
+    saved.busy = true;
+    sessionStorage.setItem("fa.assistant.chat", JSON.stringify(saved));
+    resetChatStore();
+    expect(await screen.findByRole("alert")).toHaveTextContent(INTERRUPTED);
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled(); // only because the draft is empty
+    await userEvent.type(screen.getByLabelText("Message the Assistant"), "again");
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  });
+
+  it("starts in a bad storage without failing", () => {
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    resetChatStore();
+    ui();
+    expect(screen.getByText("Ask about your money")).toBeInTheDocument();
+    get.mockRestore();
+  });
+
+  it("lists the transactions a figure counted, summing exactly to the figure", async () => {
+    const counted = [
+      {
+        evidence_id: "detail:2025-12:Transport > Fuel",
+        total_minor: 8400,
+        transactions: [
+          { id: 9, posted_on: "2025-12-22", merchant: "Tesco Fuel", amount_minor: 3600 },
+          { id: 6, posted_on: "2025-12-07", merchant: "Shell", amount_minor: 4800 },
+        ],
+      },
+    ];
+    fetchMock.mockResolvedValueOnce(stream({ path: "local_model", proposal_id: null, counted }, "You spent £84.00 on fuel."));
+    ui();
+    await ask("Fuel last month?");
+    const box = await screen.findByTestId("counted");
+    await userEvent.click(within(box).getByText("Show transactions (2)"));
+    const rows = within(within(box).getByRole("list", { name: "Transactions counted" })).getAllByRole("listitem");
+    expect(rows.map((r) => r.textContent)).toEqual([expect.stringMatching(/^22 DecTesco Fuel£36\.00/), expect.stringMatching(/^7 DecShell£48\.00/)]);
+    const minors = [...box.querySelectorAll("[data-minor]")].map((e) => Number(e.getAttribute("data-minor")));
+    expect(minors.reduce((a, b) => a + b, 0)).toBe(counted[0]!.total_minor);
+    expect(sumMinor(counted[0]!.transactions)).toBe(8400);
+    expect(screen.getByText(/You spent/)).toHaveTextContent("You spent £84.00 on fuel."); // the reply's figure
+    expect(within(box).getByText("Total").nextSibling).toHaveTextContent("£84.00");
+  });
+
+  it("shows no list for a reply without counted transactions, or a malformed one", async () => {
+    fetchMock.mockResolvedValueOnce(
+      stream({ path: "local_model", proposal_id: null, counted: [{ evidence_id: "x", total_minor: 1.5, transactions: [] }] }, "Hello."),
+    );
+    ui();
+    await ask();
+    await screen.findByText("Hello.");
+    expect(screen.queryByTestId("counted")).toBeNull();
   });
 
   it("shows a plain error when the Assistant is unavailable", async () => {

@@ -118,7 +118,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0030"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0031"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -671,6 +671,7 @@ def test_the_registry_trigger_is_present_at_head(engine: Engine) -> None:
     sql = (
         "SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='merchant'"
         " AND name NOT LIKE 'search_%'"  # the search index's own (#253)
+        " AND name NOT LIKE 'map_edge_%'"  # the personal map's own (#275)
     )
     with engine.connect() as conn:
         got = conn.execute(text(sql)).scalars().all()
