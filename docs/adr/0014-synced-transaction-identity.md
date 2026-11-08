@@ -42,7 +42,7 @@ Every Account with a sync anchor is listed with its balances, whether it is sync
 - **Ledger balance** is B₁ plus the amounts of the Account's Ledger Transactions whose instant is in (t₁, t_k], the same sum the Reconciliation uses.
 - **The Gap** is their difference, shown as one Gap from t₁'s date to t_k's date when non-zero, so bank minus ledger always equals the Account's Gaps. It is worked out on every read from the stored rows, so a CSV import after the sync that fills a missing row closes it without another sync.
 
-A linked Account's CSV running-balance Gaps still exist (the month summary lists them), but its Accounts card shows only the sync figures: the sync balance is newer than any export, and two balance rules on one card could disagree. An Account with no anchor keeps the CSV rule (ADR 0006). The latest balance is read by re-parsing the stored responses, newest first, because no table keeps it; a balance-only sync (no posted rows) still counts.
+A linked Account's CSV running-balance Gaps still exist (the month summary lists them), but its Accounts card shows only the sync figures: the sync balance is newer than any export, and two balance rules on one card could disagree. An Account with no anchor keeps the CSV rule (ADR 0006). The latest balance is read by re-parsing the stored responses, newest first, because no table keeps it; a balance-only sync (no posted rows) still counts, and a sync whose rows were rejected for conflicting IDs is skipped, as it was never reconciled.
 
 ## Known limits
 

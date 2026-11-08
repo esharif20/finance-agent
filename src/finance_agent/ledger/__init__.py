@@ -1532,6 +1532,8 @@ class Ledger:
             .order_by(si.c.imported_at.desc(), si.c.id.desc())
         ).scalars():
             for acc in simplefin.parse(raw).accounts:
+                if acc.conflicting_ids:  # rejected: apply_sync never reconciled it
+                    continue
                 account_id = by_ref.get(keyed_ref("simplefin:" + acc.provider_id))
                 if account_id in anchors and account_id not in latest:
                     latest[account_id] = (
