@@ -273,6 +273,8 @@ export type Memory = components["schemas"]["MemoryOut"];
 export const fetchForecast = () => get<ForecastBand[]>("/api/cash-flow/forecast");
 export type Goals = components["schemas"]["GoalsOut"];
 export const fetchGoals = () => get<Goals>("/api/goals");
+export type AllocationPlan = components["schemas"]["AllocationPlanOut"];
+export const fetchAllocationPlan = () => get<AllocationPlan>("/api/plan/allocation");
 export const fetchBriefing = () => get<Briefing>("/api/briefing");
 export const fetchMemories = () => get<{ items: Memory[] }>("/api/memories").then((r) => r.items);
 

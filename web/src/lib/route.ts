@@ -11,6 +11,7 @@ export type Route =
   | { name: "briefing" }
   | { name: "know" }
   | { name: "goals" }
+  | { name: "plan" }
   | { name: "assistant" }
   | { name: "category"; category: string; month?: string; account?: number };
 
@@ -23,6 +24,7 @@ export function parseHash(hash: string): Route {
   if (kind === "settings") return { name: "settings" };
   if (kind === "subscriptions") return { name: "subscriptions" };
   if (kind === "briefing") return { name: "briefing" };
+  if (kind === "plan") return { name: "plan" };
   if (kind === "goals") return { name: "goals" };
   if (kind === "know") return { name: "know" };
   if (kind === "assistant") return { name: "assistant" };
