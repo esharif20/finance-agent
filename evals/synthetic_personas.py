@@ -12,7 +12,17 @@ persona was built, never by running the Engine:
   or 3.5, 6 and 8 (does not), so none sits on the boundary.
 - **subscription-creep** applies when Subscriptions spend rose in each of the
   last three complete months. Near misses: two rises only, and an annual
-  renewal that jumps once and falls back.
+  renewal that jumps once and falls back; a refunded charge ends a run.
+- **small-daily-spends** applies when coffee, takeaways and eating out last
+  month reach 170 pounds; the base users sit at 134 to 161 (no) or 178 to
+  197 (yes).
+- **credit-cards** applies when card interest was charged last month: only
+  the revolver has any.
+- **payday-planning** applies under half a month of savings; **student-money**
+  from half a month to three (a first buffer); **saving-for-goal** from three
+  months up; **payday-checkin** whenever essentials can be worked out.
+- Short histories (one month, three months) and spending in other currencies
+  (already converted to pence) check that thin or odd data is handled.
 """
 
 import hashlib
@@ -23,7 +33,7 @@ from fractions import Fraction
 import synthetic_history as sh
 from finance_agent.engine.detectors import Row
 
-DATASET_VERSION = 1
+DATASET_VERSION = 2
 MONTHS = 14  # of history before "today", from synthetic_history's start
 TODAY = sh.on_day(MONTHS, 10)  # ten days into the month after the history
 ESSENTIAL_TOPS = {"Bills"}
@@ -34,6 +44,9 @@ ESSENTIAL_LEAVES = {
     ("Transport", "Fuel"),
 }
 SUBS = ("Subscriptions", "Streaming")
+INTEREST = ("Fees & Interest", "Card interest")
+GROCERIES = ("Food & Drink", "Groceries")
+TRAVEL = ("Travel", "Holidays")
 
 
 @dataclass(frozen=True)
@@ -97,37 +110,107 @@ def _persona(
     starts: list[int],
     gold: set[str],
     annual_at: int | None = None,
+    extra: tuple[Row, ...] = (),
+    since: int = 0,
 ) -> Persona:
+    """`extra` rows are added; rows before month `since` are dropped (a short
+    history). Savings are sized from the full base history."""
     base = _base(hid)
     rows = _subs(base, starts, annual_at=annual_at)
+    nid = max(r.id for r in rows) + 1
+    rows += [r._replace(id=nid + i) for i, r in enumerate(extra)]
+    rows = [r for r in rows if sh.month_index(r.posted_on) >= since]
     savings = (
         None if months_saved is None else int(months_saved * _monthly_essentials(base))
     )
     return Persona(name, tuple(rows), savings, TODAY, frozenset(gold))
 
 
+def _interest() -> tuple[Row, ...]:
+    """Card interest on the 25th of every month."""
+    return tuple(
+        Row(0, sh.on_day(m, 25), "NORTHBANK CARD INTEREST", INTEREST, -3_872)
+        for m in range(MONTHS)
+    )
+
+
+def _abroad() -> tuple[Row, ...]:
+    """Spending in euros and dollars, already converted to pence at the day's
+    rate, so the amounts are not round. One refund is converted too."""
+    out = [
+        Row(0, sh.on_day(m, 12), "MARCHE DU PORT", GROCERIES, -4_131 - 7 * m)
+        for m in range(MONTHS - 4, MONTHS)
+    ]
+    out.append(Row(0, sh.on_day(MONTHS - 2, 14), "MARCHE DU PORT", GROCERIES, 1_273))
+    out.append(Row(0, sh.on_day(MONTHS - 6, 8), "LAKESIDE HOTEL", TRAVEL, -23_849))
+    return tuple(out)
+
+
 EF, SC = "emergency-fund", "subscription-creep"
+SD, SG, CC = "small-daily-spends", "saving-for-goal", "credit-cards"
+PP, SM, PC = "payday-planning", "student-money", "payday-checkin"
 L = MONTHS - 1  # the last complete month
 
 
 def personas() -> list[Persona]:
     return [
         # one long-standing subscription: spend flat
-        _persona("student", 0, Fraction(1), [0], {EF}),
+        _persona("student", 0, Fraction(1), [0], {EF, SD, SM, PC}),
         # a new subscription two months ago, another last month: two rises
-        _persona("early career", 1, Fraction(5, 2), [0, L - 1, L], {EF}),
+        _persona("early career", 1, Fraction(5, 2), [0, L - 1, L], {EF, SM, PC}),
         # a new subscription in each of the last three months
-        _persona("subscription creeper", 2, Fraction(6), [0, L - 2, L - 1, L], {SC}),
-        _persona("credit-card revolver", 3, Fraction(0), [0], {EF}),
-        _persona("payday-tight", 4, Fraction(1, 5), [0], {EF}),
-        _persona("goal saver", 5, Fraction(8), [0], set()),
+        _persona(
+            "subscription creeper",
+            2,
+            Fraction(6),
+            [0, L - 2, L - 1, L],
+            {SC, SD, SG, PC},
+        ),
+        # no savings, and card interest every month
+        _persona(
+            "credit-card revolver",
+            3,
+            Fraction(0),
+            [0],
+            {EF, CC, PP, PC},
+            extra=_interest(),
+        ),
+        _persona("payday-tight", 4, Fraction(1, 5), [0], {EF, PP, PC}),
+        _persona("goal saver", 5, Fraction(8), [0], {SD, SG, PC}),
         Persona("no history", (), 50_000, TODAY, frozenset()),
         # low savings and creeping subscriptions from four months ago
-        _persona("mixed", 1, Fraction(3, 2), [L - 3, L - 2, L - 1, L], {EF, SC}),
+        _persona(
+            "mixed", 1, Fraction(3, 2), [L - 3, L - 2, L - 1, L], {EF, SC, SM, PC}
+        ),
         # an annual renewal the month before last on a flat subscription
-        _persona("annual blip", 2, Fraction(7, 2), [0], set(), annual_at=L - 1),
+        _persona("annual blip", 2, Fraction(7, 2), [0], {SD, SG, PC}, annual_at=L - 1),
         # a little savings but no subscriptions at all
-        _persona("no subscriptions", 4, Fraction(3, 10), [], {EF}),
+        _persona("no subscriptions", 4, Fraction(3, 10), [], {EF, PP, PC}),
+        # as the creeper, but last month's new subscription was refunded in
+        # full, so the run of rises ends there
+        _persona(
+            "refunded subscription",
+            2,
+            Fraction(6),
+            [0, L - 2, L - 1, L],
+            {SD, SG, PC},
+            extra=(Row(0, sh.on_day(L, 18), "STREAMLY PLUS 3", SUBS, 999),),
+        ),
+        # only last month and this one: no complete month to compare
+        _persona("one month of history", 1, Fraction(3, 2), [0], set(), since=L),
+        # three months: essentials can be worked out, subscriptions are flat
+        _persona(
+            "three months of history", 4, Fraction(3, 2), [0], {EF, SM, PC}, since=L - 3
+        ),
+        # euro and dollar spending in pence, with a refund
+        _persona(
+            "other currencies",
+            0,
+            Fraction(3, 2),
+            [0],
+            {EF, SD, SM, PC},
+            extra=_abroad(),
+        ),
     ]
 
 

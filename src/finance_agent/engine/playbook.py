@@ -17,8 +17,8 @@ every figure filled from Engine signals or a dated fact.
   date" (#251 decision 6); CI fails one older than 13 months.
 
 Loading validates everything and fails on an unknown signal, slot, fact or
-key. Card prose is linted: no digit (any script) outside a slot, no character
-outside printable ASCII and a few typographic marks, and no instruction-like
+key. Card prose is linted: no digit (any script) or number word outside a
+slot, no character outside printable ASCII and a few typographic marks, and no instruction-like
 text, so no hand-typed figure or injected instruction can reach the screen
 or the Assistant. Everything here is pure and deterministic.
 """
@@ -50,6 +50,8 @@ SIGNALS: dict[str, Kind] = {
     "subscription_spend_last_month": "money",
     "subscription_rise_streak": "count",
     "subscription_spend_rise": "money",
+    "everyday_spend_last_month": "money",
+    "card_interest_last_month": "money",
 }
 TOPICS = (
     "emergency_fund",
@@ -68,6 +70,8 @@ ESSENTIAL_LEAVES = {
     ("Transport", "Public transport"),
     ("Transport", "Fuel"),
 }
+EVERYDAY = {("Food & Drink", leaf) for leaf in ("Coffee", "Takeaway", "Eating out")}
+CARD_INTEREST = ("Fees & Interest", "Card interest")
 ESSENTIAL_MONTHS = 3
 TENTH = Decimal("0.1")
 FACT_MAX_MONTHS = 13
@@ -82,6 +86,16 @@ OPS: dict[str, Callable[[Any, Any], bool]] = {
 _ID = re.compile(r"[a-z]+(?:[-_][a-z]+)*")
 _SLOT = re.compile(r"\{(fact:)?([a-z]+(?:_[a-z]+)*)\}")
 _PROSE_CHARS = re.compile(r"[ -~£‘’“”–—…]*")
+# Numbers written as words ("twenty pounds"). "one" is common English, so it
+# is only a figure beside a money or percent unit.
+_NUMBER_WORD = re.compile(
+    r"\b(?:(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    r"|(?:thir|four|fif|six|seven|eigh|nine)teen|twenty|thirty|forty|fifty"
+    r"|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|dozen"
+    r"|half|quarter|double|triple|twice)s?"
+    r"|one\s+(?:pound|quid|pence|penny|percent|per\s*cent))\b",
+    re.IGNORECASE,
+)
 _INSTRUCTION = re.compile(
     r"\b(?:ignore|disregard|forget|override|instructions?|prompts?|system"
     r"|assistant|model|llm|tools?|functions?|pretend|jailbreak|act\s+as"
@@ -195,6 +209,8 @@ def signals(
     months = range(first, last + 1)
     essentials = dict.fromkeys(months, 0)
     subs = dict.fromkeys(months, 0)
+    everyday = dict.fromkeys(months, 0)
+    interest = dict.fromkeys(months, 0)
     for r in rows:
         m = _month(r.posted_on)
         if m in essentials:
@@ -202,6 +218,10 @@ def signals(
                 essentials[m] -= r.amount
             if r.category[0] == "Subscriptions":
                 subs[m] -= r.amount
+            if r.category in EVERYDAY:
+                everyday[m] -= r.amount
+            if r.category == CARD_INTEREST:
+                interest[m] -= r.amount
     if len(months) >= ESSENTIAL_MONTHS:
         spend = sum(essentials[m] for m in months[-ESSENTIAL_MONTHS:])
         out["essential_monthly_spend"] = spend // ESSENTIAL_MONTHS
@@ -218,6 +238,8 @@ def signals(
         out["subscription_rise_streak"] = streak
         out["subscription_spend_last_month"] = subs[last]
         out["subscription_spend_rise"] = subs[last] - subs[last - streak]
+        out["everyday_spend_last_month"] = everyday[last]
+        out["card_interest_last_month"] = interest[last]
     return out
 
 
@@ -272,6 +294,8 @@ def lint_prose(text: Any, where: str) -> str:
     bare = _SLOT.sub("", text)
     if any(ch.isnumeric() for ch in bare):
         raise PlaybookError(f"{where}: has a figure outside a slot")
+    if _NUMBER_WORD.search(bare):
+        raise PlaybookError(f"{where}: has a figure written as words")
     if "{" in bare or "}" in bare:
         raise PlaybookError(f"{where}: has a malformed slot")
     if _INSTRUCTION.search(bare):

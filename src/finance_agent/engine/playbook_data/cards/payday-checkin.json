@@ -1,0 +1,25 @@
+{
+  "id": "payday-checkin",
+  "version": 1,
+  "topic": "payday_planning",
+  "principles": [
+    "A short check on payday keeps small leaks from becoming big ones.",
+    "Look at what is left after essentials before deciding what to spend.",
+    "Move the money you want to keep out of sight straight away."
+  ],
+  "when": {
+    "all": [
+      {"signal": "essential_monthly_spend", "op": ">=", "value": 0}
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Payday check-in",
+      "body": "Your essentials run to about {essential_monthly_spend} a month and your savings stand at {savings_balance}. A minute now to set aside your savings before spending on anything else is a good habit."
+    },
+    "blunt": {
+      "title": "Payday: do this first",
+      "body": "Essentials take {essential_monthly_spend} a month and your savings stand at {savings_balance}. Cover the essentials, set savings aside, then spend what is left."
+    }
+  }
+}
