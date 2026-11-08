@@ -237,4 +237,15 @@ describe("Assistant", () => {
     ui().unmount();
     expect(beacon).toHaveBeenLastCalledWith("/api/chat/cool");
   });
+
+  it("draws a figure's chart, its bars summing to the figure", async () => {
+    const chart = { title: "Fuel in December 2025", currency: "GBP", total_minor: 8400, bars: [{ label: "Shell", minor: 4800 }, { label: "Tesco Fuel", minor: 3600 }] };
+    fetchMock.mockResolvedValueOnce(stream({ path: "planner", proposal_id: null, chart }, "You spent £84.00 on Fuel in December 2025."));
+    ui();
+    await ask("fuel?");
+    const fig = await screen.findByTestId("chart");
+    expect(within(fig).getByText("Fuel in December 2025")).toBeInTheDocument();
+    const minors = [...fig.querySelectorAll("[data-minor]")].map((e) => Number(e.getAttribute("data-minor")));
+    expect(minors.reduce((a, b) => a + b, 0)).toBe(8400);
+  });
 });
