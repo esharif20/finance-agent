@@ -18,9 +18,9 @@ every figure filled from Engine signals or a dated fact.
 
 Loading validates everything and fails on an unknown signal, slot, fact or
 key. Card prose is linted: no digit (any script) or number word outside a
-slot, no character outside printable ASCII and a few typographic marks, and no instruction-like
-text, so no hand-typed figure or injected instruction can reach the screen
-or the Assistant. Everything here is pure and deterministic.
+slot, no character outside printable ASCII and a few typographic marks, and
+no instruction-like text, so no hand-typed figure or injected instruction can
+reach the screen or the Assistant. Everything here is pure and deterministic.
 """
 
 import hashlib
