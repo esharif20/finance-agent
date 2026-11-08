@@ -21,7 +21,7 @@ def test_committed_dataset_is_the_seeded_generator_output() -> None:
     text = categoriser.DATASET.read_text()
     assert text.startswith("# synthetic\n")
     assert categoriser.generate(categoriser.SEED) == text
-    assert categoriser.DATASET_VERSION == 2
+    assert categoriser.DATASET_VERSION == 3
 
 
 def test_dataset_covers_every_case_and_resolves_to_current_categories() -> None:
@@ -70,9 +70,10 @@ def test_a_correction_beats_the_rules_and_covers_refunds() -> None:
 
 
 def test_without_the_correction_the_rule_decides() -> None:
-    eats = ("Food & Drink", "Takeaway")
-    rows = [Row(1, "test", "lookalike", "UBER EATS", -900, eats)]
-    assert categoriser.baseline(rows) == [(("Transport", "Taxi"), 1.0)]
+    taxi = ("Transport", "Taxi")
+    rows = [Row(1, "test", "lookalike", "UBER EATS", -900, taxi)]
+    # the UK base's sub-brand beats the Uber Merchant (#215)
+    assert categoriser.baseline(rows) == [(("Food & Drink", "Takeaway"), 1.0)]
 
 
 def test_nearest_neighbour_fills_only_what_corrections_and_rules_leave() -> None:
@@ -87,7 +88,7 @@ def test_nearest_neighbour_fills_only_what_corrections_and_rules_leave() -> None
             -3000,
             ("Shopping", "Clothing"),
         ),
-        Row(3, "test", "unseen", "BEAN HERE COFFEE", -300, coffee),  # no rule hits
+        Row(3, "test", "unseen", "BEAN HERE BREWS", -300, coffee),  # no rule hits
         Row(4, "test", "unseen", "SWIFT CABS", -1500, ("Transport", "Taxi")),
     ]
     preds = categoriser.nearest_neighbour(rows, embedding.TrigramEmbedder())
