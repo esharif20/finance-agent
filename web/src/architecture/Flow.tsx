@@ -10,6 +10,7 @@ import {
   useInView,
   useMotionValueEvent,
   useScroll,
+  useSpring,
   useTransform,
 } from "motion/react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -54,7 +55,9 @@ export default function Flow({ scene, wide, still, playKey }: { scene: boolean; 
 function Scene({ playKey }: { playKey: number }) {
   const track = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
-  const t = useTransform(scrollYProgress, [0, 1], [-0.5, N]);
+  // sprung, so a fast flick still sweeps through every stop instead of jumping past them
+  const smooth = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.0005 });
+  const t = useTransform(smooth, [0, 1], [-0.5, N]);
   const [stop, setStop] = useState(-1);
   const [open, setOpen] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
