@@ -119,3 +119,36 @@ forbidden_modules = [
 ]
 # ledger itself sits on storage and ingest; the Assistant may reach them only via it.
 allow_indirect_imports = true
+
+# #296: the hosted demo is a top-level adapter over api; nothing imports it.
+[[tool.importlinter.contracts]]
+name = "nothing imports demo"
+type = "forbidden"
+source_modules = [
+    "finance_agent.api",
+    "finance_agent.cli",
+    "finance_agent.storage",
+    "finance_agent.identity",
+    "finance_agent.ingest",
+    "finance_agent.ledger",
+    "finance_agent.categorise",
+    "finance_agent.engine",
+    "finance_agent.memory",
+    "finance_agent.assistant",
+    "finance_agent.gateway",
+    "finance_agent.notify",
+]
+forbidden_modules = ["finance_agent.demo"]
+
+# ADR 0016: the demo never touches the Keychain, the CLI or the cloud gateway.
+[[tool.importlinter.contracts]]
+name = "demo imports no cli, gateway or storage.keychain"
+type = "forbidden"
+source_modules = ["finance_agent.demo"]
+forbidden_modules = [
+    "finance_agent.cli",
+    "finance_agent.gateway",
+    "finance_agent.storage.keychain",
+]
+# api sits on storage, which holds keychain; the demo locks it at runtime instead
+allow_indirect_imports = true
