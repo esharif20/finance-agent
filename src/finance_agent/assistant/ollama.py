@@ -37,6 +37,7 @@ DEFAULT_MODEL = MODELS[DEFAULT_CHOICE]
 # each turn (and the chat screen's warm-up) restarts it: loaded while the user
 # chats, unloaded five idle minutes after the last turn
 KEEP_ALIVE = "5m"
+WARM_KEEP_ALIVE = "30m"  # the chat screen just opened: a question is likely
 NUM_CTX = 8192  # the context the #144 memory gate (about 7 GB) is measured at
 
 

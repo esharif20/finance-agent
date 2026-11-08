@@ -19,7 +19,7 @@ function Ask({ entry }: { entry: SubscriptionEntry }) {
   const client = useQueryClient();
   const [place, setPlace] = useState(() => placeOf(entry));
   const name = entry.display_name ?? entry.merchant;
-  const done = { onSettled: () => client.invalidateQueries({ queryKey: SUBS_KEY }) };
+  const done = { onSettled: () => void client.invalidateQueries({ queryKey: SUBS_KEY }) };
   const yes = useMutation({ mutationFn: () => confirmSubscription(entry.merchant_id, place), ...done });
   const no = useMutation({ mutationFn: () => dismissSubscription(entry.merchant_id), ...done });
   const busy = yes.isPending || no.isPending;

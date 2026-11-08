@@ -103,7 +103,7 @@ def set_rate(led: Led, body: RateIn) -> RateOut:
 def month(
     led: Led, month: MonthQ, account_id: Annotated[int | None, Query()] = None
 ) -> FxMonthOut:
-    if account_id is not None and account_id not in {a.id for a in led.accounts()}:
+    if account_id is not None and account_id not in led.account_ids():
         raise HTTPException(404, "No such account.")
     try:
         m = led.fx_month(month, account_id)

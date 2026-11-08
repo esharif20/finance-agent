@@ -77,6 +77,12 @@ def route(store: SpendStore, transport: Transport) -> CloudRoute:
     return CloudRoute(CloudChatModel(KEY, transport=transport), store)
 
 
+@pytest.fixture(autouse=True)
+def _cloud_scripts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An opted-in thread takes no fast path, so the oracle scripts every case."""
+    monkeypatch.setattr(bench, "_cloud_run", True)
+
+
 @pytest.fixture
 def store(tmp_path: Path) -> SpendStore:
     return SpendStore(tmp_path / "spend.sqlite")
@@ -329,7 +335,8 @@ def test_the_api_opts_a_thread_in_and_meta_carries_the_cost(
     )
     assert again["path"] == "cloud" and len(fake.calls) == 2
     fresh, _ = events(client.post("/api/chat", json={"message": q}).text)
-    assert fresh["path"] == "local_model" and fresh["cost_pence"] is None
+    # not opted in: the fast path answers locally, with no model call
+    assert fresh["path"] == "planner" and fresh["cost_pence"] is None
     assert len(fake.calls) == 2
     # the checkpoint holds the opt-in, never tool results
     with engine.begin() as conn:

@@ -20,6 +20,12 @@ let memoriesStatus: number;
 let deleteStatus: number;
 let insufficient: string[];
 let regretAnswers: (boolean | null)[];
+let know: {
+  bandit: { rated: number; live_pct: number | null; shadow_pct: number | null };
+  life_changes: { series: string; month: string }[];
+  map_edges: number;
+};
+let learned: { question: string; answers: number; items: { key: string; label: string; rank: number; words: string }[] };
 
 const briefing = () => ({
   week: "2026-03-02",
@@ -46,11 +52,32 @@ beforeEach(() => {
   deleteStatus = 200;
   insufficient = [];
   regretAnswers = [true, null, false];
+  know = {
+    bandit: { rated: 12, live_pct: 58, shadow_pct: 67 },
+    life_changes: [{ series: "rent", month: "2026-02" }],
+    map_edges: 2,
+  };
+  learned = {
+    question: "cut",
+    answers: 5,
+    items: [
+      { key: "category:1", label: "Groceries", rank: 1, words: "you'd keep this longest" },
+      { key: "category:2", label: "Takeaways", rank: 2, words: "you'd cut this first" },
+    ],
+  };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       calls.push({ url, method });
+      if (method === "DELETE" && deleteStatus === 200) {
+        if (url === "/api/know-you/bandit") know.bandit = { rated: 0, live_pct: null, shadow_pct: null };
+        if (url === "/api/know-you/life-changes") know.life_changes = [];
+        if (url === "/api/know-you/map") know.map_edges = 0;
+        if (url === "/api/preferences") learned = { question: "cut", answers: 0, items: [] };
+      }
+      if (url === "/api/know-you") return Response.json(know);
+      if (url.startsWith("/api/preferences")) return Response.json(learned);
       if (method === "DELETE") return deleteStatus === 200 ? Response.json({ deleted: 1 }) : new Response("{}", { status: deleteStatus });
       if (url.startsWith("/api/briefing")) return Response.json(briefing());
       if (url.startsWith("/api/memories")) return memoriesStatus === 200 ? Response.json({ items: memories }) : new Response("{}", { status: memoriesStatus });
@@ -142,5 +169,30 @@ describe("How well I know you screen", () => {
     root.querySelectorAll(".money").forEach((n) => n.remove());
     expect(root.textContent).not.toMatch(/£\d/);
     expect(container.querySelectorAll(".money")).toHaveLength(1);
+  });
+
+  it("shows the M6 figures exactly as the API gives them", async () => {
+    render();
+    expect(
+      await screen.findByText(/On 12 insights you rated, the ranker you see scored 58% and my shadow ranker would have scored 67%/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Rent changed in February 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/2 connections between/)).toBeInTheDocument();
+    expect(screen.getByText(/From 5 answers: you'd keep Groceries longest and cut Takeaways first/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["cut-first answers", "/api/preferences", /No answers yet/],
+    ["shadow ranker", "/api/know-you/bandit", /Not enough rated insights yet/],
+    ["life changes", "/api/know-you/life-changes", /None yet. I only note a change/],
+    ["connections", "/api/know-you/map", /None yet. I only join two things/],
+  ])("resetting %s calls its endpoint and the section empties", async (what, url, empty) => {
+    render();
+    await userEvent.click(await screen.findByRole("button", { name: new RegExp(`Reset: ${what}`) }));
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false); // asked first
+    await userEvent.click(screen.getByRole("button", { name: /^Yes, reset/ }));
+    expect(await screen.findByText(empty)).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "DELETE").map((c) => c.url)).toEqual([url]);
+    expect(screen.queryByRole("button", { name: new RegExp(`Reset: ${what}`) })).toBeNull();
   });
 });

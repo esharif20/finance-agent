@@ -133,7 +133,7 @@ def test_the_assistant_answers_from_tool_results(app: FastAPI) -> None:
     )
     assert r.status_code == 200
     meta = json.loads(r.text.split("event: meta\ndata: ", 1)[1].split("\n", 1)[0])
-    assert meta["path"] == "deterministic"
+    assert meta["path"] in ("deterministic", "planner")  # never a model
     assert "Groceries" in r.text and "local model" not in r.text
 
 

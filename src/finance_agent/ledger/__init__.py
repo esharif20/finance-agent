@@ -2840,6 +2840,81 @@ class Ledger:
             ),
         )
 
+    def summarise_month_by_account(
+        self, month: str, account_ids: Sequence[int]
+    ) -> tuple[MonthSummary, dict[int, MonthSummary]]:
+        """`summarise_month(month)` and `summarise_month(month, a)` for each of
+        `account_ids`, from one read of the Transfer legs, Gaps, rates and the
+        month's rows: the figures are the same, each call's whole-history work
+        is done once (#summary-perf). Nothing outlives the call."""
+        start, end = _month_bounds(month)
+        t = schema.transaction
+        terms = self._month_terms(month, None)
+        moved = self._transfer_legs()
+        owner: dict[int, int] = {}
+        gbp: dict[int, int] = {}
+        for r in self._db.execute(
+            self._db.select(
+                t, t.c.id, t.c.account_id, t.c.amount_minor, t.c.currency
+            ).where(*terms)
+        ):
+            owner[r.id] = r.account_id
+            if r.currency == fx.GBP:
+                gbp[r.id] = r.amount_minor
+        needed: Counter[int | None] = Counter()
+        for txn_id, (_, c) in self._conversions(*terms).items():
+            if c is None:  # rate needed: counted, left out of every total
+                needed[None] += 1
+                needed[owner[txn_id]] += 1
+            else:
+                gbp[txn_id] = c.gbp_minor
+        keys: list[int | None] = [None, *account_ids]
+        sums = {k: [0, 0, 0, 0] for k in keys}  # in, out, moved in, moved out
+        for txn_id, g in gbp.items():
+            side = 2 if txn_id in moved else 0
+            for k in (None, owner[txn_id]):
+                if k in sums:
+                    sums[k][side] += max(g, 0)
+                    sums[k][side + 1] -= min(g, 0)
+        gaps = [g for g in self.gaps() if g.from_date < end and g.to_date >= start]
+
+        def one(k: int | None) -> MonthSummary:
+            ins, outs, moved_in, moved_out = sums[k]
+            return MonthSummary(
+                month,
+                CURRENCY,
+                _decimal(ins),
+                _decimal(outs),
+                _decimal(ins - outs),
+                [g for g in gaps if k in (None, g.account.id)],
+                _decimal(moved_in),
+                _decimal(moved_out),
+                needed[k],
+            )
+
+        return one(None), {a: one(a) for a in account_ids}
+
+    def account_ids(self) -> list[int]:
+        """The ids `accounts()` lists, in its order, without its balances:
+        an Account with a sync anchor, a CSV row with a running balance, or a
+        CSV row without one (a balance-less Bank)."""
+        t, anchor = schema.transaction, schema.sync_anchor
+        listed = set(
+            self._db.execute(
+                self._db.select(t, t.c.account_id)
+                .where(
+                    or_(
+                        t.c.running_balance_minor.is_not(None),
+                        t.c.origin == "csv",
+                    )
+                )
+                .distinct()
+            ).scalars()
+        ) | set(
+            self._db.execute(self._db.select(anchor, anchor.c.account_id)).scalars()
+        )
+        return sorted(int(i) for i in listed)
+
     def _align(
         self, account_id: int, rows: list[ingest.ParsedRow]
     ) -> tuple[dict[int, int], int]:

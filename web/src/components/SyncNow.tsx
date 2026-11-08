@@ -18,7 +18,7 @@ export function SyncNow({ now }: { now?: Date }) {
   const sync = useMutation({
     mutationFn: postSync,
     // like an import: everything on screen may have changed
-    onSettled: () => client.invalidateQueries(),
+    onSettled: () => void client.invalidateQueries(),
   });
   const busy = sync.isPending;
   const asked = useRef(false); // one automatic sync per page load, never alongside another

@@ -126,7 +126,7 @@ def test_a_grounded_answer_comes_from_the_local_model(
         calls(("spending_summary", {"month": MONTH})),
         f"You spent {pounds(total)} in January 2026.",
     )
-    a = turn(engine, m, "what did I spend in January?")
+    a = turn(engine, m, "what did I spend in January, all told?")
     assert (a.route, a.path) == ("ask", "local_model")
     assert a.reply == f"You spent {pounds(total)} in January 2026."
     assert f"month:{MONTH}" in a.evidence

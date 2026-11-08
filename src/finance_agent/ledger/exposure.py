@@ -155,3 +155,10 @@ class Exposures:
     def forget(self) -> int:
         """Wipe the whole log (DATA_POLICY: feedback is the user's to wipe)."""
         return self._db.execute(self._db.delete(_E)).rowcount
+
+    def forget_bandit(self) -> int:
+        """Wipe what the bandit learns from (Insight and card exposures with
+        their outcomes); a model route's log is another store and stays."""
+        return self._db.execute(
+            self._db.delete(_E).where(_E.c.kind.in_(("insight", "card")))
+        ).rowcount

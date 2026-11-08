@@ -34,7 +34,7 @@ export function Explained({ text }: { text: string }) {
 function Row({ insight }: { insight: Insight }) {
   const reduce = useReducedMotion();
   const client = useQueryClient();
-  const done = { onSettled: () => client.invalidateQueries({ queryKey: INSIGHTS_KEY }) };
+  const done = { onSettled: () => void client.invalidateQueries({ queryKey: INSIGHTS_KEY }) };
   const rate = useMutation({ mutationFn: (liked: boolean) => rateInsight(insight.id, liked), ...done });
   const hide = useMutation({ mutationFn: () => dismissInsight(insight.id), ...done });
   const busy = rate.isPending || hide.isPending;
