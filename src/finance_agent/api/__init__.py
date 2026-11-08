@@ -37,6 +37,7 @@ from finance_agent.api import (
     preferences,
     proposals,
     review_queue,
+    scheduler,
     search,
     spend,
     splits,
@@ -46,6 +47,7 @@ from finance_agent.api import (
 )
 from finance_agent.categorise import auto, subscription_alerts
 from finance_agent.categorise.display_names import display_name
+from finance_agent.engine import profile
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -58,6 +60,7 @@ from finance_agent.ledger import (
     Ledger,
     MonthSummary,
     Spend,
+    SyncReport,
     Transaction,
     UnknownTarget,
 )
@@ -392,6 +395,29 @@ def _known(led: Ledger, account_id: int | None) -> None:
         raise HTTPException(404, "No such account.")
 
 
+def sync_once(
+    engine: Engine, user_id: int, notify: notifications.Notifier
+) -> list[SyncReport]:
+    """One sync, as `fa sync` runs it, then the profile refresh (#327): the
+    button and the scheduled sync share it. Raises what `run_sync` raises."""
+    reports = run_sync(engine, user_id)
+    if any(r.added for r in reports):  # same as `fa import`
+        with engine.begin() as conn:
+            categorise.run(conn, user_id)
+    auto.refresh_quietly(engine, user_id)  # every sync: Merchants may wait from before
+    subscription_alerts.run(engine, user_id, notify)
+    # categorise.run rewrites categories without a version bump, so drop a
+    # profile built in between before warming the next one
+    profile.forget(user_id)
+    profile.start(engine, user_id)
+    return reports
+
+
+def _scheduled_sync(engine: Engine, user_id: int) -> None:
+    if is_encrypted(default_db_path()):  # the CLI's gate (ADR 0002)
+        sync_once(engine, user_id, notifications.osascript)
+
+
 def create_app(
     engine: Engine,
     web_dir: Path | None = None,
@@ -519,16 +545,8 @@ def create_app(
         if not is_encrypted(default_db_path()):  # the CLI's gate (ADR 0002)
             raise HTTPException(409, "Sync needs the encrypted database.")
         try:
-            engine = request.app.state.engine
-            reports = run_sync(engine, current_user())
-            if any(r.added for r in reports):  # same as `fa import`
-                with engine.begin() as conn:
-                    categorise.run(conn, current_user())
-            auto.refresh_quietly(
-                engine, current_user()
-            )  # every sync: Merchants may wait from before
             notify = request.app.state.notify or notifications.osascript
-            subscription_alerts.run(engine, current_user(), notify)
+            reports = sync_once(request.app.state.engine, current_user(), notify)
         except Busy:
             raise HTTPException(409, "A sync is already running.") from None
         except NotConnected:
@@ -659,6 +677,9 @@ def create_app(
 
 
 def serve(port: int = DEFAULT_PORT) -> None:
-    uvicorn.run(
-        create_app(open_db(create=False)), host=HOST, port=port, log_level="warning"
-    )
+    engine = open_db(create=False)
+    profile.start(engine, current_user())  # the first scan, each time `fa` opens
+    scheduler.Scheduler(
+        engine, current_user(), lambda: _scheduled_sync(engine, current_user())
+    ).start()
+    uvicorn.run(create_app(engine), host=HOST, port=port, log_level="warning")

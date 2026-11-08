@@ -92,7 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 GROUPS = (
     ("Start", ("up", "setup", "demo", "stop")),
-    ("See", ("status", "month", "subs", "summary")),
+    ("See", ("status", "month", "subs", "summary", "scan")),
     ("Look after", ("doctor", "models", "keys", "bank", "uninstall")),
     (
         "Data",
@@ -186,11 +186,15 @@ def _front_door(args: argparse.Namespace) -> int | None:
             return bank.manage(launcher._open_browser)  # pyright: ignore[reportPrivateUsage]
         token = setup.read_token_stdin() if args.token_stdin else None
         return bank.guide(LOCAL_USER, launcher._open_browser, input, token)  # pyright: ignore[reportPrivateUsage]
-    if c in ("status", "month", "subs"):
+    if c in ("status", "month", "subs", "scan"):
         from finance_agent.cli import status
 
         engine = open_db(create=False)
         try:
+            if c == "scan":
+                from finance_agent.cli import scan
+
+                return scan.scan(engine, LOCAL_USER, args.show)
             if c == "status":
                 return status.status(engine, LOCAL_USER)
             if c == "month":
@@ -203,6 +207,23 @@ def _front_door(args: argparse.Namespace) -> int | None:
         finally:
             engine.dispose()
     return None
+
+
+def _schedule(auto: str | None, every: int | None) -> int:
+    """`fa sync --auto on|off --every HOURS`: the in-server sync's settings."""
+    from dataclasses import replace
+
+    from finance_agent.storage import sync_schedule
+
+    s = sync_schedule.load()
+    if auto is not None:
+        s = replace(s, enabled=auto == "on")
+    if every is not None:
+        s = replace(s, every_hours=every)
+    sync_schedule.save(s)  # ValueError on a bad interval: `fa: ...`, exit 1
+    state = f"every {s.every_hours}h while fa is open" if s.enabled else "off"
+    print(f"Scheduled sync: {state}")
+    return 0
 
 
 def _up() -> int:
@@ -242,6 +263,8 @@ def _add_front_door(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") 
     de.add_argument("--list", action="store_true", help="list the personas")
     de.add_argument("--no-open", action="store_true", help="don't open the browser")
     sub.add_parser("status", help="a terminal dashboard")
+    sc = sub.add_parser("scan", help="build the Assistant's profile of your history")
+    sc.add_argument("--show", action="store_true", help="print the profile too")
     mo = sub.add_parser("month", help="a month by Category, with bars")
     mo.add_argument("month", nargs="?", metavar="YYYY-MM")
     sub.add_parser("subs", help="subscriptions, monthly total and the AI cap")
@@ -324,6 +347,14 @@ def _main(argv: Sequence[str] | None) -> int:
     mode.add_argument("--install", action="store_true", help="run daily (launchd)")
     mode.add_argument("--uninstall", action="store_true", help="stop the daily run")
     mode.add_argument("--notify", action="store_true", help="alert on trouble")
+    sy.add_argument(
+        "--auto",
+        choices=["on", "off"],
+        help="the scheduled sync while `fa` is open (on by default)",
+    )
+    sy.add_argument(
+        "--every", type=int, metavar="HOURS", help="hours between scheduled syncs"
+    )
     br = sub.add_parser("brief", help="the daily news briefing on your topics")
     brsub = br.add_subparsers(dest="brief_command", required=True)
     brsub.add_parser("refresh", help="fetch today's items (launchd calls this)")
@@ -419,6 +450,8 @@ def _main(argv: Sequence[str] | None) -> int:
                 return bank.disconnect()
             if args.command == "connect":
                 return bank.connect(LOCAL_USER, args.renewed, args.link)
+            if args.auto or args.every is not None:
+                return _schedule(args.auto, args.every)
             if args.install or args.uninstall:
                 from finance_agent.cli import schedule
 
