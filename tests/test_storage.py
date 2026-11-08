@@ -725,3 +725,16 @@ def test_migration_0024_adds_a_per_user_settings_table(tmp_path: Path) -> None:
         with eng.begin() as conn, pytest.raises(Exception, match="CHECK|UNIQUE"):
             conn.execute(text(insert.format(bad)))
     eng.dispose()
+
+
+def test_gemini_key_is_read_from_its_pinned_keychain_item() -> None:
+    import keyring  # conftest's in-memory backend: never the real Keychain
+
+    assert keychain.gemini_key() is None
+    keyring.set_password("finance-agent.gemini", "api-key", "synthetic-key")
+    try:
+        assert keychain.gemini_key() == "synthetic-key"
+        # the shared account name is not the Gemini item
+        assert keychain.get_text(keychain.GEMINI_SERVICE) is None
+    finally:
+        keyring.delete_password("finance-agent.gemini", "api-key")
