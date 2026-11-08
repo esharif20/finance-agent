@@ -1,5 +1,5 @@
-"""Possible Duplicate merges (#158), subscription alerts (#108) and the
-categoriser's shadow log (#115): three new tables, nothing rebuilt
+"""Possible Duplicate merges (#158) and subscription alerts (#108): two new
+tables, nothing rebuilt
 
 Widening `ck_correction_kind` would mean copying `correction`, which
 `split_part` and `note` reference; with foreign keys on that copy breaks
@@ -51,30 +51,8 @@ def upgrade() -> None:
         sa.CheckConstraint(f"code IN ({CODES})", name="ck_subscription_alert_code"),
         sa.UniqueConstraint("user_id", "merchant_id", "code", "state"),
     )
-    op.create_table(
-        "shadow_prediction",
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("user_id", sa.Integer, sa.ForeignKey("user.id"), nullable=False),
-        sa.Column(
-            "merchant_id",
-            sa.Integer,
-            sa.ForeignKey("merchant.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column(
-            "category_id", sa.Integer, sa.ForeignKey("category.id"), nullable=False
-        ),
-        sa.Column("confidence", sa.Integer, nullable=False),
-        sa.Column("model", sa.String(80), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint(
-            "confidence BETWEEN 0 AND 1000", name="ck_shadow_prediction_confidence"
-        ),
-        sa.UniqueConstraint("user_id", "merchant_id", "model"),
-    )
 
 
 def downgrade() -> None:
-    op.drop_table("shadow_prediction")
     op.drop_table("subscription_alert")
     op.drop_table("duplicate_merge")

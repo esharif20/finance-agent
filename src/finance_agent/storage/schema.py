@@ -635,29 +635,3 @@ subscription_alert = Table(
     ),
     UniqueConstraint("user_id", "merchant_id", "code", "state"),
 )
-
-# The categoriser's shadow log (#115, ADR 0015): the Category the local model
-# would give a Merchant, logged before the user decides it, one per Merchant
-# and model version. A later Correction of that Merchant is the decision it is
-# compared with. Confidence is cosine similarity in thousandths. Real-data
-# metrics derived from it live here only, never in the repository.
-shadow_prediction = Table(
-    "shadow_prediction",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
-    Column(
-        "merchant_id",
-        Integer,
-        ForeignKey("merchant.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column("category_id", Integer, ForeignKey("category.id"), nullable=False),
-    Column("confidence", Integer, nullable=False),
-    Column("model", String(80), nullable=False),
-    Column("created_at", DateTime(timezone=True), nullable=False),
-    CheckConstraint(
-        text("confidence BETWEEN 0 AND 1000"), name="ck_shadow_prediction_confidence"
-    ),
-    UniqueConstraint("user_id", "merchant_id", "model"),
-)
