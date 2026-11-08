@@ -14,6 +14,12 @@ seasonal naive.
 
 Gates (ADR 0015, docs/ML_EVALUATIONS.md): ETS from 24 months, seasonal naive
 from 12, and "insufficient" before.
+
+After a life change the user confirmed (#270, `ledger.life_changes`), the
+series' Categories are forecast from the change's month only: while fewer than
+12 months have passed, as the median of those months ("since_change", the band
+their range), since the old level is known to be wrong. Income is scheduled
+from credits since an income change.
 """
 
 # statsmodels ships no type information
@@ -26,6 +32,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from decimal import Decimal
+from statistics import median
 from typing import Any, Literal, Protocol
 
 import numpy as np
@@ -43,6 +50,8 @@ from finance_agent.ledger import (
     shares_in_gbp,
 )
 from finance_agent.ledger.fx import GBP
+from finance_agent.ledger.life_changes import LifeChanges, Series, series_of
+from finance_agent.ledger.taxonomy import TAXONOMY_VERSION
 
 LEVEL = 0.8  # the prediction interval's coverage
 SEASON = 12
@@ -57,7 +66,7 @@ MAX_LOG = 700.0  # exp(700) is about 1e304, still a finite float
 # long ago does not stop the salary being recognised
 RECENT_CREDITS = 6
 
-Method = Literal["ets", "seasonal_naive", "insufficient"]
+Method = Literal["ets", "seasonal_naive", "since_change", "insufficient"]
 
 
 @dataclass(frozen=True)
@@ -124,7 +133,8 @@ def cash_flow(led: Ledger, as_of: date, horizon: int = 3) -> CashFlow:
     complete months before it. Read-only: the Ledger and registry are only read.
     See `project`."""
     registry = {e.merchant_id: e.status for e in led.subscriptions()}
-    return project(in_gbp(led), registry, as_of, horizon)
+    resets = LifeChanges.of(led).resets()
+    return project(in_gbp(led), registry, as_of, horizon, resets)
 
 
 def in_gbp(led: Ledger) -> list[Transaction]:
@@ -158,16 +168,24 @@ def gbp_rows(
 
 
 def project(
-    txns: Iterable[Txn], registry: Mapping[int, str], as_of: date, horizon: int = 3
+    txns: Iterable[Txn],
+    registry: Mapping[int, str],
+    as_of: date,
+    horizon: int = 3,
+    resets: Mapping[Series, date] | None = None,
 ) -> CashFlow:
-    """`cash_flow` over Transactions and the Subscription registry's status
-    per Merchant id, so a harness can run it without a Ledger.
+    """`cash_flow` over Transactions, the Subscription registry's status per
+    Merchant id and the confirmed life changes' months per series, so a
+    harness can run it without a Ledger.
 
     A Merchant with a recurring schedule (`categorise.recurring`) is projected
     from it while it is still running, unless the user said it is not a
     subscription; its charges, and a cancelled one's, are not discretionary.
     Everything else is Spending per Category, forecast by `forecast_category`."""
     start = as_of.replace(day=1)
+    # a change confirmed for a month not yet begun cannot reset anything yet
+    resets = {k: v.replace(day=1) for k, v in (resets or {}).items() if v < start}
+    paid_from = resets.get("income", date.min)
     months = [_add_months(start, k) for k in range(horizon + 1)]
     shares: list[tuple[int | None, date, tuple[str, str] | None, int]] = []
     names: dict[int, str] = {}
@@ -175,7 +193,7 @@ def project(
     by_payer: dict[str, list[tuple[date, int]]] = {}
     for t in txns:
         c = t.categorisation
-        if c is not None and c.kind == "Income" and t.posted_on < start:
+        if c is not None and c.kind == "Income" and paid_from <= t.posted_on < start:
             payer = normalise(t.description)
             by_payer.setdefault(payer, []).append((t.posted_on, int(t.amount * 100)))
         if c is None or c.kind != "Spending" or t.posted_on >= start:
@@ -214,11 +232,15 @@ def project(
             spend[on.replace(day=1)] = spend.get(on.replace(day=1), 0) + pence
     categories: dict[tuple[str, str], CategoryForecast] = {}
     for cat, spend in sorted(monthly.items()):
+        series = series_of("Spending", cat, TAXONOMY_VERSION)
+        reset = resets.get(series) if series else None
         first, history = min(spend), []
+        if reset is not None:
+            first = max(first, reset)
         while first < start:
             history.append(spend.get(first, 0))
             first = _add_months(first, 1)
-        categories[cat] = forecast_category(history, horizon)
+        categories[cat] = forecast_category(history, horizon, reset is not None)
     forecasts = [f.months for f in categories.values() if f.months]
     out: list[CashFlowMonth] = []
     for i, month in enumerate(months[:-1]):
@@ -268,10 +290,17 @@ def _next(rec: Recurrence, k: int) -> date:
     return _add_months(rec.last_on, k * (12 if rec.interval == "annual" else 1))
 
 
-def forecast_category(history: Sequence[int], horizon: int) -> CategoryForecast:
+def forecast_category(
+    history: Sequence[int], horizon: int, reset: bool = False
+) -> CategoryForecast:
     """The next `horizon` months of spend in a Category, from its complete
-    monthly totals so far (pence, oldest first; negative months count as 0)."""
+    monthly totals so far (pence, oldest first; negative months count as 0).
+    `reset`: the history starts at a confirmed life change (see the module)."""
     y = [max(0, v) for v in history]
+    if reset and 0 < len(y) < SEASONAL_NAIVE_MONTHS and horizon >= 1:
+        level = round(median(y))
+        band = Band(level, min(y), max(y))
+        return CategoryForecast("since_change", (band,) * horizon)
     if len(y) < SEASONAL_NAIVE_MONTHS or horizon < 1:
         return CategoryForecast("insufficient", ())
     if len(y) < MIN_MONTHS or len(set(y)) == 1:

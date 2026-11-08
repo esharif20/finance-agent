@@ -1,7 +1,7 @@
 """The Review Queue's endpoints (#110): list, answer, skip and undo, for
 `current_user` only. Every write returns the queue as it now stands."""
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -10,8 +10,11 @@ from sqlalchemy import Connection
 
 from finance_agent.categorise import auto, embedding
 from finance_agent.categorise.display_names import display_name
+from finance_agent.engine.baselines import Insufficient
+from finance_agent.engine.changepoint import detect_changes
 from finance_agent.identity import current_user
-from finance_agent.ledger import UnknownTarget
+from finance_agent.ledger import Transaction, UnknownTarget
+from finance_agent.ledger.life_changes import SERIES, Detected, series_rows
 from finance_agent.ledger.review import (
     Answer,
     InvalidAnswer,
@@ -24,7 +27,7 @@ from finance_agent.ledger.review import (
 class ItemOut(BaseModel):
     id: str  # "<type>:<key>"; the path parameter of answer and skip
     type: str  # category, subscription, possible_duplicate, split_recheck,
-    # split_refund or always_ask; more may come
+    # split_refund, always_ask or life_change; more may come
     version: str  # send it back with an answer or skip
     weight: int  # Transactions an answer touches ("Apply to N similar")
     title: str  # the Merchant's name, if any
@@ -38,6 +41,8 @@ class ItemOut(BaseModel):
     skipped: bool
     spend_minor: int  # what an answer touches (absolute), in `currency`
     currency: str
+    before_minor: int | None = None  # a life change's level before, in `currency`
+    after_minor: int | None = None  # ... and after
 
 
 class QueueOut(BaseModel):
@@ -77,6 +82,18 @@ class StaleOut(BaseModel):
     stale_ids: list[str]
 
 
+def detected(txns: Sequence[Transaction]) -> list[Detected]:
+    """The Engine's life changes in every series (#256), for the queue (#270)."""
+    out: list[Detected] = []
+    for series in SERIES:
+        found = detect_changes(series_rows(txns, series), series)
+        if not isinstance(found, Insufficient):
+            out += [
+                Detected(series, c.month, c.before, c.after, c.evidence) for c in found
+            ]
+    return out
+
+
 def _make(conn: Connection, user: int) -> ReviewQueue:
     return ReviewQueue(
         conn,
@@ -84,6 +101,7 @@ def _make(conn: Connection, user: int) -> ReviewQueue:
         suggester=lambda targets, labelled: embedding.suggest(
             conn, user, targets, labelled
         ),
+        detector=detected,
     )
 
 
@@ -111,6 +129,8 @@ def _item(i: Item) -> ItemOut:
         skipped=i.skipped,
         spend_minor=int(i.spend.scaleb(2)),
         currency=i.currency,
+        before_minor=i.levels[0] if i.levels else None,
+        after_minor=i.levels[1] if i.levels else None,
     )
 
 

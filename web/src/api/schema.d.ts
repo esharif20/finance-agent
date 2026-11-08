@@ -1208,6 +1208,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/story/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Story */
+        get: operations["get_story_api_story__month__get"];
+        put?: never;
+        /** Word Story */
+        post: operations["word_story_api_story__month__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/subscriptions": {
         parameters: {
             query?: never;
@@ -1893,6 +1911,18 @@ export interface components {
             /** To Date */
             to_date: string;
         };
+        /** GetStoryOut */
+        GetStoryOut: {
+            /** Anomalies */
+            anomalies: components["schemas"]["StoryAnomaly"][];
+            /** Changes */
+            changes: components["schemas"]["StoryChange"][];
+            /** Evidence Id */
+            evidence_id: string;
+            /** Month */
+            month: string;
+            wording: components["schemas"]["Data"] | null;
+        };
         /** GoalOut */
         GoalOut: {
             /** Amount Minor */
@@ -2534,6 +2564,50 @@ export interface components {
          * @enum {string}
          */
         Status: "reached" | "overdue" | "at_risk" | "on_track" | "unchecked";
+        /** StoryAnomaly */
+        StoryAnomaly: {
+            impact: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            key: components["schemas"]["Data"];
+            /**
+             * Raised On
+             * Format: date
+             */
+            raised_on: string;
+            /** Type */
+            type: string;
+        };
+        /** StoryChange */
+        StoryChange: {
+            /** Category */
+            category: string;
+            change: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            /** Drivers */
+            drivers: components["schemas"]["StoryDriver"][];
+            expected: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            /** Seasonal */
+            seasonal: boolean;
+            spent: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+        };
+        /** StoryDriver */
+        StoryDriver: {
+            change: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            expected: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+            merchant: components["schemas"]["Data"];
+            spent: components["schemas"]["finance_agent__assistant__tools__read__Money"];
+        };
+        /** StoryOut */
+        StoryOut: {
+            recap: components["schemas"]["GetStoryOut"];
+            /** Saved */
+            saved: boolean;
+            /** Text */
+            text: string;
+            /**
+             * Worded By
+             * @enum {string}
+             */
+            worded_by: "model" | "template";
+        };
         /** StrengthOut */
         StrengthOut: {
             /** Key */
@@ -2803,6 +2877,10 @@ export interface components {
         };
         /** ItemOut */
         finance_agent__api__review_queue__ItemOut: {
+            /** After Minor */
+            after_minor?: number | null;
+            /** Before Minor */
+            before_minor?: number | null;
             /** Choices */
             choices: string[];
             /** Currency */
@@ -4815,6 +4893,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_story_api_story__month__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    word_story_api_story__month__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryOut"];
                 };
             };
             /** @description Validation Error */
