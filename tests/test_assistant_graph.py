@@ -700,10 +700,43 @@ def test_the_model_is_told_today_so_it_can_fill_a_date_argument(
 
 
 @pytest.mark.parametrize(
-    ("today", "last"), [(date(2026, 1, 20), "2025-12"), (date(2026, 3, 31), "2026-02")]
+    ("today", "message", "resolved"),
+    [
+        (date(2026, 1, 20), "Fuel last month?", "Fuel last month (2025-12)?"),
+        (date(2026, 3, 31), "fuel LAST month", "fuel LAST month (2026-02)"),
+        (
+            date(2026, 1, 20),
+            "In and out this month?",
+            "In and out this month (2026-01)?",
+        ),
+        (
+            date(2026, 1, 20),
+            "Spent in January 2026?",
+            "Spent in January 2026 (2026-01)?",
+        ),
+        (date(2026, 1, 20), "net for Dec 2025", "net for Dec 2025 (2025-12)"),
+        (date(2026, 1, 20), "last month's food", "last month's (2025-12) food"),
+        (date(2026, 1, 20), "next month's bills", "next month's bills"),  # Plan's
+        (date(2026, 1, 20), "May I?", "May I?"),  # a month name needs a year
+    ],
 )
-def test_the_model_is_told_last_month_and_to_keep_pence(today: date, last: str) -> None:
-    # 4b read "last month" as the latest month, and dropped pence (£2,500)
-    (system, *_) = context.assemble("ask", "fuel last month?", [], [], today)
-    assert f"Last month is {last}." in system.content
+def test_relative_and_named_months_are_resolved_in_code(
+    today: date, message: str, resolved: str
+) -> None:
+    # 4b read "this month" as last month from a prompt hint; Python decides now
+    *_, user = context.assemble("ask", message, [], [], today)
+    assert user.content == resolved
+
+
+def test_earlier_user_turns_are_resolved_too_and_pence_are_kept() -> None:
+    history = [
+        {"role": "user", "content": "Transport last month?"},
+        {"role": "assistant", "content": "£112.80 on Transport last month."},
+    ]
+    system, earlier, reply, _ = context.assemble(
+        "ask", "Of that, fuel?", [], history, date(2026, 1, 20)
+    )
+    assert earlier.content == "Transport last month (2025-12)?"
+    assert reply.content == "£###.## on Transport last month."  # replies untouched
+    assert "Last month is" not in system.content
     assert "£2,500.00" in system.content and "pence" in system.content
