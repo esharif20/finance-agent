@@ -1,0 +1,46 @@
+{
+  "harness": "bandit",
+  "dataset": "synthetic_bandit",
+  "dataset_version": 1,
+  "dataset_sha256": "64941b8cbdae0a2c9caec8639aff25fc382b5dc52076e876bae352a58de711f1",
+  "seed": 272,
+  "users": 120,
+  "weeks": 26,
+  "candidates": 8,
+  "shown": 3,
+  "cap": 3,
+  "draws": 100,
+  "models": {
+    "candidate": {
+      "model": "Thompson sampling (engine.bandit)",
+      "model_version": "ts-shadow-v1",
+      "metrics": {
+        "acceptance": 0.254737,
+        "regret": 11.169986,
+        "largest_slate": 3,
+        "ope_true_value": 0.257685,
+        "ope_ips_error": 0.007184,
+        "ope_snips_error": 0.011387,
+        "ope_ess": 731.703618
+      }
+    },
+    "live_ranker": {
+      "model": "impact x confidence x Beta relevance",
+      "model_version": "rank-v1",
+      "metrics": {
+        "acceptance": 0.25148,
+        "regret": 11.424022,
+        "largest_slate": 3
+      }
+    },
+    "impact": {
+      "model": "rank by \u00a3 impact",
+      "model_version": "impact-v1",
+      "metrics": {
+        "acceptance": 0.245818,
+        "regret": 11.865658,
+        "largest_slate": 3
+      }
+    }
+  }
+}
