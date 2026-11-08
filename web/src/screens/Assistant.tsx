@@ -7,7 +7,7 @@ import { CloudToggle } from "@/components/CloudToggle";
 import { Money } from "@/components/Money";
 import { PayloadViewer } from "@/components/PayloadViewer";
 import { Card } from "@/components/ui/card";
-import { type Block, type Counted, type Decision, type Message, friendlyLabel, parseBlocks, pathLabel } from "@/lib/chat";
+import { type Block, type Counted, type Decision, type Message, friendlyLabel, parseBlocks, pathLabel, timingLine, timingRows } from "@/lib/chat";
 import { decide, send as sendMessage, useChat } from "@/lib/chatStore";
 import { usePrivacy } from "@/lib/privacy";
 
@@ -114,6 +114,29 @@ function CountedList({ group }: { group: Counted }) {
   );
 }
 
+/** How long the user waited and what ran (#317); tap for the per-phase breakdown. */
+function TimingLine({ m }: { m: Message }) {
+  const label = m.path ? `Answered by: ${pathLabel(m.path, m.text)}` : null;
+  if (!m.timing) return label ? <p className="mt-2 text-meta text-muted-foreground" data-testid="path">{label}</p> : null;
+  return (
+    <details className="group mt-2 text-meta text-muted-foreground" data-testid="timing">
+      <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1 rounded-full tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        {timingLine(m.timing, m.waitedMs)}
+        <ChevronDown className="size-3.5 transition-transform duration-200 ease-out group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <dl className="mt-1 grid max-w-64 grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 tabular-nums">
+        {timingRows(m.timing, m.waitedMs).map(([k, v]) => (
+          <Fragment key={k}>
+            <dt>{k}</dt>
+            <dd className="text-right">{v}</dd>
+          </Fragment>
+        ))}
+      </dl>
+      {label && <p className="mt-1" data-testid="path">{label}</p>}
+    </details>
+  );
+}
+
 function ProposalCard({
   id,
   decision,
@@ -183,7 +206,7 @@ function ProposalCard({
   );
 }
 
-function Bubble({ m, decision, busy, onDecide, thread, cloudIndex }: { m: Message; decision?: Decision; busy: boolean; onDecide: (id: number, d: Decision) => void; thread: string | null; cloudIndex: number }) {
+function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m: Message; decision?: Decision; busy: boolean; onDecide: (id: number, d: Decision) => void; onChip: (text: string) => void; thread: string | null; cloudIndex: number }) {
   const reduce = useReducedMotion();
   const mine = m.role === "user";
   return (
@@ -206,16 +229,26 @@ function Bubble({ m, decision, busy, onDecide, thread, cloudIndex }: { m: Messag
               </span>
             )}
             {m.error && <p className="text-label text-warning-foreground" role="alert">{m.error}</p>}
+            {!m.streaming && !!m.resolved?.length && (
+              <p className="mt-1 text-meta text-muted-foreground" data-testid="resolved">
+                Read as {m.resolved.join(", ")}
+              </p>
+            )}
             {!m.streaming && m.counted?.map((g) => <CountedList key={g.evidence_id} group={g} />)}
             {m.proposalId != null && !m.streaming && (
               <ProposalCard id={m.proposalId} decision={decision} disabled={busy} onDecide={(d) => onDecide(m.proposalId as number, d)} />
             )}
             {m.path === "cloud" && !m.streaming && thread && <PayloadViewer conversation={thread} index={cloudIndex} cost={m.costPence} />}
-            {m.path && !m.streaming && (
-              <p className="mt-2 text-meta text-muted-foreground" data-testid="path">
-                Answered by: {pathLabel(m.path, m.text)}
-              </p>
+            {!m.streaming && !!m.chips?.length && (
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Suggested questions">
+                {m.chips.map((c) => (
+                  <button key={c} type="button" disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
+                    {c}
+                  </button>
+                ))}
+              </div>
             )}
+            {!m.streaming && <TimingLine m={m} />}
           </>
         )}
       </div>
@@ -247,7 +280,9 @@ export function Assistant() {
   // load the local model while the user types, so the first turn skips the load;
   // a beacon, not fetch: nothing waits on it and nothing is shown
   useEffect(() => {
-    if (!DEMO) navigator.sendBeacon?.("/api/chat/warm"); // the demo has no model to warm
+    if (DEMO) return; // the demo has no model to warm
+    navigator.sendBeacon?.("/api/chat/warm");
+    return () => void navigator.sendBeacon?.("/api/chat/cool"); // the chat closed: free the model's memory
   }, []);
 
   useEffect(() => {
@@ -259,11 +294,14 @@ export function Assistant() {
     if (chat.thread === null) setCloud(false);
   }, [chat.thread]);
 
-  function send(e: React.FormEvent) {
-    e.preventDefault();
+  function say(text: string) {
     // cloud rides along only once the toggle is on; switching off a thread that used it sends false
     const optIn = cloud && !capped ? true : chat.messages.some((m) => m.path === "cloud") ? false : undefined;
-    if (sendMessage(draft.trim(), optIn)) setDraft("");
+    return sendMessage(text, optIn);
+  }
+  function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (say(draft.trim())) setDraft("");
   }
 
   return (
@@ -281,7 +319,7 @@ export function Assistant() {
           </li>
         )}
         {chat.messages.map((m, i) => (
-          <Bubble key={m.id} m={m} thread={chat.thread} cloudIndex={chat.messages.slice(0, i).filter((x) => x.path === "cloud").length} busy={chat.busy} decision={m.proposalId != null ? chat.decisions[m.proposalId] : undefined} onDecide={decide} />
+          <Bubble key={m.id} m={m} thread={chat.thread} cloudIndex={chat.messages.slice(0, i).filter((x) => x.path === "cloud").length} busy={chat.busy} decision={m.proposalId != null ? chat.decisions[m.proposalId] : undefined} onDecide={decide} onChip={say} />
         ))}
       </ol>
       {!DEMO && <CloudToggle on={cloud} capped={capped} disabled={chat.busy} onChange={setCloud} />}

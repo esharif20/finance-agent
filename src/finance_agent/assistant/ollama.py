@@ -34,11 +34,14 @@ MODELS: dict[Choice, str] = {
 }
 DEFAULT_CHOICE: Choice = "careful"
 DEFAULT_MODEL = MODELS[DEFAULT_CHOICE]
-# each turn (and the chat screen's warm-up) restarts it: loaded while the user
-# chats, unloaded five idle minutes after the last turn
-KEEP_ALIVE = "5m"
-WARM_KEEP_ALIVE = "30m"  # the chat screen just opened: a question is likely
-NUM_CTX = 8192  # the context the #144 memory gate (about 7 GB) is measured at
+# each turn (and the chat screen's warm-up) restarts it: loaded while the chat
+# screen is open (#317), unloaded when it closes (POST /api/chat/cool) or 30
+# idle minutes after the last turn
+KEEP_ALIVE = "30m"
+WARM_KEEP_ALIVE = KEEP_ALIVE
+NUM_CTX = 8192  # the context the #144 memory gate (about 7 GB) is measured at;
+# the same on every call, so Ollama never reloads and keeps its KV cache
+NUM_PREDICT = 400  # the longest reply (in-depth, #317); short ones stop early
 
 
 class OllamaHostRefused(ValueError):
@@ -167,6 +170,7 @@ class OllamaChatModel:
             "temperature": 0,
             "presence_penalty": 0,
             "num_ctx": num_ctx,
+            "num_predict": NUM_PREDICT,
         }
         if seed is not None:
             self._options["seed"] = seed

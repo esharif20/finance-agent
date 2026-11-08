@@ -284,8 +284,9 @@ def build(environ: Mapping[str, str] = os.environ) -> FastAPI:
 
     @app.get("/app", include_in_schema=False)
     @app.get("/app/{rest:path}", include_in_schema=False)
+    @app.get("/architecture", include_in_schema=False)
     def spa(rest: str = "") -> FileResponse:
-        """As vercel.json: /app and /app/* are the one-page app."""
+        """As vercel.json: /app, /app/* and /architecture are the one-page app."""
         return FileResponse(index)
 
     # create_app mounts the web build at "/" last; the routes above must precede

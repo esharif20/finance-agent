@@ -9,6 +9,7 @@ import { ACCOUNTS } from "./accounts.fixture";
 import { Field, finePointer, Flex, liteDevice, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
 import { OVERVIEW, REVIEW } from "./story/story.fixture";
+import "./hero.css";
 
 export const HEADLINE = "An AI agent for your money, on your own Mac.";
 export const HEADLINE_LINES = ["An AI agent for your money,", "on your own Mac."];
@@ -136,6 +137,125 @@ function StillStage() {
   );
 }
 
+/** The ledger field: a fine grid of dots behind the hero that the pointer pulls like iron filings.
+    Dots near the cursor lift, brighten and briefly turn into digits that scramble, then settle as a
+    tally does. One 2D canvas, DPR capped at 1.5, drawn only while something moves and paused off
+    screen. Desktop with a fine pointer only: on touch or under 900px the canvas is never created. */
+function LedgerField() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [on] = useState(() => finePointer() && !liteDevice());
+  useEffect(() => {
+    const cv = ref.current;
+    const ctx = cv?.getContext("2d");
+    if (!on || !cv || !ctx) return;
+    const GAP = 22;
+    const R = 170; // the field's reach, px
+    let w = 0;
+    let h = 0;
+    let dpr = 1;
+    let cols = 0;
+    let rows = 0;
+    let rect = cv.getBoundingClientRect();
+    const size = () => {
+      rect = cv.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      w = rect.width;
+      h = rect.height;
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      cols = Math.ceil(w / GAP) + 1;
+      rows = Math.ceil(h / GAP) + 1;
+    };
+    size();
+    // the pointer, eased (lerp 0.1), and an energy that rises as it moves and decays when it rests
+    const aim = { x: -1e4, y: -1e4 };
+    const at = { x: -1e4, y: -1e4 };
+    let energy = 0;
+    let raf = 0;
+    let visible = true;
+    const draw = (now: number) => {
+      raf = 0;
+      if (!visible) return;
+      if (at.x < -1e3) {
+        at.x = aim.x;
+        at.y = aim.y;
+      }
+      at.x += (aim.x - at.x) * 0.1;
+      at.y += (aim.y - at.y) * 0.1;
+      energy *= 0.965;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const tick = Math.floor(now / 90);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const bx = c * GAP + (r % 2 ? GAP / 2 : 0);
+          const by = r * GAP;
+          const dx = bx - at.x;
+          const dy = by - at.y;
+          const d = Math.hypot(dx, dy);
+          const f = d < R ? (1 - d / R) ** 2 * energy : 0;
+          if (f < 0.01) {
+            ctx.fillStyle = "rgba(255,255,255,0.07)";
+            ctx.fillRect(bx - 0.75, by - 0.75, 1.5, 1.5);
+            continue;
+          }
+          // filings: pushed out along the radius with a ripple that travels outwards
+          const push = f * (10 + 6 * Math.sin(d / 16 - now / 140));
+          const x = bx + (dx / (d || 1)) * push;
+          const y = by + (dy / (d || 1)) * push - f * 6;
+          if (f > 0.32) {
+            // close in: a digit that scrambles, slower as the energy falls, so it settles
+            const n = (c * 7 + r * 13 + Math.floor(tick * (0.4 + energy))) % 10;
+            ctx.fillStyle = `rgba(154,225,135,${Math.min(0.85, f * 1.1).toFixed(3)})`;
+            ctx.fillText(String(n), x, y);
+          } else {
+            const s = 1.5 + f * 2.5;
+            ctx.fillStyle = `rgba(${Math.round(255 - 100 * f)},${Math.round(255 - 30 * f)},${Math.round(255 - 120 * f)},${(0.07 + f * 0.9).toFixed(3)})`;
+            ctx.fillRect(x - s / 2, y - s / 2, s, s);
+          }
+        }
+      }
+      if (energy > 0.004) raf = requestAnimationFrame(draw);
+    };
+    const kick = () => {
+      if (!raf && visible) raf = requestAnimationFrame(draw);
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      aim.x = e.clientX - rect.left;
+      aim.y = e.clientY - rect.top;
+      energy = Math.min(1, energy + 0.08);
+      kick();
+    };
+    const reflow = () => {
+      size();
+      kick();
+    };
+    const resync = () => void (rect = cv.getBoundingClientRect());
+    const io = new IntersectionObserver(([e]) => {
+      visible = Boolean(e?.isIntersecting);
+      if (visible) kick();
+    });
+    io.observe(cv);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("resize", reflow);
+    window.addEventListener("scroll", resync, { passive: true });
+    energy = 0.001;
+    kick(); // one frame for the resting grid
+    return () => {
+      cancelAnimationFrame(raf);
+      io.disconnect();
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("resize", reflow);
+      window.removeEventListener("scroll", resync);
+    };
+  }, [on]);
+  return on ? <canvas ref={ref} className="lp-ledger-field" aria-hidden="true" /> : null;
+}
+
 /** The hero and the page's signature move. The three accounts of one made-up household arrive as
     a fanned hand of cards (WebGL, the app's own card model); scrolling lays them out in a row, each
     with its balance, then gathers them into one stack over the combined view: one total, money in
@@ -146,9 +266,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const rows = useRef<HTMLUListElement>(null);
-  const spotEl = useRef<HTMLSpanElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
+  const floors = useRef<(HTMLSpanElement | null)[]>([]);
+  const backs = useRef<(HTMLSpanElement | null)[]>([]);
+  const sheens = useRef<(HTMLSpanElement | null)[]>([]);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
@@ -182,7 +304,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const size = () => {
       const r = el.getBoundingClientRect();
       const narrow = r.width < 720;
-      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.24, 380);
+      // a bigger hand on desktop; hero.css sizes the slots to match (min(28vw, 440px))
+      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.28, 440);
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
@@ -190,7 +313,6 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     // the pointer tilt and the deal have all settled
     let lastP = -1;
     let drawn = false;
-    let spot = "";
     const sizeScene = () => {
       dims = size();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
@@ -204,24 +326,43 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const { w, narrow } = dims;
       const now = performance.now();
       if (playing.current && !dealt) dealt = now;
-      const since = dealt ? now - dealt : 0;
-      const poses = ACCOUNTS.accounts.map((_, i) => {
-        const q = pose(i, p.get(), w, narrow, tilt);
-        const k = ease(clamp01((since - 200 - i * 140) / 1300));
-        return { ...q, y: q.y + (1 - k) * w * 1.6, rz: q.rz * k + (1 - k) * (8 - i * 8), rx: q.rx + (1 - k) * 50, s: q.s * (0.82 + 0.18 * k) };
-      });
+      // the deal waits out the preloader's sheet as it lifts off the top of the page
+      const since = dealt ? now - dealt - 450 : 0;
       const pv = p.get();
+      // on idle the fan turns slowly in place, desktop and fine pointer only, and only while it is a fan
+      const sway = finePointer() && !narrow ? clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08)) : 0;
+      const poses = ACCOUNTS.accounts.map((_, i) => {
+        const q0 = pose(i, pv, w, narrow, tilt);
+        // magnetic depth: each card sits at its own depth, so the eased tilt shifts the front card most (2 to 6 px)
+        const d = 4 + 4 * i;
+        const q1 = { ...q0, x: q0.x + tilt.x * d, y: q0.y + tilt.y * d };
+        const q = sway ? { ...q1, ry: q1.ry + Math.sin(now / 2600) * 9 * sway, rz: q1.rz + Math.sin(now / 3400 + i * 1.3) * 2.2 * sway, y: q1.y + Math.sin(now / 2100 + i) * 6 * sway } : q1;
+        // a dealt card: thrown up from below and out of depth, spinning flat as it lands (quartic ease-out)
+        const k = 1 - (1 - clamp01((since - 160 - i * 170) / 1400)) ** 4;
+        const u = 1 - k;
+        return { ...q, rest: q.y, deal: k, y: q.y + u * w * 2.1, z: q.z - u * 520, rz: q.rz * k + u * (14 - i * 14), rx: q.rx + u * 64, ry: q.ry + u * (i - 1) * 18, s: q.s * (0.78 + 0.22 * k) };
+      });
       // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
       if (rows.current) rows.current.style.transform = `translate3d(${tilt.x * -40}px, ${-pv * 22 + tilt.y * -24}vh, ${-260 - pv * 200}px)`;
-      // the spotlight's position goes on the spot alone, so a pointer move restyles one element
-      const at = `${((aim.x + 0.5) * 100).toFixed(1)}% ${((aim.y + 0.5) * 100).toFixed(1)}%`;
-      if (at !== spot && spotEl.current) {
-        spot = at;
-        spotEl.current.style.setProperty("--sxy", at);
-      }
-      const sweep = clamp01((since - 700) / 1500);
+      const sweep = clamp01((since - 1100) / 1500);
       const sweeping = sweep > 0 && sweep < 1;
+      // contact shadows on the floor under the fan; they gather as each card lands, gone once the hand opens
+      const onFloor = 1 - clamp01((pv - 0.04) / 0.16);
       poses.forEach((q, i) => {
+        const f = floors.current[i];
+        if (f) {
+          f.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.rest + dims.h * 0.78}px, 0) scale(${(1.25 - 0.25 * q.deal) * q.s}, ${0.22 * q.s})`;
+          f.style.opacity = String(q.deal * onFloor);
+        }
+        // edge light: a soft backlight that spills round each card's rim from behind
+        const bk = backs.current[i];
+        if (bk) {
+          bk.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, 0) rotate(${q.rz}deg) scale(${q.s})`;
+          bk.style.opacity = String(q.deal);
+        }
+        // a sheen slides across the face in step with the tilt, opposite the pointer like a real reflection
+        const sh = sheens.current[i];
+        if (sh) sh.style.transform = `translate3d(${(-tilt.x * 150).toFixed(1)}%, ${(-tilt.y * 50).toFixed(1)}%, 0) skewX(-14deg)`;
         const c = cards.current[i];
         if (c) c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
         const l = labels.current[i];
@@ -247,10 +388,12 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           el.dataset.drawn = ""; // the canvas fades in over the CSS cards only once it has a frame
         }
       }
-      const dealing = !dealt || since < 200 + 2 * 140 + 1500 + 700;
+      // the last card lands at 160 + 2 * 170 + 1400 ms; the WebGL sweep ends at 1100 + 1500 ms
+      const dealing = !dealt || since < 2800;
+      const idling = sway > 0;
       const moving = Math.abs(pv - lastP) > 0.00005;
       lastP = pv;
-      if (dealing || moving || settling || (scene && !drawn)) raf = requestAnimationFrame(frame);
+      if (dealing || idling || moving || settling || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
       if (!raf) raf = requestAnimationFrame(frame);
@@ -262,6 +405,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     io.observe(el);
     const move = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
+      if (!el.dataset.lit) el.dataset.lit = "";
       aim.x = e.clientX / window.innerWidth - 0.5;
       aim.y = e.clientY / window.innerHeight - 0.5;
       kick();
@@ -304,10 +448,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     <section ref={track} className="lp-hero" data-still={still ? "" : undefined} aria-labelledby="lp-title">
       <div className="lp-hero-pin">
         <Field tone="night" />
+        {still ? <span className="lp-ledger-still" aria-hidden="true" /> : <LedgerField />}
         <div className="lp-halo" aria-hidden="true" data-phase={phase} />
         <div className="lp-grain" aria-hidden="true" />
         <div className="lp-hero-copy" data-phase={phase}>
-          <h1 id="lp-title" className="lp-display">
+          <h1 id="lp-title" className="lp-display" style={{ "--hd": `${delay}s` } as React.CSSProperties}>
             <Flex lines={HEADLINE_LINES} label={HEADLINE} still={still} play={play} delay={delay} />
           </h1>
           <motion.div
@@ -347,11 +492,19 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                 </li>
               ))}
             </ul>
-            <canvas ref={canvas} className="lp-stage-canvas" />
-            <span ref={spotEl} className="lp-spot" aria-hidden="true" />
             {ACCOUNTS.accounts.map((a, i) => (
-              <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot">
+              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
+            ))}
+            {ACCOUNTS.accounts.map((a, i) => (
+              <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
+            ))}
+            <canvas ref={canvas} className="lp-stage-canvas" />
+            {ACCOUNTS.accounts.map((a, i) => (
+              <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
                 <CardFace i={i} name={a.name} />
+                <span className="lp-acard-light">
+                  <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
+                </span>
               </div>
             ))}
             {ACCOUNTS.accounts.map((a, i) => (
