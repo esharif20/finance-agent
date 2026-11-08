@@ -1,0 +1,25 @@
+{
+  "id": "subscription-creep",
+  "version": 1,
+  "topic": "subscription_creep",
+  "principles": [
+    "Small monthly charges add up quietly; review them as a set, not one at a time.",
+    "Keep the ones you use every week and cancel or pause the rest.",
+    "Watch for free trials that turned into paid plans."
+  ],
+  "when": {
+    "all": [
+      {"signal": "subscription_rise_streak", "op": ">=", "value": 3}
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Your subscriptions are creeping up",
+      "body": "Subscriptions came to {subscription_spend_last_month} last month, up {subscription_spend_rise} over the last {subscription_rise_streak} months. It might be worth a quick look through the list to see which ones you still use."
+    },
+    "blunt": {
+      "title": "Subscriptions up {subscription_rise_streak} months running",
+      "body": "You spent {subscription_spend_last_month} on subscriptions last month, {subscription_spend_rise} more than {subscription_rise_streak} months ago. Go through the list today and cancel anything you have not used this month."
+    }
+  }
+}
