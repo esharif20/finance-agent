@@ -1747,6 +1747,17 @@
             "title": "Ledger Version",
             "type": "integer"
           },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
           "remaining": {
             "title": "Remaining",
             "type": "integer"

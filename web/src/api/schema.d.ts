@@ -1392,6 +1392,8 @@ export interface components {
             items: components["schemas"]["ItemOut"][];
             /** Ledger Version */
             ledger_version: number;
+            /** Message */
+            message?: string | null;
             /** Remaining */
             remaining: number;
         };

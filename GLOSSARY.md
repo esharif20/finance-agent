@@ -83,7 +83,7 @@ The bucket in Category totals and the donut holding "Always ask" payments not ye
 _Avoid_: Pending, Uncategorised
 
 **Review Queue**:
-Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence, a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
+Every decision the app is waiting on the user for, one typed item each: a Merchant whose Category could not be assigned with enough confidence (or one such payment with no Merchant), a Possible Duplicate, "is this a subscription?", or "What was this?" for an "Always ask" payment.
 _Avoid_: Inbox, uncategorised
 
 **Subscription status**:
