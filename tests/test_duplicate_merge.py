@@ -243,3 +243,62 @@ def test_api_merge_is_scoped_to_the_current_user(
     with engine.begin() as conn:
         assert Ledger(conn, 2).merged_ids() == set()
         assert Ledger(conn, 2).summarise_month(MONTH).money_out == Decimal("7.00")
+
+
+def _two_groups(a: Row, b: Row, twins_a: int, twins_b: int) -> bytes:
+    """One response whose rows `a` and `b` each arrive 1 + twins times."""
+    body = json.loads(synced([a, b], twins_a))
+    txns = body["accounts"][0]["transactions"]
+    txns += [txns[1] | {"id": f"ACC-1-btwin{k}"} for k in range(twins_b)]
+    return json.dumps(body).encode()
+
+
+@settings(max_examples=25, deadline=None)
+@given(
+    a=st.integers(-50_000, 50_000).filter(bool),
+    b=st.integers(-50_000, 50_000).filter(bool),
+    twins=st.tuples(st.integers(1, 3), st.integers(1, 3)),
+    steps=st.lists(st.tuples(st.booleans(), st.integers(0, 7)), max_size=14),
+)
+def test_random_merge_and_undo_sequences_match_a_reference(
+    a: int, b: int, twins: tuple[int, int], steps: list[tuple[bool, int]]
+) -> None:
+    """Verifier (#224): interleaved merges and undos over two groups. After
+    every step the totals equal a reference summed from the raw rows less the
+    merged ones, a refusal happens exactly when ADR 0014 says, and no group is
+    ever left with every row merged."""
+    with temp_ledger() as (led, _):
+        led.apply_sync(
+            _two_groups((5, a, "SYNTH CAFE"), (9, b, "SYNTH GROCER"), *twins)
+        )
+        groups = [frozenset(g) for g in led.possible_duplicates()]
+        assert len(groups) == 2
+        ids = sorted(groups[0] | groups[1])
+        amount = {t.id: t.amount for t in led.transactions(merged=True)}
+        live: dict[int, int] = {}  # transaction id -> merge id
+
+        for is_merge, pick in steps:
+            if is_merge:
+                t = ids[pick % len(ids)]
+                g = next(x for x in groups if t in x)
+                if t not in live and len(g - live.keys()) > 1:
+                    live[t] = led.merge_duplicate(t)
+                else:
+                    with pytest.raises(InvalidMerge):
+                        led.merge_duplicate(t)
+            elif live:
+                t = sorted(live)[pick % len(live)]
+                m = live.pop(t)
+                led.revert_merge(m)
+                with pytest.raises(UnknownTarget):
+                    led.revert_merge(m)  # an undo never applies twice
+
+            assert led.merged_ids() == set(live)
+            assert all(g - live.keys() for g in groups)
+            kept = [v for i, v in amount.items() if i not in live]
+            s = led.summarise_month(MONTH)
+            assert s.net == sum(kept, Decimal(0))
+            assert s.money_in == sum((v for v in kept if v > 0), Decimal(0))
+            assert s.money_out == -sum((v for v in kept if v < 0), Decimal(0))
+            assert len(led.transactions()) == len(kept)
+            assert led.search_transactions(month=MONTH).total == len(kept)
