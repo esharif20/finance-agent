@@ -1,15 +1,15 @@
-"""Confident auto-apply with shadow mode (#215 B, ADR 0005 as amended).
+"""Confident auto-apply right after sync (#215 B, ADR 0005 as amended).
 
 After rules and the UK merchant base, a Category Review item's embedding
-guess is applied as source `auto:<model>` only when
-- its model version (`embedding.stored_model`: name and digest) is promoted:
-  in shadow mode it logged a guess for each Review item, and of the user's
-  Merchant-wide answers to the items it guessed at or above the threshold
-  there are at least MIN_DECISIONS, PRECISION% of them agreeing; and
-- its score is at or above THRESHOLDS[model name], the lowest similarity
-  that keeps >= 95% precision on the synthetic #112 eval
-  (evals/results/categoriser_*.json, "calibration"). A model without a
-  calibrated threshold never auto-applies.
+guess is applied as source `auto:<model version>` when its score is at or
+above THRESHOLDS[model name], the lowest similarity that keeps >= 95%
+precision on the synthetic #112 eval (evals/results/categoriser_*.json,
+"calibration"). A model without a calibrated threshold never auto-applies.
+
+Every guess is logged per model version (`embedding.stored_model`: name and
+digest), and the user's Merchant-wide answer is recorded against it: a live
+accuracy record that measures and never blocks, except that a version whose
+agreement falls below PRECISION% over MIN_DECISIONS answers is suspended.
 
 Auto rows are derived like every other categorisation, re-applied from the
 log on each `categorise.run`; `undo` takes back the latest batch (one sync)
@@ -47,24 +47,26 @@ def _ids(conn: Connection, user_id: int) -> dict[Category, int]:
     return seed_taxonomy(conn, user_id)
 
 
-def _promoted(db: Scoped, model: str, threshold: int) -> bool:
-    """Promote `model` once its shadow log has earned it; promotion sticks."""
-    p, mp = schema.category_prediction, schema.model_promotion
-    if db.execute(db.select(mp, mp.c.id).where(mp.c.model == model)).first():
+def _suspended(db: Scoped, model: str, threshold: int) -> bool:
+    """The live accuracy monitor (#215 G): once the user has answered at least
+    MIN_DECISIONS of `model`'s guesses at or above the threshold and fewer
+    than PRECISION% agree, the version stops auto-applying, for good. It only
+    measures until then; it never holds anything back."""
+    p, ms = schema.category_prediction, schema.model_suspension
+    if db.execute(db.select(ms, ms.c.id).where(ms.c.model == model)).first():
         return True
     judged = db.execute(
         db.select(p, p.c.category_id, p.c.decided_category_id).where(
             p.c.model == model,
-            p.c.batch.is_(None),
             p.c.decided_category_id.is_not(None),
             p.c.score >= threshold,
         )
     ).all()
     hits = sum(r.category_id == r.decided_category_id for r in judged)
-    if len(judged) < MIN_DECISIONS or hits * 100 < PRECISION * len(judged):
+    if len(judged) < MIN_DECISIONS or hits * 100 >= PRECISION * len(judged):
         return False
-    db.insert(mp, model=model, decisions=len(judged), promoted_at=datetime.now(UTC))
-    log.info("auto-apply promoted decisions=%d", len(judged))
+    db.insert(ms, model=model, decisions=len(judged), suspended_at=datetime.now(UTC))
+    log.info("auto-apply suspended decisions=%d", len(judged))
     return True
 
 
@@ -84,7 +86,7 @@ def _set(db: Scoped, merchant_id: int, category_id: int, source: str) -> int:
 
 def _record_decisions(db: Scoped) -> None:
     """A logged guess's Merchant now has a Merchant-wide Correction: that is
-    the user's answer to the item."""
+    the user's answer to the item, or their override of an auto row."""
     p, k = schema.category_prediction, schema.correction
     answers = {
         r.merchant_id: r.category_id
@@ -98,13 +100,13 @@ def _record_decisions(db: Scoped) -> None:
             .order_by(k.c.id)  # the latest wins
         )
     }
-    open_ = db.execute(
-        db.select(p, p.c.id, p.c.merchant_id).where(
-            p.c.decided_category_id.is_(None), p.c.batch.is_(None)
+    logged = db.execute(
+        db.select(p, p.c.id, p.c.merchant_id, p.c.decided_category_id).where(
+            p.c.merchant_id.in_(answers)
         )
     ).all()
-    for r in open_:
-        if r.merchant_id in answers:
+    for r in logged:  # the user's latest answer is the one that counts
+        if r.decided_category_id != answers[r.merchant_id]:
             db.execute(
                 db.update(p)
                 .where(p.c.id == r.id)
@@ -145,7 +147,7 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
     if version is None:
         return done
     threshold = THRESHOLDS.get(version.split("@")[0])
-    live = threshold is not None and _promoted(db, version, threshold)
+    live = threshold is not None and not _suspended(db, version, threshold)
     undone = set(
         db.execute(
             db.select(p, p.c.merchant_id).where(p.c.undone_at.is_not(None))
@@ -175,7 +177,7 @@ def apply(conn: Connection, user_id: int, ids: dict[Category, int]) -> int:
                     **values,
                 )  # fmt: skip
             done += _set(db, m, ids[cat], SOURCE + version)
-        elif not live and m not in logged:  # shadow: log the guess, apply nothing
+        elif m not in logged:  # below the threshold: log the guess only
             db.insert(
                 p, model=version, merchant_id=m, category_id=ids[cat], score=score,
                 created_at=datetime.now(UTC),

@@ -687,7 +687,7 @@ def test_migration_0022_adds_transfer_rejections_which_go_with_their_transaction
 def test_migration_0023_adds_predictions_which_go_with_their_merchant(
     tmp_path: Path,
 ) -> None:
-    """0023 (#215 B) adds category_prediction and model_promotion, nothing
+    """0023 (#215 B) adds category_prediction and model_suspension, nothing
     rebuilt; a prediction is deleted with its Merchant."""
     from sqlalchemy import text
 
@@ -697,11 +697,11 @@ def test_migration_0023_adds_predictions_which_go_with_their_merchant(
         " VALUES (7, 1, 'Synth', 2)",
         "INSERT INTO category_prediction (user_id, model, merchant_id,"
         " category_id, score, created_at) VALUES (1, 'm', 5, 7, 900, '2026-01-05')",
-        "INSERT INTO model_promotion (user_id, model, decisions, promoted_at)"
+        "INSERT INTO model_suspension (user_id, model, decisions, suspended_at)"
         " VALUES (1, 'm', 50, '2026-01-05')",
     )
     eng = round_trip(
-        tmp_path, "0022", "0023", {"category_prediction", "model_promotion"}, rows
+        tmp_path, "0022", "0023", {"category_prediction", "model_suspension"}, rows
     )
     with eng.begin() as conn:
         conn.execute(text("DELETE FROM merchant WHERE id = 5"))

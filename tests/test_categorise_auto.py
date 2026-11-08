@@ -1,7 +1,8 @@
-"""#215 B: confident embedding guesses auto-apply after a sync, but only for a
-model version that passed shadow mode, only above the calibrated threshold,
-undoable per batch, and a Correction always wins. Synthetic Merchants and the
-trigram stand-in embedder only."""
+"""#215 B: confident embedding guesses auto-apply right after a sync, gated
+only by the calibrated threshold; undoable per batch, never again for an
+undone Merchant, and a Correction always wins. Every guess is logged as a
+live accuracy record that suspends a version whose agreement falls below 95%.
+Synthetic Merchants and the trigram stand-in embedder only."""
 
 import json
 import tempfile
@@ -33,23 +34,29 @@ LABELLED = {
 DECIDE = {"ZZQ MARKET EAST": GROCERIES, "QQX NOODLE STALL": EATING}
 LATER = ["ZZQ MARKET WEST", "QQX NOODLE CART"]
 ODD = "WWV UNRELATED"
+GUESSED = [*DECIDE, *LATER, ODD]
 MODEL = TrigramEmbedder.model
+OFF = 1001  # above any similarity: nothing applies
+AUTO = f"auto:{MODEL}"
 RESULTS = Path(__file__).parents[1] / "evals" / "results"
 
 
+@pytest.fixture(autouse=True)
+def _off(monkeypatch: pytest.MonkeyPatch) -> None:  # pyright: ignore[reportUnusedFunction]
+    """Each test sets the stand-in model's threshold itself."""
+    monkeypatch.setitem(auto.THRESHOLDS, MODEL, OFF)
+
+
 def _rows() -> list[tuple[str, int]]:
-    names = [*LABELLED, *DECIDE, *LATER, ODD]
+    names = [*LABELLED, *GUESSED]
     return [(n, -500) for n in names] + [(n, -700) for n in names]
 
 
 def _setup(conn: Connection, tmp_path: Path) -> None:
     _import(conn, tmp_path, 1, _rows())
-    led = Ledger(conn, 1)
-    ids = _ids(conn)
-    for n, cat in LABELLED.items():
-        led.correct_merchant(ids[n], cat)
+    _decide(conn, LABELLED)
     assert embedding.refresh(conn, 1, TrigramEmbedder()) is not None
-    categorise.run(conn, 1)  # the shadow log of every Review item
+    categorise.run(conn, 1)  # logs a guess for every Review item
 
 
 @pytest.fixture
@@ -84,14 +91,26 @@ def _decide(conn: Connection, decisions: Mapping[str, tuple[str, str]]) -> None:
         led.correct_merchant(ids[n], cat)
 
 
-@pytest.fixture
-def easy(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Promotion after two agreeing decisions, any positive score."""
-    monkeypatch.setattr(auto, "MIN_DECISIONS", 2)
-    monkeypatch.setitem(auto.THRESHOLDS, MODEL, 1)
+def _threshold(monkeypatch: pytest.MonkeyPatch, value: int) -> None:
+    monkeypatch.setitem(auto.THRESHOLDS, MODEL, value)
 
 
-def test_the_app_thresholds_are_the_committed_synthetic_calibration() -> None:
+def _floor(conn: Connection) -> int:
+    """A threshold the stand-in clears for the ZZQ/QQX guesses but not ODD."""
+    scores = _scores(conn)
+    floor = min(scores[n] for n in [*DECIDE, *LATER])
+    assert scores[ODD] < floor
+    return floor
+
+
+def _suspensions(conn: Connection) -> int:
+    return conn.execute(text("SELECT count(*) FROM model_suspension")).scalar() or 0
+
+
+def test_the_app_thresholds_are_the_committed_synthetic_calibration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.undo()  # the real table, not the autouse override
     for name in ("categoriser_baseline.json", "categoriser_ollama.json"):
         nn = json.loads((RESULTS / name).read_text())["models"]["nn"]
         model = nn["model_version"].split("@")[0]
@@ -99,13 +118,10 @@ def test_the_app_thresholds_are_the_committed_synthetic_calibration() -> None:
         assert nn["calibration"]["precision"] >= 0.95
 
 
-def test_before_promotion_nothing_applies_and_each_review_item_is_logged(
-    conn: Connection, easy: None
+def test_every_review_item_guess_is_logged_with_ids_and_scores_only(
+    conn: Connection,
 ) -> None:
-    got = _by_merchant(conn)
-    for n in [*DECIDE, *LATER, ODD]:
-        assert got[n] == {(UNCAT, "default")}
-    assert set(_scores(conn)) == {*DECIDE, *LATER, ODD}
+    assert set(_scores(conn)) == set(GUESSED)
     cols = conn.execute(text("SELECT * FROM category_prediction")).keys()
     assert set(cols) == {
         "id", "user_id", "model", "merchant_id", "category_id", "score",
@@ -113,63 +129,73 @@ def test_before_promotion_nothing_applies_and_each_review_item_is_logged(
     }  # fmt: skip
 
 
-def test_agreeing_decisions_promote_and_then_confident_rows_auto_apply(
-    conn: Connection, easy: None, monkeypatch: pytest.MonkeyPatch
+def test_confident_guesses_apply_at_once_with_no_answers_needed(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scores = _scores(conn)
-    floor = min(scores[n] for n in [*DECIDE, *LATER])
-    assert scores[ODD] < floor  # the stand-in model is unsure of it
-    monkeypatch.setitem(auto.THRESHOLDS, MODEL, floor)
-    _decide(conn, DECIDE)
+    _threshold(monkeypatch, _floor(conn))
     categorise.run(conn, 1)
     got = _by_merchant(conn)
-    assert got["ZZQ MARKET WEST"] == {(GROCERIES, f"auto:{MODEL}")}
-    assert got["QQX NOODLE CART"] == {(EATING, f"auto:{MODEL}")}
+    for n in ["ZZQ MARKET EAST", "ZZQ MARKET WEST"]:
+        assert got[n] == {(GROCERIES, AUTO)}
+    for n in ["QQX NOODLE STALL", "QQX NOODLE CART"]:
+        assert got[n] == {(EATING, AUTO)}
     assert got[ODD] == {(UNCAT, "default")}  # low confidence: still to review
     review = {i.title for i in ReviewQueue(conn, 1).items() if i.type == "category"}
     assert review == {ODD}
 
 
-def test_a_disagreeing_decision_keeps_the_model_in_shadow(
-    conn: Connection, easy: None
+def test_low_live_agreement_stops_that_version_auto_applying(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _decide(conn, {"ZZQ MARKET EAST": EATING, "QQX NOODLE STALL": EATING})
+    monkeypatch.setattr(auto, "MIN_DECISIONS", 2)
+    _threshold(monkeypatch, _floor(conn))
     categorise.run(conn, 1)
-    assert all(src == "default" for n in LATER for _, src in _by_merchant(conn)[n])
-    assert conn.execute(text("SELECT count(*) FROM model_promotion")).scalar() == 0
+    # the user overrides two auto rows: 0 of 2 agree
+    _decide(conn, {"ZZQ MARKET EAST": EATING, "QQX NOODLE STALL": GROCERIES})
+    categorise.run(conn, 1)
+    assert _suspensions(conn) == 1
+    _threshold(monkeypatch, 1)  # ODD would apply now, but the version is stopped
+    categorise.run(conn, 1)
+    got = _by_merchant(conn)
+    assert got[ODD] == {(UNCAT, "default")}
+    assert got["ZZQ MARKET WEST"] == {(GROCERIES, AUTO)}  # earlier rows stay
+    assert got["ZZQ MARKET EAST"] == {(EATING, "correction")}
 
 
-def test_fewer_than_min_decisions_never_promote(conn: Connection) -> None:
+def test_agreement_or_too_few_answers_never_suspend(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _threshold(monkeypatch, _floor(conn))
+    categorise.run(conn, 1)
     assert auto.MIN_DECISIONS == 50
-    _decide(conn, DECIDE)
+    _decide(conn, {"ZZQ MARKET EAST": EATING})  # one disagreement of 50 needed
     categorise.run(conn, 1)
-    assert conn.execute(text("SELECT count(*) FROM model_promotion")).scalar() == 0
-    assert all(src == "default" for n in LATER for _, src in _by_merchant(conn)[n])
-
-
-def _promoted(conn: Connection) -> None:
-    _decide(conn, DECIDE)
-    categorise.run(conn, 1)
-    assert _by_merchant(conn)["ZZQ MARKET WEST"] == {(GROCERIES, f"auto:{MODEL}")}
+    assert _suspensions(conn) == 0
+    monkeypatch.setattr(auto, "MIN_DECISIONS", 2)
+    _decide(conn, {"ZZQ MARKET EAST": GROCERIES, "QQX NOODLE STALL": EATING})
+    categorise.run(conn, 1)  # 2 of 2 agree (the latest answer counts)
+    assert _suspensions(conn) == 0
 
 
 def test_undo_returns_the_whole_batch_to_review_for_good(
-    conn: Connection, easy: None
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _promoted(conn)
+    _threshold(monkeypatch, 1)
+    categorise.run(conn, 1)
+    assert all(src == AUTO for n in GUESSED for _, src in _by_merchant(conn)[n])
     before = Ledger(conn, 1).ledger_version()
-    assert auto.undo(conn, 1) == len(LATER) + 1  # ODD too, at threshold 1
+    assert auto.undo(conn, 1) == len(GUESSED)
     assert Ledger(conn, 1).ledger_version() > before
     for _ in range(2):  # and a later run does not apply them again
         got = _by_merchant(conn)
-        for n in [*LATER, ODD]:
+        for n in GUESSED:
             assert got[n] == {(UNCAT, "default")}
         categorise.run(conn, 1)
     assert auto.undo(conn, 1) == 0
 
 
 def test_the_api_undoes_the_latest_auto_batch_in_one_call(
-    engine: Engine, tmp_path: Path, easy: None
+    engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from fastapi.testclient import TestClient
 
@@ -177,24 +203,24 @@ def test_the_api_undoes_the_latest_auto_batch_in_one_call(
 
     with engine.begin() as c:
         _setup(c, tmp_path)
-        _promoted(c)
+        _threshold(monkeypatch, 1)
+        categorise.run(c, 1)
     with TestClient(api.create_app(engine)) as client:
         r = client.post("/api/review-queue/undo-auto")
         assert r.status_code == 200
         body = r.json()
-        assert body["applied"] == len(LATER) + 1
-        assert {i["title"] for i in body["items"] if i["type"] == "category"} == {
-            *LATER,
-            ODD,
-        }
+        assert body["applied"] == len(GUESSED)
+        got = {i["title"] for i in body["items"] if i["type"] == "category"}
+        assert got == set(GUESSED)
         r = client.post("/api/review-queue/undo-auto")
         assert (r.json()["applied"], r.json()["message"]) == (0, "Nothing to undo.")
 
 
 def test_a_correction_beats_an_auto_applied_category(
-    conn: Connection, easy: None
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _promoted(conn)
+    _threshold(monkeypatch, _floor(conn))
+    categorise.run(conn, 1)
     led = Ledger(conn, 1)
     row = next(
         t.id
@@ -207,34 +233,34 @@ def test_a_correction_beats_an_auto_applied_category(
     assert c is not None and (c.category, c.source) == (EATING, "correction")
 
 
-def test_a_new_model_version_starts_in_shadow_again(
-    conn: Connection, easy: None, monkeypatch: pytest.MonkeyPatch
+def test_suspension_is_per_model_version(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setitem(auto.THRESHOLDS, MODEL, _scores(conn)[ODD] + 1)
-    _promoted(conn)  # ODD stays below the threshold, in Review
-    monkeypatch.setitem(auto.THRESHOLDS, MODEL, 1)  # the old version would apply it
+    monkeypatch.setattr(auto, "MIN_DECISIONS", 2)
+    _threshold(monkeypatch, _floor(conn))
+    categorise.run(conn, 1)
+    _decide(conn, {"ZZQ MARKET EAST": EATING, "QQX NOODLE STALL": GROCERIES})
+    categorise.run(conn, 1)
+    assert _suspensions(conn) == 1
+    _threshold(monkeypatch, 1)
     conn.execute(
         text("UPDATE merchant_embedding SET model = :m"), {"m": f"{MODEL}@new"}
-    )
+    )  # a re-pulled model: a new version with its own record
     categorise.run(conn, 1)
-    got = _by_merchant(conn)
-    assert got[ODD] == {(UNCAT, "default")}
-    assert got["ZZQ MARKET WEST"] == {(GROCERIES, f"auto:{MODEL}")}  # kept
-    logged = conn.execute(
-        text("SELECT merchant_id FROM category_prediction WHERE model = :m"),
-        {"m": f"{MODEL}@new"},
-    ).scalars()
-    assert list(logged) == [_ids(conn)[ODD]]
+    assert {src for _, src in _by_merchant(conn)[ODD]} == {f"{AUTO}@new"}
 
 
-def test_a_run_is_deterministic(conn: Connection, easy: None) -> None:
-    _promoted(conn)
+def test_a_run_is_deterministic(
+    conn: Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _threshold(monkeypatch, _floor(conn))
+    categorise.run(conn, 1)
     first = _by_merchant(conn)
     categorise.run(conn, 1)
     assert _by_merchant(conn) == first
 
 
-def test_after_a_sync_new_vectors_are_logged_at_once_and_failures_stay_quiet(
+def test_after_a_sync_new_vectors_apply_at_once_and_failures_stay_quiet(
     engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with engine.begin() as c:
@@ -246,9 +272,11 @@ def test_after_a_sync_new_vectors_are_logged_at_once_and_failures_stay_quiet(
             embedding.refresh(c, user_id, TrigramEmbedder())
 
     monkeypatch.setattr(embedding, "refresh_quietly", embed)
+    _threshold(monkeypatch, 1)
     auto.refresh_quietly(engine, 1)  # what import and sync call
     with engine.begin() as c:
-        assert set(_scores(c)) == {*DECIDE, *LATER, ODD}
+        assert set(_scores(c)) == set(GUESSED)
+        assert all(src == AUTO for n in GUESSED for _, src in _by_merchant(c)[n])
 
     def boom(*_: object) -> int:
         raise RuntimeError("synthetic")
@@ -259,30 +287,43 @@ def test_after_a_sync_new_vectors_are_logged_at_once_and_failures_stay_quiet(
 
 # --- property ---------------------------------------------------------------
 
-NAMES = [*DECIDE, *LATER, ODD]
 CATS = [GROCERIES, EATING, ("Shopping", "Online")]
 
 
 @settings(max_examples=12, deadline=None)
 @given(
-    threshold=st.integers(0, 1001),
-    min_decisions=st.integers(1, 4),
-    decisions=st.dictionaries(st.sampled_from(NAMES), st.sampled_from(CATS)),
-    row_fixes=st.dictionaries(st.sampled_from(NAMES), st.sampled_from(CATS)),
+    threshold=st.integers(0, OFF),
+    undo_first=st.booleans(),
+    decisions=st.dictionaries(st.sampled_from(GUESSED), st.sampled_from(CATS)),
+    row_fixes=st.dictionaries(st.sampled_from(GUESSED), st.sampled_from(CATS)),
 )
-def test_nothing_auto_applies_below_threshold_or_unpromoted_and_corrections_win(
+def test_nothing_applies_below_threshold_corrections_win_undone_never_return(
     threshold: int,
-    min_decisions: int,
+    undo_first: bool,
     decisions: dict[str, tuple[str, str]],
     row_fixes: dict[str, tuple[str, str]],
 ) -> None:
     with pytest.MonkeyPatch.context() as mp, tempfile.TemporaryDirectory() as d:
-        mp.setattr(auto, "MIN_DECISIONS", min_decisions)
+        mp.setattr(auto, "MIN_DECISIONS", 2)
         mp.setitem(auto.THRESHOLDS, MODEL, threshold)
         eng = open_db(Path(d) / "db" / "ledger.db")
         try:
             with eng.begin() as conn:
                 _setup(conn, Path(d))
+                undone: set[str] = set()
+                if undo_first:
+                    names = {i: n for n, i in _ids(conn).items()}
+                    undone = {
+                        names[m]
+                        for m in conn.execute(
+                            text(
+                                "SELECT merchant_id FROM category_prediction"
+                                " WHERE batch = (SELECT max(batch)"
+                                " FROM category_prediction)"
+                            )
+                        ).scalars()
+                    }
+                    auto.undo(conn, 1)
                 _decide(conn, decisions)
                 led = Ledger(conn, 1)
                 fixed: dict[int, tuple[str, tuple[str, str]]] = {}
@@ -295,11 +336,6 @@ def test_nothing_auto_applies_below_threshold_or_unpromoted_and_corrections_win(
                 categorise.run(conn, 1)
                 categorise.run(conn, 1)
                 scores = _scores(conn)
-                promoted = (
-                    conn.execute(text("SELECT decisions FROM model_promotion"))
-                    .scalars()
-                    .all()
-                )
                 for t in Ledger(conn, 1).transactions():
                     c = t.categorisation
                     assert c is not None
@@ -308,8 +344,8 @@ def test_nothing_auto_applies_below_threshold_or_unpromoted_and_corrections_win(
                     elif c.merchant in decisions:
                         assert c.source == "correction"
                     if c.source.startswith("auto:"):
-                        assert promoted and promoted[0] >= min_decisions
                         assert c.merchant is not None
+                        assert c.merchant not in undone
                         assert scores[c.merchant] >= threshold
         finally:
             eng.dispose()
