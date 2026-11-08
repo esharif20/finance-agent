@@ -2,7 +2,7 @@
   "harness": "allocation",
   "dataset": "synthetic_allocation",
   "dataset_version": 2,
-  "dataset_sha256": "4f6923404bff49d1ed29665b8c692d869a8356258481f071dbb5d7fe2b321bf0",
+  "dataset_sha256": "9f954ca6056d5a9cac1bdfccd5dc5bf41ecb5502d72467de8c4a36143c775c11",
   "scenarios": 216,
   "feasible_scenarios": 144,
   "models": {

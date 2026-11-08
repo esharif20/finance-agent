@@ -100,7 +100,7 @@ def _scenario(kind: str, i: int) -> Scenario:
     for name, ref in zip(goals_used, refs, strict=False):
         floor = min(ref * rng.randrange(0, 80) // 100, floor_budget)
         floor_budget -= floor
-        w = math.exp(rng.uniform(math.log(0.25), math.log(4.0)))
+        w = round(math.exp(rng.uniform(math.log(0.25), math.log(4.0))), 6)
         true.append((name, w))
         goals.append(Goal(name, ref, floor, None, _priority(rng, w)))
     for (name, essential), ref in zip(cats_used, refs[len(goals_used) :], strict=True):
@@ -111,7 +111,7 @@ def _scenario(kind: str, i: int) -> Scenario:
         cap = None
         if not essential and (kind == "caps" or rng.random() < 0.2):
             cap = ref * rng.randrange(40, 100) // 100
-        w = math.exp(rng.uniform(math.log(0.25), math.log(4.0)))
+        w = round(math.exp(rng.uniform(math.log(0.25), math.log(4.0))), 6)
         true.append((name, w))
         cats.append(Category(name, ref, floor, cap, _priority(rng, w), essential))
     if kind == "infeasible_floors":
