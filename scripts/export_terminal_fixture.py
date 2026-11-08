@@ -14,6 +14,7 @@ import io
 import json
 import sys
 import tempfile
+from collections.abc import Callable
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -56,7 +57,7 @@ def frames() -> tuple[list[str], list[str]]:
     return palette, out
 
 
-def capture(fn, *args) -> list[str]:  # noqa: ANN001 - any formatter
+def capture(fn: Callable[..., object], *args: object) -> list[str]:
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         fn(*args)
@@ -134,7 +135,7 @@ def combined(led: Ledger, month: str) -> dict[str, object]:
     """The Persona's Accounts and the month across them, as the Ledger adds it up:
     transfers between its own Accounts are left out of money in and out."""
     whole = led.summarise_month(month)
-    rows = []
+    rows: list[dict[str, object]] = []
     for a in led.accounts():
         m = led.summarise_month(month, a.id)
         rows.append(
@@ -150,7 +151,7 @@ def combined(led: Ledger, month: str) -> dict[str, object]:
         "month": month,
         "bank": led.accounts()[0].bank if rows else "",
         "accounts": rows,
-        "balance": sum(int(r["balance"]) for r in rows),
+        "balance": sum(minor(a.ledger_balance) for a in led.accounts()),
         "in": minor(whole.money_in),
         "out": minor(whole.money_out),
         "moved": minor(whole.transfers_out),
