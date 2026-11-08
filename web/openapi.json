@@ -4823,6 +4823,25 @@
         "summary": "Undo"
       }
     },
+    "/api/review-queue/undo-auto": {
+      "post": {
+        "description": "Take back the latest batch the model auto-applied (#215 B): its\nMerchants come back as items. `applied` is how many Merchants.",
+        "operationId": "undo_auto_api_review_queue_undo_auto_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Undo Auto"
+      }
+    },
     "/api/review-queue/{item_id}/answer": {
       "post": {
         "operationId": "answer_api_review_queue__item_id__answer_post",

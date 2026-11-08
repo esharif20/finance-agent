@@ -8,7 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from finance_agent import categorise
-from finance_agent.categorise import embedding, subscription_alerts
+from finance_agent.categorise import auto, embedding, subscription_alerts
 from finance_agent.cli import launcher
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger, SyncStatus
@@ -285,7 +285,7 @@ def _main(argv: Sequence[str] | None) -> int:
         return 1
     finally:
         if imported:  # after the commit: no transaction is held while Ollama works
-            embedding.refresh_quietly(engine, LOCAL_USER)
+            auto.refresh_quietly(engine, LOCAL_USER)
             subscription_alerts.run(engine, LOCAL_USER, printed)
         engine.dispose()
     return 0

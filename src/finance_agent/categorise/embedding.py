@@ -388,6 +388,18 @@ def suggest(
     the most similar Correction-labelled Merchants (`labelled`: Merchant id ->
     its corrected Categories), from the stored vectors of the model covering
     most Merchants. Nothing is assigned; no Ollama call is made."""
+    _, found = ranked(conn, user_id, targets, labelled)
+    return {k: [c for _, c in v] for k, v in found.items()}
+
+
+def ranked(
+    conn: Connection,
+    user_id: int,
+    targets: Mapping[str, int],
+    labelled: Mapping[int, set[tuple[str, str]]],
+) -> tuple[str | None, dict[str, list[tuple[int, tuple[str, str]]]]]:
+    """`suggest` with each Category's similarity (thousandths), and the stored
+    model version the vectors came from (None when there are none)."""
     me = schema.merchant_embedding
     db = Scoped(conn, user_id)
     rows = db.execute(db.select(me, me.c.merchant_id, me.c.model, me.c.vector)).all()
@@ -395,9 +407,9 @@ def suggest(
     for r in rows:
         by_model.setdefault(r.model, {})[r.merchant_id] = _unpack(r.vector)
     if not by_model:
-        return {}
-    vecs = max(by_model.items(), key=lambda kv: (len(kv[1]), kv[0]))[1]
-    out: dict[str, list[tuple[str, str]]] = {}
+        return None, {}
+    model, vecs = max(by_model.items(), key=lambda kv: (len(kv[1]), kv[0]))
+    out: dict[str, list[tuple[int, tuple[str, str]]]] = {}
     for key, m in targets.items():
         if m not in vecs:
             continue
@@ -408,9 +420,9 @@ def suggest(
             s = similarity(vecs[m], vecs[n])
             for c in cats:
                 best[c] = max(best.get(c, -SIMILARITY), s)
-        ranked = sorted(
+        scored = sorted(
             ((s, c) for c, s in best.items() if s > 0), key=lambda x: (-x[0], x[1])
         )
-        if ranked:
-            out[key] = [c for _, c in ranked[:SUGGESTIONS]]
-    return out
+        if scored:
+            out[key] = scored[:SUGGESTIONS]
+    return model, out

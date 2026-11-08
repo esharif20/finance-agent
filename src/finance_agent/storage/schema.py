@@ -653,3 +653,43 @@ subscription_alert = Table(
     ),
     UniqueConstraint("user_id", "merchant_id", "code", "state"),
 )
+
+# The embedding model's guess for a Category Review item (#215 B), one per
+# model version and Merchant, the live accuracy record: `decided_category_id`
+# filled from the user's Merchant-wide Correction, `batch` (the ledger version
+# its latest pass left; one sync is one batch) set when auto-applied,
+# `undone_at` when the user undid that batch.
+# Ids, scores and the version only: never a descriptor or an amount.
+category_prediction = Table(
+    "category_prediction",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("model", String(64), nullable=False),
+    Column(
+        "merchant_id",
+        Integer,
+        ForeignKey("merchant.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("category_id", Integer, ForeignKey("category.id"), nullable=False),
+    Column("score", Integer, nullable=False),  # cosine, thousandths
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("decided_category_id", Integer, ForeignKey("category.id")),
+    Column("batch", Integer),
+    Column("undone_at", DateTime(timezone=True)),
+    UniqueConstraint("user_id", "model", "merchant_id"),
+)
+
+# A model version the live accuracy monitor stopped (#215 B/G): it no longer
+# auto-applies, and its earlier auto rows go back to the Review Queue.
+model_suspension = Table(
+    "model_suspension",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column("model", String(64), nullable=False),
+    Column("decisions", Integer, nullable=False),  # how many it was judged on
+    Column("suspended_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("user_id", "model"),
+)

@@ -723,6 +723,45 @@ def nearest_neighbour(
     return out
 
 
+TARGET_PRECISION = 95  # percent: auto-apply's bar (#215 B)
+
+
+def calibrate(scored: Sequence[tuple[int, bool]]) -> int:
+    """The lowest similarity (thousandths) at which every band from there up
+    keeps >= TARGET_PRECISION% of the model's guesses right; above
+    SIMILARITY (never) when no threshold does. `scored`: (score, correct)."""
+    best = embedding.SIMILARITY + 1
+    hits = n = 0
+    for score in sorted({s for s, _ in scored}, reverse=True):
+        band = [ok for s, ok in scored if s == score]
+        hits, n = hits + sum(band), n + len(band)
+        if hits * 100 < TARGET_PRECISION * n:
+            break
+        best = score
+    return best
+
+
+def calibration(rows: Sequence[Row], preds: Sequence[Prediction]) -> dict[str, Any]:
+    """The auto-apply threshold for the model's own guesses (the rows
+    Corrections and rules leave), with the precision and coverage it buys."""
+    test = [r for r in rows if r.split == "test"]
+    filled = {i for i, (p, _) in enumerate(baseline(rows)) if p is None}
+    scored = [
+        (round(conf * embedding.SIMILARITY), resolve(test[i].category) == p)
+        for i, (p, conf) in enumerate(preds)
+        if i in filled and p is not None
+    ]
+    t = calibrate(scored)
+    kept = [ok for s, ok in scored if s >= t]
+    return {
+        "target_precision": TARGET_PRECISION / 100,
+        "threshold": t,
+        "precision": round(sum(kept) / len(kept), 6) if kept else 0.0,
+        "coverage": round(len(kept) / len(filled), 6) if filled else 0.0,
+        "rows": len(filled),
+    }
+
+
 def _label(c: Category) -> str:
     return f"{c[0]} / {c[1]}"
 
@@ -796,6 +835,7 @@ def evaluate(
             "model": name,
             "model_version": version,
             "metrics": metrics_for(gold, preds),
+            **({"calibration": calibration(rows, preds)} if key == "nn" else {}),
             "by_case": {
                 case: {"rows": len(oks), "accuracy": round(sum(oks) / len(oks), 6)}
                 for case, oks in sorted(by_case.items())

@@ -20,3 +20,9 @@ Every learned component needs three things:
 3. **Shadow mode before promotion.**
 
 Bandit rewards are acceptances and acted-on outcomes, never clicks or engagement. Exposure is capped. Every shown item logs its propensity from day one, so later policies can be evaluated off-policy.
+
+## Amendment (#215 B): the categoriser has no minimum-data gate or shadow mode
+
+The user decided on 8 Nov 2026 (#215) that confident guesses apply right after a sync, so the embedding categoriser has no minimum-data gate and no shadow mode. #115's gate of 200 Corrections and 5 per Category is dropped. The calibrated threshold on the #112 evaluation stands in for both: it is the baseline the model must meet.
+
+A live accuracy monitor replaces shadow mode. Every guess is logged per model version, and the user's Merchant-wide answers and overrides are recorded against it. These answers are the user's own holdout (#215 E). The monitor measures and never holds anything back, with one exception. Once a version has at least 50 answers on guesses at or above its threshold and fewer than 95% of them agree, that version stops auto-applying. See ADR 0005.

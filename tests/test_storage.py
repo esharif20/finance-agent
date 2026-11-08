@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0022"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0023"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -681,4 +681,29 @@ def test_migration_0022_adds_transfer_rejections_which_go_with_their_transaction
         conn.execute(text("DELETE FROM note"))
         conn.execute(text('DELETE FROM "transaction" WHERE id = 9'))
         assert conn.execute(text("SELECT * FROM transfer_rejection")).all() == []
+    eng.dispose()
+
+
+def test_migration_0023_adds_predictions_which_go_with_their_merchant(
+    tmp_path: Path,
+) -> None:
+    """0023 (#215 B) adds category_prediction and model_suspension, nothing
+    rebuilt; a prediction is deleted with its Merchant."""
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT OR IGNORE INTO merchant (id, user_id, name) VALUES (5, 1, 'SYNTH')",
+        "INSERT OR IGNORE INTO category (id, user_id, name, taxonomy_version)"
+        " VALUES (7, 1, 'Synth', 2)",
+        "INSERT INTO category_prediction (user_id, model, merchant_id,"
+        " category_id, score, created_at) VALUES (1, 'm', 5, 7, 900, '2026-01-05')",
+        "INSERT INTO model_suspension (user_id, model, decisions, suspended_at)"
+        " VALUES (1, 'm', 50, '2026-01-05')",
+    )
+    eng = round_trip(
+        tmp_path, "0022", "0023", {"category_prediction", "model_suspension"}, rows
+    )
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM merchant WHERE id = 5"))
+        assert conn.execute(text("SELECT * FROM category_prediction")).all() == []
     eng.dispose()
