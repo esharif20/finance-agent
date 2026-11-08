@@ -8,6 +8,7 @@ const mk = (id: string, spend: number, sugg: [string, string][], over: Partial<R
   version: `v${id}`,
   weight: 2,
   title: `M${id}`,
+  display_name: over.title ?? `M${id}`,
   merchant_id: Number(id),
   transaction_ids: [1],
   choices: [],

@@ -40,7 +40,7 @@ export function TxnRow({
   const panel = useId();
   const partsId = useId();
   const isSplit = t.source === "split";
-  const secondary = joinParts([t.merchant && addsDetail(t.merchant, t.description) ? t.description : null, mask]);
+  const secondary = joinParts([t.merchant && addsDetail(`${t.display_name ?? ""} ${t.merchant}`, t.description) ? t.description : null, mask]);
   const toReview = t.category?.[0] === "To review";
 
   return (
@@ -52,7 +52,7 @@ export function TxnRow({
         {day(t.posted_on)}
       </time>
       <div className="order-1 min-w-0 sm:order-none">
-        <p className="truncate text-row font-semibold">{t.merchant ?? t.description}</p>
+        <p className="truncate text-row font-semibold">{t.display_name ?? t.merchant ?? t.description}</p>
         {secondary && <p className="truncate text-label font-normal text-muted-foreground">{secondary}</p>}
       </div>
       <div className="order-2 text-right sm:order-none sm:min-w-28">
@@ -83,7 +83,7 @@ export function TxnRow({
             type="button"
             aria-expanded={open}
             aria-controls={panel}
-            aria-label={`Details for ${t.merchant ?? t.description}`}
+            aria-label={`Details for ${t.display_name ?? t.merchant ?? t.description}`}
             onClick={() => setOpen((o) => !o)}
             className="ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full [@media(hover:hover)]:hover:bg-active"
           >

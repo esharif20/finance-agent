@@ -101,7 +101,7 @@ export function SplitRefund({ item, busy, pick }: Body & { pick: (cat: Cat) => v
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        This refund was matched to a split payment at {item.title || "the same shop"}. Which part was it for? Until you choose, it
+        This refund was matched to a split payment at {item.display_name || "the same shop"}. Which part was it for? Until you choose, it
         comes off the largest part. If it belongs to a different purchase, skip it.
       </p>
       {split.isPending ? (

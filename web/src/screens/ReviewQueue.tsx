@@ -126,19 +126,19 @@ function OneAtATime() {
     const txn = justOne ? item.transaction_ids[0] : undefined;
     act.mutate({
       call: () => answerReview(item, { category: cat, ...(txn === undefined ? {} : { transaction_id: txn }) }),
-      text: `${item.title || "This payment"}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
+      text: `${item.display_name || "This payment"}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
     });
   };
   const choose = (choice: string) => {
     if (!item || act.isPending) return;
     act.mutate({
       call: () => answerReview(item, { choice }),
-      text: `${item.title || TYPE_LABEL[item.type] || "Item"}: ${CHOICE_LABEL[choice] ?? choice}.`,
+      text: `${item.display_name || TYPE_LABEL[item.type] || "Item"}: ${CHOICE_LABEL[choice] ?? choice}.`,
     });
   };
   const skip = () => {
     if (!item || act.isPending) return;
-    act.mutate({ call: () => skipReview(item), text: `Skipped ${item.title || "this item"}.` });
+    act.mutate({ call: () => skipReview(item), text: `Skipped ${item.display_name || "this item"}.` });
   };
   const undo = () => {
     if (!act.isPending) act.mutate({ call: undoReview, text: "Undid the last change." });
@@ -205,7 +205,7 @@ function OneAtATime() {
   }
 
   const label = TYPE_LABEL[item.type] ?? item.type.replaceAll("_", " ");
-  const title = item.title || label;
+  const title = item.display_name || label;
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-baseline justify-between gap-3 px-1">

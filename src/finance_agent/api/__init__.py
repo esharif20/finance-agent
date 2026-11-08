@@ -36,6 +36,7 @@ from finance_agent.api import (
     subscriptions,
 )
 from finance_agent.categorise import embedding, subscription_alerts
+from finance_agent.categorise.display_names import display_name
 from finance_agent.identity import DEFAULT_PORT, HOST, current_user
 from finance_agent.ledger import (
     CURRENCY,
@@ -120,6 +121,7 @@ class TransactionOut(BaseModel):
     kind: str | None
     merchant_id: int | None
     merchant: str | None
+    display_name: str | None  # readable merchant, for showing only (#223)
     category: list[str] | None  # [top, sub]
     source: str | None
 
@@ -154,6 +156,7 @@ class CategorySpendOut(BaseModel):
 class MerchantSpendOut(BaseModel):
     merchant_id: int | None  # None for "Unknown": no Merchant
     name: str
+    display_name: str  # readable name, for showing only (#223)
     amount: Money
 
 
@@ -188,6 +191,7 @@ class CategoryTxnOut(BaseModel):
     amount: Money  # signed as the Bank has it: spending negative
     merchant_id: int | None
     merchant: str | None
+    display_name: str | None  # readable merchant, for showing only (#223)
     subcategory: str | None
 
 
@@ -290,6 +294,7 @@ def _transaction(t: Transaction) -> TransactionOut:
         kind=c.kind if c else None,
         merchant_id=c.merchant_id if c else None,
         merchant=c.merchant if c else None,
+        display_name=display_name(c.merchant) if c and c.merchant else None,
         category=list(c.category) if c and c.category else None,
         source=c.source if c else None,
     )
@@ -325,6 +330,7 @@ def _txn(t: Transaction) -> CategoryTxnOut:
         amount=_money(t.amount, t.currency),
         merchant_id=c.merchant_id if c else None,
         merchant=c.merchant if c else None,
+        display_name=display_name(c.merchant) if c and c.merchant else None,
         subcategory=c.category[1] if c and c.category else None,
     )
 
@@ -343,7 +349,10 @@ def _category(month: str, d: CategoryDetail) -> CategoryDetailOut:
         subcategories=spends(d.subcategories),
         merchants=[
             MerchantSpendOut(
-                merchant_id=x.merchant_id, name=x.name, amount=_money(x.amount, c)
+                merchant_id=x.merchant_id,
+                name=x.name,
+                display_name=display_name(x.name),
+                amount=_money(x.amount, c),
             )
             for x in d.merchants
         ],

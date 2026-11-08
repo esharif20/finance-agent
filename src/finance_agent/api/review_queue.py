@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from finance_agent.categorise import embedding
+from finance_agent.categorise.display_names import display_name
 from finance_agent.identity import current_user
 from finance_agent.ledger import UnknownTarget
 from finance_agent.ledger.review import (
@@ -26,6 +27,7 @@ class ItemOut(BaseModel):
     version: str  # send it back with an answer or skip
     weight: int  # Transactions an answer touches ("Apply to N similar")
     title: str  # the Merchant's name, if any
+    display_name: str  # readable title, for showing only (#223)
     merchant_id: int | None
     transaction_ids: list[int]
     choices: list[str]  # empty: answer with a Category
@@ -97,6 +99,7 @@ def _item(i: Item) -> ItemOut:
         version=i.version,
         weight=i.weight,
         title=i.title,
+        display_name=display_name(i.title) if i.merchant_id is not None else i.title,
         merchant_id=i.merchant_id,
         transaction_ids=list(i.transaction_ids),
         choices=list(i.choices),

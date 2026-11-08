@@ -19,6 +19,7 @@ const txn = (over: Partial<Txn> = {}): Txn => ({
   id: 7,
   posted_on: "2026-02-04",
   description: "TESCO STORES 3021",
+  display_name: "Tesco",
   amount: m(-1250),
   account_id: 1,
   kind: "Spending",
@@ -245,7 +246,7 @@ describe("Transactions row text and month headers", () => {
     );
   };
   const spot = (id: number, on: string, description = "Spotify P487971923") =>
-    txn({ id, posted_on: on, merchant: "Spotify", description });
+    txn({ id, posted_on: on, merchant: "Spotify", display_name: "Spotify", description });
 
   it("hides a description that only repeats the Merchant and never leaves a dangling separator", async () => {
     mount([spot(1, "2026-03-04"), spot(2, "2026-02-04", "Spotify Limited")]);
@@ -254,6 +255,12 @@ describe("Transactions row text and month headers", () => {
     expect(row[0]).toHaveTextContent("••••0001");
     expect(row[0]?.textContent).not.toMatch(/·\s*$/);
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+  });
+
+  it("shows the readable name, and hides a description that only repeats it", async () => {
+    mount([txn({ id: 9, merchant: "ANTHROPIC CLAUDE SUB ANTHROPIC CLAUDE", display_name: "Claude (Anthropic)", description: "ANTHROPIC CLAUDE SUB ANTHROPIC CLAUDE" })]);
+    const name = await screen.findByText("Claude (Anthropic)");
+    expect(name.closest("li")).not.toHaveTextContent("ANTHROPIC CLAUDE");
   });
 
   it("adds a month header per month when filtered to a Category", async () => {

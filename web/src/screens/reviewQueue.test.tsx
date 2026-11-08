@@ -8,7 +8,9 @@ import { ReviewQueue } from "./ReviewQueue";
 type Queue = components["schemas"]["QueueOut"];
 type Item = components["schemas"]["ItemOut"];
 
-const item = (over: Partial<Item>): Item => ({
+// the shown name follows the stored title unless a test says otherwise
+const withShown = (i: Omit<Item, "display_name"> & { display_name?: string }): Item => ({ ...i, display_name: i.display_name ?? i.title });
+const item = (over: Partial<Item>): Item => withShown({
   id: "category:1",
   type: "category",
   version: "v1",

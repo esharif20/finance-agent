@@ -16,6 +16,7 @@ const mk = (n: number, over: Partial<Item> = {}): Item => ({
   version: `v${n}`,
   weight: 3,
   title: `Shop ${n}`,
+  display_name: over.title ?? `Shop ${n}`,
   merchant_id: n,
   transaction_ids: [n],
   choices: [],

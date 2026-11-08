@@ -18,7 +18,7 @@ const detail: Detail = {
     { name: "Groceries", amount: m(30000) },
     { name: "Eating out", amount: m(10000) },
   ],
-  merchants: [{ merchant_id: 7, name: "TESCO", amount: m(25000) }],
+  merchants: [{ merchant_id: 7, name: "TESCO", display_name: "TESCO", amount: m(25000) }],
   trend: ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02"].map((month, i) => ({
     month,
     amount: m(i === 5 ? 40000 : 1000),
@@ -31,6 +31,7 @@ const detail: Detail = {
       amount: m(-2550),
       merchant_id: 7,
       merchant: "TESCO",
+      display_name: "Tesco",
       subcategory: "Groceries",
     },
   ],
@@ -72,9 +73,9 @@ describe("CategoryScreen", () => {
     const twins: Detail = {
       ...detail,
       merchants: [
-        { merchant_id: 1, name: "CORNER SHOP", amount: m(2000) },
-        { merchant_id: 2, name: "CORNER SHOP", amount: m(1000) },
-        { merchant_id: null, name: "Unknown", amount: m(500) },
+        { merchant_id: 1, name: "CORNER SHOP", display_name: "CORNER SHOP", amount: m(2000) },
+        { merchant_id: 2, name: "CORNER SHOP", display_name: "CORNER SHOP", amount: m(1000) },
+        { merchant_id: null, name: "Unknown", display_name: "Unknown", amount: m(500) },
       ],
     };
     mount("Food & Drink", (url) => (url.startsWith("/api/months") ? json(["2026-02"]) : json(twins)));

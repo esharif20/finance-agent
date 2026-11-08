@@ -21,7 +21,7 @@ function Regret({ item }: { item: RegretItem }) {
     mutationFn: (worth: boolean) => answerRegret(item.transaction_id, worth),
     onSettled: () => client.invalidateQueries({ queryKey: BRIEFING_KEY }),
   });
-  const name = item.merchant ?? item.description;
+  const name = item.display_name ?? item.merchant ?? item.description;
   const mark = save.isPending ? save.variables : item.worth_it;
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4 first:pt-0 last:pb-0">
@@ -146,7 +146,7 @@ export function Briefing() {
                 {data.renewals.map((r) => (
                   <li key={r.insight_id} className="flex items-baseline justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <span>
-                      <span className="font-semibold">{r.merchant}</span>{" "}
+                      <span className="font-semibold">{r.display_name}</span>{" "}
                       <span className="text-muted-foreground">renews {day(r.due_on)}</span>
                     </span>
                     <Money value={{ minor: r.amount_minor, currency: "GBP" }} className="tabular-nums" />

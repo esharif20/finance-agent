@@ -86,7 +86,7 @@ function Transactions({ data, category }: { data: CategoryDetail; category: stri
         {data.transactions.map((t) => (
           <li key={t.id} className="flex min-h-14 items-center gap-3 py-2">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-row font-semibold">{t.merchant ?? t.description}</p>
+              <p className="truncate text-row font-semibold">{t.display_name ?? t.merchant ?? t.description}</p>
               <p className="truncate text-label font-normal text-muted-foreground">
                 {new Date(`${t.posted_on}T00:00:00Z`).toLocaleDateString("en-GB", {
                   day: "numeric",
@@ -195,7 +195,7 @@ export function CategoryScreen({
               <Bars
                 rows={d.merchants.map((s) => ({
                   key: `merchant-${s.merchant_id ?? "none"}`,
-                  name: s.name,
+                  name: s.display_name,
                   minor: s.amount.minor,
                 }))}
                 currency={d.currency}

@@ -1220,6 +1220,8 @@ export interface components {
             amount: components["schemas"]["Money"];
             /** Description */
             description: string;
+            /** Display Name */
+            display_name: string | null;
             /** Id */
             id: number;
             /** Merchant */
@@ -1417,6 +1419,8 @@ export interface components {
             category: string;
             /** Confidence */
             confidence: number;
+            /** Display Name */
+            display_name: string;
             /** Evidence */
             evidence: number[];
             /** Explanation */
@@ -1444,6 +1448,8 @@ export interface components {
             choices: string[];
             /** Currency */
             currency: string;
+            /** Display Name */
+            display_name: string;
             /** Id */
             id: string;
             /** Merchant Id */
@@ -1560,6 +1566,8 @@ export interface components {
         /** MerchantSpendOut */
         MerchantSpendOut: {
             amount: components["schemas"]["Money"];
+            /** Display Name */
+            display_name: string;
             /** Merchant Id */
             merchant_id: number | null;
             /** Name */
@@ -1762,6 +1770,8 @@ export interface components {
             amount: components["schemas"]["Money"];
             /** Description */
             description: string;
+            /** Display Name */
+            display_name: string | null;
             /** Merchant */
             merchant: string | null;
             /**
@@ -1785,6 +1795,8 @@ export interface components {
         RenewalOut: {
             /** Amount Minor */
             amount_minor: number;
+            /** Display Name */
+            display_name: string;
             /**
              * Due On
              * Format: date
@@ -1957,6 +1969,8 @@ export interface components {
             category: string[] | null;
             /** Description */
             description: string;
+            /** Display Name */
+            display_name: string | null;
             /** Id */
             id: number;
             /** Kind */

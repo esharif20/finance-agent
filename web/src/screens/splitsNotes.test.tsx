@@ -22,6 +22,7 @@ const txn = (over: Partial<Txn> = {}): Txn => ({
   id: 7,
   posted_on: "2026-02-04",
   description: "TESCO STORES 3021",
+  display_name: "Tesco",
   amount: m(-5000),
   account_id: 1,
   kind: "Spending",
@@ -264,7 +265,7 @@ describe("To review bucket", () => {
   };
 
   it("is its own legend row that links to the queue and counts what is waiting", async () => {
-    api({ "GET /api/review-queue": { items: [{ id: "always_ask:1", type: "always_ask", version: "v", weight: 1, title: "Tesco", merchant_id: 3, transaction_ids: [7], choices: [], skipped: false }], remaining: 1, ledger_version: 1 } });
+    api({ "GET /api/review-queue": { items: [{ id: "always_ask:1", type: "always_ask", version: "v", weight: 1, title: "Tesco", display_name: "Tesco", merchant_id: 3, transaction_ids: [7], choices: [], skipped: false }], remaining: 1, ledger_version: 1 } });
     render(wrap(<SpendingDonut spending={spending} />));
     expect(screen.getByRole("link", { name: "To review" })).toHaveAttribute("href", "#review");
     expect(await screen.findByText("1 waiting")).toBeInTheDocument();
@@ -274,7 +275,7 @@ describe("To review bucket", () => {
 
 describe("Review Queue renderers", () => {
   const item = (over: Partial<Item>): Item => ({
-    id: "x:1", type: "category", version: "v1", weight: 1, title: "Tesco", merchant_id: 3, transaction_ids: [7], choices: [], suggestions: [], skipped: false, spend_minor: 0, currency: "GBP", ...over,
+    id: "x:1", type: "category", version: "v1", weight: 1, title: "Tesco", display_name: over.title ?? "Tesco", merchant_id: 3, transaction_ids: [7], choices: [], suggestions: [], skipped: false, spend_minor: 0, currency: "GBP", ...over,
   });
   const queue = (i: Item) => ({ items: [i], remaining: 1, ledger_version: 1 });
 

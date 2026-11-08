@@ -187,7 +187,7 @@ function Row({ item, on, toggle }: { item: ReviewItem; on: boolean; toggle: () =
       <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-1 [@media(hover:hover)]:hover:bg-active">
         <input type="checkbox" checked={on} onChange={toggle} className="size-5 shrink-0 accent-[var(--foreground)]" />
         <span className="flex min-w-0 flex-1 flex-col py-1.5">
-          <span className="break-words font-medium">{item.title || "Unnamed payment"}</span>
+          <span className="break-words font-medium">{item.display_name || item.title || "Unnamed payment"}</span>
           <span className="text-xs text-muted-foreground">{plural(item.weight, "transaction", "transactions")}</span>
         </span>
         <Money value={{ minor: item.spend_minor, currency: item.currency }} className="shrink-0 text-right text-sm" />

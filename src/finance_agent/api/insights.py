@@ -30,6 +30,7 @@ class InsightOut(BaseModel):
     id: int
     type: str
     key: str  # the Merchant, or the Category of a spike
+    display_name: str  # readable key, for showing only (#223)
     category: str
     raised_on: date
     impact_minor: int  # pence, computed by code
@@ -75,6 +76,7 @@ def insight_out(r: insights.Ranked) -> InsightOut:
         id=i.id,
         type=i.type,
         key=i.key,
+        display_name=insights.shown_key(i),
         category=i.category,
         raised_on=i.raised_on,
         impact_minor=i.impact,

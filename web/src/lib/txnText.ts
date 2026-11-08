@@ -1,4 +1,4 @@
-// Pure helpers for the Transactions list rows; reusable once transactions carry display_name (#223).
+// Pure helpers for the Transactions list rows. addsDetail takes the display name and the stored Merchant together (#223).
 
 const NOISE = new Set(["limited", "ltd", "inc", "llc", "plc", "co", "uk", "gb", "card", "payment", "to", "from", "the"]);
 const tokens = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);

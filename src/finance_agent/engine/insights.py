@@ -23,6 +23,7 @@ from fractions import Fraction
 
 from sqlalchemy import Connection
 
+from finance_agent.categorise.display_names import display_name
 from finance_agent.engine import detectors, ranking
 from finance_agent.ledger import NOT_SUBSCRIPTION, Ledger
 from finance_agent.ledger.insights import Found, Insights, StoredInsight
@@ -125,6 +126,11 @@ TEMPLATES = {
 }
 
 
+def shown_key(i: Found) -> str:
+    """The key to show: a Merchant's readable name; a spike's Category as is."""
+    return i.key if i.type == "category_spike" else display_name(i.key)
+
+
 def explain(i: Found) -> str:
     """The Insight's explanation: its type's template, with figures from code."""
-    return TEMPLATES[i.type].format(key=i.key, impact=_pounds(i.impact))
+    return TEMPLATES[i.type].format(key=shown_key(i), impact=_pounds(i.impact))
