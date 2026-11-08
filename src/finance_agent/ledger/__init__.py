@@ -1524,6 +1524,7 @@ class Ledger:
             schema.transaction_source,
             schema.possible_duplicate,
             schema.note,
+            schema.transfer_rejection,  # the user's word stays with the row
         ):
             self._db.execute(
                 self._db.update(table)
@@ -2927,15 +2928,61 @@ class Ledger:
             legs[a], legs[b] = b, a
         return legs
 
+    def _not_pairable(self) -> set[int]:
+        r = schema.transfer_rejection
+        rejected = self._db.execute(
+            self._db.select(r, r.c.transaction_id).where(r.c.reverted_at.is_(None))
+        ).scalars()
+        return self.merged_ids() | set(rejected)
+
+    def not_a_transfer(self, transaction_id: int) -> int:
+        """The user's word that this row is no Transfer leg: its pair, if any,
+        is undone and it never pairs again until reverted; the other leg may
+        pair afresh. Returns the rejection's id. Run `categorise.run`
+        afterwards, so both rows take their Kind again."""
+        t = schema.transaction
+        self._exists(self._db.select(t, t.c.id).where(t.c.id == transaction_id))
+        rid = self._db.insert(
+            schema.transfer_rejection,
+            transaction_id=transaction_id,
+            created_at=datetime.now(UTC),
+        )
+        self._link_transfers()
+        self._db.bump_ledger_version()
+        log.info("transfer rejected")  # never the amount or the description
+        return rid
+
+    def revert_not_a_transfer(self, rejection_id: int) -> None:
+        """Undo `not_a_transfer`; it stays in the history, marked reverted, and
+        the row may pair again. Run `categorise.run` afterwards."""
+        r = schema.transfer_rejection
+        res = self._db.execute(
+            self._db.update(r)
+            .where(r.c.id == rejection_id, r.c.reverted_at.is_(None))
+            .values(reverted_at=datetime.now(UTC))
+        )
+        if res.rowcount != 1:
+            raise UnknownTarget("no such active rejection")
+        self._link_transfers()
+        self._db.bump_ledger_version()
+
     def _link_transfers(self) -> None:
         """Pair unlinked own-account Transfer legs: same amount and currency,
         opposite sign, another of this user's Accounts, dates within
         TRANSFER_DAYS. Among candidates, Type TFR on both legs, then identical
         descriptions, then the closest date win; each leg pairs at most once.
 
-        Uses raw Bank fields only.
+        Uses raw Bank fields only. Never pairs a merged Possible Duplicate
+        (#224) or a row the user said is no Transfer (#215 C), and drops a
+        link that holds one, so its leg can pair again.
         """
-        t = schema.transaction
+        t, tl = schema.transaction, schema.transfer_link
+        off = self._not_pairable()
+        self._db.execute(
+            self._db.delete(tl).where(
+                tl.c.from_transaction_id.in_(off) | tl.c.to_transaction_id.in_(off)
+            )
+        )
         linked = self._transfer_legs()
         rows = [
             r
@@ -2951,7 +2998,7 @@ class Ledger:
                     t.c.currency,
                 ).order_by(t.c.posted_on, t.c.id)
             )
-            if r.id not in linked
+            if r.id not in linked and r.id not in off
         ]
         incoming: dict[tuple[str, int], list[Any]] = {}
         for r in rows:
