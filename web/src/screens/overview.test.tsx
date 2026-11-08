@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { components } from "@/api/schema";
 import { PrivacyProvider } from "@/lib/privacy";
+import { GuidanceCard } from "@/components/GuidanceCard";
 import { MonthCard } from "./MonthCard";
 import { SpendingDonut } from "./SpendingDonut";
 import { Overview } from "./Overview";
@@ -73,6 +74,34 @@ const account = (over: Partial<Account> = {}): Account => ({
   last_import: null,
   source: "csv",
   ...over,
+});
+
+describe("GuidanceCard", () => {
+  const card = {
+    evidence_id: "card:buffer",
+    id: "buffer",
+    topic: "savings",
+    tone: "gentle",
+    title: "Build a buffer",
+    body: "You hold £1,234.50 in savings.",
+    principles: [],
+    figures: [{ signal: "savings", shown: "£1,234.50" }],
+    facts: [
+      { id: "f", label: "Allowance", shown: "£20,000", source: "gov rules", checked_on: "2026-01-05", may_be_out_of_date: true },
+    ],
+    why: [{ signal: "months_of_cover", op: "<", threshold: "3", actual: "1.2" }],
+  };
+  it("shows the figures, condition, signal values and the fact's checked-on date", () => {
+    render(
+      <PrivacyProvider>
+        <GuidanceCard card={card} />
+      </PrivacyProvider>,
+    );
+    expect(screen.getByText("£1,234.50")).toBeInTheDocument();
+    expect(screen.getByText(/months of cover is 1.2, the card needs it below 3/)).toBeInTheDocument();
+    expect(screen.getByText(/checked on 5 Jan 2026 \(may be out of date\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });
 
 describe("MonthCard", () => {

@@ -1,10 +1,10 @@
 {
   "harness": "assistant",
   "dataset": "assistant_golden",
-  "dataset_version": 7,
-  "dataset_sha256": "58b75c931a2ca99d7492482e4d38065c6e1deaa6dcc3a4cd6353813b4e659355",
+  "dataset_version": 8,
+  "dataset_sha256": "5c83ea9aa43d6340af237f16aee5e4b6c4a5ee218178b80bd3bbde947ab91bc5",
   "prompt_sha256": "c506981690b66c7c452731e03b1684c1b2f24601fb72fdd3073402e4a5010c09",
-  "cases": 41,
+  "cases": 43,
   "refusal_cases": 7,
   "models": {
     "fake_oracle": {
@@ -26,11 +26,11 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.195122,
-        "grounding_pass_rate": 0.029412,
+        "tool_call_accuracy": 0.186047,
+        "grounding_pass_rate": 0.027778,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.804878,
+        "printed_tool_call_rate": 0.813953,
         "model_error_rate": 0.0
       },
       "failures": {
@@ -53,6 +53,8 @@
           "ask-top-fuel-merchant",
           "ask-transport-last-month",
           "ask-followup-fuel",
+          "ask-car-december",
+          "ask-car-followup-shell",
           "plan-afford",
           "plan-buffer",
           "plan-forecast",
@@ -88,6 +90,8 @@
           "ask-top-fuel-merchant",
           "ask-transport-last-month",
           "ask-followup-fuel",
+          "ask-car-december",
+          "ask-car-followup-shell",
           "plan-afford",
           "plan-buffer",
           "plan-forecast",
@@ -123,6 +127,8 @@
           "ask-top-fuel-merchant",
           "ask-transport-last-month",
           "ask-followup-fuel",
+          "ask-car-december",
+          "ask-car-followup-shell",
           "plan-afford",
           "plan-buffer",
           "plan-forecast",

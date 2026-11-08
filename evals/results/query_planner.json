@@ -1,0 +1,72 @@
+{
+  "harness": "query_planner",
+  "dataset": "synthetic_query_plans",
+  "dataset_version": 1,
+  "dataset_sha256": "bbb72ff3f09438b66910ffc9ee2a58b06f925e7e0ad522d66742ff8ec278462a",
+  "cases": 43,
+  "follow_up_cases": 11,
+  "models": {
+    "planner": {
+      "model": "spend_for_query on the oracle's selectors",
+      "model_version": "1",
+      "metrics": {
+        "merchant_recall": 1.0,
+        "merchant_precision": 1.0,
+        "figure_exact": 1.0,
+        "follow_up_accuracy": 1.0,
+        "sum_exact": 1.0,
+        "grounding": 1.0
+      },
+      "failures": []
+    },
+    "single_category": {
+      "model": "spending_summary, best single Category",
+      "model_version": "1",
+      "metrics": {
+        "merchant_recall": 0.926591,
+        "merchant_precision": 0.497621,
+        "figure_exact": 0.139535,
+        "follow_up_accuracy": 0.181818
+      },
+      "failures": [
+        "car-year",
+        "car-since-october",
+        "car-january",
+        "car-february",
+        "car-march",
+        "car-tax-insurance",
+        "fuel-q4",
+        "parking-year",
+        "groceries-year",
+        "coffee-takeaway-february",
+        "coffee-year",
+        "delivery-since-october",
+        "restaurants-year",
+        "supermarkets-february",
+        "coffee-greggs-december",
+        "home-bills-year",
+        "energy-water-february",
+        "phone-since-october",
+        "home-insurance",
+        "insurance-year",
+        "subscriptions-year",
+        "fun-year",
+        "trips-since-october",
+        "getting-around-february",
+        "tesco-year",
+        "diy-since-october",
+        "shopping-since-october",
+        "transport-and-car-march",
+        "car-year-fuel",
+        "car-year-parking",
+        "coffee-takeaway-pret",
+        "coffee-year-starbucks",
+        "insurance-year-car",
+        "trips-flights",
+        "tesco-fuel",
+        "transport-march-uber",
+        "parking-year-ncp"
+      ]
+    }
+  }
+}

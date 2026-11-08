@@ -135,6 +135,7 @@ def test_a_grounded_answer_comes_from_the_local_model(
     assert offered == {
         "spending_summary",
         "category_detail",
+        "spend_for_query",
         "category_trend",
         "list_subscriptions",
         "list_insights",

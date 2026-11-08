@@ -15,6 +15,7 @@ from finance_agent.assistant.tools import (
     insight,
     plan,
     propose,
+    query,
     read,
 )
 from finance_agent.identity import current_user
@@ -37,6 +38,7 @@ class Tool:
     fn: Callable[..., BaseModel]
     proposals: bool = False
     engine: bool = False
+    thread: bool = False  # an engine tool that also reads the thread's QueryPlan
 
     def spec(self) -> ToolSpec:
         return ToolSpec(
@@ -72,6 +74,19 @@ TOOLS = {
             " top-level: subcategories: " + _CATEGORIES + _DATA,
             read.CategoryDetailIn,
             read.category_detail,
+        ),
+        Tool(
+            "spend_for_query",
+            "Spending over a time range for a compound question, e.g. what the"
+            " car cost (Transport > Fuel, Transport > Parking, plus Merchants"
+            " such as DVLA or a garage, and keywords such as MOT): the total,"
+            " each Merchant counted, and Merchants nearby that were not counted"
+            " for the user to add, in minor units. The total is already the"
+            " sum: never add figures. follow_up narrows the last answer." + _DATA,
+            query.SpendForQueryIn,
+            query.spend_for_query,
+            engine=True,
+            thread=True,
         ),
         Tool(
             "list_subscriptions",
@@ -201,6 +216,7 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
         "spending_summary",
         "category_trend",
         "category_detail",
+        "spend_for_query",
         "list_subscriptions",
         "subscription_advice",
         "list_insights",
@@ -224,10 +240,15 @@ def specs(subgraph: str) -> list[ToolSpec]:
 
 
 def run(
-    subgraph: str, call: ToolCall, conn: Connection, turn: propose.Turn | None = None
+    subgraph: str,
+    call: ToolCall,
+    conn: Connection,
+    turn: propose.Turn | None = None,
+    plan: query.QueryPlan | None = None,
 ) -> BaseModel:
     """Validate the arguments (unknown fields rejected) and run the tool. A
-    Proposal tool needs the graph's `turn` for provenance."""
+    Proposal tool needs the graph's `turn` for provenance; `plan` is the
+    thread's last QueryPlan, which a follow-up narrows."""
     if call.name not in ALLOWLIST.get(subgraph, ()):
         raise ToolNotAllowed(call.name)
     tool = TOOLS[call.name]
@@ -239,5 +260,6 @@ def run(
         return tool.fn(store, args, turn)
     if tool.engine:
         today = turn.today if turn is not None else date.today()
-        return tool.fn(read.Source(conn, current_user(), today), args)
+        src = read.Source(conn, current_user(), today)
+        return tool.fn(src, args, plan) if tool.thread else tool.fn(src, args)
     return tool.fn(Ledger(conn, current_user()), args)

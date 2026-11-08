@@ -5097,6 +5097,7 @@
     },
     "/api/guidance": {
       "get": {
+        "description": "`tone` left out is the Memory-chosen one (gentle by default); the cards come\nbest first, less those a constraint Memory rules out (#264).",
         "operationId": "guidance_api_guidance_get",
         "parameters": [
           {
@@ -5104,13 +5105,19 @@
             "name": "tone",
             "required": false,
             "schema": {
-              "default": "gentle",
-              "enum": [
-                "gentle",
-                "blunt"
+              "anyOf": [
+                {
+                  "enum": [
+                    "gentle",
+                    "blunt"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "title": "Tone",
-              "type": "string"
+              "title": "Tone"
             }
           }
         ],
