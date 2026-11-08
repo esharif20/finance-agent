@@ -726,3 +726,10 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
     transition: none;
   }
 }
+
+/* the hand-off from the hero: the next chapter arrives as a sheet with rounded top corners,
+   sliding over the hero as it sinks back (Hero.tsx); no gradient, just depth */
+.lp-ask {
+  border-radius: clamp(20px, 3vw, 36px) clamp(20px, 3vw, 36px) 0 0;
+  overflow: clip;
+}

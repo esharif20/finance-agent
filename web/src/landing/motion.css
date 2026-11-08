@@ -1474,8 +1474,8 @@
   inset: 0;
   border-radius: inherit;
   background: var(--halo);
-  -webkit-mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.45) 40%, transparent 70%);
-  mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.45) 40%, transparent 70%);
+  -webkit-mask: radial-gradient(closest-side, transparent 0%, rgb(0 0 0 / 0.55) 22%, rgb(0 0 0 / 0.4) 42%, transparent 70%);
+  mask: radial-gradient(closest-side, transparent 0%, rgb(0 0 0 / 0.55) 22%, rgb(0 0 0 / 0.4) 42%, transparent 70%);
   will-change: transform;
   animation: lp-spin 40s linear infinite;
 }

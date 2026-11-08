@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useMotionValueEvent, useScroll } from "motion/react";
+import { motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Money } from "@/components/Money";
 import { ASPECT } from "@/lib/cardArt";
@@ -289,6 +289,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   // playhead `p` after it (see PLAYHEAD), so every stage plays in full however fast the scroll
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
   const p = useMotionValue(0);
+  // the hand-off: as the next chapter slides over, the hero sinks back (slower than the page,
+  // a little smaller, dimmer), so the totals recede rather than cut. Transform and opacity only.
+  const { scrollYProgress: leaving } = useScroll({ target: track, offset: ["end end", "end start"] });
+  const exit = useTransform(leaving, (v) => `translate3d(0, ${(v * 38).toFixed(2)}vh, 0) scale(${(1 - v * 0.08).toFixed(4)})`);
+  const fade = useTransform(leaving, [0, 1], [1, 0.25]);
   const [phase, setPhase] = useState(0);
   useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.6 ? 1 : 2));
 
@@ -482,7 +487,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
 
   return (
     <section ref={track} className="lp-hero" data-still={still ? "" : undefined} aria-labelledby="lp-title">
-      <div className="lp-hero-pin">
+      <motion.div className="lp-hero-pin" style={still ? undefined : { transform: exit, opacity: fade, transformOrigin: "50% 100%" }}>
         <Field tone="night" />
         {still ? <span className="lp-ledger-still" aria-hidden="true" /> : <LedgerField />}
         <div className="lp-halo" aria-hidden="true" data-phase={phase} />
@@ -565,7 +570,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         <p className="lp-sr">
           {ACCOUNTS.accounts.map((a) => `${a.name}: ${formatMoney(gbp(a.balance))}.`).join(" ")} Together: {TOTAL}.
         </p>
-      </div>
+      </motion.div>
     </section>
   );
 }
