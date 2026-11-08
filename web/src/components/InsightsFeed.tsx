@@ -50,7 +50,8 @@ function Row({ insight }: { insight: Insight }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-label text-muted-foreground">
-            {typeTitle(insight.type)} · {insight.category}
+            {typeTitle(insight.type)}
+            {insight.category !== insight.key && ` · ${insight.category}`}
           </p>
           <p className="mt-0.5 font-semibold">{insight.key}</p>
         </div>
