@@ -96,6 +96,26 @@ function faces(accounts: Account[], balances?: Balances): Face[] {
   ];
 }
 
+/** Whether the bank balance matches the Ledger, as the card says it. */
+const statusOf = (f: Face) => (
+  <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
+    {f.rateNeeded?.length ? (
+      `Total unknown: rate needed for ${f.rateNeeded.join(", ")}`
+    ) : f.matches === null ? (
+      f.id === undefined ? "Total unknown: a bank gives no balance" : "No balance from bank"
+    ) : f.matches ? (
+      <>
+        <Check className="size-3.5" aria-hidden="true" />
+        Matches ledger
+      </>
+    ) : (
+      <span className="rounded-full bg-warning px-3 py-1 text-warning-foreground">
+        Find it
+      </span>
+    )}
+  </span>
+);
+
 /** The page colour behind the stack, which each card's back fades towards (#93). */
 const pageColour = () =>
   getComputedStyle(document.documentElement).getPropertyValue("--background").trim() || "#f3f5f7";
@@ -395,11 +415,7 @@ export function AccountStack({
                   {f.masked ? <span className="block text-label opacity-80">{f.masked}</span> : null}
                 </span>
                 {f.balance ? <Money value={f.balance} className="account-balance font-semibold" /> : null}
-                {f.matches === false ? (
-                  <span data-slot="status" className="text-label font-semibold">
-                    <span className="rounded-full bg-warning px-3 py-1 text-warning-foreground">Find it</span>
-                  </span>
-                ) : null}
+                {statusOf(f)}
               </button>
             );
           })}
@@ -499,22 +515,7 @@ export function AccountStack({
               {f.balance ? (
                 <Money value={f.balance} odometer={f.key} className="account-balance text-row font-semibold" />
               ) : null}
-              <span data-slot="status" className="flex items-center gap-1.5 text-label font-semibold">
-                {f.rateNeeded?.length ? (
-                  `Total unknown: rate needed for ${f.rateNeeded.join(", ")}`
-                ) : f.matches === null ? (
-                  f.id === undefined ? "Total unknown: a bank gives no balance" : "No balance from bank"
-                ) : f.matches ? (
-                  <>
-                    <Check className="size-3.5" aria-hidden="true" />
-                    Matches ledger
-                  </>
-                ) : (
-                  <span className="rounded-full bg-warning px-3 py-1 text-warning-foreground">
-                    Find it
-                  </span>
-                )}
-              </span>
+              {statusOf(f)}
             </button>
           );
         })}
