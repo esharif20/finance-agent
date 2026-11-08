@@ -15,8 +15,10 @@ from sqlalchemy import Connection
 
 from finance_agent.assistant.tools.guidance import Tone, clauses, evaluate, shown_as
 from finance_agent.assistant.tools.read import Source
+from finance_agent.engine.playbook import choose_tone, prioritise
 from finance_agent.identity import current_user
 from finance_agent.ledger.exposure import Exposures, Shown
+from finance_agent.ledger.proposals import Proposals
 
 CARD_POLICY = "cards-all-v1"  # every card whose condition holds
 
@@ -65,12 +67,17 @@ router = APIRouter(prefix="/api/guidance")
 
 
 @router.get("")
-def guidance(conn: Conn, tone: Annotated[Tone, Query()] = "gentle") -> list[CardOut]:
+def guidance(conn: Conn, tone: Annotated[Tone | None, Query()] = None) -> list[CardOut]:
+    """`tone` left out is the Memory-chosen one (gentle by default); the cards come
+    best first, less those a constraint Memory rules out (#264)."""
     user, today = current_user(), date.today()
-    g = evaluate(Source(conn, user, today), tone)
+    memories = Proposals(conn, user).memories()
+    g = evaluate(Source(conn, user, today), tone or choose_tone(memories))  # pyright: ignore[reportArgumentType]
     cards = {c.id: c for c in g.book.cards}
+    by_id = {s.card_id: s for s in g.shown}
+    order = prioritise([cards[i] for i in by_id], memories)
     out: list[CardOut] = []
-    for s in g.shown:
+    for s in (by_id[c.id] for c in order):
         why = [
             WhyOut(
                 signal=c.signal,
