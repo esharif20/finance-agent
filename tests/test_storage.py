@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0021"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0022"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -663,3 +663,22 @@ def test_the_registry_trigger_is_present_at_head(engine: Engine) -> None:
     with engine.connect() as conn:
         got = conn.execute(text(sql)).scalars().all()
     assert len(got) == 1 and "subscription_entry" in got[0]
+
+
+def test_migration_0022_adds_transfer_rejections_which_go_with_their_transaction(
+    tmp_path: Path,
+) -> None:
+    """0022 (#215 C) adds transfer_rejection, nothing rebuilt; a rejection
+    points at its Transaction and is deleted with it."""
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT INTO transfer_rejection (user_id, transaction_id, created_at)"
+        " VALUES (1, 9, '2026-01-05')",
+    )
+    eng = round_trip(tmp_path, "0021", "0022", {"transfer_rejection"}, rows)
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM note"))
+        conn.execute(text('DELETE FROM "transaction" WHERE id = 9'))
+        assert conn.execute(text("SELECT * FROM transfer_rejection")).all() == []
+    eng.dispose()

@@ -612,6 +612,24 @@ duplicate_merge = Table(
     Index("ix_duplicate_merge_user", "user_id", "transaction_id"),
 )
 
+# "Not a Transfer" (#215 C): the user's word that a Transaction is no Transfer
+# leg; while active, matching never pairs it. An overlay like a merge.
+transfer_rejection = Table(
+    "transfer_rejection",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "transaction_id",
+        Integer,
+        ForeignKey("transaction.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("reverted_at", DateTime(timezone=True)),
+    Index("ix_transfer_rejection_user", "user_id", "transaction_id"),
+)
+
 # Subscription alerts already sent (#108), so each fires once per state:
 # `state` is the flag's evidence date, or `converts_on` for a trial. Written
 # insert-if-absent; never holds an amount.
