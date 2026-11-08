@@ -8,6 +8,7 @@ export type Route =
   | { name: "review" }
   | { name: "settings" }
   | { name: "subscriptions" }
+  | { name: "assistant" }
   | { name: "category"; category: string; month?: string; account?: number };
 
 const id = (s: string | undefined) => (s && /^\d+$/.test(s) ? Number(s) : undefined);
@@ -18,6 +19,7 @@ export function parseHash(hash: string): Route {
   if (kind === "review") return { name: "review" };
   if (kind === "settings") return { name: "settings" };
   if (kind === "subscriptions") return { name: "subscriptions" };
+  if (kind === "assistant") return { name: "assistant" };
   if (kind === "account" && id(name) !== undefined) return { name: "overview", account: id(name) };
   if (kind === "category" && name) {
     try {
