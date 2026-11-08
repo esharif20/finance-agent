@@ -1067,6 +1067,23 @@
             "title": "Skipped",
             "type": "boolean"
           },
+          "suggestions": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1100,6 +1117,7 @@
           "merchant_id",
           "transaction_ids",
           "choices",
+          "suggestions",
           "skipped"
         ],
         "title": "ItemOut",
@@ -1137,6 +1155,32 @@
           "status"
         ],
         "title": "LocalModelOut",
+        "type": "object"
+      },
+      "ManageLinkOut": {
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "names",
+          "domain",
+          "url"
+        ],
+        "title": "ManageLinkOut",
         "type": "object"
       },
       "MemoriesOut": {
@@ -3003,6 +3047,28 @@
         "tags": [
           "local-model"
         ]
+      }
+    },
+    "/api/manage-links": {
+      "get": {
+        "operationId": "manage_links_api_manage_links_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManageLinkOut"
+                  },
+                  "title": "Response Manage Links Api Manage Links Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Manage Links"
       }
     },
     "/api/memories": {

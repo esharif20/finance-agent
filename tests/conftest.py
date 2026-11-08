@@ -16,6 +16,22 @@ from finance_agent.storage import open_db
 REAL_DATA_DIR = storage.DEFAULT_DB.parent
 
 
+class _LocalModelOff:
+    """Import and sync try the local model; tests never reach a real Ollama."""
+
+    model = "nomic-embed-text"
+
+    def digest(self) -> None:
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _no_real_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
+    from finance_agent.categorise import embedding
+
+    monkeypatch.setattr(embedding, "OllamaEmbedder", _LocalModelOff)
+
+
 @pytest.fixture(autouse=True)
 def _never_touch_real_data(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch

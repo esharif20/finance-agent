@@ -1,9 +1,12 @@
 import { ExternalLink } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchManageLinks } from "@/api/client";
 import { manageUrl } from "@/lib/manageLinks";
 
 /** Opens the service's own account page; the app itself makes no request. */
 export function ManageLink({ merchant }: { merchant: string | null }) {
-  const href = manageUrl(merchant);
+  const links = useQuery({ queryKey: ["manage-links"], queryFn: fetchManageLinks, staleTime: Infinity });
+  const href = manageUrl(merchant, links.data);
   if (!href) return <span className="text-label text-muted-foreground">No manage link yet</span>;
   return (
     <a
