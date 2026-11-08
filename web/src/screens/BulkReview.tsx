@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { type ReviewItem, type ReviewQueueOut, answerReviewBatch, undoReview } from "@/api/client";
 import { Money } from "@/components/Money";
 import { Card } from "@/components/ui/card";
-import { type BulkGroup, groupBySuggestion, selected, spendOf } from "@/lib/bulkReview";
+import { type BulkGroup, groupBySuggestion, selected } from "@/lib/bulkReview";
 import { REVIEW_KEY } from "./ReviewQueue";
 
 const btn =
@@ -73,7 +73,6 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
 
   const total = groups.reduce((n, g) => n + selected(g, unticked).length, 0);
   const rest = queue.items.length - groups.reduce((n, g) => n + g.items.length, 0);
-  const currency = groups[0]?.items[0]?.currency ?? "GBP";
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -113,8 +112,7 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
                   {g.category[1]}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  {g.category[0]} · {plural(g.items.length, "Merchant", "Merchants")} ·{" "}
-                  <Money value={{ minor: spendOf(g.items), currency }} />
+                  {g.category[0]} · {plural(g.items.length, "Merchant", "Merchants")}
                 </p>
               </div>
               <button

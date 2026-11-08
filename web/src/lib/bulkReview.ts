@@ -33,5 +33,3 @@ export function groupBySuggestion(items: ReviewItem[]): BulkGroup[] {
 
 /** What "Accept N" would send: the group's items minus the unticked ones. */
 export const selected = (g: BulkGroup, unticked: ReadonlySet<string>) => g.items.filter((i) => !unticked.has(i.id));
-
-export const spendOf = (items: ReviewItem[]) => items.reduce((n, i) => n + i.spend_minor, 0);

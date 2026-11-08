@@ -120,6 +120,15 @@ describe("Bulk review", () => {
     localStorage.removeItem("fa-private");
   });
 
+  it("shows no client-summed amount in a group header, even for mixed currencies", async () => {
+    const mixed = items.map((i, n) => (n % 2 ? { ...i, currency: "EUR" } : i));
+    setup(queue(mixed));
+    const header = (await screen.findByRole("heading", { name: "Groceries" })).parentElement as HTMLElement;
+    expect(header).toHaveTextContent("Food & Drink · 6 Merchants");
+    expect(within(header).queryByText(/[£€$]/)).toBeNull();
+    expect(header.querySelector(".money")).toBeNull();
+  });
+
   it("can switch to one at a time", async () => {
     setup(queue(items));
     await userEvent.click(await screen.findByRole("button", { name: "One at a time" }));
