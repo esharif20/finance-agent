@@ -43,7 +43,7 @@ from finance_agent.engine.baselines import (
 
 type Category = tuple[str, str]
 type InsightType = Literal[
-    "recurring", "price_increase", "category_spike", "upcoming_renewal"
+    "recurring", "price_increase", "category_spike", "upcoming_renewal", "shortfall"
 ]
 
 PER_YEAR = {"weekly": 52, "monthly": 12, "annual": 1}
