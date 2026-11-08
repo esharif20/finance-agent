@@ -277,7 +277,7 @@ def test_chat_is_deterministic(app: FastAPI) -> None:
     r = client(app, A).post("/api/chat", json={"message": "How much did I spend?"})
     assert r.status_code == 200
     meta = r.text.split("event: meta\ndata: ", 1)[1].split("\n", 1)[0]
-    assert json.loads(meta)["path"] == "deterministic"
+    assert json.loads(meta)["path"] in ("deterministic", "planner")  # no model
 
 
 def test_the_demo_never_reaches_the_network(

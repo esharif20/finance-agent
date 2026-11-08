@@ -21,7 +21,8 @@ from finance_agent.assistant.grounding import Money, format_figure
 from synthetic_assistant import DECEMBER, ME, ROWS, seed
 
 TODAY = date(2026, 1, 20)
-FUEL = "How much did I spend on fuel last month?"
+# "petrol" is not a taxonomy name, so the model answers (fuel goes to the fast path)
+FUEL = "How much did I spend on petrol last month?"
 pytestmark = pytest.mark.pre_router  # as in use: no Router call for this one
 
 

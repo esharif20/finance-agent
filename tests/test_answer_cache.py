@@ -194,7 +194,9 @@ def first_round() -> Reply:
 def turn(engine: Engine, *script: Reply | str) -> tuple[Any, FakeChatModel]:
     m = FakeChatModel([Reply(content=s) if isinstance(s, str) else s for s in script])
     with engine.begin() as conn:
-        return ask(Assistant(m, conn, TODAY), "what did I spend in January?"), m
+        return ask(
+            Assistant(m, conn, TODAY), "what did I spend in January, all told?"
+        ), m
 
 
 @pytest.fixture
