@@ -16,11 +16,14 @@ Metrics, per model, over the synthetic_allocation scenarios:
 - `oracle_utility`: 1 - sum w*|x - r| / (max w* x (spare + sum r)) under the
   planted true weights w*, where r is recent spending (goals: target); 0 for
   no plan or a plan that breaks a constraint. Mean over feasible scenarios.
+- `allocation_learned` repeats these with weights fitted from 10 simulated
+  answers (#269); its `oracle_utility` must beat `allocation`'s.
 - `deviation_from_recent`: sum |x - r| / income (lower is better).
 - `instability`: sum of |line change| / |income change| when income moves
   by +-1% (lower is better; 1.0 moves only as much as income did).
 """
 
+import math
 import sys
 from collections.abc import Callable
 from dataclasses import replace
@@ -30,8 +33,10 @@ from typing import Any
 import gate
 import synthetic_allocation as sa
 from finance_agent.engine import allocation as al
+from finance_agent.engine import preferences as pref
 
 RESULTS = Path(__file__).parent / "results" / "allocation.json"
+ANSWERS = 10
 LOWER = {"constraint_violations", "deviation_from_recent", "instability"}
 type Method = Callable[[al.AllocationInput], al.Plan | al.Infeasible]
 
@@ -115,12 +120,21 @@ def score(method: Method, ss: list[sa.Scenario]) -> dict[str, float]:
     }
 
 
+def _learned(s: sa.Scenario, n: int) -> sa.Scenario:
+    """The scenario with weights fitted from `n` simulated answers (#269)."""
+    prior = {x.name: math.log(x.weight) for x in (*s.inp.goals, *s.inp.categories)}
+    fitted = pref.strengths(sorted(prior), sa.simulated_answers(s, n), prior)
+    return replace(s, inp=al.with_strengths(s.inp, fitted))
+
+
 def evaluate() -> dict[str, Any]:
     ss = sa.scenarios()
+    learned = [_learned(s, ANSWERS) for s in ss]
     names: dict[str, tuple[str, str, Method]] = {
         "allocation": ("engine.allocation linprog (HiGHS)", "lp-1", al.plan),
         "fifty_thirty_twenty": ("50/30/20 rule", "baseline", al.fifty_thirty_twenty),
     }
+    with_answers = score(al.plan, learned)
     return {
         "harness": "allocation",
         "dataset": "synthetic_allocation",
@@ -131,6 +145,13 @@ def evaluate() -> dict[str, Any]:
         "models": {
             key: {"model": model, "model_version": version, "metrics": score(fn, ss)}
             for key, (model, version, fn) in names.items()
+        }
+        | {
+            "allocation_learned": {
+                "model": f"engine.allocation + Bradley-Terry after {ANSWERS} answers",
+                "model_version": "lp-1+bt-1",
+                "metrics": with_answers,
+            }
         },
     }
 

@@ -22,6 +22,7 @@ from finance_agent.engine.allocation import (
     plan,
     split,
     violations,
+    with_strengths,
 )
 
 pence = st.integers(0, 2_000_000)
@@ -255,3 +256,43 @@ def test_split_is_exact(total: int, weights: list[int]) -> None:
     out = split(total, weights)
     assert sum(out) == (total if weights else 0)
     assert all(x >= 0 for x in out)
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    inputs(),
+    st.lists(
+        st.floats(-1e6, 1e6, allow_nan=False) | st.sampled_from([-50.0, 0.0, 50.0]),
+        min_size=9,
+        max_size=9,
+    ),
+)
+def test_strengths_never_override_a_hard_constraint(
+    inp: AllocationInput, values: list[float]
+) -> None:
+    """Any strengths, however extreme, leave the plan feasible whenever the
+    unweighted problem is, and leave every floor, cap and the sum intact."""
+    names = [x.name for x in (*inp.goals, *inp.categories)]
+    fitted = dict(zip(names, values, strict=False))
+    result = plan(with_strengths(inp, fitted))
+    assert isinstance(result, Plan) == isinstance(plan(inp), Plan)
+    if isinstance(result, Plan):
+        assert violations(inp, result) == []
+        assert sum(ln.amount_minor for ln in result.lines) == inp.income_minor
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -float("inf")])
+def test_non_finite_strengths_are_rejected(bad: float) -> None:
+    inp = AllocationInput(100, categories=(Category("c", 50),))
+    with pytest.raises(ValueError, match="finite"):
+        with_strengths(inp, {"c": bad})
+
+
+def test_strengths_move_the_cut_to_the_weaker_line() -> None:
+    inp = AllocationInput(
+        100_000, categories=(Category("a", 80_000), Category("b", 80_000))
+    )
+    result = plan(with_strengths(inp, {"a": 2.0, "b": -2.0}))
+    assert isinstance(result, Plan)
+    got = {ln.name: ln.amount_minor for ln in result.lines}
+    assert got["a"] == 80_000 and got["b"] == 20_000
