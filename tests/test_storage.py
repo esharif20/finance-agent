@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0016"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0018"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -524,3 +524,43 @@ def test_migration_0016_adds_checkpoints_and_keeps_rows_that_reference_them(
     )
     added = {"assistant_checkpoint", "assistant_checkpoint_write"}
     round_trip(tmp_path, "0015", "0016", added, rows).dispose()
+
+
+def test_migration_0017_adds_the_answer_cache_and_keeps_rows_that_reference_them(
+    tmp_path: Path,
+) -> None:
+    """0017 (#140) adds answer_cache, nothing rebuilt; a Memory pointing at its
+    Proposal survives the round trip."""
+    rows = (
+        "INSERT OR IGNORE INTO proposal (id, user_id, kind, payload, status,"
+        " created_at) VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-03')",
+        "INSERT OR IGNORE INTO memory (id, user_id, proposal_id, type, text, tags,"
+        " turn_id, quote, said_on, created_at) VALUES (1, 1, 1, 'goal', 's', '[]',"
+        " 't', 'q', '2026-01-03', '2026-01-03')",
+        "INSERT INTO answer_cache (user_id, key, ledger_version, reply, evidence,"
+        " created_at) VALUES (1, 'k', 0, 'synthetic', '[]', '2026-01-03')",
+    )
+    round_trip(tmp_path, "0016", "0017", {"answer_cache"}, rows).dispose()
+
+
+def test_migration_0018_adds_insights_and_keeps_rows_that_reference_them(
+    tmp_path: Path,
+) -> None:
+    """0018 (#150) adds insight and insight_feedback, nothing rebuilt; a rating
+    points at its Insight, which it then pins."""
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT INTO insight (id, user_id, type, key, category, raised_on,"
+        " impact_minor, confidence, evidence, created_at) VALUES (1, 1,"
+        " 'recurring', 'SYNTH GYM', 'Health / Gym', '2026-01-03', 1200, 90,"
+        " '[9]', '2026-01-03')",
+        "INSERT INTO insight_feedback (user_id, insight_id, insight_type,"
+        " category, signal, created_at) VALUES (1, 1, 'recurring',"
+        " 'Health / Gym', 'up', '2026-01-03')",
+    )
+    added = {"insight", "insight_feedback"}
+    eng = round_trip(tmp_path, "0017", "0018", added, rows)
+    with eng.begin() as conn, pytest.raises(Exception, match="FOREIGN KEY"):
+        conn.execute(text("DELETE FROM insight WHERE id = 1"))
+    eng.dispose()

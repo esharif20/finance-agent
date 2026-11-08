@@ -101,6 +101,19 @@ The Subscriptions rule is what lets a renewal be predicted from one or two charg
 
 `evals/gate.py` is the shared gate: CI fails unless the committed results equal a fresh run, and `--write` refuses to lower any committed metric, or to change the dataset without a version bump, unless `--accept-lower` is passed. Every model in a results file records its name and version.
 
+### Insight ranking (#150)
+
+`engine.ranking` scores an Insight as impact × confidence × relevance, where relevance is the mean of a Beta(1, 1) posterior per (Insight type, Category), updated only by an explicit thumbs-up (a success) and a thumbs-down or dismissal (a failure). Equal scores keep their given order. `evals/ranking.py` replays 14 monthly slates of 10 per synthetic user, with ratings on the logging policy's top 3. Committed run (seed 146, dataset v2):
+
+| Ranker | NDCG@3 | NDCG@5 |
+| --- | --- | --- |
+| £ impact (baseline) | 0.802 | 0.850 |
+| impact × confidence × Beta relevance | 0.838 | 0.877 |
+
+It wins on five of six users at @3 and all six at @5; history 3 loses at @3 (0.801 against 0.816). Probing outside the gate: impact × confidence alone (relevance flat) scores 0.829, so about a quarter of the gain is relevance; separate Beta posteriors per type and per Category, multiplied, score 0.865, because 42 ratings spread thin over the (type, Category) cells. That factorised form is the next step if real ratings stay this sparse.
+
+Confidences are still the detectors' fixed per-rule priors, not calibrated: calibration needs outcomes on real Insights, which only the user's feedback will give.
+
 ### Forecasting (#149)
 
 `engine.forecast.forecast_category` is ETS(A,N,A) on log(1 + monthly spend), with the initial states estimated, an error variance divided by its degrees of freedom (residuals less the 14 estimated parameters) and a Student's t interval. `cash_flow` adds recurring payments, projected from their schedules (`categorise.recurring`, minus registry entries the user marked not a subscription or cancelled), to the Category forecasts; Category bounds add as if fully correlated, so the total band is conservative. Recurring income (Income credits from one payer, scheduled from its last six so an old pay rise does not hide a salary) is projected with its dates for the what-if (#151); one-off credits are not.
@@ -163,6 +176,30 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 | Memory correctness | Proposals only when supported by the conversation |
 | Explanation quality | local LLM judge with fixed rubric; cloud judge on synthetic data; human spot-check |
 | Latency and peak memory on M1 Pro 16 GB | recorded per model |
+
+### Model benchmark (#143)
+
+`evals/assistant_bench.py` runs the whole graph on the golden set in `evals/assistant_golden.py`. Each case is a question, its route, the expected tool calls in order, and a grounded answer. v1 has 20 cases: Ask, Memory and Correct, plus five refusals (a payment, an unconfirmed bulk write, a figure as a Memory, a plan before M5, and investment advice). They run over the synthetic Ledger of `tests/synthetic_assistant.py`. Each case runs in a rolled-back transaction on a throwaway encrypted database, keyed in memory.
+
+| Metric | Passes when |
+| --- | --- |
+| `route_accuracy` | the Router picks the case's sub-graph |
+| `tool_call_accuracy` | the model's structured calls match the expected ones in order. Arguments are a subset match: dicts key by key, lists item by item, and an expected string must appear in the model's, ignoring case |
+| `grounding_pass_rate` (non-refusals) | the reply came from the model, passed the grounding check (`path == local_model`), and contains each expected figure |
+| `refusal_correctness` (refusals) | nothing was proposed: no `propose_*` call and no pending Proposal |
+| `printed_tool_call_rate` (lower is better) | the qwen tool-call printing bug: a reply whose text holds a tool call (a `<tool_call>` or `<function=` marker, a `{"name": <tool>, "arguments"/"parameters": ...}` object, or `<tool>(`) |
+| `model_error_rate` (lower is better) | Ollama errors, including malformed tool calls it refuses |
+| `latency_p50_ms`, `latency_p95_ms` | nearest-rank percentiles of the wall time of each turn (real runs only) |
+| `peak_rss_gb`, `peak_ollama_size_gb`, `peak_memory_gb` | peak RSS of Ollama's runner process and peak `/api/ps` size, sampled every 0.25 s, and the larger of the two (real runs only) |
+
+- **CI** runs it on two scripted `FakeChatModel`s and requires `evals/results/assistant_fake.json` to reproduce (`gate.py`). The oracle does what each case expects and scores 1.0 everywhere. The negative control prints its tool calls as text, and must be flagged on every tool-using case: it scores 0.25 tool-call accuracy and a 0.75 printing rate.
+- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:4b`.
+  - It talks only to localhost Ollama, at `num_ctx` 8192.
+  - It merges the model's scores into `evals/results/assistant_local.json`, which CI never reads. The model digest is its `model_version`.
+  - It unloads the model afterwards (`keep_alive` 0), even if the run fails.
+  - Run it on an idle Mac.
+- **Choosing the model (#144):** the smallest model that passes the accuracy gates with `peak_memory_gb` of about 7 or less.
+- **Known gap:** a printed tool call with no figures in it passes the grounding check, so the user sees it as the reply. The printing metric catches it here.
 
 ## Outcomes over time
 

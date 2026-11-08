@@ -199,6 +199,19 @@ def test_default_model_and_keep_alive() -> None:
             },
         }
     ]
+    assert "options" not in sent  # Ollama's own context length unless asked
+
+
+def test_num_ctx_sets_the_context_length_the_benchmark_measures_at() -> None:
+    conns: list[FakeConnection] = []
+    reply = json.dumps(wire_reply({"role": "assistant", "content": "ok"})).encode()
+
+    def connect() -> FakeConnection:
+        conns.append(FakeConnection(FakeResponse(200, reply, {})))
+        return conns[-1]
+
+    OllamaChatModel(num_ctx=8192, connect=connect).chat(ASK)
+    assert conns[0].requests[0][2]["options"] == {"num_ctx": 8192}
 
 
 def test_ollama_parses_content_and_tool_calls() -> None:

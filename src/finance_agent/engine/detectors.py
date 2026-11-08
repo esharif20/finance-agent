@@ -19,7 +19,8 @@ depend only on the multiset of rows, never on their order.
   Subscriptions charge with nothing from the Merchant for 300 days around it.
 
 The learned gates of ADR 0015 return `Insufficient` when no key clears them.
-Confidences are fixed priors per rule until the ranker (#150) calibrates them.
+Confidences are fixed priors per rule, not calibrated (#150: that needs
+outcomes on real Insights; see `engine.insights`).
 """
 
 from collections import defaultdict

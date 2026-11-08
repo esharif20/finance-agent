@@ -8,6 +8,7 @@ encrypted database (`LedgerSaver`).
 The checkpointed state holds the turn's message, reply and route, never tool
 results. Nothing here logs message, reply or tool text."""
 
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,7 +25,12 @@ from pydantic import ValidationError
 from sqlalchemy import Connection
 
 from finance_agent.assistant import context
-from finance_agent.assistant.chat_model import ChatModel, Message, Reply
+from finance_agent.assistant.chat_model import (
+    ChatModel,
+    Message,
+    Reply,
+    printed_tool_call,
+)
 from finance_agent.assistant.checkpoints import LedgerSaver
 from finance_agent.assistant.grounding import (
     ToolValue,
@@ -32,10 +38,18 @@ from finance_agent.assistant.grounding import (
     render_fallback,
 )
 from finance_agent.assistant.ollama import OllamaError
-from finance_agent.assistant.tools import NoData, ToolNotAllowed, Turn, run, specs
+from finance_agent.assistant.tools import (
+    TOOLS,
+    NoData,
+    ToolNotAllowed,
+    Turn,
+    run,
+    specs,
+)
 from finance_agent.assistant.tools.propose import ProposalOut
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
+from finance_agent.ledger.answer_cache import AnswerCache
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.proposals import Proposals
 
@@ -44,6 +58,7 @@ Path = Literal["cache", "local_model", "deterministic"]
 ROUTES: tuple[Route, ...] = ("ask", "plan", "memory", "correct")
 MAX_ROUNDS = 3  # model calls that may ask for tools in one turn
 MAX_CALLS = 4  # tool calls run per round
+CACHED = ("ask",)  # read-only answers; Proposals are never cached (ADR 0010)
 HISTORY = 12  # messages kept in the thread for the conversation slot
 PLAN_REPLY = (
     "Planning tools aren't available yet, so I can't plan or run a what-if."
@@ -53,8 +68,23 @@ MODEL_DOWN = "The local model isn't answering, so I can't help with that right n
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
 REGENERATE = (
     "Some figures in that reply are not in this turn's tool results. Rewrite it"
-    " using only figures copied exactly from the tool results, or none."
+    " using only figures copied exactly from the tool results, or none, and"
+    " with no links."
 )
+# A link, image or address in a reply could carry the user's data off the device
+# when rendered or followed (#142), so such a reply is never shown or cached.
+_LINK = re.compile(
+    r"\b[a-z][a-z0-9+.-]*://|//|\bwww\.|\]\(|</?[a-z]+[\s>/]"
+    r"|\b(?:mailto|javascript|file)\s*:|\bdata:\s*[a-z]+/"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}[/?]",
+    re.IGNORECASE,
+)
+
+
+def _shown(reply: str) -> bool:
+    """A reply may reach the user only with no link and no tool call printed as
+    text (a failed generation, #143), whatever its figures."""
+    return not _LINK.search(reply) and not printed_tool_call(reply, frozenset(TOOLS))
 
 
 def _keep_last(
@@ -87,6 +117,10 @@ class Draft:
     proposal_id: int | None = None
     messages: list[Message] = field(default_factory=list[Message])
     failed: bool = False
+    rounds: list[list[dict[str, Any]]] = field(
+        default_factory=list[list[dict[str, Any]]]
+    )
+    cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
 
 
 @dataclass
@@ -158,6 +192,9 @@ class Assistant:
 
     # --- the work ------------------------------------------------------------
 
+    def _cache(self) -> AnswerCache:
+        return AnswerCache(self.conn, current_user())
+
     def _turn(self, s: State) -> Turn:
         return Turn(turn_id=s["turn_id"], quote=s["message"], today=self.today)
 
@@ -180,6 +217,12 @@ class Assistant:
                 d.reply = r.content
                 return d
             calls = list(r.tool_calls[:MAX_CALLS])
+            d.rounds.append([c.model_dump() for c in calls])
+            if route in CACHED and len(d.rounds) == 1:
+                hit = self._cache().get(route, d.rounds[0], self.today)
+                if hit is not None:
+                    d.reply, d.cached = hit
+                    return d
             d.messages.append(
                 Message(role="assistant", content=r.content, tool_calls=tuple(calls))
             )
@@ -211,10 +254,13 @@ class Assistant:
         return out.model_dump_json()
 
     def _ground(self, route: Route, s: State, d: Draft) -> Update:
+        if d.cached is not None:
+            return {"reply": d.reply, "path": "cache", "evidence": list(d.cached)}
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)
-        if not d.failed and not res.grounded:
+        ok = res.grounded and _shown(d.reply)
+        if not d.failed and not ok:
             try:
                 again: Reply = self.model.chat(
                     [
@@ -225,15 +271,19 @@ class Assistant:
                 )
                 d.reply = again.content
                 res = check_grounding(d.reply, d.values, today=self.today)
+                ok = res.grounded and _shown(d.reply)
             except (OllamaError, OSError):
                 d.failed = True
-        if d.failed or not res.grounded:
+        if d.failed or not ok:
             return {
                 "reply": render_fallback(d.values),
                 "path": "deterministic",
                 "proposal_id": d.proposal_id,
                 "evidence": sorted({v.evidence_id for v in d.values}),
             }
+        # one round only: the key (its tool calls) then holds everything read
+        if route in CACHED and len(d.rounds) == 1 and d.proposal_id is None:
+            self._cache().put(route, d.rounds[0], self.today, d.reply, res.evidence_ids)
         return {
             "reply": d.reply,
             "path": "local_model",

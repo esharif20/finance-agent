@@ -125,7 +125,8 @@ Every table has `user_id`. Money is stored as integer minor units plus an ISO cu
 | `merchant_embedding` | user_id, merchant_id, model, dims, vector (int16): one local-model vector per Merchant (#113). Cascades from `merchant`; a trigger on `transaction` delete drops vectors of Merchants no Transaction names any more |
 | `transfer_link` | from_transaction_id, to_transaction_id, confidence, confirmed |
 | `reconciliation_gap` | account_id, from_date, to_date, amount_minor (Bank minus Ledger; rebuilt after every import) |
-| `insight` | id, user_id, type, impact_minor, confidence, relevance, evidence (JSON of ids), created_at, status |
+| `insight` | id, user_id, type, key (Merchant or Category), category, raised_on, impact_minor, confidence, evidence (JSON of ids), created_at: the Engine's current Insights (#150), unique per (type, key, raised_on), rewritten by each refresh |
+| `insight_feedback` | id, user_id, insight_id (NULL once the Insight is no longer found), insight_type, category, signal (up, down, dismissed), created_at: one per Insight, the latest kept; the relevance posterior's only input (#150) |
 | `feedback` | insight_id or transaction_id, signal (accept, dismiss, worth_it, regret, pairwise), created_at |
 | `memory` | id, user_id, type (preference, goal, constraint), text, tags, provenance (turn id, quote, date), review_on, status |
 | `proposal` | id, user_id, kind (memory, correction), payload, status, created_at, decided_at |
