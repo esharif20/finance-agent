@@ -221,7 +221,9 @@ def sync(user_id: int, notify: Notifier | None = None) -> int:
         if any(r.added for r in reports):  # same as `fa import`
             with engine.begin() as conn:
                 categorise.run(conn, user_id)
-            auto.refresh_quietly(engine, user_id)
+        auto.refresh_quietly(
+            engine, user_id
+        )  # every sync: Merchants may wait from before
         # every sync, so a trial converting soon is announced in time
         subscription_alerts.run(engine, user_id, notify or printed)
     except NotConnected as e:
