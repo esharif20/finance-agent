@@ -12,6 +12,8 @@ import {
 } from "@/api/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BULK_MIN, bulkable } from "@/lib/bulkReview";
+import { BulkReview } from "./BulkReview";
 import { AlwaysAskExtras, SplitRecheck, SplitRefund } from "./ReviewSplitItems";
 
 export const REVIEW_KEY = ["review-queue"] as const;
@@ -54,7 +56,41 @@ function suggestions(groups: { name: string; subs: string[] }[], model: Cat[] = 
     .slice(0, 3);
 }
 
+/** Bulk by default when a queue is mostly suggested Category rows; one at a time otherwise, or by choice. */
 export function ReviewQueue() {
+  const queue = useQuery({ queryKey: REVIEW_KEY, queryFn: fetchReviewQueue });
+  const [mode, setMode] = useState<"bulk" | "single" | null>(null);
+  if (!queue.data) return <OneAtATime />; // loading and error states live there
+  const eligible = queue.data.items.filter(bulkable).length >= BULK_MIN;
+  const view = mode ?? (eligible ? "bulk" : "single");
+  return (
+    <div className="flex flex-col gap-4">
+      {(eligible || mode === "single") && (
+        <div role="group" aria-label="View" className="mx-auto flex gap-1 self-center rounded-full bg-raised p-1">
+          {(
+            [
+              ["bulk", "Bulk"],
+              ["single", "One at a time"],
+            ] as const
+          ).map(([m, text]) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={view === m}
+              onClick={() => setMode(m)}
+              className={`${btn} ${view === m ? "bg-card" : ""}`}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      )}
+      {view === "bulk" ? <BulkReview queue={queue.data} others={() => setMode("single")} /> : <OneAtATime />}
+    </div>
+  );
+}
+
+function OneAtATime() {
   const client = useQueryClient();
   const queue = useQuery({ queryKey: REVIEW_KEY, queryFn: fetchReviewQueue });
   const categories = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });

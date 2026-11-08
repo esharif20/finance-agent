@@ -4,8 +4,8 @@
 from collections.abc import Callable, Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from finance_agent.categorise import embedding
 from finance_agent.identity import current_user
@@ -33,6 +33,8 @@ class ItemOut(BaseModel):
         tuple[str, str]
     ]  # local-model Categories, best first; may be empty
     skipped: bool
+    spend_minor: int  # what an answer touches (absolute), in `currency`
+    currency: str
 
 
 class QueueOut(BaseModel):
@@ -42,6 +44,7 @@ class QueueOut(BaseModel):
     # set when an undo changed nothing because the answer's Correction was
     # already reverted elsewhere; show it instead of "Undid the last change."
     message: str | None = None
+    applied: int = 0  # answers a batch wrote; send it to undo as `count`
 
 
 class VersionIn(BaseModel):
@@ -52,6 +55,23 @@ class AnswerIn(VersionIn):
     category: tuple[str, str] | None = None
     transaction_id: int | None = None  # "just this one"
     choice: str | None = None
+
+
+MAX_BATCH = 500
+
+
+class BatchAnswerIn(VersionIn):
+    id: str
+    category: tuple[str, str]
+
+
+class BatchIn(BaseModel):
+    answers: list[BatchAnswerIn] = Field(min_length=1, max_length=MAX_BATCH)
+
+
+class StaleOut(BaseModel):
+    message: str
+    stale_ids: list[str]
 
 
 def _queue(request: Request) -> Iterator[ReviewQueue]:
@@ -82,6 +102,8 @@ def _item(i: Item) -> ItemOut:
         choices=list(i.choices),
         suggestions=list(i.suggestions),
         skipped=i.skipped,
+        spend_minor=int(i.spend.scaleb(2)),
+        currency=i.currency,
     )
 
 
@@ -108,9 +130,39 @@ def queue(q: Queue) -> QueueOut:
 
 
 @router.post("/undo")
-def undo(q: Queue) -> QueueOut:
-    """Undo the latest answer or skip."""
-    return _out(q, q.undo)
+def undo(q: Queue, count: Annotated[int, Query(ge=1, le=MAX_BATCH)] = 1) -> QueueOut:
+    """Undo the latest answer or skip; `count` undoes a whole batch."""
+    return _out(q, lambda: q.undo(count))
+
+
+@router.post(
+    "/answers",
+    responses={409: {"model": StaleOut, "description": "nothing was applied"}},
+)
+def answers(q: Queue, body: BatchIn) -> QueueOut:
+    """Answer many Category items in one transaction: each exactly as the
+    single answer would, all or none. A stale or missing item refuses the lot
+    with 409 and its ids. Replaying a batch finds its items gone and applies
+    nothing."""
+    ids = [a.id for a in body.answers]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(422, "an item appears twice")
+    batch = [(a.id, a.version, Answer(a.category)) for a in body.answers]
+    stale: list[str] = []
+
+    def apply() -> str | None:
+        stale.extend(q.answer_many(batch))
+        return None
+
+    out = _out(q, apply)
+    if stale:
+        raise HTTPException(
+            409,
+            StaleOut(
+                message="some items changed since shown", stale_ids=stale
+            ).model_dump(),
+        )
+    return out.model_copy(update={"applied": len(batch)})
 
 
 @router.post("/{item_id}/answer")
