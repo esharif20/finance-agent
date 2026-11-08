@@ -90,14 +90,14 @@ What the benchmark found:
 
 ### Cloud models (#305)
 
-`evals/assistant_bench.py` also runs the golden set (v3) through the cloud path (#301): a local driver routes and calls the tools, and the cloud model only words the reply from the redacted payload, so a cloud row scores grounding, refusal, leaks, fallback, cost and latency. The driver here is the oracle, so route and tools are 1.00 by construction. Grounding counts a reply only when the cloud wrote it (`path == "cloud"`). Both the bench and the judge reserve on `synthetic_judge`, and only the synthetic golden set and the hand-labelled replies are sent. CI replays `tests/fixtures/synthetic/cloud/bench_*.json` (`results/assistant_cloud.json`, `results/judge.json`).
+`evals/assistant_bench.py` also runs the golden set (v3) through the cloud path (#301), golden set v8 (43 cases): a local driver routes and calls the tools, and the cloud model only words the reply from the redacted payload, so a cloud row scores grounding, refusal, leaks, fallback, cost and latency. The driver here is the oracle, so route and tools are 1.00 by construction. Grounding counts a reply only when the cloud wrote it (`path == "cloud"`). Both the bench and the judge reserve on `synthetic_judge`, and only the synthetic golden set and the hand-labelled replies are sent. CI replays `tests/fixtures/synthetic/cloud/bench_*.json` (`results/assistant_cloud.json`, `results/judge.json`).
 
-The committed rows come from an **offline stand-in** (`model_version` `offline-standin`): it replays #301's golden wordings and judges with rules. They show the harness working and are not a measurement of Gemini. The real-key run (#306) is `uv run python evals/assistant_bench.py --model cloud:gemini-flash-latest`. It prints the worst case first (23 Flash calls at 46p and 53 Pro judge calls at 106p, so 152p, under the £9 monthly cap), asks before sending anything, and then rewrites the recordings and both results files.
+The committed rows come from an **offline stand-in** (`model_version` `offline-standin`): it replays #301's golden wordings and judges with rules. They show the harness working and are not a measurement of Gemini. The real-key run (#306) is `uv run python evals/assistant_bench.py --model cloud:gemini-flash-latest`. It prints the worst case first (31 Flash calls at 62p and 61 Pro judge calls at 122p, so 184p, under the £9 monthly cap; the meter still stops at `synthetic_judge`'s 150p, and real spend is far below the reservations), asks before sending anything, and then rewrites the recordings and both results files.
 
 | Model | route | tools | grounding | refusal | leaks | fallback | cost per case | p50 / p95 |
 |---|---|---|---|---|---|---|---|---|
-| **`gemini-flash-latest`** (cloud wording; offline stand-in until #306) | 1.00* | 1.00* | 1.00 | 1.00 | 0 | 0.00 | 0.74p | recorded live only |
-| `qwen3.5:9b-q4_K_M` (local, for comparison) | 0.97 | 0.81 | 0.80 | 1.00 | – | – | 0p | 10.1 s / 19.5 s |
+| **`gemini-flash-latest`** (cloud wording; offline stand-in until #306) | 1.00* | 1.00* | 1.00 | 1.00 | 0 | 0.00 | 0.72p | recorded live only |
+| `qwen3.5:9b-q4_K_M` (local, golden set v3, for comparison) | 0.97 | 0.81 | 0.80 | 1.00 | – | – | 0p | 10.1 s / 19.5 s |
 
 \* from the oracle driver, not the cloud model.
 

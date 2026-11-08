@@ -48,7 +48,7 @@ def _sent(prefix: str) -> list[dict[str, Any]]:
 
 def test_no_recorded_payload_leaks() -> None:
     sent = _sent(bench.CHAT) + _sent(judge.PREFIX)
-    assert len(sent) >= 23 + 30
+    assert len(sent) >= 31 + 30
     assert [p for p in sent if bench.leaked(p)] == []
     for p in sent:
         GatewayPayload.model_validate_json(json.dumps(p))  # passes the payload check
@@ -141,5 +141,5 @@ def test_the_live_run_never_runs_in_ci(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_worst_case_stays_under_the_monthly_cap() -> None:
     calls, chat = bench.worst_case_pence("gemini-flash-latest")
     judged, pro = judge.worst_case_pence(calls)
-    assert calls >= 23 and judged == 30 + calls
+    assert calls >= 31 and judged == 30 + calls
     assert chat + pro <= bench.MONTHLY_CAP_PENCE
