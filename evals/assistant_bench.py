@@ -143,12 +143,11 @@ def percentile(xs: Sequence[float], p: float) -> float:
 
 def oracle(case: golden.Case, ids: Ids) -> ChatModel:
     script = [Reply(content=case.route)]
-    if case.route != "plan":
-        script += [
-            Reply(tool_calls=(ToolCall(name=c.name, arguments=_resolve(c.args, ids)),))
-            for c in case.calls
-        ]
-        script.append(Reply(content=case.answer))
+    script += [
+        Reply(tool_calls=(ToolCall(name=c.name, arguments=_resolve(c.args, ids)),))
+        for c in case.calls
+    ]
+    script.append(Reply(content=case.answer))
     return FakeChatModel(script)
 
 
