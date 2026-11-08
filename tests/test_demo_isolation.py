@@ -350,7 +350,7 @@ def test_landing_at_root_and_the_app_at_app_as_vercel_routes_it(
     env = {"FA_DEMO": "1", "FA_DEMO_DIR": str(demo_dir), "FA_DEMO_SECRET": SECRET}
     c = client(demo.build(env))
     keyring.set_keyring(held)
-    for path in ("/", "/app", "/app/", "/app/review/deep/link"):
+    for path in ("/", "/app", "/app/", "/app/review/deep/link", "/architecture"):
         r = c.get(path)
         assert r.status_code == 200 and "<title>spa</title>" in r.text, path
     assert c.get("/api/health").json()["app"] == "finance-agent"
