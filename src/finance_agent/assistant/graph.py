@@ -1,5 +1,5 @@
 """The Assistant graph (#139, ADR 0008, docs/AI_DESIGN.md): a Router sends each
-message to one sub-graph (Ask, Memory, Correct, or the Plan stub). Each runs
+message to one sub-graph (Ask, Memory, Correct or Plan). Each runs
 its allowlisted tools, and every reply passes the one grounding check:
 regenerate once, then the deterministic table. A Proposal pauses the graph
 (`interrupt`) until the user confirms or rejects it; checkpoints live in the
@@ -59,11 +59,9 @@ ROUTES: tuple[Route, ...] = ("ask", "plan", "memory", "correct")
 MAX_ROUNDS = 3  # model calls that may ask for tools in one turn
 MAX_CALLS = 4  # tool calls run per round
 CACHED = ("ask",)  # read-only answers; Proposals are never cached (ADR 0010)
+# Insight ratings and dismissals change these without a Ledger version bump
+UNCACHED = frozenset({"list_insights", "explain_insight"})
 HISTORY = 12  # messages kept in the thread for the conversation slot
-PLAN_REPLY = (
-    "Planning tools aren't available yet, so I can't plan or run a what-if."
-    " I can answer questions about your spending."
-)
 MODEL_DOWN = "The local model isn't answering, so I can't help with that right now."
 PROPOSED = "Here's the change I'd make. Nothing changes until you confirm it."
 REGENERATE = (
@@ -146,9 +144,6 @@ class Assistant:
         route = next((r for r in ROUTES if r == word), "ask")
         return {"route": route, "proposal_id": None, "evidence": []}
 
-    def plan(self, s: State) -> Update:
-        return {"reply": PLAN_REPLY, "path": "deterministic"}
-
     def subgraph(self, route: Route) -> Callable[[State], Update]:
         def node(s: State) -> Update:
             d = self._tools(route, s)
@@ -218,7 +213,7 @@ class Assistant:
                 return d
             calls = list(r.tool_calls[:MAX_CALLS])
             d.rounds.append([c.model_dump() for c in calls])
-            if route in CACHED and len(d.rounds) == 1:
+            if self._cacheable(route, d) and len(d.rounds) == 1:
                 hit = self._cache().get(route, d.rounds[0], self.today)
                 if hit is not None:
                     d.reply, d.cached = hit
@@ -236,6 +231,12 @@ class Assistant:
                 )
         d.failed = True  # still asking for tools: no reply to check
         return d
+
+    @staticmethod
+    def _cacheable(route: Route, d: Draft) -> bool:
+        return route in CACHED and not any(
+            c["name"] in UNCACHED for r in d.rounds for c in r
+        )
 
     def _run(self, route: Route, call: Any, s: State, d: Draft) -> str:
         try:
@@ -282,7 +283,7 @@ class Assistant:
                 "evidence": sorted({v.evidence_id for v in d.values}),
             }
         # one round only: the key (its tool calls) then holds everything read
-        if route in CACHED and len(d.rounds) == 1 and d.proposal_id is None:
+        if self._cacheable(route, d) and len(d.rounds) == 1 and d.proposal_id is None:
             self._cache().put(route, d.rounds[0], self.today, d.reply, res.evidence_ids)
         return {
             "reply": d.reply,
@@ -296,8 +297,7 @@ class Assistant:
     def compile(self) -> Any:
         g: Any = StateGraph(State)
         g.add_node("router", self.router)
-        g.add_node("plan", self.plan)
-        for r in ("ask", "memory", "correct"):
+        for r in ROUTES:
             g.add_node(r, self.subgraph(r))
         g.add_node("finish", self.finish)
         g.add_node("confirm", self.confirm)

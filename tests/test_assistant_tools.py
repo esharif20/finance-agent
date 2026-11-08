@@ -3,7 +3,7 @@ ways, scoped to `current_user`, and figure-for-figure the dashboard API's."""
 
 import tempfile
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -25,6 +25,7 @@ from finance_agent.assistant.tools import (
     sanitise,
     specs,
 )
+from finance_agent.engine.forecast import cash_flow
 from finance_agent.ledger import Ledger
 from finance_agent.storage import open_db
 from synthetic_banks import revolut_pockets
@@ -69,13 +70,15 @@ def test_each_sub_graph_is_offered_only_its_own_tools() -> None:
         "spending_summary",
         "category_trend",
         "list_subscriptions",
+        "list_insights",
+        "explain_insight",
     }
     assert {s.name for s in specs("correct")} == {
         "find_transactions",
         "propose_correction",
     }
     assert {s.name for s in specs("memory")} == {"list_memories", "propose_memory"}
-    assert specs("plan") == []
+    assert {s.name for s in specs("plan")} == {"forecast_cashflow", "simulate_purchase"}
 
 
 @pytest.mark.parametrize(
@@ -115,7 +118,7 @@ def test_unknown_or_out_of_range_arguments_are_rejected(
 
 
 def test_every_schema_forbids_extra_fields() -> None:
-    for sg in ("ask", "correct", "memory"):
+    for sg in ("ask", "correct", "memory", "plan"):
         for s in specs(sg):
             assert s.parameters.get("additionalProperties") is False
 
@@ -198,6 +201,32 @@ def assert_matches_api(engine: Engine, c: TestClient) -> None:
         )
         for x in want
     ]
+    # #155: Insights after the feed refreshes them, and the Plan tools
+    feed = c.get("/api/insights", params={"limit": 20}).json()
+    ins = call(engine, "ask", "list_insights", limit=20)
+    assert [
+        (r.evidence_id, r.impact.minor, r.confidence_percent) for r in ins.rows
+    ] == [(f"insight:{x['id']}", x["impact_minor"], x["confidence"]) for x in feed]
+    for x in feed:
+        e = call(engine, "ask", "explain_insight", insight_id=x["id"])
+        assert e.insight.transactions == [f"txn:{t}" for t in x["evidence"]][:MAX_ROWS]
+    with engine.begin() as conn:
+        flow = cash_flow(Ledger(conn, ME), date.today(), 3)
+    f = call(engine, "plan", "forecast_cashflow")
+    assert [
+        (r.month, r.money_out.minor, r.low.minor, r.high.minor) for r in f.months
+    ] == [(m.month, m.total.point, m.total.lower, m.total.upper) for m in flow.months]
+    w = c.get("/api/cash-flow/simulate-purchase", params={"amount_minor": 5000})
+    if w.status_code == 404:  # no GBP balance
+        with pytest.raises(NoData):
+            call(engine, "plan", "simulate_purchase", amount_minor=5000)
+    else:
+        sim = call(engine, "plan", "simulate_purchase", amount_minor=5000)
+        api_sim = w.json()
+        assert sim.status == api_sim["status"]
+        assert (sim.have, sim.need) == (api_sim["have"], api_sim["need"])
+        if sim.minimum is not None:
+            assert sim.minimum.minor == api_sim["minimum"]["minor"]
 
 
 def test_tool_figures_equal_the_api_with_another_user_present(

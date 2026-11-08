@@ -3,12 +3,13 @@ tools (docs/AI_DESIGN.md). Every call runs on a Ledger for `current_user`."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 
 from pydantic import BaseModel
 from sqlalchemy import Connection
 
 from finance_agent.assistant.chat_model import ToolCall, ToolSpec
-from finance_agent.assistant.tools import propose, read
+from finance_agent.assistant.tools import insight, plan, propose, read
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.proposals import Proposals
@@ -21,9 +22,11 @@ class Tool:
     name: str
     description: str
     input: type[BaseModel]
-    # read tools take (Reads, input); Proposal tools take (Store, input, Turn)
+    # read tools take (Reads, input); engine tools (Source, input); Proposal
+    # tools (Store, input, Turn)
     fn: Callable[..., BaseModel]
     proposals: bool = False
+    engine: bool = False
 
     def spec(self) -> ToolSpec:
         return ToolSpec(
@@ -62,6 +65,41 @@ TOOLS = {
             read.find_transactions,
         ),
         Tool(
+            "list_insights",
+            "The user's ranked Insights, best first: impact in minor units,"
+            " confidence and txn:<id> evidence. Fill each template's {key} and"
+            " {impact} from its row." + _DATA,
+            insight.ListInsightsIn,
+            insight.list_insights,
+            engine=True,
+        ),
+        Tool(
+            "explain_insight",
+            "One Insight (the number in insight:<id>) with the Transactions"
+            " behind it." + _DATA,
+            insight.ExplainInsightIn,
+            insight.explain_insight,
+            engine=True,
+        ),
+        Tool(
+            "forecast_cashflow",
+            "Money out and recurring money in for the coming months, with an 80%"
+            " band, in minor units. left_out counts Categories with too little"
+            " history to forecast.",
+            plan.ForecastCashflowIn,
+            plan.forecast_cashflow,
+            engine=True,
+        ),
+        Tool(
+            "simulate_purchase",
+            "What a purchase of amount_minor would do to the projected balance"
+            " before the next payday: the lowest balance, when, and the risk."
+            " Nothing is bought, paid or recorded.",
+            plan.SimulatePurchaseIn,
+            plan.simulate_purchase,
+            engine=True,
+        ),
+        Tool(
             "propose_correction",
             "Propose a Correction to one Transaction (txn:<id>): a new Category"
             " [top, sub], a Split into parts, or a purpose note. It changes"
@@ -91,7 +129,14 @@ TOOLS = {
 }
 
 ALLOWLIST: dict[str, tuple[str, ...]] = {
-    "ask": ("spending_summary", "category_trend", "list_subscriptions"),
+    "ask": (
+        "spending_summary",
+        "category_trend",
+        "list_subscriptions",
+        "list_insights",
+        "explain_insight",
+    ),
+    "plan": ("forecast_cashflow", "simulate_purchase"),
     "correct": ("find_transactions", "propose_correction"),
     "memory": ("list_memories", "propose_memory"),
 }
@@ -119,4 +164,7 @@ def run(
             raise ToolNotAllowed(f"{call.name} runs only inside a turn")
         store: propose.Store = Proposals(conn, current_user())
         return tool.fn(store, args, turn)
+    if tool.engine:
+        today = turn.today if turn is not None else date.today()
+        return tool.fn(read.Source(conn, current_user(), today), args)
     return tool.fn(Ledger(conn, current_user()), args)
