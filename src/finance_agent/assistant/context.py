@@ -23,11 +23,12 @@ TOO_LARGE = '{"error": "result too large for this turn"}'
 SYSTEM = {
     "router": (
         "You route a personal-finance question. Reply with exactly one word:"
-        " ask (questions about spending, Categories, trends, Subscriptions),"
+        " ask (questions about spending, Categories, trends, Subscriptions,"
+        " Insights),"
         " correct (fixing a Transaction's Category, splitting it or noting what"
         " it was for), memory (the user states a lasting preference, goal or"
-        " constraint, or asks what you remember), or plan (budgets, what-if,"
-        " saving plans)."
+        " constraint, or asks what you remember), or plan (can I afford a"
+        " purchase, what-if, the cash-flow forecast)."
     ),
     "common": (
         "You are a careful personal-finance assistant on the user's own Mac."
@@ -39,6 +40,11 @@ SYSTEM = {
         " 1234 GBP is £12.34."
     ),
     "ask": "Answer the question using the tools offered.",
+    "plan": (
+        "Check a purchase with simulate_purchase or the coming months with"
+        " forecast_cashflow, and report their figures as they are. You can't"
+        " make payments, transfers or saving plans; say so if asked."
+    ),
     "correct": (
         "Find the Transaction with find_transactions, then propose the change"
         " with propose_correction using its txn:<id> number. Nothing changes"

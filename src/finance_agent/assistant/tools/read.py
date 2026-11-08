@@ -8,11 +8,13 @@ them. When they land, add an opt-in `include_notes` input and a `note: Data`
 field, so notes go through the same sanitiser and never reach the model by
 default."""
 
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import Connection
 
 from finance_agent.assistant.tools.sanitise import sanitise
 from finance_agent.ledger import (
@@ -21,6 +23,7 @@ from finance_agent.ledger import (
     CategoryDetail,
     MonthSummary,
     SubscriptionEntry,
+    Transaction,
     TransactionPage,
 )
 
@@ -58,6 +61,16 @@ class Reads(Protocol):
         limit: int = 100,
         offset: int = 0,
     ) -> TransactionPage: ...
+
+
+@dataclass(frozen=True)
+class Source:
+    """What an engine-backed tool reads from (#155): the user's own data, as of
+    the turn's day. Those tools call engine reads only, never `refresh`."""
+
+    conn: Connection
+    user_id: int
+    today: date
 
 
 class NoData(LookupError):
@@ -276,24 +289,24 @@ class FindTransactionsOut(BaseModel):
     truncated: bool
 
 
+def txn_row(t: Transaction) -> TransactionRow:
+    c = t.categorisation
+    return TransactionRow(
+        evidence_id=f"txn:{t.id}",
+        posted_on=t.posted_on.isoformat(),
+        description=Data(data=t.description),
+        merchant=Data(data=c.merchant) if c and c.merchant else None,
+        amount=_money(t.amount, t.currency),  # its own currency
+        kind=c.kind if c else None,
+        category=list(c.category) if c and c.category else None,
+    )
+
+
 def find_transactions(led: Reads, inp: FindTransactionsIn) -> FindTransactionsOut:
     page = led.search_transactions(
         None, inp.kind, inp.category, inp.month, inp.query, inp.limit
     )
-    rows: list[TransactionRow] = []
-    for t in page.items:
-        c = t.categorisation
-        rows.append(
-            TransactionRow(
-                evidence_id=f"txn:{t.id}",
-                posted_on=t.posted_on.isoformat(),
-                description=Data(data=t.description),
-                merchant=Data(data=c.merchant) if c and c.merchant else None,
-                amount=_money(t.amount, t.currency),  # its own currency
-                kind=c.kind if c else None,
-                category=list(c.category) if c and c.category else None,
-            )
-        )
+    rows = [txn_row(t) for t in page.items]
     return FindTransactionsOut(
         rows=rows, total=page.total, truncated=page.total > len(rows)
     )
