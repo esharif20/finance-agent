@@ -473,3 +473,37 @@ feedback = Table(
     Column("signal", String(16), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
+
+# Assistant graph checkpoints (#139, ADR 0008): LangGraph's saved state per
+# conversation thread, in this encrypted database only. They hold the session's
+# messages and replies, so they live for the session: deleted when the user ends
+# it and purged after a day idle (`secure_delete` zeroes the pages).
+assistant_checkpoint = Table(
+    "assistant_checkpoint",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("thread_id", String(64), primary_key=True),
+    Column("checkpoint_ns", String(255), primary_key=True),
+    Column("checkpoint_id", String(64), primary_key=True),
+    Column("parent_id", String(64)),
+    Column("checkpoint_type", String(32), nullable=False),
+    Column("checkpoint", LargeBinary, nullable=False),
+    Column("metadata_type", String(32), nullable=False),
+    Column("metadata", LargeBinary, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+assistant_checkpoint_write = Table(
+    "assistant_checkpoint_write",
+    metadata,
+    Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
+    Column("thread_id", String(64), primary_key=True),
+    Column("checkpoint_ns", String(255), primary_key=True),
+    Column("checkpoint_id", String(64), primary_key=True),
+    Column("task_id", String(64), primary_key=True),
+    Column("idx", Integer, primary_key=True),
+    Column("channel", String(255), nullable=False),
+    Column("value_type", String(32), nullable=False),
+    Column("value", LargeBinary, nullable=False),
+    Column("task_path", String(255), nullable=False),
+)
