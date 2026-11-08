@@ -139,6 +139,29 @@ def test_wiping_regret_answers_only_wipes_this_users(
         assert list(Regret(conn, 2).answers()) == [theirs]
 
 
+def test_the_general_feedback_wipe_also_wipes_regret_answers(
+    engine: Engine, write_export: Export, client: TestClient
+) -> None:
+    """Verifier (#152): regret answers are feedback, so DATA_POLICY's one
+    feedback wipe (`DELETE /api/feedback`) reaches them, only this user's, and
+    an answer never becomes a Proposal or a Memory."""
+    seed(engine, write_export)
+    seed(engine, write_export, user_id=2)
+    with engine.begin() as conn:
+        theirs = next(
+            t.id for t in Ledger(conn, 2).transactions() if "CAFE" in t.description
+        )
+        Regret(conn, 2).answer(theirs, ON_WEEK, False)
+    (item,) = client.get("/api/briefing", params=ON).json()["regret"]
+    tid = item["transaction_id"]
+    client.post(f"/api/briefing/regret/{tid}", params=ON, json={"worth_it": False})
+    assert client.get("/api/proposals").json()["items"] == []
+    assert client.delete("/api/feedback").status_code == 200
+    with engine.begin() as conn:
+        assert Regret(conn, 1).answers() == {}
+        assert list(Regret(conn, 2).answers()) == [theirs]
+
+
 @pytest.mark.parametrize("bad", ["0", "-1", str(2**63)])
 def test_an_out_of_range_id_is_refused(client: TestClient, bad: str) -> None:
     r = client.post(f"/api/briefing/regret/{bad}", json={"worth_it": True})

@@ -111,3 +111,18 @@ def test_a_constraint_tag_naming_the_subject_filters_it() -> None:
     assert feasible([a, b], subject, ["RENT"]) == [b]
     assert feasible([a, b], subject, ["ren", "mortgages"]) == [a, b]  # whole words
     assert feasible([a, b], subject, []) == [a, b]
+
+
+def test_a_hyphenated_constraint_tag_matches_its_words() -> None:
+    """Verifier (#150): Memory tags are `[a-z][a-z0-9-]*`, so "eating-out" must
+    rule out "Eating out" (all its words present), and "out" alone must not
+    match "outdoor"."""
+    a = Item(1, "category_spike", "Food & Drink / Eating out", 1000, 80)
+    b = Item(2, "category_spike", "Leisure / Outdoor", 900, 80)
+
+    def subject(i: Item) -> str:
+        return i.category
+
+    assert feasible([a, b], subject, ["eating-out"]) == [b]
+    assert feasible([a, b], subject, ["out-eating"]) == [b]  # words, any order
+    assert feasible([a, b], subject, ["eating-in"]) == [a, b]

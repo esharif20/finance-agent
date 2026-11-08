@@ -138,3 +138,21 @@ def test_wiping_feedback_resets_relevance_and_only_this_users(
     assert all(i["relevance"] == {"liked": 0, "disliked": 0} for i in feed)
     with engine.begin() as conn:
         assert Insights(conn, 2).signals() == [("recurring", "Bills / Energy", True)]
+
+
+def test_the_general_feedback_wipe_also_wipes_insight_ratings(
+    engine: Engine, write_export: Export, client: TestClient
+) -> None:
+    """Verifier (#150): DATA_POLICY's one feedback wipe (`DELETE /api/feedback`,
+    which the planned forget command lists) must reach Insight ratings too,
+    and only this user's."""
+    seed(engine, write_export)
+    ids = theirs(engine)
+    with engine.begin() as conn:
+        Insights(conn, 2).give(ids[0], "up")
+    a, *_ = client.get("/api/insights").json()
+    client.post(f"/api/insights/{a['id']}/feedback", json={"liked": False})
+    assert client.delete("/api/feedback").status_code == 200
+    with engine.begin() as conn:
+        assert Insights(conn, 1).signals() == []
+        assert Insights(conn, 2).signals() == [("recurring", "Bills / Energy", True)]
