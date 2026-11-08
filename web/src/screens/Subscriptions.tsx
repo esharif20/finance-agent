@@ -82,7 +82,7 @@ function Flags({ row }: { row: Row }) {
   const trialOpen = row.trial && !row.trial.converted;
   if (!row.flags.length && !trialOpen) return null;
   return (
-    <ul className="mt-2 flex flex-wrap gap-2" aria-label={`Flags for ${row.merchant}`}>
+    <ul className="mt-2 flex flex-wrap gap-2" aria-label={`Flags for ${row.name}`}>
       {row.flags.map((f) => (
         <li key={f.code} className={`${pill} bg-warning text-warning-foreground`}>
           <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
@@ -104,13 +104,13 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
   const fail = (e: Error) => onNote({ text: e.message, bad: true });
   const regroup = useMutation({
     mutationFn: (p: Place) => regroupSubscription(row.merchant_id, p),
-    onSuccess: (_d, p) => onNote({ text: `${row.merchant} moved to ${p.group}.` }),
+    onSuccess: (_d, p) => onNote({ text: `${row.name} moved to ${p.group}.` }),
     onError: fail,
     onSettled: refresh,
   });
   const cancel = useMutation({
     mutationFn: () => cancelSubscription(row.merchant_id),
-    onSuccess: () => onNote({ text: `${row.merchant} marked as cancelled. You'll be alerted if it charges again.` }),
+    onSuccess: () => onNote({ text: `${row.name} marked as cancelled. You'll be alerted if it charges again.` }),
     onError: fail,
     onSettled: refresh,
   });
@@ -118,7 +118,7 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
     mutationFn: () => removeSubscription(row.merchant_id),
     onSuccess: () =>
       onNote({
-        text: `${row.merchant} removed. It's remembered as not a subscription.`,
+        text: `${row.name} removed. It's remembered as not a subscription.`,
         undo: () => addSubscription(row.merchant_id, place).then(refresh),
       }),
     onError: fail,
@@ -137,7 +137,7 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold">{row.merchant}</span>
+            <span className="font-semibold">{row.name}</span>
             <span
               className={`${pill} min-h-6 ${row.status === "overdue" || row.status === "lapsed" ? "bg-warning text-warning-foreground" : "bg-active"}`}
             >
@@ -162,9 +162,9 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
       </div>
       <Flags row={row} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <ManageLink merchant={row.merchant} />
+        <ManageLink merchant={row.merchant} name={row.name} />
         <PlacementSelect
-          label={`Group for ${row.merchant}`}
+          label={`Group for ${row.name}`}
           value={place}
           disabled={busy}
           onChange={(p) => regroup.mutate(p)}
@@ -174,13 +174,13 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
             type="button"
             disabled={busy}
             onClick={() => cancel.mutate()}
-            aria-label={`I cancelled ${row.merchant}`}
+            aria-label={`I cancelled ${row.name}`}
             className={action}
           >
             Cancelled?
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => remove.mutate()} aria-label={`Remove ${row.merchant}`} className={action}>
+        <button type="button" disabled={busy} onClick={() => remove.mutate()} aria-label={`Remove ${row.name}`} className={action}>
           Remove
         </button>
       </div>

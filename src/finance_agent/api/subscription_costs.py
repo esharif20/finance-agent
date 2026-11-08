@@ -16,6 +16,7 @@ from finance_agent.api.subscriptions import (
     SubscriptionOut,
     apply_change,
 )
+from finance_agent.categorise.display_names import display_name
 from finance_agent.categorise.subscriptions import (
     Flag,
     FlagCode,
@@ -47,7 +48,8 @@ class TrialOut(BaseModel):
 
 class CostOut(BaseModel):
     merchant_id: int
-    merchant: str
+    merchant: str  # as stored: Manage links and matching use this
+    display_name: str  # readable, for showing only
     kind: str
     group: str
     status: str  # active, overdue, lapsed, cancelled or suggested
@@ -116,6 +118,7 @@ def subscription_costs(led: Led) -> CostsOut:
             CostOut(
                 merchant_id=c.entry.merchant_id,
                 merchant=c.entry.merchant,
+                display_name=display_name(c.entry.merchant),
                 kind=c.entry.kind or "",
                 group=c.entry.group or "",
                 status=c.status,

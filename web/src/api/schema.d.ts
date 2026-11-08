@@ -1041,6 +1041,8 @@ export interface components {
             cost_note: string | null;
             /** Counted */
             counted: boolean;
+            /** Display Name */
+            display_name: string;
             /** Flags */
             flags: components["schemas"]["FlagOut"][];
             /** Group */
@@ -1504,6 +1506,8 @@ export interface components {
             changed_at: string;
             /** Created At */
             created_at: string;
+            /** Display Name */
+            display_name: string;
             evidence: components["schemas"]["EvidenceOut"];
             /** Group */
             group: string | null;

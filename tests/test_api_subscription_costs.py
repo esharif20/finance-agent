@@ -236,3 +236,16 @@ def test_estimates_and_totals_never_cross_users(
     with engine.begin() as conn:
         (theirs,) = costs(Ledger(conn, 2), date.today()).items
     assert (theirs.interval_source, theirs.monthly) == ("catalogue", 1099)
+
+
+def test_entries_carry_a_readable_name_and_keep_the_raw_one(
+    engine: Engine, client: TestClient, write_export: Export
+) -> None:
+    """The display name is for showing; `merchant` stays as stored."""
+    raw = "SYNTHCO STREAM SUBSCR SYNTHCO STREAM SU"
+    seed_rows(engine, write_export, charges(raw, ["6.99", "6.99"]))
+    (item,) = client.get("/api/subscriptions/costs").json()["items"]
+    (entry,) = client.get("/api/subscriptions").json()
+    assert item["merchant"] == entry["merchant"]
+    assert raw.startswith(item["merchant"].upper()[:14])  # stored text, not cleaned
+    assert item["display_name"] == entry["display_name"] == "Synthco Stream"

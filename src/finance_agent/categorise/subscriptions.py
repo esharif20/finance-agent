@@ -52,6 +52,20 @@ KNOWN_SERVICES: dict[str, tuple[str, str]] = {
     "Deezer": (SUB, "Streaming"),
     "Tidal": (SUB, "Streaming"),
     "Audible": (SUB, "Streaming"),
+    "BritBox": (SUB, "Streaming"),
+    "Discovery Plus": (SUB, "Streaming"),
+    "ITVX": (SUB, "Streaming"),
+    "Crunchyroll": (SUB, "Streaming"),
+    "MUBI": (SUB, "Streaming"),
+    "Kindle Unlimited": (SUB, "Streaming"),
+    "Google Workspace": (SUB, "Software"),
+    "Zoom": (SUB, "Software"),
+    "Slack": (SUB, "Software"),
+    "Grammarly": (SUB, "Software"),
+    "Figma": (SUB, "Software"),
+    "Headspace": (SUB, "Software"),
+    "Perplexity": (SUB, "AI tools"),
+    "Cursor": (SUB, "AI tools"),
     "Microsoft 365": (SUB, "Software"),
     "Adobe": (SUB, "Software"),
     "GitHub": (SUB, "Software"),
@@ -95,7 +109,26 @@ def _key(name: str) -> str:
     return re.sub(r"\.CO(M|\.UK)$", "", " ".join(name.upper().split()))
 
 
-_BY_KEY = {k: n for n in KNOWN_SERVICES for k in (_key(n), _key(n).replace(" ", ""))}
+# Other whole names a known service's charges carry -> its catalogue name
+ALIASES: dict[str, str] = {
+    "Anthropic Claude": "Anthropic",
+    "Claude": "Anthropic",
+    "Claude AI": "Anthropic",
+    "OpenAI ChatGPT": "OpenAI",
+    "ChatGPT Plus": "ChatGPT",
+}
+# How a known service is shown, when not by its catalogue name
+SERVICE_DISPLAY: dict[str, str] = {
+    "Anthropic": "Claude (Anthropic)",
+    "OpenAI": "ChatGPT (OpenAI)",
+    "ChatGPT": "ChatGPT (OpenAI)",
+}
+
+_BY_KEY = {
+    k: ALIASES.get(n, n)
+    for n in (*KNOWN_SERVICES, *ALIASES)
+    for k in (_key(n), _key(n).replace(" ", ""))
+}
 
 
 def known_service(merchant: str) -> tuple[str, str, str] | None:

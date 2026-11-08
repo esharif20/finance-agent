@@ -122,6 +122,19 @@ describe("buildView", () => {
     ]);
   });
 
+  it("shows the API's display name, sorts on it, and keeps the stored name for matching", () => {
+    const e = [entry(1, { merchant: "ZETA SUB ZETA" }), entry(2, { merchant: "BETA" })];
+    const c = [
+      cost(1, { merchant: "ZETA SUB ZETA", display_name: "Alpha Zeta" }),
+      cost(2, { merchant: "BETA" }), // an older server: no display name
+    ];
+    const rows = view(e, c, { sort: "name" }).bands[0]!.rows;
+    expect(rows.map((r) => [r.name, r.merchant])).toEqual([
+      ["Alpha Zeta", "ZETA SUB ZETA"],
+      ["BETA", "BETA"],
+    ]);
+  });
+
   it("gives no flags when the API does not send them yet", () => {
     const r = view([entry(1)], [cost(1)]).bands[0]!.rows[0]!;
     expect([r.flags, r.trial, r.interval_source]).toEqual([[], null, null]);

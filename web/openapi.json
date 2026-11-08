@@ -683,6 +683,10 @@
             "title": "Counted",
             "type": "boolean"
           },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
           "flags": {
             "items": {
               "$ref": "#/components/schemas/FlagOut"
@@ -784,6 +788,7 @@
         "required": [
           "merchant_id",
           "merchant",
+          "display_name",
           "kind",
           "group",
           "status",
@@ -2072,6 +2077,10 @@
             "title": "Created At",
             "type": "string"
           },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
           "evidence": {
             "$ref": "#/components/schemas/EvidenceOut"
           },
@@ -2128,6 +2137,7 @@
         "required": [
           "merchant_id",
           "merchant",
+          "display_name",
           "kind",
           "group",
           "status",

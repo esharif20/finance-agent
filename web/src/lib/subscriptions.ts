@@ -2,7 +2,8 @@ import type { components } from "@/api/schema";
 import type { Money } from "@/lib/money";
 
 type S = components["schemas"];
-export type Entry = S["SubscriptionOut"];
+/** display_name (#210) is optional so an older server still renders: show `merchant` then. */
+export type Entry = Omit<S["SubscriptionOut"], "display_name"> & { display_name?: string };
 export type Kind = "subscription" | "bill";
 
 export type FlagCode = "overlap" | "duplicate" | "charged_after_cancel" | "trial_converted" | "price_rise";
@@ -12,7 +13,7 @@ export type Trial = { started_on: string; converts_on: string; converted: boolea
 export type IntervalSource = NonNullable<S["CostOut"]["interval_source"]>;
 
 // #210's fields are optional too, for the same reason
-type Since210 = "interval_source" | "charge_count" | "next_due_on";
+type Since210 = "interval_source" | "charge_count" | "next_due_on" | "display_name";
 export type CostItem = Omit<S["CostOut"], "flags" | "trial" | Since210> & {
   flags?: Flag[];
   trial?: Trial | null;
@@ -32,7 +33,8 @@ export const KIND_TITLE: Record<Kind, string> = { subscription: "Subscriptions",
 
 export type Row = {
   merchant_id: number;
-  merchant: string;
+  merchant: string; // as stored: Manage links match on it
+  name: string; // what the screen shows
   status: string;
   monthly: Money | null;
   cost_note: string | null;
@@ -66,7 +68,7 @@ const last = <T,>(a: T | null, b: T | null, cmp: (x: T, y: T) => number) =>
   a === null ? (b === null ? 0 : 1) : b === null ? -1 : cmp(a, b);
 const SORTS: Record<Filters["sort"], (a: Row, b: Row) => number> = {
   monthly: (a, b) => last(a.monthly?.minor ?? null, b.monthly?.minor ?? null, (x, y) => y - x),
-  name: (a, b) => a.merchant.localeCompare(b.merchant, "en-GB", { sensitivity: "base" }),
+  name: (a, b) => a.name.localeCompare(b.name, "en-GB", { sensitivity: "base" }),
   due: (a, b) => last(a.next_due_on, b.next_due_on, (x, y) => x.localeCompare(y)),
 };
 
@@ -88,6 +90,7 @@ export function buildView(
     rows.push({
       merchant_id: c.merchant_id,
       merchant: c.merchant,
+      name: c.display_name ?? entry.display_name ?? c.merchant,
       status: c.status,
       monthly: c.monthly,
       cost_note: c.cost_note,

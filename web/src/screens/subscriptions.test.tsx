@@ -141,6 +141,23 @@ describe("Subscriptions screen", () => {
     expect(screen.getByText("Netflix")).toBeInTheDocument();
   });
 
+  it("shows readable names, while Manage links still match the stored name", async () => {
+    const c = costs();
+    c.items[0] = { ...c.items[0]!, merchant: "NETFLIX.COM", display_name: "Netflix (synthetic)" };
+    const before = entries[0]!;
+    entries[0] = { ...before, merchant: "NETFLIX.COM", display_name: "Netflix (synthetic)" };
+    try {
+      serve(c);
+      wrap(<Subscriptions />);
+      expect(await screen.findByText("Netflix (synthetic)")).toBeInTheDocument();
+      expect(screen.queryByText("NETFLIX.COM")).toBeNull();
+      const link = await screen.findByRole("link", { name: /Manage Netflix \(synthetic\)/ });
+      expect(link).toHaveAttribute("href", "https://www.netflix.com/youraccount");
+    } finally {
+      entries[0] = before;
+    }
+  });
+
   it("says when a cost is estimated, and why an entry has none", async () => {
     const c = costs();
     c.items[0] = { ...c.items[0]!, interval_source: "catalogue", next_due_on: "2026-04-01" };
