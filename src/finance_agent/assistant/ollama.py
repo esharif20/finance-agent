@@ -145,9 +145,11 @@ class OllamaChatModel:
         *,
         keep_alive: str = KEEP_ALIVE,
         timeout: float = 120.0,
+        num_ctx: int | None = None,  # the context length; the #143 benchmark sets 8k
         connect: Callable[[], _Connection] | None = None,
     ) -> None:
         self.model = model
+        self._num_ctx = num_ctx
         self._host, self._port = _local_endpoint(base_url)
         self._keep_alive = keep_alive
         self._timeout = timeout
@@ -160,12 +162,14 @@ class OllamaChatModel:
     def _post(
         self, messages: Sequence[Message], tools: Sequence[ToolSpec], stream: bool
     ) -> Generator[_Response]:
-        body = {
+        body: dict[str, Any] = {
             "model": self.model,
             "messages": [_wire(m) for m in messages],
             "stream": stream,
             "keep_alive": self._keep_alive,
         }
+        if self._num_ctx is not None:
+            body["options"] = {"num_ctx": self._num_ctx}
         if tools:
             body["tools"] = [
                 {
