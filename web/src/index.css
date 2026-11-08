@@ -1047,3 +1047,26 @@ html[data-private] .money {
 .bottom-bar.glass {
   background: var(--card);
 }
+
+/* Phones: no backdrop blur on anything that scrolls or sits over scrolling content (iOS Safari
+   re-blurs it every frame), two ambient fields instead of four, and the drift pauses while the
+   page scrolls (useScrollPause sets html[data-scrolling]). */
+@media (max-width: 639px) {
+  .card-glass,
+  .glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .card-glass {
+    background-color: var(--card);
+  }
+  .glass {
+    background: var(--card);
+  }
+  .ambient:not(.lp-amb) i:nth-child(n + 3) {
+    display: none;
+  }
+}
+html[data-scrolling] .ambient i {
+  animation-play-state: paused;
+}

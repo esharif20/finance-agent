@@ -74,7 +74,9 @@ export type CardScene = Awaited<ReturnType<typeof createCardScene>>;
 
 export function createCardScene(canvas: HTMLCanvasElement, perspective: number) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // phones: 1.5x is sharp enough on a small card and draws 44% fewer pixels than the 2x cap
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, coarse ? 1.5 : 2));
   renderer.toneMapping = THREE.NeutralToneMapping; // keeps bank colours true
   renderer.toneMappingExposure = 1;
   const scene = new THREE.Scene();
