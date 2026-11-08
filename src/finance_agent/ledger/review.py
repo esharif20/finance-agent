@@ -454,7 +454,11 @@ ITEM_TYPES: dict[str, ItemType] = {
     )
 }
 
-# (item key -> Merchant id, Merchant id -> its corrected Categories) -> item key
+# Categorisation sources a suggester may learn from besides Corrections: the
+# UK base and rules, and the confident model tier (never `auto-low:`).
+CONFIDENT = ("merchant:", "rule:", "auto:")
+
+# (item key -> Merchant id, Merchant id -> its confident Categories) -> item key
 # -> suggested Categories. Injected by the API so the Ledger never imports
 # `categorise`.
 Suggester = Callable[
@@ -524,7 +528,9 @@ class ReviewQueue:
             if (
                 c is not None
                 and c.merchant_id is not None
-                and c.source == "correction"
+                # confident rows only, never Corrections alone: a few labels in
+                # one Category made every Merchant's nearest label a grocer
+                and (c.source == "correction" or c.source.startswith(CONFIDENT))
                 and c.category is not None
                 and c.category != (UNCATEGORISED, UNCATEGORISED)
             ):

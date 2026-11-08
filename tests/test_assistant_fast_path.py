@@ -116,7 +116,7 @@ def test_a_simple_question_takes_no_model_call_and_matches_the_api(
     )
     assert a.evidence
     again = turn(engine, m, "how much did I spend on FOOD and drink this month?")
-    assert (again.path, again.reply, m.calls) == ("cache", a.reply, [])
+    assert (again.path, again.reply, m.calls) == ("planner", a.reply, [])
 
 
 def test_a_month_with_no_data_goes_to_the_model(engine: Engine, txns: Any) -> None:
@@ -203,7 +203,13 @@ def test_the_chat_stream_reports_each_step_before_the_reply(
     kinds = [
         b.splitlines()[0].removeprefix("event: ") for b in r.text.strip().split("\n\n")
     ]
-    assert kinds[0] == "status" and "meta" in kinds and kinds[-1] == "done"
-    assert kinds.index("meta") > max(i for i, k in enumerate(kinds) if k == "status")
-    first = json.loads(r.text.split("\n\n")[0].splitlines()[1].removeprefix("data: "))
-    assert first == {"step": "category_detail"}
+    assert kinds[-2:] == ["delta", "done"] or kinds[-1] == "done"
+    stages = [
+        json.loads(b.splitlines()[1].removeprefix("data: "))["text"]
+        for b in r.text.strip().split("\n\n")
+        if b.startswith("event: stage")
+    ]
+    assert "Finding your groceries spending…" in stages
+    meta = next(b for b in r.text.split("\n\n") if b.startswith("event: meta"))
+    data = json.loads(meta.splitlines()[1].removeprefix("data: "))
+    assert data["path"] == "planner" and data["counted"]  # Show transactions

@@ -140,5 +140,9 @@ A user-confirmed preference, goal or constraint the Assistant may rely on, with 
 _Avoid_: Profile, belief, fact
 
 **Proposal**:
-A change the Assistant suggests (a Memory or a Correction) that has no effect until the user confirms it.
+A change the Assistant suggests (a Memory, a Correction or a map edge) that has no effect until the user confirms it.
 _Avoid_: Draft, pending change
+
+**Personal map**:
+A small graph of how things in the user's life connect. Its nodes are Merchants, Categories, goal Memories and confirmed life changes. The obvious edges (a Merchant to its Categories, a goal to the Categories its tags name, a life change to its series) are derived on every read; any other edge is a map edge, a `map_edge` Proposal the user confirmed. An edge goes with either of its nodes. It holds no figures.
+_Avoid_: Knowledge graph, entity graph

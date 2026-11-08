@@ -59,7 +59,7 @@ class ProposalOut(BaseModel):
     model_config = _STRICT
     evidence_id: str
     proposal_id: int
-    kind: Literal["memory", "correction"]
+    kind: Literal["memory", "correction", "map_edge"]
     status: Literal["pending"]  # the user confirms or rejects it on a card
 
 

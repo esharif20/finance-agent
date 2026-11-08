@@ -444,7 +444,9 @@ proposal = Table(
     Column("result_id", Integer),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("decided_at", DateTime(timezone=True)),
-    CheckConstraint(text("kind IN ('memory', 'correction')"), name="ck_proposal_kind"),
+    CheckConstraint(
+        text("kind IN ('memory', 'correction', 'map_edge')"), name="ck_proposal_kind"
+    ),
     CheckConstraint(
         text("status IN ('pending', 'confirmed', 'rejected')"),
         name="ck_proposal_status",
@@ -848,4 +850,28 @@ life_change = Table(
     Column("after_minor", BigInteger, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("user_id", "series", "month"),
+)
+
+# Personal map edges (#275): only the ones the Assistant proposed and the user
+# confirmed (the obvious ones are derived on read, `engine.map`). A node is a
+# Merchant, a Category, a goal Memory or a life change, by kind and id; the
+# pair is stored in order (a < b). Triggers (migration 0031) delete an edge
+# with either node, and the edge's emptied Proposal with the edge.
+MAP_KINDS = "('merchant', 'category', 'goal', 'life_change')"
+map_edge = Table(
+    "map_edge",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("user.id"), nullable=False),
+    Column(
+        "proposal_id", Integer, ForeignKey("proposal.id"), nullable=False, unique=True
+    ),
+    Column("a_kind", String(16), nullable=False),
+    Column("a_id", Integer, nullable=False),
+    Column("b_kind", String(16), nullable=False),
+    Column("b_id", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(text(f"a_kind IN {MAP_KINDS}"), name="ck_map_edge_a_kind"),
+    CheckConstraint(text(f"b_kind IN {MAP_KINDS}"), name="ck_map_edge_b_kind"),
+    UniqueConstraint("user_id", "a_kind", "a_id", "b_kind", "b_id"),
 )

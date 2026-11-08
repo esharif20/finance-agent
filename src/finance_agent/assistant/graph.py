@@ -33,6 +33,7 @@ from finance_agent.assistant.chat_model import (
     printed_tool_call,
 )
 from finance_agent.assistant.checkpoints import LedgerSaver
+from finance_agent.assistant.evidence import Evidence, counted
 from finance_agent.assistant.grounding import (
     ToolValue,
     check_grounding,
@@ -49,11 +50,14 @@ from finance_agent.assistant.tools import (
 )
 from finance_agent.assistant.tools.propose import FigureInMemory, NotSaid, ProposalOut
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
+from finance_agent.assistant.tools.read import _category  # pyright: ignore[reportPrivateUsage]
 from finance_agent.assistant.values import tool_values
 from finance_agent.identity import current_user
+from finance_agent.ledger import Ledger
 from finance_agent.ledger.answer_cache import AnswerCache, Hit
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.proposals import Proposals
+from finance_agent.ledger.taxonomy import TAXONOMY
 
 Route = Literal["ask", "plan", "memory", "correct"]
 Path = Literal["cache", "local_model", "deterministic", "planner"]
@@ -116,6 +120,45 @@ def pre_route(message: str) -> Route | None:
     return "ask" if _ASK.search(message) else None
 
 
+ROUTE_STAGE: dict[str, str] = {
+    "ask": "Looking through your ledger…",
+    "plan": "Running the numbers…",
+    "memory": "Noting that down…",
+    "correct": "Finding that transaction…",
+}
+TOOL_STAGE = {
+    "spending_summary": "Adding up your month…",
+    "compare_months": "Comparing your months…",
+    "find_transactions": "Searching your transactions…",
+    "search": "Searching your transactions…",
+    "list_subscriptions": "Checking your subscriptions…",
+    "subscription_advice": "Checking your subscriptions…",
+    "forecast_cashflow": "Forecasting the coming months…",
+    "simulate_purchase": "Checking that purchase against your plan…",
+}
+CHECKING = "Checking every figure…"
+
+
+def tool_stage(name: str, args: dict[str, Any]) -> str:
+    """Progress words for a tool call. A Category is named only when it is a
+    taxonomy name, so no model or bank text is echoed back."""
+    if name in ("category_detail", "spend_for_query", "category_trend"):
+        raw = args.get("category")
+        cats = args.get("categories")
+        if raw is None and isinstance(cats, list) and cats:
+            raw = cast(list[Any], cats)[0]
+        if isinstance(raw, str):
+            top, sub = _category(raw)
+            subs = TAXONOMY.get(top, ())
+            leaf = next(
+                (x for x in subs if sub and x.casefold() == sub.casefold()), None
+            )
+            if top in TAXONOMY and (leaf or not sub):
+                return f"Finding your {(leaf or top).lower()} spending…"
+        return "Finding that spending…"
+    return TOOL_STAGE.get(name, "Checking your ledger…")
+
+
 def _shown(reply: str) -> bool:
     """A reply may reach the user only with no link and no tool call printed as
     text (a failed generation, #143), whatever its figures."""
@@ -168,9 +211,16 @@ class Assistant:
     model: ChatModel
     conn: Connection
     today: date
-    progress: Callable[[str], None] | None = None  # a tool name, or "model"
     prefetch: bool = False  # retrieve-then-generate (the app turns it on)
     saver: LedgerSaver = field(init=False)
+    on_stage: Callable[[str], None] | None = None  # progress words, no data
+    # Transactions behind each spending total this turn, by evidence ID;
+    # shown to the user only, never checkpointed (ADR 0007)
+    counted: dict[str, Evidence] = field(default_factory=dict[str, Evidence])
+
+    def _stage(self, words: str) -> None:
+        if self.on_stage is not None:
+            self.on_stage(words)
 
     # --- nodes ---------------------------------------------------------------
 
@@ -181,6 +231,7 @@ class Assistant:
         ):
             route = "ask"
         if route is not None:
+            self._stage(ROUTE_STAGE[route])
             return {"route": route, "proposal_id": None, "evidence": []}
         try:
             r = self.model.chat(
@@ -193,6 +244,7 @@ class Assistant:
         except (OllamaError, OSError, IndexError):
             word = ""
         route = next((r for r in ROUTES if r == word), "ask")
+        self._stage(ROUTE_STAGE[route])
         return {"route": route, "proposal_id": None, "evidence": []}
 
     def subgraph(self, route: Route) -> Callable[[State], Update]:
@@ -256,15 +308,15 @@ class Assistant:
                 route, s["message"], memories, s.get("history", []), self.today
             )
         )
-        if (hit := self._first_hit(route, s)) is not None:
+        hit = self._first_hit(route, s)
+        if route == "ask" and self.prefetch:
+            self._prefetch(s, d)  # on a hit, re-read only for the Transactions shown
+        if hit is not None:
             d.reply, d.cached = hit
             return d
-        if route == "ask" and self.prefetch:
-            self._prefetch(s, d)
         budget = context.ToolBudget()
         offered = specs(route)
         for _ in range(MAX_ROUNDS):
-            self._say("model")
             try:
                 r = self.model.chat(d.messages, offered)
             except (OllamaError, OSError):
@@ -279,11 +331,14 @@ class Assistant:
                 hit = self._cache().get(route, s["message"], d.rounds[0], self.today)
                 if hit is not None:
                     d.reply, d.cached = hit
+                    for call in calls:  # re-read only for the Transactions shown
+                        self._run(route, call, s, d)
                     return d
             d.messages.append(
                 Message(role="assistant", content=r.content, tool_calls=tuple(calls))
             )
             for call in calls:
+                self._stage(tool_stage(call.name, call.arguments))
                 seen = len(d.values)
                 content = budget.take(self._run(route, call, s, d))
                 if content == context.TOO_LARGE:  # unseen, so not evidence
@@ -300,21 +355,14 @@ class Assistant:
             return None
         return self._cache().get(route, s["message"], FIRST, self.today)
 
-    def _say(self, step: str) -> None:
-        if self.progress is not None:
-            self.progress(step)
-
     def _fast(self, s: State) -> Update | None:
         """A simple spending question with no model call: the planner's one
-        tool call and a template (fast_path), checked like any reply. Cached
-        by that call, as a model's answer to it would be."""
+        tool call and a template (fast_path), checked like any reply. Not
+        cached: the Engine read takes milliseconds and lists the Transactions
+        shown."""
         call = fast_path.parse(s["message"], self.today)
         if call is None:
             return None
-        calls = [call.model_dump()]
-        hit = self._cache().get("ask", s["message"], calls, self.today)
-        if hit is not None:
-            return {"reply": hit.reply, "path": "cache", "evidence": list(hit.evidence)}
         d = Draft()
         out = self._call("ask", call, s, d)
         reply = fast_path.render(out) if out is not None else None
@@ -324,7 +372,6 @@ class Assistant:
         ):
             return None  # no data, or a template slip: the model answers
         evidence = sorted({v.evidence_id for v in d.values})
-        self._cache().put("ask", s["message"], calls, self.today, reply, evidence)
         return {"reply": reply, "path": "planner", "evidence": evidence}
 
     def _prefetch(self, s: State, d: Draft) -> None:
@@ -362,11 +409,13 @@ class Assistant:
 
     def _call(self, route: Route, call: ToolCall, s: State, d: Draft) -> Any:
         """Run a call the graph made itself; None when it gives nothing."""
-        self._say(call.name)
+        self._stage(tool_stage(call.name, call.arguments))
         try:
             out = run(route, call, self.conn, self._turn(s), _plan(s))
         except (ToolNotAllowed, NoData, ValidationError, ValueError):
             return None
+        if (ev := counted(Ledger(self.conn, current_user()), out)) is not None:
+            self.counted[ev.evidence_id] = ev
         d.values += tool_values(call.name, out)
         return out
 
@@ -377,7 +426,6 @@ class Assistant:
         )
 
     def _run(self, route: Route, call: Any, s: State, d: Draft) -> str:
-        self._say(call.name)
         try:
             out = run(route, call, self.conn, self._turn(s), d.plan or _plan(s))
         except ToolNotAllowed:
@@ -400,6 +448,8 @@ class Assistant:
             d.proposal_id = out.proposal_id
         if isinstance(out, SpendForQueryOut):
             d.plan = out.plan
+        if (ev := counted(Ledger(self.conn, current_user()), out)) is not None:
+            self.counted[ev.evidence_id] = ev
         d.values += tool_values(call.name, out)
         return out.model_dump_json()
 
@@ -410,6 +460,7 @@ class Assistant:
             return {"reply": d.refusal, "path": "deterministic"}
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
+        self._stage(CHECKING)
         res = check_grounding(d.reply, d.values, today=self.today)
         ok = res.grounded and _shown(d.reply)
         if not d.failed and not ok:
@@ -439,7 +490,7 @@ class Assistant:
             self._cache().put(
                 route, s["message"], d.rounds[0], self.today, d.reply, res.evidence_ids
             )
-        first = not s.get("history") and len(d.rounds) <= 1  # never multi-round
+        first = not s.get("history") and not d.rounds  # all it read: the prefetch
         if first and self._cacheable(route, d) and d.proposal_id is None:
             self._cache().put(
                 route, s["message"], FIRST, self.today, d.reply, res.evidence_ids
@@ -505,18 +556,21 @@ class Answer:
     path: Path
     evidence: tuple[str, ...]
     proposal_id: int | None  # a confirm card is waiting for this Proposal
+    counted: tuple[Evidence, ...] = ()  # Transactions behind its totals
 
 
-def _answer(thread: str, out: dict[str, Any]) -> Answer:
+def _answer(assistant: Assistant, thread: str, out: dict[str, Any]) -> Answer:
     pending = out.get("__interrupt__") or ()
+    evidence = tuple(out.get("evidence") or ())
     return Answer(
         thread_id=thread,
         turn_id=out.get("turn_id", ""),
         route=out.get("route", "ask"),
         reply=out.get("reply", ""),
         path=out.get("path", "deterministic"),
-        evidence=tuple(out.get("evidence") or ()),
+        evidence=evidence,
         proposal_id=out.get("proposal_id") if pending else None,
+        counted=tuple(assistant.counted[e] for e in evidence if e in assistant.counted),
     )
 
 
@@ -531,7 +585,7 @@ def ask(assistant: Assistant, message: str, thread_id: str | None = None) -> Ans
         },
         thread,
     )
-    return _answer(thread, out)
+    return _answer(assistant, thread, out)
 
 
 def waiting_for(assistant: Assistant, thread_id: str) -> int | None:
@@ -545,4 +599,6 @@ def waiting_for(assistant: Assistant, thread_id: str) -> int | None:
 def resume(
     assistant: Assistant, thread_id: str, decision: Literal["confirm", "reject"]
 ) -> Answer:
-    return _answer(thread_id, assistant.invoke(Command(resume=decision), thread_id))
+    return _answer(
+        assistant, thread_id, assistant.invoke(Command(resume=decision), thread_id)
+    )

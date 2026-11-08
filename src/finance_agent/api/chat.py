@@ -3,14 +3,12 @@ server-sent events, for `current_user` only.
 
 The reply streams only after the grounding check has passed (or the
 deterministic table has replaced it), so no unchecked figure ever reaches the
-screen. Events: `status` while the turn runs ({"step": a tool name, or
-"model"}, so the screen can say what it is looking up), then `meta` (thread,
-which path answered, any confirm card), then `delta` chunks of the reply,
-then `done`. Clients that ignore `status` see the old stream. Bodies are
-parsed here rather than by FastAPI, so a refusal never echoes the user's
-text (#169)."""
+screen. Events: `stage` (progress words while the turn runs, never data),
+`meta` (thread, which path answered, any confirm card, the Transactions
+behind each spending total), then `delta` chunks of the reply, then `done`;
+`error` if the turn failed. Bodies are parsed here rather than
+by FastAPI, so a refusal never echoes the user's text (#169)."""
 
-import contextvars
 import json
 import queue
 import re
@@ -21,7 +19,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import Connection
+from sqlalchemy import Connection, Engine
 
 from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
@@ -84,57 +82,76 @@ def _thread(value: object) -> str:
     return value
 
 
-def _status(step: str) -> str:
-    return f"event: status\ndata: {json.dumps({'step': step})}\n\n"
-
-
-def _live(turn: Callable[[Callable[[str], None]], Answer]) -> StreamingResponse:
-    """Run the turn on a worker and stream `status` events (a tool name, or
-    "model") while it runs, then the checked reply. Waits for the first event
-    here, so an error before any work still fails the request."""
-    q: queue.Queue[tuple[str, Any]] = queue.Queue()
-
-    def work() -> None:
-        try:
-            q.put(("answer", turn(lambda step: q.put(("status", step)))))
-        except BaseException as e:  # noqa: BLE001 - re-raised on the stream
-            q.put(("error", e))
-
-    ctx = contextvars.copy_context()
-    threading.Thread(target=ctx.run, args=(work,), daemon=True).start()
-    first = q.get()
-    if first[0] == "error":
-        raise first[1]
-
-    def events() -> Iterator[str]:
-        kind, value = first
-        while kind == "status":
-            yield _status(value)
-            kind, value = q.get()
-        if kind == "error":
-            raise value
-        yield from _events(value)
-
-    return StreamingResponse(events(), media_type="text/event-stream")
-
-
-def _sse(a: Answer) -> StreamingResponse:
-    return StreamingResponse(_events(a), media_type="text/event-stream")
-
-
-def _events(a: Answer) -> Iterator[str]:
-    meta = {
+def _meta(a: Answer) -> dict[str, Any]:
+    return {
         "thread_id": a.thread_id,
         "turn_id": a.turn_id,
         "route": a.route,
         "path": a.path,
         "evidence": list(a.evidence),
         "proposal_id": a.proposal_id,
+        "counted": [
+            {
+                "evidence_id": e.evidence_id,
+                "total_minor": e.total_minor,
+                "transactions": [
+                    {
+                        "id": t.transaction_id,
+                        "posted_on": t.posted_on.isoformat(),
+                        "merchant": t.merchant,
+                        "amount_minor": t.amount_minor,
+                    }
+                    for t in e.transactions
+                ],
+            }
+            for e in a.counted
+        ],
     }
-    yield f"event: meta\ndata: {json.dumps(meta)}\n\n"
-    for chunk in _WORD.findall(a.reply):
-        yield f"event: delta\ndata: {json.dumps({'text': chunk})}\n\n"
-    yield "event: done\ndata: {}\n\n"
+
+
+def _event(name: str, data: object) -> str:
+    return f"event: {name}\ndata: {json.dumps(data)}\n\n"
+
+
+def _sse(
+    engine: Engine,
+    work: Callable[[Assistant], Answer],
+    make: Callable[[Connection], Assistant],
+) -> StreamingResponse:
+    """Run the turn on its own thread and stream its stages, then the reply.
+    The turn finishes and commits even if the client goes away, so a
+    reloaded screen can still find the conversation."""
+    q: queue.Queue[tuple[str, object]] = queue.Queue()
+
+    def run() -> None:
+        try:
+            with engine.begin() as conn:
+                assistant = make(conn)
+                assistant.on_stage = lambda words: q.put(("stage", words))
+                q.put(("answer", work(assistant)))
+        # anything at all, so the stream never waits forever; its text could
+        # quote data, so it is never logged
+        except BaseException:  # noqa: BLE001
+            q.put(("error", None))
+
+    threading.Thread(target=run, daemon=True).start()
+
+    def events() -> Iterator[str]:
+        while True:
+            kind, item = q.get()
+            if kind == "stage":
+                yield _event("stage", {"text": item})
+            elif kind == "error":
+                yield _event("error", {})
+                return
+            elif isinstance(item, Answer):
+                yield _event("meta", _meta(item))
+                for chunk in _WORD.findall(item.reply):
+                    yield _event("delta", {"text": chunk})
+                yield _event("done", {})
+                return
+
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 @router.post("")
@@ -146,20 +163,18 @@ def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingRes
         raise HTTPException(422, f"message is text of 1 to {MESSAGE_MAX} characters")
     if set(body) - {"message", "thread_id"}:
         raise HTTPException(422, "only message and thread_id are accepted")
-    engine = request.app.state.engine
+    engine: Engine = request.app.state.engine
     with engine.begin() as conn:
         convo = Conversations(conn, current_user())
         convo.purge_idle(datetime.now(UTC) - IDLE)
         thread = body.get("thread_id")
         if thread is not None and not convo.has_thread(_thread(thread)):
             raise HTTPException(404, "no such conversation")
-
-    def turn(progress: Callable[[str], None]) -> Answer:
-        with engine.begin() as conn:
-            assistant = Assistant(model, conn, day, progress, prefetch=True)
-            return ask(assistant, message, thread)
-
-    return _live(turn)
+    return _sse(
+        engine,
+        lambda a: ask(a, message, thread),
+        lambda conn: Assistant(model, conn, day, prefetch=True),
+    )
 
 
 @router.get("/model")
@@ -210,14 +225,17 @@ def decide(
     if decision not in ("confirm", "reject") or set(body) != {"decision"}:
         raise HTTPException(422, "decision is confirm or reject")
     thread = _thread(thread_id)
-    with request.app.state.engine.begin() as conn:
+    engine: Engine = request.app.state.engine
+    with engine.begin() as conn:
         if not Conversations(conn, current_user()).has_thread(thread):
             raise HTTPException(404, "no such conversation")
-        assistant = Assistant(model, conn, day)
-        if waiting_for(assistant, thread) is None:
+        if waiting_for(Assistant(model, conn, day), thread) is None:
             raise HTTPException(409, "nothing is waiting for confirmation")
-        answer = resume(assistant, thread, decision)
-    return _sse(answer)
+    return _sse(
+        engine,
+        lambda a: resume(a, thread, decision),
+        lambda conn: Assistant(model, conn, day),
+    )
 
 
 @router.delete("/{thread_id}")

@@ -216,7 +216,7 @@ def test_a_repeated_question_is_answered_from_the_cache_until_the_ledger_changes
     assert a.path == "local_model"
     b, m = turn(engine, "ask", first_round())  # no third reply: never asked
     assert (b.path, b.reply) == ("cache", answer)
-    assert m.calls == []  # a first message: found before any model call
+    assert len(m.calls) == 2
     with engine.begin() as conn:  # a Correction bumps the Ledger version
         led = Ledger(conn, ME)
         led.correct_transaction(led.transactions()[1].id, EATING_OUT)

@@ -1942,6 +1942,11 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** MapEdgeCardOut */
+        MapEdgeCardOut: {
+            a: components["schemas"]["NodeOut"];
+            b: components["schemas"]["NodeOut"];
+        };
         /** MemoriesOut */
         MemoriesOut: {
             /** Items */
@@ -2050,6 +2055,16 @@ export interface components {
             /** Month */
             month: string;
         };
+        /** NodeOut */
+        NodeOut: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "merchant" | "category" | "goal" | "life_change";
+        };
         /** NoteIn */
         NoteIn: {
             /** Text */
@@ -2132,9 +2147,10 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "memory" | "correction";
+            kind: "memory" | "correction" | "map_edge";
             /** Ledger Version */
             ledger_version: number;
+            map_edge?: components["schemas"]["MapEdgeCardOut"] | null;
             memory: components["schemas"]["MemoryCardOut"] | null;
             /** Result Id */
             result_id: number | null;

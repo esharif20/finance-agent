@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import Connection
 
-from finance_agent.categorise import auto, embedding
+from finance_agent.categorise import auto
 from finance_agent.categorise.display_names import display_name
 from finance_agent.engine.baselines import Insufficient
 from finance_agent.engine.changepoint import detect_changes
@@ -98,9 +98,7 @@ def _make(conn: Connection, user: int) -> ReviewQueue:
     return ReviewQueue(
         conn,
         user,
-        suggester=lambda targets, labelled: embedding.suggest(
-            conn, user, targets, labelled
-        ),
+        suggester=lambda targets, labelled: auto.suggest(conn, user, targets, labelled),
         detector=detected,
     )
 
