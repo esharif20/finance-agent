@@ -18,8 +18,9 @@ Results are document ids with a 60-character sanitised snippet, quoted as data
 (`Snippet`), never instructions. The query and results are never logged.
 """
 
+import importlib
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from fractions import Fraction
@@ -27,7 +28,6 @@ from typing import Literal
 
 from sqlalchemy import Connection
 
-from finance_agent.assistant.tools.sanitise import sanitise
 from finance_agent.categorise.embedding import (
     Embedder,
     EmbeddingUnavailable,
@@ -35,6 +35,14 @@ from finance_agent.categorise.embedding import (
     stored_model,
 )
 from finance_agent.ledger import search_index as ix
+
+# shortcut: main moved the sanitiser to finance_agent.sanitise while m6 still has
+# it under the Assistant; import `finance_agent.sanitise` directly once m6 has main.
+try:
+    _sanitiser = importlib.import_module("finance_agent.sanitise")
+except ModuleNotFoundError:
+    _sanitiser = importlib.import_module("finance_agent.assistant.tools.sanitise")
+sanitise: Callable[[str], str] = _sanitiser.sanitise
 
 K = 60  # the usual RRF constant (Cormack et al. 2009)
 DEPTH = 50  # candidates taken from each list
