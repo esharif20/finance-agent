@@ -1,13 +1,61 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { fetchMerchants, setAlwaysAsk } from "@/api/client";
+import { type AssistantModel, fetchAssistantModel, fetchMerchants, setAlwaysAsk, setAssistantModel } from "@/api/client";
 import { MERCHANTS_KEY, Switch } from "@/components/AlwaysAskToggle";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** The Merchants the Shortcut asks about, one per line, as the Wallet automation's filter takes them. */
 export const shortcutList = (names: string[]) => names.join("\n");
+
+const MODEL_KEY = ["assistant-model"];
+const MODELS: { value: AssistantModel; label: string; hint: string }[] = [
+  { value: "fast", label: "Faster", hint: "About twice as quick, but more answers fall back to a plain table. Uses about 5 GB of memory." },
+  { value: "careful", label: "More careful", hint: "The default. Slower, and better at sticking to the figures. Uses about 7 GB." },
+];
+
+/** Which local model the Assistant runs. Changing it unloads the old one. */
+function AssistantCard() {
+  const client = useQueryClient();
+  const model = useQuery({ queryKey: MODEL_KEY, queryFn: fetchAssistantModel });
+  const set = useMutation({
+    mutationFn: setAssistantModel,
+    onSuccess: (r) => client.setQueryData(MODEL_KEY, r.model),
+  });
+  if (!model.isSuccess) return null;
+  return (
+    <Card aria-labelledby="assistant-title" className="flex flex-col gap-4">
+      <CardHeader className="mb-0">
+        <CardTitle id="assistant-title">Assistant</CardTitle>
+      </CardHeader>
+      <fieldset className="flex flex-col gap-2" disabled={set.isPending}>
+        <legend className="mb-2 text-muted-foreground">The model runs on this Mac. Pick speed or care.</legend>
+        {MODELS.map((m) => (
+          <label key={m.value} className="flex min-h-14 cursor-pointer items-start gap-3 rounded-[14px] bg-raised p-4 has-[:checked]:ring-2 has-[:checked]:ring-primary">
+            <input
+              type="radio"
+              name="assistant-model"
+              value={m.value}
+              checked={model.data === m.value}
+              onChange={() => set.mutate(m.value)}
+              className="mt-1 size-4 accent-[var(--primary)]"
+            />
+            <span className="flex flex-col">
+              <span className="font-semibold">{m.label}</span>
+              <span className="text-sm text-muted-foreground">{m.hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {set.error && (
+        <p role="alert" className="text-sm">
+          Couldn't change the model. Try again in a moment.
+        </p>
+      )}
+    </Card>
+  );
+}
 
 export function Settings() {
   const client = useQueryClient();
@@ -34,6 +82,7 @@ export function Settings() {
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+      <AssistantCard />
       <Card aria-labelledby="always-ask-title" className="flex flex-col gap-5">
         <CardHeader className="mb-0">
           <CardTitle id="always-ask-title">Always ask</CardTitle>

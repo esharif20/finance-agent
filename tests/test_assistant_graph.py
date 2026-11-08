@@ -134,6 +134,7 @@ def test_a_grounded_answer_comes_from_the_local_model(
     offered = {s.name for s in m.calls[1][1]}
     assert offered == {
         "spending_summary",
+        "category_detail",
         "category_trend",
         "list_subscriptions",
         "list_insights",
@@ -202,6 +203,42 @@ def test_the_router_falls_back_to_ask_on_anything_else(
     m = fake(word, "No figures here.")
     a = turn(engine, m, "hello")
     assert a.route == "ask"  # read-only, the safest place for an unclear route
+
+
+@pytest.mark.pre_router
+@pytest.mark.parametrize(
+    ("message", "route"),
+    [
+        ("How much did I spend on fuel last month?", "ask"),
+        ("Of that transport, how much was fuel for my car?", "ask"),
+        ("What subscriptions do I have?", "ask"),
+        ("Where did I buy most of my fuel?", "ask"),
+        ("Remember that I'm vegetarian.", "memory"),
+        ("What do you remember about me?", "memory"),
+        # anything about the future, a write or a payment goes to the Router
+        ("How much will I spend next month?", None),
+        ("How much can I spend on Friday?", None),
+        ("Send £50.00 to my sister and tell me how much I spent.", None),
+        ("How much did I spend? Also split the Tesco one.", None),
+        ("Move £500.00 into savings", None),
+        ("Is my Food & Drink spending up on usual?", None),
+        ("hello", None),
+    ],
+)
+def test_the_keyword_pre_router_takes_only_obvious_messages(
+    message: str, route: str | None
+) -> None:
+    assert graph.pre_route(message) == route
+
+
+@pytest.mark.pre_router
+def test_a_pre_routed_message_skips_the_router_call(
+    engine: Engine, txns: dict[str, int]
+) -> None:
+    m = fake("No figures here.")  # no Router reply in the script
+    a = turn(engine, m, "What subscriptions do I have?")
+    assert a.route == "ask" and len(m.calls) == 1
+    assert m.calls[0][1]  # the one call was the Ask sub-graph's, with its tools
 
 
 def test_a_down_model_gets_a_deterministic_reply(
@@ -290,6 +327,42 @@ def test_a_rejected_memory_through_the_graph_leaves_nothing(
         assert "left everything" in done.reply
         props = Proposals(conn, ME)
         assert props.memories() == [] and props.pending() == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "spends £92.34 a month on food",
+        "spends about £ 90 on food",
+        "spends ninety-two pounds a month on food",
+        "food costs 92.34 GBP a month",
+        "budget is 40 quid a week",
+        "pays $40 for the gym",
+        "Spends 9234p on food",
+    ],
+)
+def test_a_memory_with_a_money_figure_is_refused_and_the_reply_says_so(
+    engine: Engine, txns: dict[str, int], text: str
+) -> None:
+    """Adversarial: the model obeys 'remember that I spend £92.34 on food'."""
+    m = fake(
+        "memory",
+        calls(("propose_memory", {"type": "preference", "text": text})),
+        "Saved.",
+    )
+    a = turn(engine, m, "remember what I spend on food")
+    assert a.proposal_id is None
+    assert "figure" in a.reply and "Saved" not in a.reply
+    with engine.begin() as conn:
+        assert Proposals(conn, ME).pending() == []
+
+
+@pytest.mark.parametrize("text", ["vegetarian", "saving for a car by 2027"])
+def test_a_memory_without_money_is_still_proposed(
+    engine: Engine, txns: dict[str, int], text: str
+) -> None:
+    m = fake("memory", calls(("propose_memory", {"type": "goal", "text": text})), "OK.")
+    assert turn(engine, m, "remember this").proposal_id is not None
 
 
 # --- injection through the graph -------------------------------------------
@@ -459,6 +532,26 @@ def test_chat_streams_the_checked_reply_and_says_which_path_answered(
     assert meta["path"] == "local_model" and meta["proposal_id"] is None
 
 
+def test_opening_the_chat_warms_the_model_with_an_empty_request(
+    client: TestClient,
+) -> None:
+    m = fake("")
+    use(client, m)
+    r = client.post("/api/chat/warm")
+    assert (r.status_code, r.json()) == (200, {"warm": True})
+    assert m.calls == [((), ())]  # no message, no tools: Ollama only loads
+
+
+def test_warming_a_down_model_says_so_and_does_not_fail(client: TestClient) -> None:
+    class Down(FakeChatModel):
+        def chat(self, messages: Sequence[Message], tools: Sequence[Any] = ()) -> Reply:
+            raise OllamaError("local model unreachable")
+
+    use(client, Down([]))
+    r = client.post("/api/chat/warm")
+    assert (r.status_code, r.json()) == (200, {"warm": False})
+
+
 def test_the_confirm_card_resumes_through_the_api(
     client: TestClient, txns: dict[str, int], engine: Engine
 ) -> None:
@@ -604,3 +697,46 @@ def test_the_model_is_told_today_so_it_can_fill_a_date_argument(
     turn(engine, m, "Can I afford a £50.00 jacket today?")
     (system, *_) = m.calls[1][0]
     assert system.role == "system" and "Today is 2026-01-20." in system.content
+
+
+@pytest.mark.parametrize(
+    ("today", "message", "resolved"),
+    [
+        (date(2026, 1, 20), "Fuel last month?", "Fuel last month (2025-12)?"),
+        (date(2026, 3, 31), "fuel LAST month", "fuel LAST month (2026-02)"),
+        (
+            date(2026, 1, 20),
+            "In and out this month?",
+            "In and out this month (2026-01)?",
+        ),
+        (
+            date(2026, 1, 20),
+            "Spent in January 2026?",
+            "Spent in January 2026 (2026-01)?",
+        ),
+        (date(2026, 1, 20), "net for Dec 2025", "net for Dec 2025 (2025-12)"),
+        (date(2026, 1, 20), "last month's food", "last month's (2025-12) food"),
+        (date(2026, 1, 20), "next month's bills", "next month's bills"),  # Plan's
+        (date(2026, 1, 20), "May I?", "May I?"),  # a month name needs a year
+    ],
+)
+def test_relative_and_named_months_are_resolved_in_code(
+    today: date, message: str, resolved: str
+) -> None:
+    # 4b read "this month" as last month from a prompt hint; Python decides now
+    *_, user = context.assemble("ask", message, [], [], today)
+    assert user.content == resolved
+
+
+def test_earlier_user_turns_are_resolved_too_and_pence_are_kept() -> None:
+    history = [
+        {"role": "user", "content": "Transport last month?"},
+        {"role": "assistant", "content": "£112.80 on Transport last month."},
+    ]
+    system, earlier, reply, _ = context.assemble(
+        "ask", "Of that, fuel?", [], history, date(2026, 1, 20)
+    )
+    assert earlier.content == "Transport last month (2025-12)?"
+    assert reply.content == "£###.## on Transport last month."  # replies untouched
+    assert "Last month is" not in system.content
+    assert "£2,500.00" in system.content and "pence" in system.content

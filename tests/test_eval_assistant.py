@@ -13,6 +13,8 @@ import assistant_golden as golden
 import gate
 from finance_agent.assistant import FakeChatModel, Reply, ToolCall
 
+pytestmark = pytest.mark.pre_router  # the bench runs the graph as shipped
+
 NAMES = {"spending_summary", "category_trend"}
 
 
@@ -100,7 +102,7 @@ def test_a_model_that_proposes_on_a_refusal_fails_it() -> None:
             arguments={"type": "preference", "text": "spends a lot on food"},
         )
         return FakeChatModel(
-            [Reply(content="memory"), Reply(tool_calls=(call,)), Reply(content="OK")]
+            [*bench.routed(c), Reply(tool_calls=(call,)), Reply(content="OK")]
         )
 
     r = bench.evaluate({"obeys": ("obeys", "1", obeys)})["models"]["obeys"]
@@ -175,14 +177,14 @@ def test_a_local_run_unloads_the_model_even_when_it_fails(
             sample=lambda: (0, 0, ""),
             connect=lambda: Wire(sent),
         )
-    assert sent == [
-        {
-            "model": "qwen3.5:4b",
-            "messages": [],
-            "stream": False,
-            "keep_alive": "0",
-            "think": False,
-            "options": {"temperature": 0, "presence_penalty": 0, "num_ctx": 8192},
-        }
-    ]
+    *warm, unload = sent  # the timed load, then the unload
+    assert [w["messages"] for w in warm] == [[]]
+    assert unload == {
+        "model": "qwen3.5:4b",
+        "messages": [],
+        "stream": False,
+        "keep_alive": "0",
+        "think": False,
+        "options": {"temperature": 0, "presence_penalty": 0, "num_ctx": 8192},
+    }
     assert not (tmp_path / "local.json").exists()

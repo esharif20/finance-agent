@@ -26,9 +26,11 @@ from finance_agent.ledger import (
     Transaction,
     TransactionPage,
 )
+from finance_agent.ledger.taxonomy import TAXONOMY
 from finance_agent.sanitise import sanitise
 
 MAX_ROWS = 20
+TOP_MERCHANTS = 5  # as the Category drill-down shows
 _STRICT = ConfigDict(extra="forbid", frozen=True)
 Month = Annotated[str, Field(pattern=r"^\d{4}-\d{2}$")]
 # Field descriptions are the only part of a tool the model reads besides its name
@@ -222,6 +224,109 @@ def category_trend(led: Reads, inp: CategoryTrendIn) -> CategoryTrendOut:
         total=_money(d.total),
         points=rows[-MAX_ROWS:],
         truncated=len(rows) > MAX_ROWS,
+    )
+
+
+# --- category_detail -------------------------------------------------------
+
+
+class CategoryDetailIn(BaseModel):
+    model_config = _STRICT
+    category: str = Field(
+        min_length=1,
+        max_length=60,
+        description="a top-level Category (Transport), a Subcategory as"
+        ' "Top > Sub" (Transport > Fuel) or a Subcategory alone (Fuel)',
+    )
+    month: Month | None = Field(
+        default=None, description="YYYY-MM; default the latest month"
+    )
+
+
+class SpendRow(BaseModel):
+    model_config = _STRICT
+    evidence_id: str
+    name: str
+    amount: Money  # spending after refunds
+
+
+class MerchantRow(BaseModel):
+    model_config = _STRICT
+    evidence_id: str
+    merchant: Data
+    amount: Money
+
+
+class CategoryDetailOut(BaseModel):
+    model_config = _STRICT
+    evidence_id: str
+    category: str  # "Top" or "Top > Sub"
+    month: str
+    total: Money
+    subcategories: list[SpendRow]  # empty when a Subcategory was asked for
+    merchants: list[MerchantRow]  # largest first
+    truncated: bool
+
+
+def _category(name: str) -> tuple[str, str | None]:
+    """(top, sub or None) for a Category the model named; unknown names pass
+    through as a top level (the Ledger then finds nothing)."""
+    top_in, _, sub_in = (p.strip() for p in name.replace("/", ">").partition(">"))
+    for top in TAXONOMY:
+        if top.casefold() == top_in.casefold():
+            return top, sub_in or None
+    if not sub_in:  # a Subcategory alone, e.g. "Fuel"
+        for top, subs in TAXONOMY.items():
+            for s in subs:
+                if s.casefold() == top_in.casefold():
+                    return top, s
+    # e.g. "To review", which the taxonomy doesn't list
+    return top_in, sub_in or None
+
+
+def category_detail(led: Reads, inp: CategoryDetailIn) -> CategoryDetailOut:
+    m = _month(led, inp.month)
+    top, sub = _category(inp.category)
+    if top not in TAXONOMY:  # e.g. "to review": the month's own name for it
+        names = (c.name for c in led.category_breakdown(m).categories)
+        top = next((n for n in names if n.casefold() == top.casefold()), top)
+    # one more than the drill-down shows, so `truncated` can say there are more
+    d = led.category_detail(top, m, trend=1, top_merchants=TOP_MERCHANTS + 1)
+    if d is None:
+        raise NoData("no spending in that Category that month")
+    if sub is None:
+        name, total, subs, merchants = d.name, d.total, d.subcategories, d.merchants
+    else:
+        want = sub.casefold()
+        s = next((s for s in d.subcategories if s.name.casefold() == want), None)
+        if s is None:
+            raise NoData("no spending in that Subcategory that month")
+        name, total, subs, merchants = f"{d.name} > {s.name}", s.amount, (), s.children
+    rows = [
+        MerchantRow(
+            # never the name in an ID: it is bank text
+            evidence_id=f"merchant:{m}:{name}:{x.merchant_id or f'unknown{i}'}",
+            merchant=Data(data=display_name(x.name)),
+            amount=_money(x.amount),
+        )
+        for i, x in enumerate(merchants)
+    ]
+    return CategoryDetailOut(
+        # a top level shares category_trend's ID: the same drill-down total
+        evidence_id=f"detail:{m}:{name}",
+        category=name,
+        month=m,
+        total=_money(total),
+        subcategories=[
+            SpendRow(
+                evidence_id=f"detail:{m}:{d.name} > {x.name}",
+                name=x.name,
+                amount=_money(x.amount),
+            )
+            for x in subs
+        ],
+        merchants=rows[:TOP_MERCHANTS],
+        truncated=len(rows) > TOP_MERCHANTS,
     )
 
 

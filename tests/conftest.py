@@ -42,6 +42,21 @@ def _no_real_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _model_router_unless_marked(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Scripted graph tests start with the Router's reply, so the keyword
+    pre-router is off unless a test is marked `pre_router`."""
+    if request.node.get_closest_marker("pre_router") is None:
+        from finance_agent.assistant import graph
+
+        def model_router(_message: str) -> None:
+            return None
+
+        monkeypatch.setattr(graph, "pre_route", model_router)
+
+
+@pytest.fixture(autouse=True)
 def _no_real_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
     """A test never pops a macOS notification; one that wants them records."""
     from finance_agent import notify

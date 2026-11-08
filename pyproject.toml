@@ -39,7 +39,10 @@ packages = ["src/finance_agent"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts", "evals"]
-markers = ["real_ollama: talks to the real local Ollama; runs only with FA_REAL_OLLAMA=1"]
+markers = [
+    "real_ollama: talks to the real local Ollama; runs only with FA_REAL_OLLAMA=1",
+    "pre_router: the Assistant's keyword pre-router is on (off elsewhere, so a script's first reply is the Router's)",
+]
 
 [tool.ruff]
 src = ["src", "tests", "scripts", "evals"]

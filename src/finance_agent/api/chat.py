@@ -15,11 +15,14 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import Connection
 
-from finance_agent.assistant import ChatModel, OllamaChatModel
+from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
+from finance_agent.assistant.ollama import DEFAULT_CHOICE, MODELS
 from finance_agent.identity import current_user
 from finance_agent.ledger.conversation import Conversations
+from finance_agent.ledger.settings import CHOICES, Choice, Settings
 
 MESSAGE_MAX = 2000
 IDLE = timedelta(days=1)  # a conversation lasts one session (DATA_POLICY)
@@ -29,8 +32,23 @@ _WORD = re.compile(r"\S+\s*|\s+")
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
-def chat_model() -> ChatModel:
-    return OllamaChatModel()
+def model_for(conn: Connection) -> OllamaChatModel:
+    """The model the user chose in Settings, or the default."""
+    choice = Settings(conn, current_user()).assistant_model() or DEFAULT_CHOICE
+    return OllamaChatModel(MODELS[choice])
+
+
+def unload(model: str) -> None:
+    """Ask Ollama to drop `model` now (an empty chat with keep_alive 0)."""
+    try:
+        OllamaChatModel(model, keep_alive="0").chat([])
+    except (OllamaError, OSError):
+        pass  # not loaded, or Ollama is off: it unloads itself when idle
+
+
+def chat_model(request: Request) -> ChatModel:
+    with request.app.state.engine.connect() as conn:
+        return model_for(conn)
 
 
 def today() -> date:
@@ -95,6 +113,41 @@ def chat(request: Request, body: Body, model: Model, day: Today) -> StreamingRes
             raise HTTPException(404, "no such conversation")
         answer = ask(Assistant(model, conn, day), message, thread)
     return _sse(answer)
+
+
+@router.get("/model")
+def get_model(request: Request) -> dict[str, Choice]:
+    """Settings' Assistant model: "fast" (Faster) or "careful" (More careful)."""
+    with request.app.state.engine.connect() as conn:
+        return {
+            "model": Settings(conn, current_user()).assistant_model() or DEFAULT_CHOICE
+        }
+
+
+@router.put("/model")
+def set_model(request: Request, body: Body) -> dict[str, Choice]:
+    """Change it; the old model is unloaded so two never sit in memory."""
+    choice = body.get("model")
+    if set(body) != {"model"} or choice not in CHOICES:
+        raise HTTPException(422, "model is fast or careful")
+    with request.app.state.engine.begin() as conn:
+        s = Settings(conn, current_user())
+        old = s.assistant_model() or DEFAULT_CHOICE
+        s.set_assistant_model(choice)
+    if old != choice:
+        unload(MODELS[old])
+    return {"model": choice}
+
+
+@router.post("/warm")
+def warm(model: Model) -> dict[str, bool]:
+    """Load the model while the chat screen opens, so the first turn doesn't
+    wait for it. An empty chat only loads; it stays for the keep_alive."""
+    try:
+        model.chat([])
+    except (OllamaError, OSError):
+        return {"warm": False}
+    return {"warm": True}
 
 
 @router.post("/{thread_id}/resume")

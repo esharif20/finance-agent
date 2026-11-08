@@ -38,6 +38,15 @@ const ask = async (q = "Groceries?") => {
 };
 
 describe("Assistant", () => {
+  it("warms the local model once when the chat opens, without waiting on it", () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal("navigator", { ...navigator, sendBeacon: beacon });
+    ui();
+    expect(beacon).toHaveBeenCalledTimes(1);
+    expect(beacon).toHaveBeenCalledWith("/api/chat/warm");
+    expect(fetchMock).not.toHaveBeenCalled(); // the first turn's fetch stays the first
+  });
+
   it("streams a reply, labels the path and wraps figures for Hide amounts", async () => {
     fetchMock.mockResolvedValueOnce(stream({ path: "cache", proposal_id: null }, "You spent £42.50 on Groceries."));
     ui();
