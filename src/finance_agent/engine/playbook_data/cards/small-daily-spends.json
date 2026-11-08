@@ -1,0 +1,29 @@
+{
+  "id": "small-daily-spends",
+  "version": 1,
+  "topic": "small_daily_spends",
+  "principles": [
+    "Small treats are fine; the aim is to choose them, not drift into them.",
+    "Pick the ones you would miss most and let the rest go.",
+    "Look at the month's total, not the single purchase."
+  ],
+  "when": {
+    "all": [
+      {
+        "signal": "everyday_spend_last_month",
+        "op": ">=",
+        "value": 17000
+      }
+    ]
+  },
+  "variants": {
+    "gentle": {
+      "title": "Little treats add up",
+      "body": "Coffee, takeaways and eating out came to {everyday_spend_last_month} last month. None of it is wrong, but it is worth deciding which of those you really enjoy and which just happened."
+    },
+    "blunt": {
+      "title": "Everyday spending is {everyday_spend_last_month} a month",
+      "body": "You spent {everyday_spend_last_month} on coffee, takeaways and eating out last month. Pick the ones you would actually miss and cut the rest this week."
+    }
+  }
+}
