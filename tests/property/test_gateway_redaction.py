@@ -207,7 +207,8 @@ def test_ordinary_questions_do_not_fail_closed(
     )
     payload, placeholders = redact(question, facts)
     assert len(placeholders.placeholders()) >= len({_words(n) for n in names})
-    if any(ch.isalpha() for n in names for ch in _words(n)):
+    # a name with a digit may be cut as a figure ("-0A" -> "#"): safe either way
+    if any(_words(n).replace(" ", "").isalpha() for n in names):
         assert "{M" in payload.question
 
 
