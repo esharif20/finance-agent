@@ -86,6 +86,11 @@ describe("weekly briefing", () => {
     expect(JSON.parse(post?.body ?? "{}")).toEqual({ pair_id: 1, choice: "category:2" });
   });
 
+  it("links to the month's story", async () => {
+    render(<App />);
+    expect(await screen.findByRole("link", { name: "Your month" })).toHaveAttribute("href", "#story");
+  });
+
   it("skip records nothing", async () => {
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Skip" }));

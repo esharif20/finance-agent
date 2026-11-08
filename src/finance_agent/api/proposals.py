@@ -26,6 +26,7 @@ from finance_agent.ledger.proposals import (
     CategoryChange,
     CorrectionDraft,
     InvalidProposal,
+    MapEdgeDraft,
     MemoryDraft,
     Proposal,
     Proposals,
@@ -65,15 +66,26 @@ class CorrectionCardOut(BaseModel):
     part: int | None
 
 
+class NodeOut(BaseModel):
+    kind: Literal["merchant", "category", "goal", "life_change"]
+    id: int
+
+
+class MapEdgeCardOut(BaseModel):
+    a: NodeOut
+    b: NodeOut
+
+
 class ProposalOut(BaseModel):
     id: int
-    kind: Literal["memory", "correction"]
+    kind: Literal["memory", "correction", "map_edge"]
     status: Literal["pending", "confirmed", "rejected"]
     created_at: datetime
     decided_at: datetime | None
     result_id: int | None
     memory: MemoryCardOut | None  # only while pending
     correction: CorrectionCardOut | None  # only while pending
+    map_edge: MapEdgeCardOut | None = None  # only while pending (#275)
     ledger_version: int
 
 
@@ -128,8 +140,12 @@ def _call[T](f: Callable[[], T]) -> T:
 
 
 def _card(led: Ledger, p: Proposal) -> ProposalOut:
-    memory = correction = None
+    memory = correction = edge = None
     d = p.draft
+    if isinstance(d, MapEdgeDraft):
+        edge = MapEdgeCardOut(
+            a=NodeOut(kind=d.a.kind, id=d.a.id), b=NodeOut(kind=d.b.kind, id=d.b.id)
+        )
     if isinstance(d, MemoryDraft):
         memory = MemoryCardOut(
             type=d.type,
@@ -173,6 +189,7 @@ def _card(led: Ledger, p: Proposal) -> ProposalOut:
         result_id=p.result_id,
         memory=memory,
         correction=correction,
+        map_edge=edge,
         ledger_version=led.ledger_version(),
     )
 

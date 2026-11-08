@@ -1,6 +1,7 @@
 """Proposals and Memories (#138, docs/AI_DESIGN.md "Memory"): the Assistant's
-only write path. A Proposal is a Memory or a Correction (a Category, a Split or
-a purpose note) and does nothing until the user confirms it.
+only write path. A Proposal is a Memory, a Correction (a Category, a Split or
+a purpose note) or a personal map edge (#275), and does nothing until the user
+confirms it.
 
 - Proposing validates by running the confirm path inside a savepoint that is
   always rolled back, so a Proposal that would fail on confirm (another
@@ -31,6 +32,7 @@ from finance_agent.ledger import (
     UnknownTarget,
 )
 from finance_agent.ledger.answer_cache import AnswerCache
+from finance_agent.ledger.map_edges import Kind, MapEdges, Node
 from finance_agent.storage import Scoped, schema
 
 MEMORY_MAX = 280  # characters
@@ -113,18 +115,36 @@ class CorrectionDraft(BaseModel):
     change: Annotated[Change, Field(discriminator="kind")]
 
 
-_DRAFT = TypeAdapter(MemoryDraft | CorrectionDraft)
+class NodeRef(BaseModel):
+    model_config = _STRICT
+    kind: Kind
+    id: int = Field(ge=1, le=2**63 - 1)
+
+    def node(self) -> Node:
+        return Node(self.kind, self.id)
+
+
+class MapEdgeDraft(BaseModel):
+    """Two of the user's map nodes the Assistant thinks are related (#275)."""
+
+    model_config = _STRICT
+    a: NodeRef
+    b: NodeRef
+
+
+type Draft = MemoryDraft | CorrectionDraft | MapEdgeDraft
+_DRAFT = TypeAdapter(Draft)
 
 
 @dataclass(frozen=True)
 class Proposal:
     id: int
-    kind: Literal["memory", "correction"]
+    kind: Literal["memory", "correction", "map_edge"]
     status: Literal["pending", "confirmed", "rejected"]
     created_at: datetime
     decided_at: datetime | None
-    result_id: int | None  # the Memory, Correction or note written on confirm
-    draft: MemoryDraft | CorrectionDraft | None  # only while pending
+    result_id: int | None  # the Memory, Correction, note or edge on confirm
+    draft: Draft | None  # only while pending
 
 
 @dataclass(frozen=True)
@@ -157,6 +177,7 @@ class Proposals:
         self._db = Scoped(conn, user_id)
         self._led = Ledger(conn, user_id)
         self._cache = AnswerCache(conn, user_id)
+        self._map = MapEdges(conn, user_id)
 
     # --- proposing ----------------------------------------------------------
 
@@ -194,7 +215,19 @@ class Proposals:
             sp.rollback()
         return self._insert("correction", draft)
 
-    def _insert(self, kind: str, draft: MemoryDraft | CorrectionDraft) -> Proposal:
+    def propose_map_edge(self, draft: MapEdgeDraft) -> Proposal:
+        """Refused (UnknownTarget) unless both nodes are this user's, and
+        (InvalidProposal) for a node joined to itself or an edge already on
+        the map. Nothing is written but the Proposal."""
+        a, b = draft.a.node(), draft.b.node()
+        if a == b:
+            raise InvalidProposal("an edge joins two different nodes")
+        self._map.check(a, b)
+        if self._map.find(a, b) is not None:
+            raise InvalidProposal("that edge is already on the map")
+        return self._insert("map_edge", draft)
+
+    def _insert(self, kind: str, draft: Draft) -> Proposal:
         pid = self._db.insert(
             schema.proposal,
             kind=kind,
@@ -267,8 +300,8 @@ class Proposals:
             )
             if claimed.rowcount == 1:
                 result = self._apply(current.draft, proposal_id)
-                if isinstance(current.draft, MemoryDraft):
-                    self._cache.clear()  # answers may have leant on Memories
+                if not isinstance(current.draft, CorrectionDraft):
+                    self._cache.clear()  # answers may lean on Memories, the map
                 self._db.execute(
                     self._db.update(p)
                     .where(p.c.id == proposal_id)
@@ -304,9 +337,7 @@ class Proposals:
         )
         return self.get(proposal_id)
 
-    def _apply(
-        self, draft: MemoryDraft | CorrectionDraft, proposal_id: int | None = None
-    ) -> int:
+    def _apply(self, draft: Draft, proposal_id: int | None = None) -> int:
         if isinstance(draft, MemoryDraft):
             if proposal_id is None:
                 raise InvalidProposal("a Memory is written only from a Proposal")
@@ -326,6 +357,10 @@ class Proposals:
                 created_at=datetime.now(UTC),
                 **{f: getattr(draft, f) for f in GOAL_FIELDS},
             )
+        if isinstance(draft, MapEdgeDraft):
+            if proposal_id is None:
+                raise InvalidProposal("an edge is written only from a Proposal")
+            return self._map.add(draft.a.node(), draft.b.node(), proposal_id)
         t, c = draft.transaction_id, draft.change
         match c:
             case CategoryChange():
