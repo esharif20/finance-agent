@@ -679,6 +679,13 @@
             "title": "Counted",
             "type": "boolean"
           },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/FlagOut"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
           "group": {
             "title": "Group",
             "type": "string"
@@ -730,6 +737,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "trial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrialOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -742,13 +759,19 @@
           "last_charge_on",
           "monthly",
           "cost_note",
-          "counted"
+          "counted",
+          "flags",
+          "trial"
         ],
         "title": "CostOut",
         "type": "object"
       },
       "CostsOut": {
         "properties": {
+          "flag_count": {
+            "title": "Flag Count",
+            "type": "integer"
+          },
           "groups": {
             "items": {
               "$ref": "#/components/schemas/GroupTotal"
@@ -773,13 +796,20 @@
             },
             "title": "Totals",
             "type": "array"
+          },
+          "trial_detection": {
+            "const": "partial",
+            "default": "partial",
+            "title": "Trial Detection",
+            "type": "string"
           }
         },
         "required": [
           "items",
           "totals",
           "groups",
-          "rate_needed"
+          "rate_needed",
+          "flag_count"
         ],
         "title": "CostsOut",
         "type": "object"
@@ -868,6 +898,60 @@
           "signal"
         ],
         "title": "FeedbackOut",
+        "type": "object"
+      },
+      "FlagOut": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "enum": [
+              "overlap",
+              "duplicate",
+              "charged_after_cancel",
+              "trial_converted",
+              "price_rise"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          }
+        },
+        "required": [
+          "code",
+          "on",
+          "before",
+          "after"
+        ],
+        "title": "FlagOut",
         "type": "object"
       },
       "FxMonthOut": {
@@ -1097,6 +1181,23 @@
             "title": "Skipped",
             "type": "boolean"
           },
+          "suggestions": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1130,6 +1231,7 @@
           "merchant_id",
           "transaction_ids",
           "choices",
+          "suggestions",
           "skipped"
         ],
         "title": "ItemOut",
@@ -1167,6 +1269,32 @@
           "status"
         ],
         "title": "LocalModelOut",
+        "type": "object"
+      },
+      "ManageLinkOut": {
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "names",
+          "domain",
+          "url"
+        ],
+        "title": "ManageLinkOut",
         "type": "object"
       },
       "MemoriesOut": {
@@ -2400,6 +2528,29 @@
         "title": "TrendPointOut",
         "type": "object"
       },
+      "TrialOut": {
+        "properties": {
+          "converted": {
+            "title": "Converted",
+            "type": "boolean"
+          },
+          "converts_on": {
+            "title": "Converts On",
+            "type": "string"
+          },
+          "started_on": {
+            "title": "Started On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "started_on",
+          "converts_on",
+          "converted"
+        ],
+        "title": "TrialOut",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -3188,6 +3339,28 @@
         "tags": [
           "local-model"
         ]
+      }
+    },
+    "/api/manage-links": {
+      "get": {
+        "operationId": "manage_links_api_manage_links_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManageLinkOut"
+                  },
+                  "title": "Response Manage Links Api Manage Links Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Manage Links"
       }
     },
     "/api/memories": {
@@ -4650,6 +4823,47 @@
           }
         },
         "summary": "Transactions"
+      }
+    },
+    "/api/transactions/{transaction_id}": {
+      "get": {
+        "operationId": "one_transaction_api_transactions__transaction_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One Transaction"
       }
     }
   }

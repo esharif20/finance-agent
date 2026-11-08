@@ -92,7 +92,7 @@ class Draft:
     rounds: list[list[dict[str, Any]]] = field(
         default_factory=list[list[dict[str, Any]]]
     )
-    cached: bool = False
+    cached: tuple[str, ...] | None = None  # a cache hit's evidence IDs
 
 
 @dataclass
@@ -193,17 +193,18 @@ class Assistant:
             if route in CACHED and len(d.rounds) == 1:
                 hit = self._cache().get(route, d.rounds[0], self.today)
                 if hit is not None:
-                    d.reply, d.cached = hit, True
+                    d.reply, d.cached = hit
                     return d
             d.messages.append(
                 Message(role="assistant", content=r.content, tool_calls=tuple(calls))
             )
             for call in calls:
-                content = self._run(route, call, s, d)
+                seen = len(d.values)
+                content = budget.take(self._run(route, call, s, d))
+                if content == context.TOO_LARGE:  # unseen, so not evidence
+                    del d.values[seen:]
                 d.messages.append(
-                    Message(
-                        role="tool", tool_name=call.name, content=budget.take(content)
-                    )
+                    Message(role="tool", tool_name=call.name, content=content)
                 )
         d.failed = True  # still asking for tools: no reply to check
         return d
@@ -225,8 +226,8 @@ class Assistant:
         return out.model_dump_json()
 
     def _ground(self, route: Route, s: State, d: Draft) -> Update:
-        if d.cached:
-            return {"reply": d.reply, "path": "cache", "evidence": []}
+        if d.cached is not None:
+            return {"reply": d.reply, "path": "cache", "evidence": list(d.cached)}
         if not d.reply.strip() and d.proposal_id is not None:
             d.reply = PROPOSED
         res = check_grounding(d.reply, d.values, today=self.today)
@@ -252,7 +253,7 @@ class Assistant:
             }
         # one round only: the key (its tool calls) then holds everything read
         if route in CACHED and len(d.rounds) == 1 and d.proposal_id is None:
-            self._cache().put(route, d.rounds[0], self.today, d.reply)
+            self._cache().put(route, d.rounds[0], self.today, d.reply, res.evidence_ids)
         return {
             "reply": d.reply,
             "path": "local_model",

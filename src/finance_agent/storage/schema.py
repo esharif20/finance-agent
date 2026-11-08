@@ -519,6 +519,7 @@ answer_cache = Table(
     Column("key", String(64), primary_key=True),
     Column("ledger_version", Integer, nullable=False),
     Column("reply", Text, nullable=False),
+    Column("evidence", Text, nullable=False),  # JSON list of the reply's IDs
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
 

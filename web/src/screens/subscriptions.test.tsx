@@ -6,6 +6,7 @@ import { App } from "@/App";
 import { SubscriptionsCard } from "@/components/SubscriptionsCard";
 import { PrivacyProvider } from "@/lib/privacy";
 import type { Costs, Entry } from "@/lib/subscriptions";
+import { MANAGE_LINKS_STUB } from "./manageLinksStub";
 import { Subscriptions } from "./Subscriptions";
 
 // synthetic
@@ -76,6 +77,7 @@ function serve(c: Costs = costs()) {
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url, method: init?.method ?? "GET", body: init?.body as string | undefined });
+      if (url === "/api/manage-links") return Response.json(MANAGE_LINKS_STUB);
       if (url === "/api/subscriptions/costs") return Response.json(c);
       if (url === "/api/subscriptions" && !init?.method) return Response.json(entries);
       if (url.startsWith("/api/merchants")) return Response.json({ items: [{ id: 9, name: "Dropbox" }] });
