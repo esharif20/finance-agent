@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewItem } from "@/api/client";
-import { groupBySuggestion, score, selected } from "./bulkReview";
+import { GROUP_CAP, groupBySuggestion, isBig, pages, payments, score, selected, shown } from "./bulkReview";
 
 const mk = (id: string, spend: number, sugg: [string, string][], over: Partial<ReviewItem> = {}): ReviewItem => ({
   id: `category:${id}`,
@@ -53,9 +53,45 @@ describe("groupBySuggestion", () => {
   });
 });
 
+describe("default ticks and the cap", () => {
+  it("leaves unticked every Merchant scoring below the group's median", () => {
+    const [g] = groupBySuggestion([mk("1", 100, [FOOD]), mk("2", 200, [FOOD]), mk("3", 300, [FOOD]), mk("4", 400, [FOOD])]);
+    expect([...g!.off].sort()).toEqual(["category:1", "category:2"]); // median 250
+    expect(selected(g!, new Set()).map((i) => i.id)).toEqual(["category:4", "category:3"]);
+  });
+
+  it("ticks the whole group when the scores are level, and a lone Merchant", () => {
+    const [g] = groupBySuggestion([mk("1", 100, [FOOD]), mk("2", 100, [FOOD])]);
+    expect(g!.off.size).toBe(0);
+    expect(groupBySuggestion([mk("1", 5, [CAR])])[0]?.off.size).toBe(0);
+  });
+
+  it("a click flips the default either way", () => {
+    const [g] = groupBySuggestion([mk("1", 100, [FOOD]), mk("2", 300, [FOOD])]);
+    expect(selected(g!, new Set(["category:1", "category:2"])).map((i) => i.id)).toEqual(["category:1"]);
+  });
+
+  it("offers a big group GROUP_CAP rows at a time, a small one whole", () => {
+    const many = Array.from({ length: 40 }, (_, n) => mk(String(n + 1), 1000 - n, [FOOD]));
+    const [g] = groupBySuggestion(many);
+    expect(isBig(g!)).toBe(true);
+    expect(pages(g!)).toBe(3);
+    expect(shown(g!, 0)).toHaveLength(GROUP_CAP);
+    expect(shown(g!, 2)).toHaveLength(10);
+    expect(shown(g!, 9)).toHaveLength(10); // a page past the end clamps
+    const [small] = groupBySuggestion(many.slice(0, GROUP_CAP));
+    expect(isBig(small!)).toBe(false);
+    expect(shown(small!, 0)).toHaveLength(GROUP_CAP);
+  });
+
+  it("counts payments from weight, never money", () => {
+    expect(payments([mk("1", 1, [FOOD], { weight: 3 }), mk("2", 1, [FOOD], { weight: 4 })])).toBe(7);
+  });
+});
+
 describe("selected", () => {
   it("leaves out unticked items", () => {
-    const [g] = groupBySuggestion([mk("1", 1, [FOOD]), mk("2", 2, [FOOD])]);
+    const [g] = groupBySuggestion([mk("1", 1, [FOOD]), mk("2", 1, [FOOD])]);
     expect(selected(g!, new Set(["category:1"])).map((i) => i.id)).toEqual(["category:2"]);
   });
 });
