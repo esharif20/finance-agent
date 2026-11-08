@@ -4,19 +4,19 @@
 
 /* chapter 1: the sticky pile, on night */
 .st-pile {
-  padding-block: clamp(96px, 12vw, 176px);
   background: var(--lp-black);
   color: var(--lp-white);
+}
+.st-pile[data-mode="stack"] {
+  padding-block: clamp(96px, 12vw, 176px);
 }
 .st-pile-grid {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
   gap: clamp(32px, 5vw, 96px);
-  align-items: start;
+  align-items: center;
 }
 .st-pile-title {
-  position: sticky;
-  top: 18vh;
   display: grid;
   gap: 24px;
 }
@@ -25,13 +25,30 @@
   font-size: var(--lp-step-lead);
   line-height: 1.35;
 }
-.st-slot {
-  position: sticky;
-  top: 14vh;
-  margin-bottom: 36vh;
+/* the pin: one screen of stage held for about two more screens of scroll, three stages on it */
+.st-pile-track {
+  height: 290svh;
 }
-.st-slot:last-child {
-  margin-bottom: 0;
+.st-pile-stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  min-height: 640px;
+  display: grid;
+  align-content: center;
+  overflow: clip;
+}
+.st-deck {
+  display: grid;
+}
+/* the three cards share one cell, so the deck is as tall as its tallest card */
+.st-deck > .st-panel {
+  grid-area: 1 / 1;
+  transform-origin: 50% 0;
+}
+.st-pile-stack {
+  display: grid;
+  gap: 16px;
 }
 .st-card {
   --card: var(--st-card);
@@ -53,16 +70,14 @@
   border-radius: 8px;
   background: var(--st-card);
   color: var(--lp-black);
-  transform-origin: 50% 0;
-  will-change: transform;
 }
-.st-slot[data-layer="0"] {
+.st-panel[data-layer="0"] {
   --st-card: var(--lp-mint);
 }
-.st-slot[data-layer="1"] {
+.st-panel[data-layer="1"] {
   --st-card: var(--lp-cyan);
 }
-.st-slot[data-layer="2"] {
+.st-panel[data-layer="2"] {
   --st-card: var(--lp-lemon);
 }
 .st-card-veil {
@@ -521,10 +536,6 @@
   .st-principles-grid .lp-h2 {
     position: static;
   }
-  .st-slot {
-    top: 12vh;
-    margin-bottom: 24vh;
-  }
   .st-card {
     min-height: 0;
   }
@@ -544,7 +555,6 @@
 }
 
 /* reduced motion: every chapter flat in its final state */
-.st[data-still] .st-slot,
 .st[data-still] .st-pile-title,
 .st[data-still] .st-principles-grid .lp-h2 {
   position: static;
