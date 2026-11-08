@@ -359,3 +359,32 @@ def test_deleting_a_merchant_removes_its_whole_registry_history(
     rows = db.execute(db.select(schema.subscription_entry, schema.subscription_entry.c.merchant_id)
     ).all()
     assert [r.merchant_id for r in rows] == [other]
+
+
+def test_confirming_a_user_added_entry_keeps_user_added(
+    ledger_for: LedgerFor,
+) -> None:
+    # decided by orchestrator (#132): confirming changes status, not origin
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH ADDED")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.cancel_subscription(m)
+
+    led.confirm_subscription(m)
+
+    e = led.subscription(m)
+    assert e is not None
+    assert (e.status, e.reason) == ("active", "user_added")
+
+
+def test_confirming_after_a_removal_is_user_confirmed(ledger_for: LedgerFor) -> None:
+    led = ledger_for(1)
+    m = merchant(led, "SYNTH REMOVED")
+    led.add_subscription(m, "subscription", "Streaming")
+    led.not_a_subscription(m)
+
+    led.confirm_subscription(m, "subscription", "Streaming")
+
+    e = led.subscription(m)
+    assert e is not None
+    assert e.reason == "user_confirmed"
