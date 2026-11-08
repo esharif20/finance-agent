@@ -83,8 +83,7 @@ def test_an_annual_price_rounds_once_to_the_penny() -> None:
 
 
 subs_st = st.lists(
-    st.builds(
-        lambda p, d, k, m, r, i, w, s: (p, d, k, m, r, i, w, s),
+    st.tuples(
         st.integers(1, 5000),
         st.sampled_from([1, 3, 12]),
         st.sampled_from(["a", "a", "b", None]),

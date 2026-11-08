@@ -141,6 +141,7 @@ def test_a_grounded_answer_comes_from_the_local_model(
         "explain_insight",
         "list_guidance",  # #259
         "explain_card",
+        "subscription_advice",  # #308
     }
 
 

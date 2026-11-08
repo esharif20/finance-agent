@@ -124,6 +124,11 @@ def test_outside_ask_or_with_bad_arguments_it_is_refused(engine: Engine) -> None
     for sub in ("plan", "correct", "memory"):
         with pytest.raises(ToolNotAllowed):
             advice(engine, sub, group="AI tools")
-    for bad in ({}, {"group": "Rent"}, {"group": "AI tools", "cancel": True}):
+    bad_args: list[dict[str, Any]] = [
+        {},
+        {"group": "Rent"},
+        {"group": "AI tools", "cancel": True},  # no write field, ever
+    ]
+    for bad in bad_args:
         with pytest.raises(ValidationError):
             advice(engine, **bad)
