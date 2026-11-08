@@ -11,6 +11,7 @@ import {
   fetchSummary,
 } from "@/api/client";
 import { ForecastPanel } from "@/components/ForecastPanel";
+import { GuidanceCards } from "@/components/GuidanceCard";
 import { InsightsFeed } from "@/components/InsightsFeed";
 import { SubscriptionsCard } from "@/components/SubscriptionsCard";
 import { Card } from "@/components/ui/card";
@@ -200,6 +201,7 @@ export function Overview({ account }: { account?: number }) {
             </MonthCard>
             <SpendingDonut spending={spending.data} account={account} />
           </div>
+          <GuidanceCards />
           <InsightsFeed />
           <ForecastPanel />
           <SubscriptionsCard />

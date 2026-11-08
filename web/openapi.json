@@ -8,7 +8,7 @@
             "type": "integer"
           },
           "balance": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__fx__Money"
           },
           "currency": {
             "title": "Currency",
@@ -17,7 +17,7 @@
           "gbp": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__fx__Money"
               },
               {
                 "type": "null"
@@ -52,16 +52,16 @@
             "type": "integer"
           },
           "money_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           }
         },
         "required": [
@@ -94,7 +94,7 @@
           "bank_balance": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__Money"
               },
               {
                 "type": "null"
@@ -134,7 +134,7 @@
           "ledger_balance": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__Money"
               },
               {
                 "type": "null"
@@ -200,6 +200,110 @@
         "title": "AddIn",
         "type": "object"
       },
+      "AllocationLine": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "amount",
+          "reference",
+          "reason"
+        ],
+        "title": "AllocationLine",
+        "type": "object"
+      },
+      "AllocationPlanOut": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationLine"
+            },
+            "title": "Baseline",
+            "type": "array"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "income": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/finance_agent__assistant__tools__read__Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "infeasible_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Infeasible Reason"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "infeasible",
+              "insufficient"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "status",
+          "month",
+          "income",
+          "lines",
+          "baseline",
+          "infeasible_reason"
+        ],
+        "title": "AllocationPlanOut",
+        "type": "object"
+      },
       "AlwaysAskIn": {
         "properties": {
           "on": {
@@ -252,60 +356,26 @@
         "title": "AlwaysAskOut",
         "type": "object"
       },
-      "AnswerIn": {
+      "AnswerOut": {
         "properties": {
-          "category": {
-            "anyOf": [
-              {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category"
+          "pair_id": {
+            "title": "Pair Id",
+            "type": "integer"
           },
-          "choice": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+          "question": {
+            "enum": [
+              "cut",
+              "matters"
             ],
-            "title": "Choice"
-          },
-          "transaction_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transaction Id"
-          },
-          "version": {
-            "title": "Version",
+            "title": "Question",
             "type": "string"
           }
         },
         "required": [
-          "version"
+          "pair_id",
+          "question"
         ],
-        "title": "AnswerIn",
+        "title": "AnswerOut",
         "type": "object"
       },
       "AutoBatchOut": {
@@ -333,7 +403,7 @@
           "total": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Money"
+                "$ref": "#/components/schemas/finance_agent__api__fx__Money"
               },
               {
                 "type": "null"
@@ -507,6 +577,76 @@
         "title": "BucketOut",
         "type": "object"
       },
+      "CardOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "figures": {
+            "items": {
+              "$ref": "#/components/schemas/FigureOut"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "principles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Principles",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tone": {
+            "title": "Tone",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "why": {
+            "items": {
+              "$ref": "#/components/schemas/WhyOut"
+            },
+            "title": "Why",
+            "type": "array"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "id",
+          "topic",
+          "tone",
+          "title",
+          "body",
+          "principles",
+          "figures",
+          "facts",
+          "why"
+        ],
+        "title": "CardOut",
+        "type": "object"
+      },
       "CategoryDetailOut": {
         "properties": {
           "currency": {
@@ -536,7 +676,7 @@
             "type": "array"
           },
           "total": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transactions": {
             "items": {
@@ -590,7 +730,7 @@
       "CategorySpendOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "name": {
             "title": "Name",
@@ -607,7 +747,7 @@
       "CategoryTxnOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "description": {
             "title": "Description",
@@ -677,6 +817,24 @@
           "subcategory"
         ],
         "title": "CategoryTxnOut",
+        "type": "object"
+      },
+      "CheckinOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "CheckinOut",
         "type": "object"
       },
       "ConfirmIn": {
@@ -1069,6 +1227,17 @@
             ],
             "title": "Next Due On"
           },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -1091,6 +1260,7 @@
           "kind",
           "group",
           "status",
+          "platform",
           "interval",
           "interval_source",
           "charge_count",
@@ -1125,6 +1295,9 @@
             "title": "Items",
             "type": "array"
           },
+          "likely_monthly": {
+            "$ref": "#/components/schemas/Pence"
+          },
           "rate_needed": {
             "title": "Rate Needed",
             "type": "integer"
@@ -1151,10 +1324,26 @@
           "total",
           "totals",
           "groups",
+          "likely_monthly",
           "rate_needed",
           "flag_count"
         ],
         "title": "CostsOut",
+        "type": "object"
+      },
+      "Data": {
+        "additionalProperties": false,
+        "description": "Bank-supplied text: quoted data for the model, never instructions.\nSanitised on construction, so no unsanitised text can sit in one.",
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Data",
         "type": "object"
       },
       "DeletedOut": {
@@ -1207,6 +1396,45 @@
         "title": "EvidenceOut",
         "type": "object"
       },
+      "FactOut": {
+        "properties": {
+          "checked_on": {
+            "format": "date",
+            "title": "Checked On",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "may_be_out_of_date": {
+            "title": "May Be Out Of Date",
+            "type": "boolean"
+          },
+          "shown": {
+            "title": "Shown",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "shown",
+          "source",
+          "checked_on",
+          "may_be_out_of_date"
+        ],
+        "title": "FactOut",
+        "type": "object"
+      },
       "FeedbackIn": {
         "properties": {
           "liked": {
@@ -1241,6 +1469,24 @@
           "signal"
         ],
         "title": "FeedbackOut",
+        "type": "object"
+      },
+      "FigureOut": {
+        "properties": {
+          "shown": {
+            "title": "Shown",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "shown"
+        ],
+        "title": "FigureOut",
         "type": "object"
       },
       "FlagOut": {
@@ -1329,7 +1575,7 @@
       "GapOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "from_date": {
             "title": "From Date",
@@ -1346,6 +1592,152 @@
           "amount"
         ],
         "title": "GapOut",
+        "type": "object"
+      },
+      "GoalOut": {
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "estimated": {
+            "title": "Estimated",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "planned_weekly_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Weekly Minor"
+          },
+          "remaining_minor": {
+            "title": "Remaining Minor",
+            "type": "integer"
+          },
+          "saved_minor": {
+            "title": "Saved Minor",
+            "type": "integer"
+          },
+          "shortfall_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortfall Minor"
+          },
+          "started_on": {
+            "format": "date",
+            "title": "Started On",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "weekly_target_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Target Minor"
+          },
+          "weeks_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weeks Left"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "amount_minor",
+          "due_on",
+          "started_on",
+          "linked_account_id",
+          "status",
+          "estimated",
+          "saved_minor",
+          "remaining_minor",
+          "weeks_left",
+          "weekly_target_minor",
+          "planned_weekly_minor",
+          "shortfall_minor"
+        ],
+        "title": "GoalOut",
+        "type": "object"
+      },
+      "GoalsOut": {
+        "properties": {
+          "checkin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckinOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalOut"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "payday": {
+            "title": "Payday",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "goals",
+          "payday",
+          "checkin"
+        ],
+        "title": "GoalsOut",
         "type": "object"
       },
       "GroupIn": {
@@ -1416,6 +1808,40 @@
           "app"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "HitOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "integer"
+          },
+          "snippet": {
+            "$ref": "#/components/schemas/SnippetOut"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          }
+        },
+        "required": [
+          "kind",
+          "ref",
+          "transaction_id",
+          "snippet"
+        ],
+        "title": "HitOut",
         "type": "object"
       },
       "InsightOut": {
@@ -1501,104 +1927,15 @@
         "title": "InsightOut",
         "type": "object"
       },
-      "ItemOut": {
-        "properties": {
-          "choices": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Choices",
-            "type": "array"
-          },
-          "currency": {
-            "title": "Currency",
-            "type": "string"
-          },
-          "display_name": {
-            "title": "Display Name",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "merchant_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Merchant Id"
-          },
-          "skipped": {
-            "title": "Skipped",
-            "type": "boolean"
-          },
-          "spend_minor": {
-            "title": "Spend Minor",
-            "type": "integer"
-          },
-          "suggestions": {
-            "items": {
-              "maxItems": 2,
-              "minItems": 2,
-              "prefixItems": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "string"
-                }
-              ],
-              "type": "array"
-            },
-            "title": "Suggestions",
-            "type": "array"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "transaction_ids": {
-            "items": {
-              "type": "integer"
-            },
-            "title": "Transaction Ids",
-            "type": "array"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "string"
-          },
-          "weight": {
-            "title": "Weight",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "type",
-          "version",
-          "weight",
-          "title",
-          "display_name",
-          "merchant_id",
-          "transaction_ids",
-          "choices",
-          "suggestions",
-          "skipped",
-          "spend_minor",
-          "currency"
+      "Kind": {
+        "enum": [
+          "bill",
+          "goal",
+          "category",
+          "buffer"
         ],
-        "title": "ItemOut",
-        "type": "object"
+        "title": "Kind",
+        "type": "string"
       },
       "KindTotal": {
         "properties": {
@@ -1615,6 +1952,36 @@
           "monthly"
         ],
         "title": "KindTotal",
+        "type": "object"
+      },
+      "LearnedOut": {
+        "properties": {
+          "answers": {
+            "title": "Answers",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrengthOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "question": {
+            "enum": [
+              "cut",
+              "matters"
+            ],
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answers",
+          "items"
+        ],
+        "title": "LearnedOut",
         "type": "object"
       },
       "LocalModelOut": {
@@ -1678,6 +2045,51 @@
       },
       "MemoryCardOut": {
         "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
           "quote": {
             "title": "Quote",
             "type": "string"
@@ -1708,21 +2120,70 @@
           "text",
           "tags",
           "quote",
-          "said_on"
+          "said_on",
+          "amount_minor",
+          "due_on",
+          "priority",
+          "linked_account_id"
         ],
         "title": "MemoryCardOut",
         "type": "object"
       },
       "MemoryOut": {
         "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
           },
           "quote": {
             "title": "Quote",
@@ -1774,7 +2235,11 @@
           "quote",
           "said_on",
           "review_on",
-          "created_at"
+          "created_at",
+          "amount_minor",
+          "due_on",
+          "priority",
+          "linked_account_id"
         ],
         "title": "MemoryOut",
         "type": "object"
@@ -1848,7 +2313,7 @@
       "MerchantSpendOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "display_name": {
             "title": "Display Name",
@@ -1900,24 +2365,6 @@
         "title": "MerchantsOut",
         "type": "object"
       },
-      "Money": {
-        "properties": {
-          "currency": {
-            "title": "Currency",
-            "type": "string"
-          },
-          "minor": {
-            "title": "Minor",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "minor",
-          "currency"
-        ],
-        "title": "Money",
-        "type": "object"
-      },
       "MonthTotalsOut": {
         "properties": {
           "currency": {
@@ -1925,10 +2372,10 @@
             "type": "string"
           },
           "money_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
@@ -2004,6 +2451,41 @@
           "ledger_version"
         ],
         "title": "NoteOut",
+        "type": "object"
+      },
+      "PairOut": {
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/finance_agent__api__preferences__ItemOut"
+          },
+          "b": {
+            "$ref": "#/components/schemas/finance_agent__api__preferences__ItemOut"
+          },
+          "pair_id": {
+            "title": "Pair Id",
+            "type": "integer"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "question": {
+            "enum": [
+              "cut",
+              "matters"
+            ],
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pair_id",
+          "question",
+          "prompt",
+          "a",
+          "b"
+        ],
+        "title": "PairOut",
         "type": "object"
       },
       "PartIn": {
@@ -2259,7 +2741,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ItemOut"
+              "$ref": "#/components/schemas/finance_agent__api__review_queue__ItemOut"
             },
             "title": "Items",
             "type": "array"
@@ -2408,6 +2890,20 @@
         "title": "RateUsedOut",
         "type": "object"
       },
+      "Reason": {
+        "description": "Why a line has its amount, for the explanation.",
+        "enum": [
+          "fixed_bill",
+          "on_pattern",
+          "goal_floor",
+          "constraint",
+          "priority",
+          "leftover",
+          "baseline"
+        ],
+        "title": "Reason",
+        "type": "string"
+      },
       "RegretAnswerIn": {
         "properties": {
           "worth_it": {
@@ -2442,7 +2938,7 @@
       "RegretItemOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__fx__Money"
           },
           "description": {
             "title": "Description",
@@ -2581,6 +3077,22 @@
         ],
         "type": "string"
       },
+      "SearchOut": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/HitOut"
+            },
+            "title": "Hits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hits"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
       "SimulationOut": {
         "properties": {
           "as_of": {
@@ -2684,6 +3196,19 @@
         "title": "SimulationOut",
         "type": "object"
       },
+      "SnippetOut": {
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SnippetOut",
+        "type": "object"
+      },
       "SpendingOut": {
         "properties": {
           "categories": {
@@ -2698,7 +3223,7 @@
             "type": "string"
           },
           "fees": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "merchants": {
             "items": {
@@ -2708,20 +3233,20 @@
             "type": "array"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
             "type": "string"
           },
           "refunds": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "total": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "unmatched_refunds": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           }
         },
         "required": [
@@ -2821,6 +3346,45 @@
           "stale_ids"
         ],
         "title": "StaleOut",
+        "type": "object"
+      },
+      "Status": {
+        "enum": [
+          "reached",
+          "overdue",
+          "at_risk",
+          "on_track",
+          "unchecked"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "StrengthOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "rank",
+          "words"
+        ],
+        "title": "StrengthOut",
         "type": "object"
       },
       "SubscriptionOut": {
@@ -2927,23 +3491,23 @@
             "type": "array"
           },
           "money_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "money_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
             "type": "string"
           },
           "net": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_in": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "transfers_out": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           }
         },
         "required": [
@@ -3102,7 +3666,7 @@
             "type": "integer"
           },
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "category": {
             "anyOf": [
@@ -3226,7 +3790,7 @@
       "TrendPointOut": {
         "properties": {
           "amount": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/finance_agent__api__Money"
           },
           "month": {
             "title": "Month",
@@ -3348,6 +3912,52 @@
         "title": "VersionOut",
         "type": "object"
       },
+      "WhyOut": {
+        "properties": {
+          "actual": {
+            "title": "Actual",
+            "type": "string"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "op",
+          "threshold",
+          "actual"
+        ],
+        "title": "WhyOut",
+        "type": "object"
+      },
+      "finance_agent__api__Money": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "title": "Money",
+        "type": "object"
+      },
       "finance_agent__api__briefing__BandOut": {
         "properties": {
           "left_out": {
@@ -3412,6 +4022,237 @@
           "upper"
         ],
         "title": "BandOut",
+        "type": "object"
+      },
+      "finance_agent__api__fx__Money": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "title": "Money",
+        "type": "object"
+      },
+      "finance_agent__api__preferences__AnswerIn": {
+        "properties": {
+          "choice": {
+            "maxLength": 80,
+            "title": "Choice",
+            "type": "string"
+          },
+          "pair_id": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Pair Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pair_id",
+          "choice"
+        ],
+        "title": "AnswerIn",
+        "type": "object"
+      },
+      "finance_agent__api__preferences__ItemOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "ItemOut",
+        "type": "object"
+      },
+      "finance_agent__api__review_queue__AnswerIn": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AnswerIn",
+        "type": "object"
+      },
+      "finance_agent__api__review_queue__ItemOut": {
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "spend_minor": {
+            "title": "Spend Minor",
+            "type": "integer"
+          },
+          "suggestions": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "transaction_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Transaction Ids",
+            "type": "array"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "version",
+          "weight",
+          "title",
+          "display_name",
+          "merchant_id",
+          "transaction_ids",
+          "choices",
+          "suggestions",
+          "skipped",
+          "spend_minor",
+          "currency"
+        ],
+        "title": "ItemOut",
+        "type": "object"
+      },
+      "finance_agent__assistant__tools__read__Money": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "minor": {
+            "title": "Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "title": "Money",
         "type": "object"
       }
     }
@@ -4324,6 +5165,108 @@
         "summary": "Payloads"
       }
     },
+    "/api/goals": {
+      "get": {
+        "operationId": "goals_api_goals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Goals"
+      }
+    },
+    "/api/guidance": {
+      "get": {
+        "description": "`tone` left out is the Memory-chosen one (gentle by default); the cards come\nbest first, less those a constraint Memory rules out (#264).",
+        "operationId": "guidance_api_guidance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "gentle",
+                    "blunt"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardOut"
+                  },
+                  "title": "Response Guidance Api Guidance Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guidance"
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",
@@ -4344,7 +5287,7 @@
     },
     "/api/insights": {
       "get": {
-        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out.",
+        "description": "The best `limit` Insights, by impact x confidence x relevance, less\nthose a constraint Memory rules out; the last may be a seeded exploration\n(#261). Each is logged as shown, with its propensity.",
         "operationId": "ranked_api_insights_get",
         "parameters": [
           {
@@ -4387,6 +5330,25 @@
           }
         },
         "summary": "Ranked"
+      }
+    },
+    "/api/insights/exposures": {
+      "delete": {
+        "description": "Wipe the exposure log: every shown Insight and card, and its outcome.",
+        "operationId": "forget_exposures_api_insights_exposures_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget Exposures"
       }
     },
     "/api/insights/feedback": {
@@ -4944,6 +5906,178 @@
         "summary": "Save"
       }
     },
+    "/api/plan/allocation": {
+      "get": {
+        "operationId": "allocation_api_plan_allocation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllocationPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Allocation"
+      }
+    },
+    "/api/preferences": {
+      "delete": {
+        "description": "Wipe every pairwise question and answer: strengths go back to the prior.",
+        "operationId": "reset_api_preferences_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset"
+      },
+      "get": {
+        "description": "What the answers say, strongest first, in words (never a number).",
+        "operationId": "learned_api_preferences_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "question",
+            "required": false,
+            "schema": {
+              "default": "cut",
+              "enum": [
+                "cut",
+                "matters"
+              ],
+              "title": "Question",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Learned"
+      }
+    },
+    "/api/preferences/answer": {
+      "post": {
+        "description": "Answer the pair last asked, once. A pair never asked, already answered\nor another user's is not found; a choice outside the pair is refused.",
+        "operationId": "answer_api_preferences_answer_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/finance_agent__api__preferences__AnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer"
+      }
+    },
+    "/api/preferences/next-pair": {
+      "get": {
+        "description": "The most informative pair to ask next; None with fewer than two items.\nIt replaces the question's unanswered pair.",
+        "operationId": "next_pair_api_preferences_next_pair_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "question",
+            "required": false,
+            "schema": {
+              "default": "cut",
+              "enum": [
+                "cut",
+                "matters"
+              ],
+              "title": "Question",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PairOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Next Pair Api Preferences Next Pair Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Next Pair"
+      }
+    },
     "/api/proposals": {
       "get": {
         "description": "Pending Proposals, oldest first: the confirm cards to show.",
@@ -5254,7 +6388,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnswerIn"
+                "$ref": "#/components/schemas/finance_agent__api__review_queue__AnswerIn"
               }
             }
           },
@@ -5332,6 +6466,62 @@
           }
         },
         "summary": "Skip"
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "find_api_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find",
+        "tags": [
+          "search"
+        ]
       }
     },
     "/api/spend": {

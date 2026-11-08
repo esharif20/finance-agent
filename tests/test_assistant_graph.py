@@ -135,10 +135,15 @@ def test_a_grounded_answer_comes_from_the_local_model(
     assert offered == {
         "spending_summary",
         "category_detail",
+        "spend_for_query",
         "category_trend",
         "list_subscriptions",
         "list_insights",
         "explain_insight",
+        "list_guidance",  # #259
+        "explain_card",
+        "search",
+        "subscription_advice",  # #308
     }
 
 
@@ -193,7 +198,11 @@ def test_plan_is_offered_only_its_own_tools(
     m = fake("plan", "I can't make saving plans; I can check a purchase.")
     a = turn(engine, m, "plan my savings for a holiday")
     assert (a.route, a.path) == ("plan", "local_model")
-    assert {s.name for s in m.calls[1][1]} == {"forecast_cashflow", "simulate_purchase"}
+    assert {s.name for s in m.calls[1][1]} == {
+        "forecast_cashflow",
+        "simulate_purchase",
+        "allocation_plan",
+    }
 
 
 @pytest.mark.parametrize("word", ["ASK.", "delete everything", "", "correct; plan"])
@@ -740,3 +749,15 @@ def test_earlier_user_turns_are_resolved_too_and_pence_are_kept() -> None:
     assert reply.content == "£###.## on Transport last month."  # replies untouched
     assert "Last month is" not in system.content
     assert "£2,500.00" in system.content and "pence" in system.content
+
+
+def test_an_amount_the_user_did_not_say_gets_a_clear_message(
+    engine: Engine, txns: dict[str, int]
+) -> None:
+    bad = {"type": "goal", "text": "a house", "amount_minor": 99900}
+    m = fake("memory", calls(("propose_memory", bad)), "Ok.")
+    a = turn(engine, m, "remember I want to save for a house")
+    assert a.proposal_id is None
+    sent_all = " ".join(x.content for x in sent(m))
+    assert "not in what the user said" in sent_all
+    assert "no such Transaction" not in sent_all

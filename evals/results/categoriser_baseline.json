@@ -52,7 +52,7 @@
   "models": {
     "rules": {
       "model": "corrections+rules",
-      "model_version": "rules-7324f5cfed01",
+      "model_version": "rules-f87a38c55006",
       "metrics": {
         "macro_f1": 0.840063,
         "ece": 0.004601,

@@ -30,9 +30,18 @@ def test_default_location_is_application_support(
     )
 
 
+def _context(conn: Any) -> MigrationContext:
+    """The FTS5 table and its shadow tables (#253) live outside the metadata."""
+
+    def ours(name: str | None, type_: str, _parent: Any) -> bool:
+        return not (type_ == "table" and (name or "").startswith("search_fts"))
+
+    return MigrationContext.configure(conn, opts={"include_name": ours})
+
+
 def test_migrations_produce_exactly_the_schema(engine: Engine) -> None:
     with engine.connect() as conn:
-        diff = compare_metadata(MigrationContext.configure(conn), schema.metadata)
+        diff = compare_metadata(_context(conn), schema.metadata)
     assert diff == []
 
 
@@ -72,7 +81,7 @@ def test_migrations_upgrade_from_0003_to_head(tmp_path: Path) -> None:
     eng = open_db(path)  # upgrades the rest of the way
     with eng.connect() as conn:
         assert {"merchant", "categorisation"} <= set(inspect(conn).get_table_names())
-        assert compare_metadata(MigrationContext.configure(conn), schema.metadata) == []
+        assert compare_metadata(_context(conn), schema.metadata) == []
     eng.dispose()
 
 
@@ -109,7 +118,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0024"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0028"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -659,7 +668,10 @@ def test_the_registry_trigger_is_present_at_head(engine: Engine) -> None:
     this catches that before the registry can outlive its Merchant."""
     from sqlalchemy import text
 
-    sql = "SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='merchant'"
+    sql = (
+        "SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='merchant'"
+        " AND name NOT LIKE 'search_%'"  # the search index's own (#253)
+    )
     with engine.connect() as conn:
         got = conn.execute(text(sql)).scalars().all()
     assert len(got) == 1 and "subscription_entry" in got[0]
@@ -738,3 +750,77 @@ def test_gemini_key_is_read_from_its_pinned_keychain_item() -> None:
         assert keychain.get_text(keychain.GEMINI_SERVICE) is None
     finally:
         keyring.delete_password("finance-agent.gemini", "api-key")
+
+
+def test_migration_0025_adds_goal_fields_and_keeps_memories(tmp_path: Path) -> None:
+    """0025 (#257) adds four nullable memory columns, nothing rebuilt on the
+    way up; a Memory survives the round trip, and deleting its linked Account
+    unlinks it rather than deleting it."""
+    from sqlalchemy import inspect, text
+
+    rows = (
+        "INSERT OR IGNORE INTO account (id, user_id, bank_id, external_ref, name,"
+        " kind, masked_number, currency) VALUES (2, 1, 1, 's', 'B', 'savings',"
+        " 'y', 'GBP')",
+        "INSERT OR IGNORE INTO proposal (id, user_id, kind, payload, status,"
+        " created_at) VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-05')",
+        "INSERT OR IGNORE INTO memory (id, user_id, proposal_id, type, text, tags,"
+        " turn_id, quote, said_on, created_at) VALUES (1, 1, 1, 'goal',"
+        " 'synthetic car fund', '[]', 't', 'q', '2026-01-05', '2026-01-05')",
+        "UPDATE memory SET amount_minor = 300000, due_on = '2027-06-30',"
+        " priority = 1, linked_account_id = 2 WHERE id = 1",
+    )
+    eng = round_trip(tmp_path, "0024", "0025", set(), rows)
+    with eng.begin() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns("memory")}
+        assert {"amount_minor", "due_on", "priority", "linked_account_id"} <= cols
+        conn.execute(text("DELETE FROM account WHERE id = 2"))
+        got = conn.execute(
+            text("SELECT text, amount_minor, linked_account_id FROM memory")
+        ).all()
+        assert got == [("synthetic car fund", 300000, None)]
+        with pytest.raises(Exception, match="CHECK"):  # the rebuild kept checks
+            conn.execute(text("UPDATE memory SET type = 'fact'"))
+    eng.dispose()
+
+
+def test_migration_0026_backfills_once_and_drops_only_the_search_index(
+    tmp_path: Path,
+) -> None:
+    """0026 (#253, M6 verifier): rows already present are indexed once per
+    round trip (no duplicate documents), every source row and constraint is
+    kept, and the downgrade leaves no FTS shadow table or trigger. The Memory
+    text is hostile FTS and SQL syntax, stored and indexed as plain data."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    hostile = 'synthetic NEAR("x" OR y*) \' ; DROP TABLE memory; --'
+    memory = (
+        "INSERT INTO memory (id, user_id, proposal_id, type, text, tags,"
+        " turn_id, quote, said_on, created_at, amount_minor) VALUES (:id, 1, 1,"
+        " 'goal', :t, '[]', 't', 'q', '2026-01-05', '2026-01-05', 300000)"
+    )
+    proposal = (
+        "INSERT OR IGNORE INTO proposal (id, user_id, kind, payload, status,"
+        " created_at) VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-05')"
+    )
+    eng = round_trip(tmp_path, "0025", "0026", {"text_embedding"}, (proposal,))
+    with eng.begin() as conn:
+        conn.execute(text(memory), {"id": 1, "t": hostile})
+        got = conn.execute(text("SELECT rowid, body FROM search_fts")).all()
+        # the Transaction and its Note (backfilled), the Memory (trigger), once each
+        assert sorted(b for _, b in got) == sorted(["SYNTH", "synthetic", hostile])
+        with pytest.raises(Exception, match="UNIQUE"):  # 0025's rebuild kept it
+            conn.execute(text(memory), {"id": 2, "t": "x"})
+    cfg = Config()
+    cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.downgrade(cfg, "0025")
+        left = "SELECT name FROM sqlite_master WHERE name LIKE 'search%'"
+        assert conn.execute(text(left + " OR name = 'text_embedding'")).all() == []
+        assert conn.execute(text("SELECT text, amount_minor FROM memory")).all() == [
+            (hostile, 300000)
+        ]
+    eng.dispose()

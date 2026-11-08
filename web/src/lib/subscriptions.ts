@@ -13,12 +13,14 @@ export type Trial = { started_on: string; converts_on: string; converted: boolea
 export type IntervalSource = NonNullable<S["CostOut"]["interval_source"]>;
 
 // #210's fields are optional too, for the same reason
-type Since210 = "interval_source" | "charge_count" | "next_due_on" | "display_name";
+// and #310's platform and likely total
+type Since210 = "interval_source" | "charge_count" | "next_due_on" | "display_name" | "platform";
 export type CostItem = Omit<S["CostOut"], "flags" | "trial" | Since210> & {
   flags?: Flag[];
   trial?: Trial | null;
 } & Partial<Pick<S["CostOut"], Since210>>;
-export type Costs = Omit<S["CostsOut"], "items" | "flag_count" | "trial_detection" | "total"> & {
+export type Costs = Omit<S["CostsOut"], "items" | "flag_count" | "trial_detection" | "total" | "likely_monthly"> & {
+  likely_monthly?: Money;
   items: CostItem[];
   flag_count?: number;
   trial_detection?: "partial";
@@ -49,17 +51,21 @@ export type Row = {
   trial: Trial | null;
 };
 
-export const STATUSES = ["all", "active", "suggested", "overdue", "lapsed", "cancelled"] as const;
+export const STATUSES = ["all", "active", "likely", "suggested", "overdue", "lapsed", "cancelled"] as const;
 export type Filters = { status: (typeof STATUSES)[number]; kind: "all" | Kind; sort: "monthly" | "name" | "due" };
 export const DEFAULT_FILTERS: Filters = { status: "all", kind: "all", sort: "monthly" };
 
-export type BandName = "Active" | "Needs a look" | "Ended";
+export type BandName = "Active" | "Likely (new)" | "Needs a look" | "Ended";
+/** Entries the list shows: listed by the user or detection, and guesses from a first charge (#310). */
+export const LISTED = new Set(["active", "likely", "user_cancelled"]);
 export type Band = { name: BandName; rows: Row[] };
 
 const band = (r: Row): BandName =>
   r.status === "lapsed" || r.status === "cancelled"
     ? "Ended"
-    : r.status === "overdue" || r.flags.length > 0 || r.monthly === null
+    : r.status === "likely"
+      ? "Likely (new)"
+      : r.status === "overdue" || r.flags.length > 0 || r.monthly === null
       ? "Needs a look"
       : "Active";
 
@@ -85,7 +91,7 @@ export function buildView(
   const rows: Row[] = [];
   for (const entry of entries) {
     const c = cost.get(entry.merchant_id);
-    if (!c || !entry.kind || !entry.group || (entry.status !== "active" && entry.status !== "user_cancelled")) continue;
+    if (!c || !entry.kind || !entry.group || !LISTED.has(entry.status)) continue;
     if (!kindOk(entry.kind) || (f.status !== "all" && c.status !== f.status)) continue;
     rows.push({
       merchant_id: c.merchant_id,
@@ -106,7 +112,7 @@ export function buildView(
     });
   }
   rows.sort(SORTS[f.sort]);
-  const bands = (["Active", "Needs a look", "Ended"] as const).map((name) => ({
+  const bands = (["Active", "Likely (new)", "Needs a look", "Ended"] as const).map((name) => ({
     name,
     rows: rows.filter((r) => band(r) === name),
   }));
@@ -157,7 +163,9 @@ export function reasonText(e: Entry): string {
     case "pattern":
       return e.evidence.charge_count && e.evidence.interval
         ? `Detected: ${e.evidence.charge_count} ${e.evidence.interval} charges`
-        : "Detected from a repeating pattern";
+        : e.status === "likely"
+          ? "Spotted from a first charge"
+          : "Detected from a repeating pattern";
     default:
       return "";
   }

@@ -333,6 +333,7 @@ def test_a_foreign_charge_costs_in_gbp_once_a_rate_exists(
             None, "rate_needed", False, 1,
         )  # fmt: skip
         led.set_rate("EUR", Decimal("0.8"), date(2026, 1, 1))
+        categorise.run(conn, 1)  # #187: the series is judged once it is in GBP
         s = costs(led, TODAY)
     assert (s.items[0].monthly, s.items[0].cost_note) == (920, None)  # 11.50 EUR
     assert s.kind_totals == {"subscription": 920} and s.rate_needed == 0

@@ -17,10 +17,10 @@ every figure filled from Engine signals or a dated fact.
   date" (#251 decision 6); CI fails one older than 13 months.
 
 Loading validates everything and fails on an unknown signal, slot, fact or
-key. Card prose is linted: no digit (any script) outside a slot, no character
-outside printable ASCII and a few typographic marks, and no instruction-like
-text, so no hand-typed figure or injected instruction can reach the screen
-or the Assistant. Everything here is pure and deterministic.
+key. Card prose is linted: no digit (any script) or number word outside a
+slot, no character outside printable ASCII and a few typographic marks, and
+no instruction-like text, so no hand-typed figure or injected instruction can
+reach the screen or the Assistant. Everything here is pure and deterministic.
 """
 
 import hashlib
@@ -32,8 +32,9 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_FLOOR, Decimal
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, Protocol, cast
 
+from finance_agent.engine import ranking
 from finance_agent.engine.detectors import Row
 
 DATA = Path(__file__).parent / "playbook_data"
@@ -50,6 +51,8 @@ SIGNALS: dict[str, Kind] = {
     "subscription_spend_last_month": "money",
     "subscription_rise_streak": "count",
     "subscription_spend_rise": "money",
+    "everyday_spend_last_month": "money",
+    "card_interest_last_month": "money",
 }
 TOPICS = (
     "emergency_fund",
@@ -68,6 +71,8 @@ ESSENTIAL_LEAVES = {
     ("Transport", "Public transport"),
     ("Transport", "Fuel"),
 }
+EVERYDAY = {("Food & Drink", leaf) for leaf in ("Coffee", "Takeaway", "Eating out")}
+CARD_INTEREST = ("Fees & Interest", "Card interest")
 ESSENTIAL_MONTHS = 3
 TENTH = Decimal("0.1")
 FACT_MAX_MONTHS = 13
@@ -82,6 +87,16 @@ OPS: dict[str, Callable[[Any, Any], bool]] = {
 _ID = re.compile(r"[a-z]+(?:[-_][a-z]+)*")
 _SLOT = re.compile(r"\{(fact:)?([a-z]+(?:_[a-z]+)*)\}")
 _PROSE_CHARS = re.compile(r"[ -~£‘’“”–—…]*")
+# Numbers written as words ("twenty pounds"). "one" is common English, so it
+# is only a figure beside a money or percent unit.
+_NUMBER_WORD = re.compile(
+    r"\b(?:(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    r"|(?:thir|four|fif|six|seven|eigh|nine)teen|twenty|thirty|forty|fifty"
+    r"|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|dozen"
+    r"|half|quarter|double|triple|twice)s?"
+    r"|one\s+(?:pound|quid|pence|penny|percent|per\s*cent))\b",
+    re.IGNORECASE,
+)
 _INSTRUCTION = re.compile(
     r"\b(?:ignore|disregard|forget|override|instructions?|prompts?|system"
     r"|assistant|model|llm|tools?|functions?|pretend|jailbreak|act\s+as"
@@ -195,6 +210,8 @@ def signals(
     months = range(first, last + 1)
     essentials = dict.fromkeys(months, 0)
     subs = dict.fromkeys(months, 0)
+    everyday = dict.fromkeys(months, 0)
+    interest = dict.fromkeys(months, 0)
     for r in rows:
         m = _month(r.posted_on)
         if m in essentials:
@@ -202,6 +219,10 @@ def signals(
                 essentials[m] -= r.amount
             if r.category[0] == "Subscriptions":
                 subs[m] -= r.amount
+            if r.category in EVERYDAY:
+                everyday[m] -= r.amount
+            if r.category == CARD_INTEREST:
+                interest[m] -= r.amount
     if len(months) >= ESSENTIAL_MONTHS:
         spend = sum(essentials[m] for m in months[-ESSENTIAL_MONTHS:])
         out["essential_monthly_spend"] = spend // ESSENTIAL_MONTHS
@@ -218,6 +239,8 @@ def signals(
         out["subscription_rise_streak"] = streak
         out["subscription_spend_last_month"] = subs[last]
         out["subscription_spend_rise"] = subs[last] - subs[last - streak]
+        out["everyday_spend_last_month"] = everyday[last]
+        out["card_interest_last_month"] = interest[last]
     return out
 
 
@@ -272,6 +295,8 @@ def lint_prose(text: Any, where: str) -> str:
     bare = _SLOT.sub("", text)
     if any(ch.isnumeric() for ch in bare):
         raise PlaybookError(f"{where}: has a figure outside a slot")
+    if _NUMBER_WORD.search(bare):
+        raise PlaybookError(f"{where}: has a figure written as words")
     if "{" in bare or "}" in bare:
         raise PlaybookError(f"{where}: has a malformed slot")
     if _INSTRUCTION.search(bare):
@@ -457,3 +482,69 @@ def render(
         tuple(sorted(figures.items())),
         tuple(shown_facts[k] for k in sorted(shown_facts)),
     )
+
+
+# --- tone, priority and constraints from Memories (#264) --------------------
+
+
+class Noted(Protocol):
+    """What the playbook reads of a Memory (`ledger.proposals.Memory` fits)."""
+
+    @property
+    def type(self) -> str: ...
+    @property
+    def tags(self) -> tuple[str, ...]: ...
+    @property
+    def priority(self) -> int | None: ...
+    @property
+    def amount_minor(self) -> int | None: ...
+
+
+DEFAULT_TONE = "gentle"
+UNRANKED = 6  # after the lowest stated priority (5)
+
+
+def _words(text: str) -> set[str]:
+    return set("".join(c if c.isalnum() else " " for c in text.casefold()).split())
+
+
+def _subject(card: Card) -> str:
+    # card prose names no Merchant, so a constraint can only match what it says
+    text = " ".join(f"{v.title} {v.body}" for v in card.variants.values())
+    return f"{card.id} {card.topic} {text}"
+
+
+def choose_tone(memories: Iterable[Noted]) -> str:
+    """The tone a `tone`-tagged preference Memory asks for (also tagged `blunt`
+    or `gentle`); gentle when none, or when they disagree."""
+    asked = {
+        t
+        for m in memories
+        if m.type == "preference" and "tone" in m.tags
+        for t in m.tags
+        if t in TONES
+    }
+    return "blunt" if asked == {"blunt"} else DEFAULT_TONE
+
+
+def prioritise(cards: Iterable[Card], memories: Iterable[Noted]) -> list[Card]:
+    """`cards` (already applicable) less those a constraint Memory rules out
+    (the Insights rule: all words of its tag appear in the card), best first:
+    by the highest stated priority of a goal Memory about the card's topic
+    (1 is highest), then the larger goal amount, then id. Deterministic."""
+    mems = list(memories)
+    keep = ranking.feasible(
+        cards, _subject, [t for m in mems if m.type == "constraint" for t in m.tags]
+    )
+    goals = [m for m in mems if m.type == "goal"]
+
+    def key(c: Card) -> tuple[int, int, str]:
+        words = _words(f"{c.id} {c.topic}")
+        hit = [m for m in goals if any((w := _words(t)) and w <= words for t in m.tags)]
+        return (
+            min((m.priority or UNRANKED for m in hit), default=UNRANKED),
+            -max((m.amount_minor or 0 for m in hit), default=0),
+            c.id,
+        )
+
+    return sorted(keep, key=key)

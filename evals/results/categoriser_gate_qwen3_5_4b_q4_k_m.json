@@ -6,7 +6,7 @@
   "dataset": "categoriser_v4.csv",
   "dataset_version": 4,
   "dataset_sha256": "0f07a236a238974b74a63bf8849aa7aea42fd0e7ec52b40d151219782896caad",
-  "rules_version": "rules-7324f5cfed01",
+  "rules_version": "rules-f87a38c55006",
   "prompt_version": 2,
   "residual_merchants": 125,
   "missing_signals": [],

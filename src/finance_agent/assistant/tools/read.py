@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Connection
 
 from finance_agent.categorise.display_names import display_name
+from finance_agent.engine import search
 from finance_agent.ledger import (
     CURRENCY,
     Breakdown,
@@ -432,4 +433,49 @@ def find_transactions(led: Reads, inp: FindTransactionsIn) -> FindTransactionsOu
     rows = [txn_row(t) for t in page.items]
     return FindTransactionsOut(
         rows=rows, total=page.total, truncated=page.total > len(rows)
+    )
+
+
+# --- search ------------------------------------------------------------------
+
+
+class SearchIn(BaseModel):
+    model_config = _STRICT
+    query: str = Field(
+        min_length=1,
+        max_length=100,
+        description="words to look for in the user's Transactions, Merchants,"
+        " Notes, Split parts and Memories",
+    )
+    limit: int = Field(default=5, ge=1, le=10, description="most hits to return")
+
+
+class SearchHit(BaseModel):
+    model_config = _STRICT
+    evidence_id: str  # txn:<id>, merchant:<id>, note:<id>, split:<id>, memory:<id>
+    kind: str
+    transaction_id: int | None
+    snippet: Data
+
+
+class SearchOut(BaseModel):
+    model_config = _STRICT
+    hits: list[SearchHit]
+
+
+def search_ledger(src: Source, inp: SearchIn) -> SearchOut:
+    """The user's best matches, as quoted data. Full-text and the deterministic
+    rerank only (shortcut: no embedder here, so the Ask tool is the FTS arm of
+    the API's hybrid search; no model is called from a tool)."""
+    hits = search.search(src.conn, src.user_id, inp.query, None, limit=inp.limit)
+    return SearchOut(
+        hits=[
+            SearchHit(
+                evidence_id=f"{'txn' if h.kind == 'transaction' else h.kind}:{h.ref}",
+                kind=h.kind,
+                transaction_id=h.transaction_id,
+                snippet=Data(data=h.snippet.data),
+            )
+            for h in hits
+        ]
     )
