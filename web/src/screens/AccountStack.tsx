@@ -390,24 +390,38 @@ export function AccountStack({
         <div role="group" aria-label="Accounts" className="account-rail">
           {all.map((f, i) => {
             const on = f === current;
+            const image = f.art ? cssArt[f.art] : undefined;
             return (
               <button
                 key={f.key}
                 type="button"
                 aria-pressed={on}
                 onClick={() => onSelect(f.id)}
-                className="account-chip text-left"
+                className="account-card account-mini text-left"
                 data-selected={on}
-                style={{ "--i": i, ...(f.hue === null ? {} : { "--h": f.hue }) } as CSSProperties}
+                data-all={f.id === undefined}
+                data-art={Boolean(image)}
+                style={
+                  {
+                    "--i": i,
+                    ...(f.hue === null ? {} : { "--h": f.hue }),
+                    ...(image ? { backgroundImage: image } : {}),
+                  } as CSSProperties
+                }
               >
-                <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold">
-                  <span aria-hidden="true" className="account-chip-dot" data-all={f.id === undefined} />
-                  <span className="truncate">{f.title}</span>
-                  {f.masked ? <span className="shrink-0 opacity-70">{f.masked}</span> : null}
+                <span data-slot="title" className="truncate text-label font-semibold">
+                  {f.title}
                 </span>
-                {f.balance ? <Money value={f.balance} className="text-row font-semibold" /> : <span className="text-row">–</span>}
-                {/* the status stays in the button's name; only a mismatch shows */}
-                <span className={f.matches === false ? "account-chip-warn" : "sr-only"}>{statusOf(f)}</span>
+                {f.id !== undefined && !image ? (
+                  <svg data-slot="nfc" viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 opacity-80">
+                    <path d="M5 4a6 6 0 0 1 0 8M8 2.5a9 9 0 0 1 0 11M11 1a12 12 0 0 1 0 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                ) : null}
+                {f.balance ? <Money value={f.balance} className="account-balance font-semibold" /> : null}
+                {f.masked ? <span data-slot="masked" className="text-label opacity-80">{f.masked.slice(-6)}</span> : null}
+                {/* the status and full number stay in the card's name; only a mismatch shows */}
+                {f.masked ? <span className="sr-only">{f.masked}</span> : null}
+                <span className={f.matches === false ? "account-mini-warn" : "sr-only"}>{statusOf(f)}</span>
               </button>
             );
           })}
