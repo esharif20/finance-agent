@@ -122,3 +122,30 @@ def test_a_bigger_purchase_never_raises_the_minimum(
 def test_the_outlook_is_deterministic(balance: int, amount: int, when: date) -> None:
     runs = {outlook(balance, AS_OF, _flow(), PACE, amount, when) for _ in range(3)}
     assert len(runs) == 1
+
+
+def test_income_already_held_is_not_credited_again() -> None:
+    """Verifier #227: a fresher account's import already holds the salary, so
+    a stale `as_of` must not add it a second time (that would be optimistic)."""
+    when = date(2026, 3, 30)
+    o = outlook(70_000, AS_OF, _flow(), PACE, 1_000, when)
+    held = outlook(70_000, AS_OF, _flow(), PACE, 1_000, when, paid_to=PAYDAY)
+    assert isinstance(o, Outlook) and isinstance(held, Outlook)
+    assert (o.minimum, held.minimum) == (6_000, -73_000)  # no salary on the 25th
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    st.integers(0, 60), st.integers(0, 10**6), st.integers(0, 10**6), st.integers(0, 40)
+)
+def test_verifier_crediting_less_income_is_never_optimistic(
+    days: int, balance: int, purchase: int, ahead: int
+) -> None:
+    paid_to = AS_OF + timedelta(days=days)
+    when = AS_OF + timedelta(days=ahead)
+    o = outlook(balance, AS_OF, _flow(), PACE, purchase, when)
+    held = outlook(balance, AS_OF, _flow(), PACE, purchase, when, paid_to=paid_to)
+    assert type(o) is type(held)
+    if isinstance(o, Outlook) and isinstance(held, Outlook):
+        assert held.minimum <= o.minimum and held.floor <= o.floor
+        assert held.payday == o.payday

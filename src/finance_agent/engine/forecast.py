@@ -35,7 +35,13 @@ from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
 from finance_agent.categorise import normalise
 from finance_agent.categorise.recurring import CADENCES, Recurrence, detect_recurring
-from finance_agent.ledger import Categorisation, Ledger, Transaction
+from finance_agent.ledger import (
+    Categorisation,
+    Ledger,
+    SplitPart,
+    Transaction,
+    shares_in_gbp,
+)
 from finance_agent.ledger.fx import GBP
 
 LEVEL = 0.8  # the prediction interval's coverage
@@ -131,21 +137,21 @@ def gbp_rows(
 ) -> list[Transaction]:
     """`txns` in GBP: a foreign one at `gbp[id]` (minor units, from
     `Ledger.foreign_in_gbp`, the one #156 rate), left out while it needs a
-    rate, never counted as pence of its own currency.
-    shortcut: a foreign Split counts whole under its largest part's Category
-    (its parts are in its own currency); convert each part if that matters."""
+    rate, never counted as pence of its own currency. A foreign Split's parts
+    are rescaled to GBP as the Ledger's totals do (`shares_in_gbp`)."""
     out: list[Transaction] = []
     for t in txns:
         if t.currency == GBP:
             out.append(t)
         elif (minor := gbp.get(t.id)) is not None:
             c = t.categorisation
+            if c is not None and c.parts:
+                own = [(p.category, p.amount_minor) for p in c.parts]
+                parts = shares_in_gbp(own, int(t.amount.scaleb(2)), minor)
+                c = replace(c, parts=tuple(SplitPart(m, k) for k, m in parts))
             out.append(
                 replace(
-                    t,
-                    amount=Decimal(minor).scaleb(-2),
-                    currency=GBP,
-                    categorisation=c and replace(c, parts=()),
+                    t, amount=Decimal(minor).scaleb(-2), currency=GBP, categorisation=c
                 )
             )
     return out

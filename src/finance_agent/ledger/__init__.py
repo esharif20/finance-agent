@@ -480,7 +480,7 @@ def _decimal(minor: int) -> Decimal:
 CURRENCY = fx.GBP  # every total is in GBP; foreign figures convert (#156)
 
 
-def _shares_in_gbp(
+def shares_in_gbp(
     shares: list[tuple[tuple[str, str], int]], amount_minor: int, gbp_minor: int
 ) -> list[tuple[tuple[str, str], int]]:
     """`shares` of a Transaction of `amount_minor` rescaled to its GBP figure:
@@ -1503,7 +1503,7 @@ class Ledger:
         for txn_id, c in self._categorisations().items():
             if txn_id in amounts and c.category and c.kind in ("Spending", "Refund"):
                 own, gbp = amounts[txn_id]
-                for (top, sub), minor in _shares_in_gbp(_shares(c, own), own, gbp):
+                for (top, sub), minor in shares_in_gbp(_shares(c, own), own, gbp):
                     merchants = tree.setdefault(top, {}).setdefault(sub, {})
                     key = (c.merchant_id, c.merchant or "Unknown")
                     merchants[key] = merchants.get(key, 0) - minor
@@ -1599,7 +1599,7 @@ class Ledger:
                 refunds += _decimal(gbp)
                 # only the Uncategorised and To review shares: a split
                 # Refund's other parts are matched in their own Categories
-                for (top, _), minor in _shares_in_gbp(_shares(c, own), own, gbp):
+                for (top, _), minor in shares_in_gbp(_shares(c, own), own, gbp):
                     if top in unmatched:
                         unmatched[top] -= _decimal(minor)
         cats: list[Spend] = []

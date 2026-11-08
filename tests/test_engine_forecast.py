@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
 
 from hypothesis import given, settings
@@ -243,7 +244,7 @@ def test_a_foreign_row_never_moves_a_gbp_forecast_without_a_rate(
     assert converted == _what_if([*txns, as_gbp], as_of)
 
 
-def test_a_foreign_split_counts_whole_under_its_largest_part() -> None:
+def test_a_foreign_splits_parts_are_each_converted() -> None:
     parts = (SplitPart(-700, ("Shopping", "S0")), SplitPart(-300, ("Food", "F")))
     t = _spend(1, date(2026, 1, 3), 1_000)
     assert t.categorisation is not None
@@ -251,7 +252,74 @@ def test_a_foreign_split_counts_whole_under_its_largest_part() -> None:
     t = replace(t, currency="EUR", categorisation=split)
     (out,) = gbp_rows([t], {1: -850})
     assert out.amount == Decimal("-8.50") and out.currency == "GBP"
-    assert out.categorisation is not None and out.categorisation.parts == ()
+    assert out.categorisation is not None
+    assert out.categorisation.parts == (
+        SplitPart(-595, ("Shopping", "S0")),
+        SplitPart(-255, ("Food", "F")),
+    )
+
+
+MIXED = st.lists(
+    st.tuples(
+        st.integers(0, 29),  # months back
+        st.integers(1, 28),  # day
+        st.integers(1, 10**7),  # minor units spent, in the row's own currency
+        st.sampled_from(["GBP", "EUR", "USD"]),
+        st.one_of(st.none(), st.integers(1, 10**7)),  # GBP figure, None: no rate
+        st.integers(0, 3),  # Split parts: 0 is no Split
+    ),
+    max_size=40,
+)
+
+
+@settings(max_examples=80, deadline=None)
+@given(MIXED)
+def test_verifier_mixed_currencies_match_an_exact_per_row_reference(
+    rows: list[tuple[int, int, int, str, int | None, int]],
+) -> None:
+    """Verifier #227: over mixed currencies with a rate present or not, the
+    forecast equals one built from GBP rows made by hand: each foreign row at
+    its GBP figure, its Split parts adding up to exactly that, or dropped."""
+    as_of = date(2026, 7, 14)
+    txns: list[Transaction] = [_salary(i) for i in range(30)]
+    gbp: dict[int, int | None] = {}
+    reference: list[Transaction] = list(txns)
+    for i, (m, d, own, cur, g, n) in enumerate(rows, start=1):
+        t = _spend(i, _month(m, d), own)
+        c = t.categorisation
+        assert c is not None
+        if n and own >= n:  # parts in its own currency, adding up to it
+            cuts = [own // n] * (n - 1)
+            cats = [("Shopping", f"P{k}") for k in range(n)]
+            parts = tuple(
+                SplitPart(-p, k)
+                for p, k in zip([*cuts, own - sum(cuts)], cats, strict=True)
+            )
+            t = replace(t, categorisation=replace(c, parts=parts))
+        t = replace(t, currency=cur)
+        txns.append(t)
+        if cur == "GBP":
+            reference.append(t)
+            continue
+        gbp[i] = None if g is None else -g
+        if g is None:
+            continue  # fail closed: never counted as pence
+        (out,) = gbp_rows([t], gbp)
+        assert out.amount == Decimal(-g).scaleb(-2) and out.currency == "GBP"
+        oc = out.categorisation
+        assert oc is not None
+        if t.categorisation and t.categorisation.parts:
+            assert sum(p.amount_minor for p in oc.parts) == -g
+            for p, q in zip(t.categorisation.parts, oc.parts, strict=True):
+                assert p.category == q.category
+                assert abs(Fraction(p.amount_minor * g, own) - q.amount_minor) <= 1
+        reference.append(
+            replace(t, amount=Decimal(-g).scaleb(-2), currency="GBP", categorisation=oc)
+        )
+    assert project(gbp_rows(txns, gbp), {}, as_of) == project(reference, {}, as_of)
+    for out in gbp_rows(txns, gbp):
+        assert out.currency == "GBP"
+        assert out.amount == out.amount.quantize(Decimal("0.01"))
 
 
 def test_cash_flow_converts_a_foreign_subscription_at_the_entered_rate(

@@ -5,7 +5,7 @@ GBP: a foreign row counts at its #156 rate, or not at all while one is needed.
 The projection starts from the last import or sync (the balance's date), not
 today, so the spend since then is projected rather than skipped."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -14,8 +14,9 @@ from pydantic import BaseModel
 from finance_agent.api.subscription_costs import Pence
 from finance_agent.api.subscriptions import Led
 from finance_agent.engine.baselines import Insufficient
-from finance_agent.engine.forecast import cash_flow, in_gbp
+from finance_agent.engine.forecast import in_gbp, project
 from finance_agent.engine.shortfall import Risk, outlook, pace
+from finance_agent.ingest.simplefin import LONDON
 
 router = APIRouter(prefix="/api/cash-flow")
 
@@ -43,7 +44,7 @@ def simulate_purchase(
     on: date | None = None,
     buffer_minor: Minor = 0,
 ) -> SimulationOut:
-    today = date.today()
+    today = datetime.now(LONDON).date()
     when = on or today
     if when < today:
         raise HTTPException(422, "A purchase cannot be in the past.")
@@ -58,20 +59,40 @@ def simulate_purchase(
     known = [(a, b) for a, b in pool if b is not None]
     if not known:
         raise HTTPException(404, "No GBP balance yet. Run `fa import` first.")
-    # the stalest balance decides: a fresher one only makes this pessimistic
-    imported = [a.last_import.date() for a, _ in known if a.last_import is not None]
+    # the stalest balance decides; a fresher one already holds the money in and
+    # out since then, so its spend counts twice (pessimistic) and its income
+    # on or before its import is not credited again (`paid_to`)
+    imported = [
+        a.last_import.replace(tzinfo=a.last_import.tzinfo or UTC)
+        .astimezone(LONDON)
+        .date()
+        for a, _ in known
+        if a.last_import is not None
+    ]
     as_of = min([today, *imported])
-    flow = cash_flow(led, as_of, HORIZON)
+    paid_to = min(today, max(imported, default=as_of))
+    # income counts only into the pool; spend from anywhere does (pessimistic)
+    pooled = {a.id for a, _ in known}
+    rows = [
+        t
+        for t in in_gbp(led)
+        if t.account_id in pooled
+        or t.categorisation is None
+        or t.categorisation.kind != "Income"
+    ]
+    registry = {e.merchant_id: e.status for e in led.subscriptions()}
+    flow = project(rows, registry, as_of, HORIZON)
     if f"{when:%Y-%m}" not in {m.month for m in flow.months}:
         raise HTTPException(422, "A purchase is beyond the forecast horizon.")
     o = outlook(
         int(sum(b for _, b in known) * 100),
         as_of,
         flow,
-        pace(in_gbp(led), flow, as_of),
+        pace(rows, flow, as_of),
         amount_minor,
         when,
         buffer_minor,
+        paid_to=paid_to,
     )
     if isinstance(o, Insufficient):
         return SimulationOut(

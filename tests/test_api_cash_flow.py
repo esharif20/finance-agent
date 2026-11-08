@@ -3,12 +3,14 @@
 
 from collections.abc import Callable
 from datetime import UTC, date, datetime, time, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, update
 
 from finance_agent import api, categorise
+from finance_agent.ingest.simplefin import LONDON
 from finance_agent.ledger import Ledger
 from finance_agent.storage import schema
 from synthetic_banks import revolut_pockets
@@ -143,7 +145,7 @@ def test_the_projection_starts_from_the_last_import_and_says_so(
         )
     with TestClient(api.create_app(engine)) as c:
         old = c.get(URL, params={"amount_minor": 100}).json()
-    assert fresh["as_of"] == date.today().isoformat()
+    assert fresh["as_of"] == datetime.now(LONDON).date().isoformat()
     assert old["status"] == "ok" and old["as_of"] == stale.isoformat()
 
 
@@ -176,6 +178,51 @@ def test_a_foreign_spend_without_a_rate_never_moves_the_what_if(
     with engine.begin() as conn:
         assert Ledger(conn, 1).import_files([p]).rejected == []
         categorise.run(conn, 1)
+    with TestClient(api.create_app(engine)) as c:
+        after = c.get(URL, params={"amount_minor": 100}).json()
+    assert after == before
+
+
+def test_another_users_stale_import_never_moves_this_ones_start(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    """Verifier #227: `as_of` comes from this user's own accounts only."""
+    _load(engine, write_export, 1, 14)
+    _load(engine, write_export, 2, 14)
+    si = schema.statement_import
+    old = datetime.combine(date.today() - timedelta(days=20), time(9), UTC)
+    with engine.begin() as conn:
+        conn.execute(update(si).where(si.c.user_id == 2).values(imported_at=old))
+    with TestClient(api.create_app(engine)) as c:
+        body = c.get(URL, params={"amount_minor": 100}).json()
+    assert body["as_of"] == datetime.now(LONDON).date().isoformat()
+
+
+def test_income_into_a_foreign_account_never_props_up_the_gbp_pool(
+    engine: Engine, write_export: Callable[[str], Path], tmp_path: Path
+) -> None:
+    """Verifier #227: the pool is GBP accounts only, so a EUR salary (even at
+    a rate) must not be projected into it; that would be optimistic."""
+    _load(engine, write_export, 1, 14)
+    with TestClient(api.create_app(engine)) as c:
+        before = c.get(URL, params={"amount_minor": 100}).json()
+    eur = [
+        ("TOPUP", "EUR", _month(back, 20), "SYNTH EURO CO SALARY", 500_000)
+        for back in range(1, 13)
+    ]
+    p = tmp_path / "revolut.csv"
+    p.write_text(revolut_pockets(eur))
+    with engine.begin() as conn:
+        led = Ledger(conn, 1)
+        assert led.import_files([p]).rejected == []
+        led.set_rate("EUR", Decimal("0.85"), date(2020, 1, 1))
+        categorise.run(conn, 1)
+        kinds = {
+            t.categorisation.kind
+            for t in led.transactions()
+            if t.currency == "EUR" and t.categorisation
+        }
+    assert kinds == {"Income"}, kinds  # the case under test is reached
     with TestClient(api.create_app(engine)) as c:
         after = c.get(URL, params={"amount_minor": 100}).json()
     assert after == before
