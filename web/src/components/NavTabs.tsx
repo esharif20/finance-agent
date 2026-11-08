@@ -10,11 +10,17 @@ export function NavTabs({
   tab,
   className,
   item,
+  label: labelClass,
+  tip,
 }: {
   tabs: readonly Tab[];
   tab: string;
   className: string;
   item: string;
+  /** classes on each label, e.g. to hide it visually (it stays the link's name) when space runs out */
+  label?: string;
+  /** show the label as a tooltip too, for when it is visually hidden */
+  tip?: boolean;
 }) {
   const marker = useId(); // the desktop and mobile navs each keep their own marker
   const reduced = useReducedMotion();
@@ -25,6 +31,7 @@ export function NavTabs({
           key={id}
           href={`#${id}`}
           aria-current={tab === id ? "page" : undefined}
+          data-tip={tip ? label : undefined}
           className={`${item} relative ${tab === id ? "" : "[@media(hover:hover)]:hover:bg-active"}`}
         >
           {tab === id && (
@@ -39,7 +46,7 @@ export function NavTabs({
           )}
           <span className="relative inline-flex items-center gap-2">
             {icon}
-            {label}
+            <span className={labelClass}>{label}</span>
             {!!badge && (
               <>
                 <span
