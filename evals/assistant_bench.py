@@ -219,7 +219,11 @@ class _MemoryKeyring(keyring.backend.KeyringBackend):
 
 
 def _score(
-    factory: Factory, engine: Any, ids: Ids, timed: bool
+    factory: Factory,
+    engine: Any,
+    ids: Ids,
+    timed: bool,
+    cases: tuple[golden.Case, ...] = golden.CASES,
 ) -> tuple[dict[str, float], dict[str, list[str]]]:
     fails: dict[str, list[str]] = {
         k: []
@@ -235,7 +239,7 @@ def _score(
     }
     latencies: list[float] = []
     phases: dict[str, list[float]] = {p: [] for p in PHASES}
-    for case in golden.CASES:
+    for case in cases:
         rec = Recorder(factory(case, ids))
         with engine.connect() as conn:
             tx = conn.begin()
@@ -278,11 +282,11 @@ def _score(
         for k, ok in checks.items():
             if not ok:
                 fails[k].append(case.id)
-    n = len(golden.CASES)
-    refusals = sum(c.refusal for c in golden.CASES)
+    n = len(cases)
+    refusals = sum(c.refusal for c in cases)
 
     def rate(k: str, of: int = n) -> float:
-        return round(1 - len(fails[k]) / of, 6)
+        return round(1 - len(fails[k]) / of, 6) if of else 1.0
 
     metrics = {
         "route_accuracy": rate("route"),
@@ -309,7 +313,9 @@ def _score(
 
 
 def evaluate(
-    models: dict[str, tuple[str, str, Factory]] = FAKES, timed: bool = False
+    models: dict[str, tuple[str, str, Factory]] = FAKES,
+    timed: bool = False,
+    cases: tuple[golden.Case, ...] = golden.CASES,  # the routing dataset's (#283)
 ) -> dict[str, Any]:
     prev = keyring.get_keyring()
     keyring.set_keyring(_MemoryKeyring())  # never the real Keychain
@@ -322,7 +328,7 @@ def evaluate(
                 ids = seed(engine, ME, d, DECEMBER + ROWS)
                 out: dict[str, Any] = {}
                 for key, (name, version, factory) in models.items():
-                    metrics, fails = _score(factory, engine, ids, timed)
+                    metrics, fails = _score(factory, engine, ids, timed, cases)
                     out[key] = {
                         "model": name,
                         "model_version": version,
