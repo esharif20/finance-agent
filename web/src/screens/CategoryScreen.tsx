@@ -157,7 +157,7 @@ export function CategoryScreen({
           <button
             type="button"
             onClick={() => detail.refetch()}
-            className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground"
+            data-magnetic className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground"
           >
             Try again
           </button>

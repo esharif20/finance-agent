@@ -95,7 +95,7 @@ export function SpendingDonut({ spending, account }: { spending: Spending; accou
             </svg>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-label text-muted-foreground">Spent</span>
-              <Money value={spending.total} className="figure text-figure" />
+              <Money value={spending.total} countUp className="figure text-figure" />
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { Check, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, Check, TriangleAlert } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { Account, Spending, Summary } from "@/api/client";
 import { Money } from "@/components/Money";
@@ -85,7 +85,11 @@ export function TransfersLine({ summary, combined }: { summary: Summary; combine
   if (tin.minor === 0 && tout.minor === 0) return null;
   const one = combined && tin.minor === tout.minor;
   return (
-    <p role="group" aria-label="Transfers between your accounts" className="text-sm text-muted-foreground">
+    <p role="group" aria-label="Transfers between your accounts" className="transfers flex items-start gap-3 rounded-[14px] p-3 text-sm text-muted-foreground">
+      <span className="transfers-icon" aria-hidden="true">
+        <ArrowLeftRight className="size-4" />
+      </span>
+      <span className="self-center">
       {one ? (
         <>
           <Money value={tout} className="font-semibold text-foreground" /> moved between your
@@ -98,13 +102,25 @@ export function TransfersLine({ summary, combined }: { summary: Summary; combine
           <Money value={tout} className="font-semibold text-foreground" /> out.
         </>
       )}
+      </span>
     </p>
   );
 }
 
 /** The combined view's per-Account parts: each Account's share of this month's money in
  * and out. The parts add up to the combined figures (the API's test proves it). */
-export function AccountShares({ summary, accounts }: { summary: Summary; accounts: Account[] }) {
+export function AccountShares({
+  summary,
+  accounts,
+  hot,
+  onHot,
+}: {
+  summary: Summary;
+  accounts: Account[];
+  hot?: number; // an Account under the pointer or keyboard, here or on its card: its share is lit
+  onHot?: (id: number | undefined) => void;
+}) {
+  const lit = (id: number) => (hot === undefined ? undefined : hot === id ? "on" : "off");
   const rows = summary.accounts.flatMap((p) => {
     const i = accounts.findIndex((a) => a.id === p.account_id);
     const a = accounts[i];
@@ -120,6 +136,7 @@ export function AccountShares({ summary, accounts }: { summary: Summary; account
             .map((r) => (
               <span
                 key={r.account_id}
+                data-lit={lit(r.account_id)}
                 style={{ "--h": r.hue, flexGrow: r[key].minor } as CSSProperties}
               />
             ))}
@@ -127,7 +144,7 @@ export function AccountShares({ summary, accounts }: { summary: Summary; account
     </div>
   );
   return (
-    <Card aria-labelledby="shares-title" className="flex flex-col gap-5">
+    <Card aria-labelledby="shares-title" className="card-rich flex flex-col gap-5" data-lit={hot === undefined ? undefined : ""}>
       <CardHeader className="mb-0">
         <CardTitle id="shares-title">By account</CardTitle>
       </CardHeader>
@@ -144,7 +161,13 @@ export function AccountShares({ summary, accounts }: { summary: Summary; account
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.account_id}>
+            <tr
+              key={r.account_id}
+              data-lit={lit(r.account_id)}
+              className="share-row"
+              onPointerEnter={() => onHot?.(r.account_id)}
+              onPointerLeave={() => onHot?.(undefined)}
+            >
               <th scope="row" className="py-1.5 text-left font-semibold">
                 <span className="flex items-center gap-2">
                   <span className="share-key" style={{ "--h": r.hue } as CSSProperties} aria-hidden="true" />
