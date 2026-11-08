@@ -266,6 +266,13 @@ def _score(engine: Any, model_for: Any, timed: bool) -> dict[str, Any]:
                                 and a.path == "deterministic"
                                 and "spending_summary" not in a.reply
                             )
+                            # an open answer that fails its check is worded by
+                            # code from Guidance and Insights, never a table
+                            or (
+                                t.kind == "open"
+                                and a.path == "planner"
+                                and "|" not in a.reply
+                            )
                         )
                         ok = (
                             (a.path == t.path or honest)
