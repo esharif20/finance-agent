@@ -41,6 +41,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cash-flow/simulate-purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Simulate Purchase */
+        get: operations["simulate_purchase_api_cash_flow_simulate_purchase_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/categories": {
         parameters: {
             query?: never;
@@ -1583,6 +1600,27 @@ export interface components {
             /** Ledger Version */
             ledger_version: number;
         };
+        /** @enum {string} */
+        Risk: "none" | "below_buffer" | "below_zero";
+        /** SimulationOut */
+        SimulationOut: {
+            floor: components["schemas"]["Pence"] | null;
+            /** Have */
+            have: number | null;
+            minimum: components["schemas"]["Pence"] | null;
+            /** Need */
+            need: number | null;
+            /** On */
+            on: string | null;
+            /** Payday */
+            payday: string | null;
+            risk: components["schemas"]["Risk"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient";
+        };
         /** SpendingOut */
         SpendingOut: {
             /** Categories */
@@ -1835,6 +1873,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_purchase_api_cash_flow_simulate_purchase_get: {
+        parameters: {
+            query: {
+                amount_minor: number;
+                on?: string | null;
+                buffer_minor?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationOut"];
+                };
             };
             /** @description Validation Error */
             422: {

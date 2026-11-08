@@ -2037,6 +2037,112 @@
         "title": "RevertOut",
         "type": "object"
       },
+      "Risk": {
+        "enum": [
+          "none",
+          "below_buffer",
+          "below_zero"
+        ],
+        "type": "string"
+      },
+      "SimulationOut": {
+        "properties": {
+          "floor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "have": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Have"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "need": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Need"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          },
+          "payday": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payday"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Risk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "payday",
+          "minimum",
+          "on",
+          "risk",
+          "floor",
+          "have",
+          "need"
+        ],
+        "title": "SimulationOut",
+        "type": "object"
+      },
       "SpendingOut": {
         "properties": {
           "categories": {
@@ -2720,6 +2826,76 @@
           }
         },
         "summary": "Card Image"
+      }
+    },
+    "/api/cash-flow/simulate-purchase": {
+      "get": {
+        "operationId": "simulate_purchase_api_cash_flow_simulate_purchase_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "amount_minor",
+            "required": true,
+            "schema": {
+              "maximum": 10000000000000,
+              "minimum": 1,
+              "title": "Amount Minor",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          },
+          {
+            "in": "query",
+            "name": "buffer_minor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000000000000,
+              "minimum": 0,
+              "title": "Buffer Minor",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Simulate Purchase"
       }
     },
     "/api/categories": {
