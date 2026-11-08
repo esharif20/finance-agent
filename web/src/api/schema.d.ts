@@ -389,6 +389,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guidance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Guidance */
+        get: operations["guidance_api_guidance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1275,6 +1292,29 @@ export interface components {
              */
             week: string;
         };
+        /** CardOut */
+        CardOut: {
+            /** Body */
+            body: string;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Facts */
+            facts: components["schemas"]["FactOut"][];
+            /** Figures */
+            figures: components["schemas"]["FigureOut"][];
+            /** Id */
+            id: string;
+            /** Principles */
+            principles: string[];
+            /** Title */
+            title: string;
+            /** Tone */
+            tone: string;
+            /** Topic */
+            topic: string;
+            /** Why */
+            why: components["schemas"]["WhyOut"][];
+        };
         /** CategoryDetailOut */
         CategoryDetailOut: {
             /** Currency */
@@ -1432,6 +1472,24 @@ export interface components {
             /** On */
             on: string;
         };
+        /** FactOut */
+        FactOut: {
+            /**
+             * Checked On
+             * Format: date
+             */
+            checked_on: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** May Be Out Of Date */
+            may_be_out_of_date: boolean;
+            /** Shown */
+            shown: string;
+            /** Source */
+            source: string;
+        };
         /** FeedbackIn */
         FeedbackIn: {
             /** Liked */
@@ -1446,6 +1504,13 @@ export interface components {
              * @enum {string}
              */
             signal: "up" | "down" | "dismissed";
+        };
+        /** FigureOut */
+        FigureOut: {
+            /** Shown */
+            shown: string;
+            /** Signal */
+            signal: string;
         };
         /** FlagOut */
         FlagOut: {
@@ -1595,6 +1660,14 @@ export interface components {
         };
         /** MemoryCardOut */
         MemoryCardOut: {
+            /** Amount Minor */
+            amount_minor: number | null;
+            /** Due On */
+            due_on: string | null;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Priority */
+            priority: number | null;
             /** Quote */
             quote: string;
             /**
@@ -1611,13 +1684,21 @@ export interface components {
         };
         /** MemoryOut */
         MemoryOut: {
+            /** Amount Minor */
+            amount_minor: number | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Due On */
+            due_on: string | null;
             /** Id */
             id: number;
+            /** Linked Account Id */
+            linked_account_id: number | null;
+            /** Priority */
+            priority: number | null;
             /** Quote */
             quote: string;
             /** Review On */
@@ -2126,6 +2207,17 @@ export interface components {
             superseded_at: string | null;
             /** Text */
             text: string;
+        };
+        /** WhyOut */
+        WhyOut: {
+            /** Actual */
+            actual: string;
+            /** Op */
+            op: string;
+            /** Signal */
+            signal: string;
+            /** Threshold */
+            threshold: string;
         };
         /** BandOut */
         finance_agent__api__briefing__BandOut: {
@@ -2755,6 +2847,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guidance_api_guidance_get: {
+        parameters: {
+            query?: {
+                tone?: "gentle" | "blunt";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOut"][];
                 };
             };
             /** @description Validation Error */

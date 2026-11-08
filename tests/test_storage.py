@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0024"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0025"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -724,4 +724,36 @@ def test_migration_0024_adds_a_per_user_settings_table(tmp_path: Path) -> None:
     for bad in ("huge", "fast"):  # an unknown choice; a second row for the user
         with eng.begin() as conn, pytest.raises(Exception, match="CHECK|UNIQUE"):
             conn.execute(text(insert.format(bad)))
+    eng.dispose()
+
+
+def test_migration_0025_adds_goal_fields_and_keeps_memories(tmp_path: Path) -> None:
+    """0025 (#257) adds four nullable memory columns, nothing rebuilt on the
+    way up; a Memory survives the round trip, and deleting its linked Account
+    unlinks it rather than deleting it."""
+    from sqlalchemy import inspect, text
+
+    rows = (
+        "INSERT OR IGNORE INTO account (id, user_id, bank_id, external_ref, name,"
+        " kind, masked_number, currency) VALUES (2, 1, 1, 's', 'B', 'savings',"
+        " 'y', 'GBP')",
+        "INSERT OR IGNORE INTO proposal (id, user_id, kind, payload, status,"
+        " created_at) VALUES (1, 1, 'memory', '{}', 'confirmed', '2026-01-05')",
+        "INSERT OR IGNORE INTO memory (id, user_id, proposal_id, type, text, tags,"
+        " turn_id, quote, said_on, created_at) VALUES (1, 1, 1, 'goal',"
+        " 'synthetic car fund', '[]', 't', 'q', '2026-01-05', '2026-01-05')",
+        "UPDATE memory SET amount_minor = 300000, due_on = '2027-06-30',"
+        " priority = 1, linked_account_id = 2 WHERE id = 1",
+    )
+    eng = round_trip(tmp_path, "0024", "0025", set(), rows)
+    with eng.begin() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns("memory")}
+        assert {"amount_minor", "due_on", "priority", "linked_account_id"} <= cols
+        conn.execute(text("DELETE FROM account WHERE id = 2"))
+        got = conn.execute(
+            text("SELECT text, amount_minor, linked_account_id FROM memory")
+        ).all()
+        assert got == [("synthetic car fund", 300000, None)]
+        with pytest.raises(Exception, match="CHECK"):  # the rebuild kept checks
+            conn.execute(text("UPDATE memory SET type = 'fact'"))
     eng.dispose()

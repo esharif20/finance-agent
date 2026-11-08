@@ -42,6 +42,11 @@ class MemoryCardOut(BaseModel):
     tags: list[str]
     quote: str  # the user's own words
     said_on: date
+    # goal and constraint only, for the user to check against their words
+    amount_minor: int | None
+    due_on: date | None
+    priority: int | None
+    linked_account_id: int | None
 
 
 class PartOut(BaseModel):
@@ -86,6 +91,10 @@ class MemoryOut(BaseModel):
     said_on: date
     review_on: date | None
     created_at: datetime
+    amount_minor: int | None
+    due_on: date | None
+    priority: int | None
+    linked_account_id: int | None
 
 
 class MemoriesOut(BaseModel):
@@ -128,6 +137,10 @@ def _card(led: Ledger, p: Proposal) -> ProposalOut:
             tags=list(d.tags),
             quote=d.provenance.quote,
             said_on=d.provenance.said_on,
+            amount_minor=d.amount_minor,
+            due_on=d.due_on,
+            priority=d.priority,
+            linked_account_id=d.linked_account_id,
         )
     elif isinstance(d, CorrectionDraft):
         c = d.change
@@ -208,6 +221,10 @@ def memories(db: Store) -> MemoriesOut:
                 said_on=m.said_on,
                 review_on=m.review_on,
                 created_at=m.created_at,
+                amount_minor=m.amount_minor,
+                due_on=m.due_on,
+                priority=m.priority,
+                linked_account_id=m.linked_account_id,
             )
             for m in props.memories()
         ]

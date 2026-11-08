@@ -456,6 +456,15 @@ memory = Table(
     Column("said_on", Date, nullable=False),
     Column("review_on", Date),  # constraints never expire
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # goal and constraint only, in the user's own words (#257); never inferred
+    Column("amount_minor", BigInteger),  # pence, > 0
+    Column("due_on", Date),
+    Column("priority", Integer),  # 1 (highest) to 5
+    Column(  # goals only
+        "linked_account_id",
+        Integer,
+        ForeignKey("account.id", ondelete="SET NULL", name="fk_memory_linked_account"),
+    ),
     CheckConstraint(
         text("type IN ('preference', 'goal', 'constraint')"), name="ck_memory_type"
     ),
