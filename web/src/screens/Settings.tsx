@@ -150,7 +150,7 @@ export function Settings() {
             type="button"
             onClick={copy}
             disabled={asked.length === 0}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
+            data-magnetic className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
           >
             {copied === "done" ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
             Copy list

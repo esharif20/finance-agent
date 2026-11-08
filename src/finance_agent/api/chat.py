@@ -34,7 +34,8 @@ from finance_agent.assistant import ChatModel, OllamaChatModel, OllamaError
 from finance_agent.assistant.cloud_route import CloudRoute
 from finance_agent.assistant.graph import Answer, Assistant, ask, resume, waiting_for
 from finance_agent.assistant.ollama import DEFAULT_CHOICE, MODELS, WARM_KEEP_ALIVE
-from finance_agent.gateway.cloud import CloudChatModel, CloudError
+from finance_agent.gateway.cloud import CloudChatModel, CloudError, Usage
+from finance_agent.gateway.types import GatewayPayload
 from finance_agent.identity import current_user
 from finance_agent.ledger.conversation import Conversations
 from finance_agent.ledger.settings import CHOICES, Choice, Settings
@@ -72,21 +73,35 @@ def today() -> date:
     return date.today()
 
 
+class LazyCloud:
+    """The cloud model, keyed on its first call: the Keychain is read only
+    when a thread actually words a reply in the cloud, at most once per
+    process (`keychain.cached_gemini_key`), never per request or at startup."""
+
+    _model: CloudChatModel | None = None  # shared by the process's requests
+
+    def complete(
+        self, payload: GatewayPayload, *, model: str, max_tokens: int
+    ) -> tuple[str, Usage]:
+        if LazyCloud._model is None:
+            try:
+                key = keychain.cached_gemini_key()
+            except Exception:  # a locked or broken Keychain fails closed
+                raise CloudError("the Keychain could not be read") from None
+            LazyCloud._model = CloudChatModel(key or "")  # CloudError when none
+        return LazyCloud._model.complete(payload, model=model, max_tokens=max_tokens)
+
+
 def cloud_route(request: Request) -> CloudRoute | None:
-    """The gateway, or None: in the demo, with no key, or with no ledger file
-    for `spend.sqlite` to sit beside."""
+    """The gateway, or None: in the demo, when no key was stored (the
+    non-secret flag, not the Keychain), or with no ledger file for
+    `spend.sqlite` to sit beside."""
     if os.environ.get("FA_DEMO"):
         return None
     db = getattr(getattr(request.app.state.engine, "url", None), "database", None)
-    if not db or db == ":memory:":
+    if not db or db == ":memory:" or not keychain.gemini_configured(Path(db)):
         return None
-    try:
-        key = keychain.gemini_key()
-        return CloudRoute(CloudChatModel(key or ""), SpendStore.beside(Path(db)))
-    except CloudError:  # no key, or a malformed one
-        return None
-    except Exception:  # a locked or broken Keychain (the demo) fails closed
-        return None
+    return CloudRoute(LazyCloud(), SpendStore.beside(Path(db)))
 
 
 Model = Annotated[ChatModel, Depends(chat_model)]

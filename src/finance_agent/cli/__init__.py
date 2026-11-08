@@ -66,7 +66,7 @@ def _brief(command: str) -> int:
             print("Removed")
             return 0
         try:
-            cloud = CloudChatModel(keychain.gemini_key() or "")
+            cloud = CloudChatModel(keychain.cached_gemini_key() or "")
         except CloudError as e:
             print(f"fa: {e}; run `fa keys set gemini`", file=sys.stderr)
             return 1

@@ -186,7 +186,7 @@ function Item({ row, onNote }: { row: Row; onNote: (n: Note) => void }) {
             disabled={busy}
             onClick={() => confirm.mutate()}
             aria-label={`Yes, ${row.name} is a subscription`}
-            className={`${pill} bg-primary text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50`}
+            data-magnetic className={`${pill} bg-primary text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50`}
           >
             Yes, it is
           </button>
@@ -253,7 +253,7 @@ function Summary({ costs }: { costs: Costs }) {
       </h2>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
         <p>
-          <Money value={costs.total.monthly} className="text-hero tabular-nums" />
+          <Money value={costs.total.monthly} countUp className="text-hero tabular-nums" />
           <span className="text-muted-foreground"> a month</span>
           <span className="block text-muted-foreground">
             <Money value={costs.total.annual} className="tabular-nums text-foreground" /> a year
@@ -372,7 +372,7 @@ function AddOne({ taken, onNote }: { taken: Set<number>; onNote: (n: Note) => vo
         ))}
       </select>
       <PlacementSelect label="Group for the new entry" value={place} onChange={setPlace} />
-      <button type="submit" disabled={!merchant || add.isPending} className={`${action} min-h-11 bg-primary px-5 text-sm text-primary-foreground`}>
+      <button type="submit" disabled={!merchant || add.isPending} data-magnetic className={`${action} min-h-11 bg-primary px-5 text-sm text-primary-foreground`}>
         Add
       </button>
       <button type="button" onClick={() => setOpen(false)} className={`${action} min-h-11 px-5 text-sm`}>
@@ -413,7 +413,7 @@ export function Subscriptions() {
             entries.refetch();
             costs.refetch();
           }}
-          className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground"
+          data-magnetic className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground"
         >
           Try again
         </button>

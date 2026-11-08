@@ -46,7 +46,7 @@ export function TxnRow({
   return (
     <li
       aria-label={`${t.description}, ${day(t.posted_on)}`}
-      className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised sm:grid-cols-[96px_1fr_auto_auto]"
+      className="txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised sm:grid-cols-[96px_1fr_auto_auto]"
     >
       <time dateTime={t.posted_on} className="order-3 text-label text-muted-foreground sm:order-none">
         {day(t.posted_on)}
@@ -85,7 +85,7 @@ export function TxnRow({
             aria-controls={panel}
             aria-label={`Details for ${t.display_name ?? t.merchant ?? t.description}`}
             onClick={() => setOpen((o) => !o)}
-            className="ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full [@media(hover:hover)]:hover:bg-active"
+            className="row-action ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full [@media(hover:hover)]:hover:bg-active"
           >
             <ChevronDown className={`size-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           </button>

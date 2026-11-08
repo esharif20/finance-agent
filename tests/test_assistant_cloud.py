@@ -31,6 +31,7 @@ from finance_agent.gateway import PlaceholderMap, redact
 from finance_agent.gateway.cloud import (
     FLASH_MODEL,
     CloudChatModel,
+    CloudError,
     FakeCloud,
     RecordedTransport,
     Transport,
@@ -39,6 +40,7 @@ from finance_agent.gateway.cloud import (
 )
 from finance_agent.gateway.types import MONTH_TEXT, PLACEHOLDER
 from finance_agent.gateway.validate import display
+from finance_agent.storage import keychain
 from finance_agent.storage.spend import SpendStore
 from synthetic_assistant import DECEMBER, ME, OTHER, ROWS, seed
 
@@ -375,15 +377,24 @@ def test_the_demo_and_a_locked_keychain_have_no_gateway(
 ) -> None:
     req: Any = type("R", (), {"app": client.app})()
     keyring.set_password("finance-agent.gemini", "api-key", KEY)
-    assert chat.cloud_route(req) is not None  # the key is from conftest's fake keyring
+    assert chat.cloud_route(req) is None  # no flag: `fa keys set gemini` not run
+    app: Any = client.app
+    db = Path(str(app.state.engine.url.database))
+    keychain.mark_gemini(db, True)
+    assert chat.cloud_route(req) is not None
     monkeypatch.setenv("FA_DEMO", "1")
     assert chat.cloud_route(req) is None
     monkeypatch.delenv("FA_DEMO")
     held = keyring.get_keyring()
     try:
         guard.lock_keychain()
-        assert chat.cloud_route(req) is None
+        route = chat.cloud_route(req)  # set up, but the key is read only on use
+        assert route is not None
+        with pytest.raises(CloudError):  # a locked Keychain fails closed
+            route.cloud.complete(Any, model="m", max_tokens=1)  # pyright: ignore[reportArgumentType]
     finally:
+        keychain.mark_gemini(db, False)
+        chat.LazyCloud._model = None  # pyright: ignore[reportPrivateUsage]
         keyring.set_keyring(held)
         keyring.delete_password(
             "finance-agent.gemini", "api-key"
