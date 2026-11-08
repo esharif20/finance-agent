@@ -697,3 +697,13 @@ def test_the_model_is_told_today_so_it_can_fill_a_date_argument(
     turn(engine, m, "Can I afford a £50.00 jacket today?")
     (system, *_) = m.calls[1][0]
     assert system.role == "system" and "Today is 2026-01-20." in system.content
+
+
+@pytest.mark.parametrize(
+    ("today", "last"), [(date(2026, 1, 20), "2025-12"), (date(2026, 3, 31), "2026-02")]
+)
+def test_the_model_is_told_last_month_and_to_keep_pence(today: date, last: str) -> None:
+    # 4b read "last month" as the latest month, and dropped pence (£2,500)
+    (system, *_) = context.assemble("ask", "fuel last month?", [], [], today)
+    assert f"Last month is {last}." in system.content
+    assert "£2,500.00" in system.content and "pence" in system.content

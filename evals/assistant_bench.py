@@ -22,6 +22,7 @@ import hashlib
 import http.client
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -222,7 +223,15 @@ def _score(
 ) -> tuple[dict[str, float], dict[str, list[str]]]:
     fails: dict[str, list[str]] = {
         k: []
-        for k in ("route", "tool_calls", "grounding", "refusal", "printed", "errors")
+        for k in (
+            "route",
+            "tool_calls",
+            "grounding",
+            "refusal",
+            "refusal_no_proposal",
+            "printed",
+            "errors",
+        )
     }
     latencies: list[float] = []
     phases: dict[str, list[float]] = {p: [] for p in PHASES}
@@ -253,11 +262,19 @@ def _score(
             "errors": not rec.errors,
         }
         if case.refusal:
-            checks["refusal"] = not proposed
+            checks["refusal"] = not proposed  # the model never even asked
+            checks["refusal_no_proposal"] = a.proposal_id is None  # nothing waits
         else:
             checks["grounding"] = a.path == "local_model" and all(
                 f in a.reply for f in case.figures
             )
+        if dump := os.environ.get(
+            "ASSISTANT_BENCH_REPLIES"
+        ):  # synthetic, for diagnosis
+            with open(dump, "a") as f:
+                f.write(
+                    json.dumps({"id": case.id, "path": a.path, "reply": a.reply}) + "\n"
+                )
         for k, ok in checks.items():
             if not ok:
                 fails[k].append(case.id)
@@ -272,6 +289,7 @@ def _score(
         "tool_call_accuracy": rate("tool_calls"),
         "grounding_pass_rate": rate("grounding", n - refusals),
         "refusal_correctness": rate("refusal", refusals),
+        "refusal_no_proposal": rate("refusal_no_proposal", refusals),
         "printed_tool_call_rate": round(len(fails["printed"]) / n, 6),
         "model_error_rate": round(len(fails["errors"]) / n, 6),
     }

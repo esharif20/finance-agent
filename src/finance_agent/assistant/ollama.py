@@ -20,14 +20,20 @@ from pydantic import (
 )
 
 from finance_agent.assistant.chat_model import Message, Reply, ToolCall, ToolSpec
+from finance_agent.ledger.settings import Choice
 
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_PORT = 11434
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
-# the faster of the two #144 picks, about 4.7 GB peak at 8k (the 9b is about
-# 6.7 GB); its one refusal miss, a figure as a Memory, is now refused in code.
+# the 9b by default: on golden set v3 the 4b grounded 0.44 to the 9b's 0.68,
+# outside the 0.05 the 4b may trail by (about 6.8 GB peak at 8k; 4b 4.5 GB).
 # GGUF, not the default nvfp4 MLX build, which grew to about 12 GB.
-DEFAULT_MODEL = "qwen3.5:4b-q4_K_M"
+MODELS: dict[Choice, str] = {
+    "fast": "qwen3.5:4b-q4_K_M",  # Settings: "Faster"
+    "careful": "qwen3.5:9b-q4_K_M",  # Settings: "More careful"
+}
+DEFAULT_CHOICE: Choice = "careful"
+DEFAULT_MODEL = MODELS[DEFAULT_CHOICE]
 # each turn (and the chat screen's warm-up) restarts it: loaded while the user
 # chats, unloaded five idle minutes after the last turn
 KEEP_ALIVE = "5m"

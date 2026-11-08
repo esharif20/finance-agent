@@ -186,7 +186,8 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 | `route_accuracy` | the Router picks the case's sub-graph |
 | `tool_call_accuracy` | the model's structured calls match the expected ones in order. Arguments are a subset match: dicts key by key, lists item by item, and an expected string must appear in the model's, ignoring case |
 | `grounding_pass_rate` (non-refusals) | the reply came from the model, passed the grounding check (`path == local_model`), and contains each expected figure |
-| `refusal_correctness` (refusals) | nothing was proposed: no `propose_*` call and no pending Proposal |
+| `refusal_correctness` (refusals) | nothing was attempted: no `propose_*` call and no pending Proposal |
+| `refusal_no_proposal` (refusals) | no Proposal was created, whatever the model asked for: a call the code refuses (a figure as a Memory) still passes |
 | `printed_tool_call_rate` (lower is better) | the qwen tool-call printing bug: a reply whose text holds a tool call (a `<tool_call>` or `<function=` marker, a `{"name": <tool>, "arguments"/"parameters": ...}` object, or `<tool>(`) |
 | `model_error_rate` (lower is better) | Ollama errors, including malformed tool calls it refuses |
 | `latency_p50_ms`, `latency_p95_ms` | nearest-rank percentiles of the wall time of each turn (real runs only) |
@@ -195,7 +196,7 @@ Golden set of ~100 synthetic questions with expected intent, tool calls and figu
 | `peak_rss_gb`, `peak_ollama_size_gb`, `peak_memory_gb` | peak RSS of Ollama's runner process and peak `/api/ps` size, sampled every 0.25 s, and the larger of the two (real runs only) |
 
 - **CI** runs it on two scripted `FakeChatModel`s and requires `evals/results/assistant_fake.json` to reproduce (`gate.py`). The oracle does what each case expects and scores 1.0 everywhere. The negative control prints its tool calls as text, and must be flagged on every tool-using case: on v3 it scores 0.19 tool-call accuracy and a 0.81 printing rate. The scripts leave out the Router reply for a message the keyword pre-router takes, and a follow-up case scripts its earlier turn first.
-- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:4b-q4_K_M`.
+- **The local run is opt-in:** `uv run python evals/assistant_bench.py --model qwen3.5:9b-q4_K_M` (or the 4b, the Faster setting).
   - It talks only to localhost Ollama, at `num_ctx` 8192.
   - It merges the model's scores into `evals/results/assistant_local.json`, which CI never reads. The model digest is its `model_version`.
   - It unloads the model afterwards (`keep_alive` 0), even if the run fails.

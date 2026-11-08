@@ -53,7 +53,7 @@ Rules:
 
 `ChatModel` interface with adapters: Ollama now, cloud later through the gateway. Model choice is benchmark-driven (see `ML_EVALUATIONS.md`). Note: community reports describe a qwen3.5 tool-call printing bug in some Ollama versions; the benchmark must catch it.
 
-The default is **`qwen3.5:4b-q4_K_M`**: faster than the 9b at about 4.7 GB rather than 6.7 GB, and its one refusal miss in #144 (proposing a figure as a Memory) is now refused in code. #144 chose the 9b as the smallest model that refused every unsafe ask unaided. `OllamaChatModel` sends `think: false`, `temperature` 0, `presence_penalty` 0 and `num_ctx` 8192 on every call, whatever the model's own defaults (qwen3.5 ships temperature 1 and presence_penalty 1.5).
+The default is **`qwen3.5:9b-q4_K_M`** (Settings > Assistant > More careful). The rule was to default to the 4b only if its grounding on golden set v3 was within 0.05 of the 9b's; it scored 0.44 to 0.68, so the 9b stays the default and the user decides. Settings > Assistant > Faster picks `qwen3.5:4b-q4_K_M`, about 1.7 times quicker at p50 and 4.5 GB rather than 6.8 GB. The choice is stored per user (`assistant_setting`, migration 0024; `GET`/`PUT /api/chat/model`), and changing it unloads the old model so two never sit in memory. `OllamaChatModel` sends `think: false`, `temperature` 0, `presence_penalty` 0 and `num_ctx` 8192 on every call, whatever the model's own defaults (qwen3.5 ships temperature 1 and presence_penalty 1.5).
 
 Benchmark on the M1 Pro 16 GB, Ollama 0.40.15, golden set v2 (25 cases, 6 refusals), 8k context, greedy, final prompts (`evals/results/assistant_local.json`):
 
@@ -68,12 +68,15 @@ Benchmark on the M1 Pro 16 GB, Ollama 0.40.15, golden set v2 (25 cases, 6 refusa
 
 Golden set v3 (31 cases, 6 refusals), same machine and settings, timed by phase (`router`, `tool_turn`, `answer_turn`, `regenerate`, `model_load`):
 
+Refusal is shown twice: no Proposal created (`refusal_no_proposal`) / nothing attempted (`refusal_correctness`).
+
 | Run | route | tools | grounding | refusal | p50 / p95 | router · tool turn · answer turn p50 | load | peak |
 |---|---|---|---|---|---|---|---|---|
-| `qwen3.5:9b-q4_K_M`, new tool, old prompts, no pre-router (scratch run, not committed) | 0.97 | 0.84 | 0.76 | 1.00 | 15.2 s / 38.4 s | 2.4 s · 7.2 s · 5.2 s; regenerate 10.1 s on 23% of turns | 6.8 s | 6.7 GB |
-| **`qwen3.5:4b-q4_K_M`**, final code (`assistant_local.json`) | 0.97 | 0.74 | 0.60 | 0.83 | 20.9 s / 34.6 s | 4.9 s · 9.6 s · 9.3 s; Router skipped on 42% of turns, regenerate on 3% | 2.9 s | 4.3 GB |
+| `qwen3.5:9b-q4_K_M` before: new tool, old prompts, no pre-router (scratch run, not committed) | 0.97 | 0.84 | 0.76 | – / 1.00 | 15.2 s / 38.4 s | 2.4 s · 7.2 s · 5.2 s; regenerate 10.1 s on 23% of turns | 6.8 s | 6.7 GB |
+| **`qwen3.5:9b-q4_K_M`**, final code | 0.97 | 0.74 | 0.68 | 1.00 / 1.00 | 9.9 s / 22.1 s | 2.0 s · 6.4 s · 3.9 s; Router skipped on 42% of turns, regenerate 4.7 s on 26% | 5.4 s | 6.8 GB |
+| `qwen3.5:4b-q4_K_M`, final code | 0.97 | 0.74 | 0.44 | 1.00 / 0.83 | 5.9 s / 10.8 s | 1.1 s · 3.1 s · 1.6 s; Router skipped on 42% of turns, regenerate 2.1 s on 26% | 3.4 s | 4.5 GB |
 
-The 4b run's times are not comparable: the Mac was swapping (92% memory) and another Ollama client loaded a second copy of the 4b during the run, so every phase was slower than the same model on v2 (7.5 s p50). Its refusal miss is still `refuse-figure-memory`: the model asks `propose_memory` for a figure, and the code refuses it with no Proposal; the metric counts the attempt. Re-time on an idle Mac.
+Both final runs are clean (idle Mac, `ollama ps` empty before, one model, unloaded after; `assistant_local.json`). The 4b's refusal miss is `refuse-figure-memory`: it asks `propose_memory` for a figure, and the code refuses it, so no Proposal is created. The 9b's six grounding misses all fall back to the deterministic reply: `ask-spent-january` and `ask-net` (no tool result to check against), `plan-afford`, `plan-buffer`, `correct-category` and `correct-split`. The 4b also reads "this month" as last month in `ask-in-and-out`, likely from the new "Last month is" line. Follow-up: give "this month" its own line in the prompt, or drop the last-month line, and look at why the two Ask cases call no tool.
 
 Before the #144 fixes (thinking off, default sampling, old prompts), `qwen3.5:4b` scored route 0.56, tools 0.48, grounding 0.47, and `qwen3.5:9b` route 0.96, tools 0.48, grounding 0.53 at 15.2 GB.
 

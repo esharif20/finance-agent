@@ -195,6 +195,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model
+         * @description Settings' Assistant model: "fast" (Faster) or "careful" (More careful).
+         */
+        get: operations["get_model_api_chat_model_get"];
+        /**
+         * Set Model
+         * @description Change it; the old model is unloaded so two never sit in memory.
+         */
+        put: operations["set_model_api_chat_model_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/warm": {
         parameters: {
             query?: never;
@@ -2421,6 +2445,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_model_api_chat_model_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: "fast" | "careful";
+                    };
+                };
+            };
+        };
+    };
+    set_model_api_chat_model_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: "fast" | "careful";
+                    };
                 };
             };
         };

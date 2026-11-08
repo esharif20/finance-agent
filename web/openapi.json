@@ -3645,6 +3645,64 @@
         ]
       }
     },
+    "/api/chat/model": {
+      "get": {
+        "description": "Settings' Assistant model: \"fast\" (Faster) or \"careful\" (More careful).",
+        "operationId": "get_model_api_chat_model_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "enum": [
+                      "fast",
+                      "careful"
+                    ],
+                    "type": "string"
+                  },
+                  "title": "Response Get Model Api Chat Model Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Model",
+        "tags": [
+          "chat"
+        ]
+      },
+      "put": {
+        "description": "Change it; the old model is unloaded so two never sit in memory.",
+        "operationId": "set_model_api_chat_model_put",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "enum": [
+                      "fast",
+                      "careful"
+                    ],
+                    "type": "string"
+                  },
+                  "title": "Response Set Model Api Chat Model Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Set Model",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/chat/warm": {
       "post": {
         "description": "Load the model while the chat screen opens, so the first turn doesn't\nwait for it. An empty chat only loads; it stays for the keep_alive.",

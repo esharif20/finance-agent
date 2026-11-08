@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0023"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0024"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -706,4 +706,22 @@ def test_migration_0023_adds_predictions_which_go_with_their_merchant(
     with eng.begin() as conn:
         conn.execute(text("DELETE FROM merchant WHERE id = 5"))
         assert conn.execute(text("SELECT * FROM category_prediction")).all() == []
+    eng.dispose()
+
+
+def test_migration_0024_adds_a_per_user_settings_table(tmp_path: Path) -> None:
+    """0024 adds assistant_setting, nothing rebuilt: one row per user, and
+    only a known choice."""
+    from sqlalchemy import text
+
+    insert = (
+        "INSERT INTO assistant_setting (user_id, model, updated_at)"
+        " VALUES (1, '{}', '2026-01-05')"
+    )
+    eng = round_trip(
+        tmp_path, "0023", "0024", {"assistant_setting"}, (insert.format("careful"),)
+    )
+    for bad in ("huge", "fast"):  # an unknown choice; a second row for the user
+        with eng.begin() as conn, pytest.raises(Exception, match="CHECK|UNIQUE"):
+            conn.execute(text(insert.format(bad)))
     eng.dispose()
