@@ -273,3 +273,23 @@ def test_fx_conversion_states_its_rate(seeded: Engine) -> None:
     [a], _ = run(seeded, [], "How much did I spend on food in January 2026 in euros?")
     assert a.path == "planner" and "at the rate of 10 January 2026" in a.reply
     assert "€" in a.reply
+
+
+def test_the_writer_reads_the_profile_right_after_the_system_prefix(
+    seeded: Engine,
+) -> None:
+    import re
+
+    from finance_agent.engine import profile
+
+    with seeded.connect() as conn:
+        text, _ = profile.profile_context(conn, ME, TODAY)
+    fig = re.search(r"£[\d,]+\.\d\d", text)
+    assert text and fig  # the synthetic Ledger has a profile with figures
+    [a], model = run(
+        seeded, [f"Your profile shows {fig.group()}."], "Where can I save?"
+    )
+    [(messages, _)] = model.calls
+    assert messages[0].content.startswith("You are a careful")
+    assert messages[1].role == "system" and messages[1].content == text
+    assert a.path == "local_model"  # a profile figure is grounded

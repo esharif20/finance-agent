@@ -62,6 +62,7 @@ from finance_agent.assistant.tools.read import (
     _category,  # pyright: ignore[reportPrivateUsage]
 )
 from finance_agent.assistant.values import tool_values
+from finance_agent.engine import profile
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.answer_cache import AnswerCache, Hit
@@ -536,7 +537,7 @@ class Assistant:
         schemas. Grounding as ever: one regeneration, then the table."""
         led = Ledger(self.conn, current_user())
         memories = Proposals(self.conn, current_user()).memories()
-        profile, profile_values = profile_context(self.conn, current_user())
+        profile, profile_values = profile_context(self.conn, current_user(), self.today)
         d = Draft(
             messages=context.writer(
                 s["message"],
@@ -708,6 +709,10 @@ class Assistant:
             and d.proposal_id is None
         ):
             return self._ground_local(route, s, d)
+        # the gateway sends only this turn's redacted tool facts: the profile
+        # (prompt prose of the local writer) never reaches a cloud call.
+        # shortcut: no profile figures for cloud wording; sending them as
+        # facts needs the golden cloud recordings re-made with a real key
         w = self.cloud.word(
             s["message"],
             d.values,
@@ -859,14 +864,13 @@ _NEW_TURN: Update = {
 }
 
 
-def profile_context(conn: Connection, user_id: int) -> tuple[str, list[ToolValue]]:
-    """The L0 financial profile (#327) and its figures for grounding; empty
-    until engine/profile.py lands."""
-    try:
-        from finance_agent.engine import profile  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
-    except ImportError:
-        return "", []
-    return profile.profile_context(conn, user_id)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+def profile_context(
+    conn: Connection, user_id: int, today: date
+) -> tuple[str, list[ToolValue]]:
+    """The L0 financial profile (#327): its prompt text (cached per Ledger
+    version) and its figures for grounding."""
+    text, prof = profile.profile_context(conn, user_id, today)
+    return text, tool_values("profile", prof)
 
 
 def miss(reason: str) -> Update:

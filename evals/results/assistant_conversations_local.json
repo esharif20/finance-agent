@@ -6,103 +6,105 @@
           "turns": 2,
           "llm_calls_per_question": 0.0,
           "pass_rate": 1.0,
-          "latency_p50_ms": 30.5,
-          "latency_p95_ms": 31.3
+          "latency_p50_ms": 28.8,
+          "latency_p95_ms": 34.1
         },
         "clarify": {
           "turns": 1,
           "llm_calls_per_question": 0.0,
           "pass_rate": 1.0,
-          "latency_p50_ms": 23.6,
-          "latency_p95_ms": 23.6
+          "latency_p50_ms": 24.4,
+          "latency_p95_ms": 24.4
         },
         "figure": {
           "turns": 4,
           "llm_calls_per_question": 0.0,
           "pass_rate": 1.0,
           "latency_p50_ms": 55.0,
-          "latency_p95_ms": 71.5
+          "latency_p95_ms": 69.6
         },
         "follow_up": {
           "turns": 6,
           "llm_calls_per_question": 0.0,
           "pass_rate": 1.0,
-          "latency_p50_ms": 47.9,
-          "latency_p95_ms": 148.6
+          "latency_p50_ms": 51.9,
+          "latency_p95_ms": 155.3
         },
         "in_depth": {
           "turns": 2,
           "llm_calls_per_question": 1.0,
           "pass_rate": 1.0,
-          "latency_p50_ms": 5317.7,
-          "latency_p95_ms": 6786.3
+          "latency_p50_ms": 8749.0,
+          "latency_p95_ms": 9239.6
         },
         "miss": {
           "turns": 1,
           "llm_calls_per_question": 2.0,
           "pass_rate": 1.0,
-          "latency_p50_ms": 13876.3,
-          "latency_p95_ms": 13876.3
+          "latency_p50_ms": 16340.7,
+          "latency_p95_ms": 16340.7
         },
         "near_miss": {
           "turns": 1,
           "llm_calls_per_question": 3.0,
           "pass_rate": 1.0,
-          "latency_p50_ms": 18750.0,
-          "latency_p95_ms": 18750.0
+          "latency_p50_ms": 19123.0,
+          "latency_p95_ms": 19123.0
         },
         "open": {
           "turns": 3,
-          "llm_calls_per_question": 1.0,
-          "pass_rate": 1.0,
-          "latency_p50_ms": 4686.8,
-          "latency_p95_ms": 5533.2
+          "llm_calls_per_question": 1.333333,
+          "pass_rate": 0.666667,
+          "latency_p50_ms": 4719.1,
+          "latency_p95_ms": 9512.4
         }
       },
       "metrics": {
-        "pass_rate": 1.0,
-        "writer_prompt_growth": 1.598,
+        "pass_rate": 0.95,
+        "writer_prompt_growth": 1.512,
         "misses": 0,
         "map_proxy_with_map": 1,
         "map_proxy_without_map": 0,
-        "writer_prompt_tokens_turn_0": 488.0,
-        "writer_prompt_tokens_turn_1": 550.0,
-        "writer_prompt_tokens_turn_2": 567.0,
-        "writer_prompt_tokens_turn_4": 773.0,
+        "writer_prompt_tokens_turn_0": 568.0,
+        "writer_prompt_tokens_turn_1": 612.0,
+        "writer_prompt_tokens_turn_2": 786.0,
+        "writer_prompt_tokens_turn_4": 1010.5,
         "balance_llm_calls_per_question": 0.0,
         "balance_pass_rate": 1.0,
-        "balance_latency_p50_ms": 30.5,
-        "balance_latency_p95_ms": 31.3,
+        "balance_latency_p50_ms": 28.8,
+        "balance_latency_p95_ms": 34.1,
         "clarify_llm_calls_per_question": 0.0,
         "clarify_pass_rate": 1.0,
-        "clarify_latency_p50_ms": 23.6,
-        "clarify_latency_p95_ms": 23.6,
+        "clarify_latency_p50_ms": 24.4,
+        "clarify_latency_p95_ms": 24.4,
         "figure_llm_calls_per_question": 0.0,
         "figure_pass_rate": 1.0,
         "figure_latency_p50_ms": 55.0,
-        "figure_latency_p95_ms": 71.5,
+        "figure_latency_p95_ms": 69.6,
         "follow_up_llm_calls_per_question": 0.0,
         "follow_up_pass_rate": 1.0,
-        "follow_up_latency_p50_ms": 47.9,
-        "follow_up_latency_p95_ms": 148.6,
+        "follow_up_latency_p50_ms": 51.9,
+        "follow_up_latency_p95_ms": 155.3,
         "in_depth_llm_calls_per_question": 1.0,
         "in_depth_pass_rate": 1.0,
-        "in_depth_latency_p50_ms": 5317.7,
-        "in_depth_latency_p95_ms": 6786.3,
+        "in_depth_latency_p50_ms": 8749.0,
+        "in_depth_latency_p95_ms": 9239.6,
         "miss_llm_calls_per_question": 2.0,
         "miss_pass_rate": 1.0,
-        "miss_latency_p50_ms": 13876.3,
-        "miss_latency_p95_ms": 13876.3,
+        "miss_latency_p50_ms": 16340.7,
+        "miss_latency_p95_ms": 16340.7,
         "near_miss_llm_calls_per_question": 3.0,
         "near_miss_pass_rate": 1.0,
-        "near_miss_latency_p50_ms": 18750.0,
-        "near_miss_latency_p95_ms": 18750.0,
-        "open_llm_calls_per_question": 1.0,
-        "open_pass_rate": 1.0,
-        "open_latency_p50_ms": 4686.8,
-        "open_latency_p95_ms": 5533.2
+        "near_miss_latency_p50_ms": 19123.0,
+        "near_miss_latency_p95_ms": 19123.0,
+        "open_llm_calls_per_question": 1.333333,
+        "open_pass_rate": 0.666667,
+        "open_latency_p50_ms": 4719.1,
+        "open_latency_p95_ms": 9512.4
       },
-      "failures": []
+      "failures": [
+        "food-and-advice#2"
+      ]
     }
   },
   "harness": "assistant_conversations_local"
