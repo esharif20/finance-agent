@@ -89,11 +89,13 @@ def outlook(
     purchase: int = 0,
     when: date | None = None,
     buffer: int = 0,
+    paid_to: date | None = None,
 ) -> Outlook | Insufficient:
     """The lowest projected balance from `balance`, at the end of `as_of`, to
     the day before the first payday after `when` (default `as_of`), with
     `purchase` pence spent on `when`. `flow` is `cash_flow` from `as_of` and
-    `spend` is `pace` then."""
+    `spend` is `pace` then. Income projected on or before `paid_to` is taken
+    as already in `balance` (a fresher account's import) and not added."""
     when = when or as_of
     if when < as_of:
         raise ValueError("a purchase cannot be in the past")
@@ -111,6 +113,8 @@ def outlook(
         for r in series:
             per = Counter(f"{d:%Y-%m}" for d in r.dates)
             for d in r.dates:
+                if sign > 0 and paid_to is not None and d <= paid_to:
+                    continue
                 i = list(month).index(f"{d:%Y-%m}")
                 moves[d] += sign * r.months[i] // per[f"{d:%Y-%m}"]
     moves[when] -= purchase
