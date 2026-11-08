@@ -12,6 +12,13 @@ zero. Results are integer pence.
   the median cycle's spend times the share spent by that day over complete
   cycles, so the week after payday is not compared with a month's average day.
 
+After a life change the user confirmed (#270), `seasonal_baseline(since=)`
+reads only the months from the change: the median of up to six of them, and
+the same calendar month in earlier years only once those years are after it.
+The ADR 0015 gate still counts the whole history, as the Category's history
+is not lost, only out of date; a month with no complete month since the
+change is `Insufficient(0, 1)`.
+
 Each declares its ADR 0015 minimum and returns `Insufficient` below it, never
 an estimate from too little data. Both are invariant to row order.
 """
@@ -71,8 +78,11 @@ def _month(d: date) -> int:
     return d.year * 12 + d.month - 1
 
 
-def seasonal_baseline(rows: Rows, month: date) -> SeasonalBaseline | Insufficient:
-    """The expected spend in the calendar month of `month`, from rows before it."""
+def seasonal_baseline(
+    rows: Rows, month: date, since: date | None = None
+) -> SeasonalBaseline | Insufficient:
+    """The expected spend in the calendar month of `month`, from rows before it,
+    and only from the month of `since` (a confirmed life change) when given."""
     target = _month(month)
     spend: dict[int, int] = {}
     for d, amount in rows:
@@ -83,12 +93,15 @@ def seasonal_baseline(rows: Rows, month: date) -> SeasonalBaseline | Insufficien
     have = target - min(spend) if spend else 0
     if have < MIN_MONTHS:
         return Insufficient(have, MIN_MONTHS)
+    first = target - have if since is None else max(target - have, _month(since))
+    if first >= target:
+        return Insufficient(0, 1)
     same = [spend.get(target - 12 * y, 0) for y in range(1, SEASONAL_YEARS + 1)]
-    same = same[: have // 12]
+    same = same[: (target - first) // 12]
     if same:
         return SeasonalBaseline(_median(same), have, True)
     trailing = [spend.get(target - i, 0) for i in range(1, TRAILING + 1)]
-    return SeasonalBaseline(_median(trailing), have, False)
+    return SeasonalBaseline(_median(trailing[: target - first]), have, False)
 
 
 def payday_baseline(
