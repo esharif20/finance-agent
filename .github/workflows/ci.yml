@@ -69,6 +69,7 @@ jobs:
           uv run python evals/playbook.py
           uv run python evals/changepoint.py
           uv run python evals/search.py
+          uv run python evals/knowledge_profile.py
       - name: assistant benchmark on FakeChatModel (results reproduce)
         run: |
           uv run python evals/assistant_bench.py

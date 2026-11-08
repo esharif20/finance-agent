@@ -15,7 +15,7 @@ from finance_agent.cli import gbp, models
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.review import ReviewQueue
 from finance_agent.storage import backup as store
-from finance_agent.storage import default_db_path, keychain, spend
+from finance_agent.storage import default_db_path, keychain, spend, sync_schedule
 
 AI_GROUP = ("subscription", "AI tools")
 AI_CAP = Decimal(100)  # the user's AI subscriptions cap (#308)
@@ -55,6 +55,7 @@ def loaded_models() -> list[str] | None:
 class Snapshot:
     month: str
     last_sync_at: datetime | None
+    last_attempt_at: datetime | None
     accounts: int
     money_in: Decimal
     money_out: Decimal
@@ -69,9 +70,12 @@ def snapshot(engine: Engine, user_id: int, today: date) -> Snapshot:
         led = Ledger(conn, user_id)
         s = led.summarise_month(month)
         c = costs(led, today)
+        st = led.sync_status(today)
+        tried = [t for t in (st.last_sync_at, st.last_failure_at) if t is not None]
         return Snapshot(
             month,
-            led.sync_status(today).last_sync_at,
+            st.last_sync_at,
+            max(tried, default=None),
             len(led.accounts()),
             s.money_in,
             s.money_out,
@@ -90,6 +94,20 @@ def cloud_line(now: datetime) -> str:
     rows = spend.SpendStore(path).month_status(now)
     used = _pounds(sum(b.spent_pence + b.reserved_pence for b in rows))
     return f"{gbp(used)} of £{CLOUD_CAP} this month  {bar(used, CLOUD_CAP, 12)}"
+
+
+def next_sync_line(s: Snapshot, now: datetime) -> str:
+    """When the `fa` server's scheduled sync runs next (#327)."""
+    sched = sync_schedule.load()
+    due = sync_schedule.next_at(sched, s.last_attempt_at, now)
+    if due is None:
+        return "off (`fa sync --auto on`)"
+    every = f"every {sched.every_hours}h while fa is open"
+    if due <= now:
+        return f"due now · {every}"
+    left = int((due - now).total_seconds()) // 60
+    when = f"{left}m" if left < 60 else f"{left // 60}h {left % 60}m"
+    return f"in {when} ({due:%H:%M} UTC) · {every}"
 
 
 def one_line(s: Snapshot, now: datetime) -> str:
@@ -114,6 +132,7 @@ def status(
     cloud = cloud_line(now) if configured else "off"
     rows = (
         ("Last sync", _ago(s.last_sync_at, now)),
+        ("Next sync", next_sync_line(s, now)),
         ("Accounts", str(s.accounts)),
         (f"{s.month} in", gbp(s.money_in)),
         (f"{s.month} out", gbp(s.money_out)),
