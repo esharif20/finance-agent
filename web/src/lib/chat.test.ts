@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Chat, friendlyLabel, initial, parseBlocks, parseSse, parseTiming, pathLabel, reduce, shortModel, timingLine, timingRows } from "./chat";
+import { type Chat, friendlyLabel, initial, parseBlocks, parseChart, parseSse, parseTiming, pathLabel, reduce, shortModel, timingLine, timingRows } from "./chat";
 
 // synthetic
 const ev = (name: string, data: object) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -134,5 +134,17 @@ describe("timing", () => {
   it("keeps the browser's wait on the finished message", () => {
     const s = [{ type: "send", text: "x" } as const, { type: "event", event: { name: "done", data: { waited_ms: 900 } } } as const].reduce(reduce, initial);
     expect(s.messages.at(-1)?.waitedMs).toBe(900);
+  });
+});
+
+describe("parseChart", () => {
+  const bars = [{ label: "Shell", minor: 4800 }, { label: "Tesco Fuel", minor: 3600 }];
+  it("keeps a chart whose bars sum to its total", () => {
+    expect(parseChart({ title: "Fuel in December 2025", currency: "GBP", total_minor: 8400, bars })?.bars).toEqual(bars);
+  });
+  it("drops one that disagrees with its figure, or is malformed", () => {
+    expect(parseChart({ title: "x", currency: "GBP", total_minor: 8401, bars })).toBeUndefined();
+    expect(parseChart({ title: "x", currency: "GBP", total_minor: 4800, bars: [bars[0], { label: 1, minor: 0 }] })).toBeUndefined();
+    expect(parseChart(null)).toBeUndefined();
   });
 });

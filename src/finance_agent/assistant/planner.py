@@ -37,6 +37,7 @@ from finance_agent.assistant.tools.insight import ListInsightsOut
 from finance_agent.assistant.tools.query import QueryPlan, SpendForQueryOut
 from finance_agent.assistant.tools.query import spend as spend
 from finance_agent.assistant.tools.read import (
+    CategoryDetailOut,
     Data,
     FindTransactionsOut,
     Source,
@@ -569,6 +570,57 @@ def open_plan(
 
 
 ADVICE_ROWS = 3
+CHART_ROWS = 6  # bars before the rest is one "Other" bar
+
+
+class Bar(BaseModel):
+    model_config = _STRICT
+    label: str  # a Merchant's display name: shown as text, never markup
+    minor: int
+
+
+class Chart(BaseModel):
+    """An inline chart for a figure reply (#317): where the total went. The
+    bars sum to `total_minor` exactly, the figure the reply states."""
+
+    model_config = _STRICT
+    kind: Literal["breakdown"] = "breakdown"
+    title: str
+    evidence_id: str
+    currency: str
+    total_minor: int
+    bars: list[Bar]
+
+
+def chart(plan: Plan, fetched: Sequence[Fetched]) -> Chart | None:
+    """The asked period's spending by Merchant, when there are two or more."""
+    first = fetched[0].out if fetched else None
+    if not isinstance(first, SpendForQueryOut | CategoryDetailOut):
+        return None
+    if len(first.merchants) < 2:
+        return None
+    rows = first.merchants[:CHART_ROWS]
+    bars = [Bar(label=r.merchant.data, minor=r.amount.minor) for r in rows]
+    rest = first.total.minor - sum(b.minor for b in bars)
+    if rest:
+        bars.append(Bar(label="Other", minor=rest))
+    if sum(b.minor for b in bars) != first.total.minor:
+        return None  # never a chart that disagrees with the figure
+    if isinstance(first, CategoryDetailOut):
+        y, mo = int(first.month[:4]), int(first.month[5:])
+        when = "in " + format_figure(Month(year=y, month=mo))
+        what = plan.what or first.category.rpartition(" > ")[2]
+    else:
+        when, what = _period_of(first, plan), plan.what or "Spending"
+    return Chart(
+        title=f"{what} {when}",
+        evidence_id=first.evidence_id,
+        currency=first.total.currency,
+        total_minor=first.total.minor,
+        bars=bars,
+    )
+
+
 GENERAL = (
     "How much did I spend last month?",
     "What's my balance?",

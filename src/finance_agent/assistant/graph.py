@@ -222,6 +222,7 @@ class State(TypedDict):
     turn_plan: NotRequired[dict[str, Any] | None]
     resolved: NotRequired[list[str]]  # what code resolved, shown with the reply
     chips: NotRequired[list[str]]  # follow-ups the planner answers with 0 calls
+    chart: NotRequired[dict[str, Any] | None]  # a figure reply's inline chart
     topics: NotRequired[Annotated[list[str], _keep_topics]]  # one per turn
 
 
@@ -527,12 +528,14 @@ class Assistant:
         res = self._check(reply, values, today=self.today)
         if not res.grounded:
             return None  # a template slip: the model answers
+        c = planner.chart(plan, got)
         return {
             "reply": reply,
             "path": "planner",
             "evidence": _shown_evidence(v.evidence_id for v in values),
             "turn_plan": plan.model_dump(mode="json"),
             "resolved": list(plan.labels),
+            "chart": c.model_dump() if c else None,
         }
 
     def _write(self, route: Route, s: State, plan: planner.Plan) -> Update:
@@ -623,6 +626,8 @@ class Assistant:
         plan = planner.figure(s["message"], self.today, led)
         if isinstance(plan, planner.Plan):  # so a follow-up can patch it
             done |= {"turn_plan": plan.model_dump(mode="json"), "resolved": []}
+            c = out and planner.chart(plan, [planner.Fetched(call.name, out)])
+            done["chart"] = c.model_dump() if c else None
         return done
 
     def _prefetch(self, s: State, d: Draft) -> None:
@@ -903,6 +908,7 @@ _NEW_TURN: Update = {
     "turn_plan": None,
     "resolved": [],
     "chips": [],
+    "chart": None,
 }
 
 
@@ -976,6 +982,7 @@ class Answer:
     counted: tuple[Evidence, ...] = ()  # Transactions behind its totals
     resolved: tuple[str, ...] = ()  # what code resolved the question to (#317)
     chips: tuple[str, ...] = ()
+    chart: dict[str, Any] | None = None
     # server-side monotonic ms: total and per phase, model calls and name
     timing: dict[str, Any] = field(default_factory=dict[str, Any])
 
@@ -1019,6 +1026,7 @@ def _answer(
         resolved=tuple(out.get("resolved") or ()),
         chips=tuple(out.get("chips") or _chips(out, bool(pending))),
         timing=_timing(assistant, started),
+        chart=out.get("chart"),
     )
 
 

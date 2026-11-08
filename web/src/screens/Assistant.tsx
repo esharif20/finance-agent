@@ -7,7 +7,7 @@ import { CloudToggle } from "@/components/CloudToggle";
 import { Money } from "@/components/Money";
 import { PayloadViewer } from "@/components/PayloadViewer";
 import { Card } from "@/components/ui/card";
-import { type Block, type Counted, type Decision, type Message, friendlyLabel, parseBlocks, pathLabel, timingLine, timingRows } from "@/lib/chat";
+import { type Block, type Chart, type Counted, type Decision, type Message, friendlyLabel, parseBlocks, pathLabel, timingLine, timingRows } from "@/lib/chat";
 import { decide, send as sendMessage, useChat } from "@/lib/chatStore";
 import { usePrivacy } from "@/lib/privacy";
 
@@ -111,6 +111,30 @@ function CountedList({ group }: { group: Counted }) {
         </span>
       </p>
     </details>
+  );
+}
+
+/** Where a figure went, as bars (#317). Static: it draws once. Amounts are `Money`, so
+ * Hide amounts blurs them; the bars' widths are shares of the largest. */
+function ReplyChart({ chart }: { chart: Chart }) {
+  const top = Math.max(...chart.bars.map((b) => Math.abs(b.minor)), 1);
+  return (
+    <figure className="mt-3 rounded-2xl bg-raised px-4 py-3" data-testid="chart">
+      <figcaption className="text-label font-semibold">{chart.title}</figcaption>
+      <ul className="mt-2 space-y-2 text-label" aria-label={`${chart.title}, by merchant`}>
+        {chart.bars.map((b, i) => (
+          <li key={i} className="grid grid-cols-[minmax(0,7rem)_1fr_auto] items-center gap-3">
+            <span className="truncate">{b.label}</span>
+            <span className="h-2 rounded-full bg-active" aria-hidden="true">
+              <span className="block h-2 rounded-full bg-primary" style={{ width: `${(Math.abs(b.minor) / top) * 100}%` }} />
+            </span>
+            <span className="tabular-nums font-medium" data-minor={b.minor}>
+              <Money value={{ minor: b.minor, currency: chart.currency }} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </figure>
   );
 }
 
@@ -229,6 +253,7 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
               </span>
             )}
             {m.error && <p className="text-label text-warning-foreground" role="alert">{m.error}</p>}
+            {!m.streaming && m.chart && <ReplyChart chart={m.chart} />}
             {!m.streaming && !!m.resolved?.length && (
               <p className="mt-1 text-meta text-muted-foreground" data-testid="resolved">
                 Read as {m.resolved.join(", ")}
