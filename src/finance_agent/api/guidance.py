@@ -1,10 +1,12 @@
 """Guidance cards (#259): the playbook cards whose Engine-evaluated conditions
 hold for `current_user`, each with the figures it names and why it is shown.
 A thin adapter over `assistant.tools.guidance.evaluate`, which the Assistant's
-tools share. Read-only; nothing here logs."""
+tools share. It writes only the exposure log (#261): each card shown, once a
+week. Nothing here logs to stdout."""
 
 from collections.abc import Iterator
 from datetime import date
+from fractions import Fraction
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -15,7 +17,10 @@ from finance_agent.assistant.tools.guidance import Tone, clauses, evaluate, show
 from finance_agent.assistant.tools.read import Source
 from finance_agent.engine.playbook import choose_tone, prioritise
 from finance_agent.identity import current_user
+from finance_agent.ledger.exposure import Exposures, Shown
 from finance_agent.ledger.proposals import Proposals
+
+CARD_POLICY = "cards-all-v1"  # every card whose condition holds
 
 
 class FigureOut(BaseModel):
@@ -65,9 +70,9 @@ router = APIRouter(prefix="/api/guidance")
 def guidance(conn: Conn, tone: Annotated[Tone | None, Query()] = None) -> list[CardOut]:
     """`tone` left out is the Memory-chosen one (gentle by default); the cards come
     best first, less those a constraint Memory rules out (#264)."""
-    user = current_user()
+    user, today = current_user(), date.today()
     memories = Proposals(conn, user).memories()
-    g = evaluate(Source(conn, user, date.today()), tone or choose_tone(memories))  # pyright: ignore[reportArgumentType]
+    g = evaluate(Source(conn, user, today), tone or choose_tone(memories))  # pyright: ignore[reportArgumentType]
     cards = {c.id: c for c in g.book.cards}
     by_id = {s.card_id: s for s in g.shown}
     order = prioritise([cards[i] for i in by_id], memories)
@@ -107,4 +112,13 @@ def guidance(conn: Conn, tone: Annotated[Tone | None, Query()] = None) -> list[C
                 why=why,
             )
         )
+    # every applicable card is shown, so each has propensity 1 (#261)
+    Exposures(conn, user).log(
+        today,
+        CARD_POLICY,
+        (
+            Shown("card", c.id, k, len(out), Fraction(1), {"tone": c.tone})
+            for k, c in enumerate(out)
+        ),
+    )
     return out

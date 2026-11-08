@@ -9,7 +9,10 @@ or marked not a subscription as `stopped`, and stores what they raise in the
 not yet due to be raised) waits for a later refresh. It is idempotent.
 
 `ranked` orders the stored Insights by impact x confidence x relevance
-(`engine.ranking`), then drops those a constraint Memory rules out.
+(`engine.ranking`), then drops those a constraint Memory rules out. `shown`
+takes the week's slate from that feasible list, with the seeded exploration of
+`engine.ope` in its last slot, and logs each exposure with its propensity
+(#261, ADR 0015).
 
 Confidences are the detectors' fixed per-rule priors, not calibrated: that
 needs outcomes on real Insights, which only the user's own feedback will
@@ -18,14 +21,15 @@ give. Relevance carries what feedback teaches meanwhile.
 
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 from fractions import Fraction
 
 from sqlalchemy import Connection
 
 from finance_agent.categorise.display_names import display_name
-from finance_agent.engine import detectors, ranking
+from finance_agent.engine import detectors, ope, ranking
 from finance_agent.ledger import NOT_SUBSCRIPTION, Ledger
+from finance_agent.ledger.exposure import Exposures, Shown, week_of
 from finance_agent.ledger.insights import Found, Insights, StoredInsight
 from finance_agent.ledger.proposals import Proposals
 
@@ -112,6 +116,30 @@ def ranked(conn: Connection, user_id: int) -> list[Ranked]:
     best = ranking.rank(store.current(), cells)
     keep = ranking.feasible(best, lambda i: f"{i.key} {i.category}", tags)
     return [Ranked(i, cells.get((i.type, i.category), ranking.PRIOR)) for i in keep]
+
+
+def shown(conn: Connection, user_id: int, k: int, day: date) -> list[Ranked]:
+    """The `k`-slate shown in `day`'s week, each item logged as an exposure.
+    Only feasible Insights are candidates, and exploration swaps a slot, never
+    adds one. Listing is not an outcome: nothing here teaches relevance."""
+    feed = ranked(conn, user_id)
+    slots = ope.slate(feed, k, ope.seed(user_id, week_of(day), ope.POLICY))
+    Exposures(conn, user_id).log(
+        day,
+        ope.POLICY,
+        (
+            Shown(
+                "insight",
+                str(s.item.insight.id),
+                s.slot,
+                len(slots),
+                s.propensity,
+                {"type": s.item.insight.type, "day": day.day, "candidates": len(feed)},
+            )
+            for s in slots
+        ),
+    )
+    return [s.item for s in slots]
 
 
 def _pounds(pence: int) -> str:
