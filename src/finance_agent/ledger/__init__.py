@@ -870,10 +870,14 @@ class Ledger:
         query: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        *,
+        notes: bool = True,
     ) -> TransactionPage:
         """Transactions matching every filter given, newest first. `category` is
         a top-level name, after Corrections; `query` is a case-insensitive
-        substring of the description, the Merchant's name or a live note."""
+        substring of the description, the Merchant's name or (when `notes`) a
+        live note. The Assistant passes `notes=False` so it can't probe a note
+        by guessing (#241)."""
         t, c, m = schema.transaction, schema.categorisation, schema.merchant
         n = schema.note
         terms = [*_only(account_id), self._live()]
@@ -906,7 +910,7 @@ class Ledger:
                 or_(
                     func.lower(t.c.description).contains(needle, autoescape=True),
                     t.c.id.in_(named),
-                    t.c.id.in_(noted),
+                    *([t.c.id.in_(noted)] if notes else []),
                 )
             )
         rows = [

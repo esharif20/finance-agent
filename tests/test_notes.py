@@ -135,6 +135,17 @@ def test_search_finds_a_transaction_by_its_live_note_only() -> None:
         assert [t.id for t in led.search_transactions(query="boots").items] == [b]
 
 
+def test_search_can_leave_notes_out_for_the_assistant() -> None:
+    """#241: the Assistant's search must not let it probe a note by guessing."""
+    with ledger_with([(KNOWN, -1200)]) as (_, led):
+        (a,) = (t.id for t in led.transactions())
+        led.set_note(a, "Football Boots")
+        assert led.search_transactions(query="boots").total == 1
+        assert led.search_transactions(query="boots", notes=False).total == 0
+        desc = led.transactions()[0].description[:3]
+        assert led.search_transactions(query=desc, notes=False).total == 1
+
+
 @settings(max_examples=25, deadline=None)
 @given(
     st.lists(
@@ -302,3 +313,43 @@ def test_a_purge_then_a_backup_and_restore_does_not_bring_the_note_back(
     db.with_name(db.name + ".pre-restore").unlink()
     backup.restore(folder / before, db)
     assert notes() == ["SYNTHPURGE one", "SYNTHPURGE two"]
+
+
+# --- verifier (#241): the Assistant's search is blind to notes -----------------
+
+
+@settings(max_examples=40, deadline=None)
+@given(
+    st.text(
+        st.characters(codec="utf-8", categories=["L", "N", "P", "Zs"]),
+        min_size=1,
+        max_size=NOTE_MAX,
+    ).filter(str.strip),
+    st.data(),
+)
+def test_the_assistant_search_is_blind_to_any_note(text: str, data: Any) -> None:
+    """Whatever the note says, and whatever slice, case or padding of it the
+    model guesses, find_transactions returns the same rows with the note as
+    without it, on the whole Transaction or on a Split part."""
+    from finance_agent.assistant.tools.read import (
+        FindTransactionsIn,
+        find_transactions,
+    )
+
+    i = data.draw(st.integers(0, len(text) - 1))
+    j = data.draw(st.integers(i + 1, min(len(text), i + 100)))
+    case = data.draw(st.sampled_from([str, str.lower, str.upper, str.casefold]))
+    pad = data.draw(st.sampled_from(["", " ", "\t "]))
+    q = (pad + case(text[i:j]) + pad)[:100]
+    if not q.strip():
+        return
+    with ledger_with([(KNOWN, -1200), (KNOWN, -300)]) as (_, led):
+        a, b = (t.id for t in led.transactions())
+        led.split_transaction(b, [(-100, GROCERIES), (None, GIFTS)])
+        inp = FindTransactionsIn(query=q)
+        before = find_transactions(led, inp)
+        led.set_note(a, text)
+        led.set_note(b, text, part=1)
+        assert find_transactions(led, inp) == before
+        if q.isascii():  # SQLite lower() folds ASCII only; the screen still finds it
+            assert led.search_transactions(query=q).total >= 1

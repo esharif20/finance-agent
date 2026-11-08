@@ -63,6 +63,8 @@ class Reads(Protocol):
         query: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        *,
+        notes: bool = True,
     ) -> TransactionPage: ...
 
 
@@ -320,7 +322,7 @@ def txn_row(t: Transaction) -> TransactionRow:
 
 def find_transactions(led: Reads, inp: FindTransactionsIn) -> FindTransactionsOut:
     page = led.search_transactions(
-        None, inp.kind, inp.category, inp.month, inp.query, inp.limit
+        None, inp.kind, inp.category, inp.month, inp.query, inp.limit, notes=False
     )
     rows = [txn_row(t) for t in page.items]
     return FindTransactionsOut(
