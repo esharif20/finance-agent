@@ -88,7 +88,7 @@ export function MonthBars({
       </CardHeader>
 
       <div role="group" aria-label={`${noun} by month`} className="flex h-44 items-stretch gap-1.5 sm:gap-2.5">
-        {rows.map((r) => {
+        {rows.map((r, i) => {
           const selected = r.month === month;
           const partial = r.month === latest ? until : undefined;
           const label = `${monthLabel(r.month)}${partial ? ` so far, to ${partial}` : ""}, ${noun} ${hidden ? "amount hidden" : formatMoney(r[side])}`;
@@ -98,7 +98,6 @@ export function MonthBars({
               type="button"
               aria-pressed={selected}
               aria-label={label}
-              title={label}
               onClick={() => onChange(r.month)}
               onPointerEnter={() => onPreview?.(r.month)}
               className="group flex min-w-0 flex-1 flex-col items-stretch justify-end gap-1.5 rounded-[10px] focus-visible:outline-offset-1"
@@ -107,11 +106,20 @@ export function MonthBars({
                 <motion.span
                   data-partial={partial ? "" : undefined}
                   data-selected={selected || undefined}
-                  className={`month-bar block w-full rounded-t-[6px] ${side === "money_in" ? "is-in" : "is-out"}`}
+                  className={`month-bar relative block w-full rounded-t-[6px] ${side === "money_in" ? "is-in" : "is-out"}`}
                   initial={false}
                   animate={{ height: `${Math.max((r[side].minor / max) * 100, 2)}%` }}
                   transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-                />
+                >
+                  {/* the figure on hover or focus; the button's label already carries it */}
+                  <span
+                    aria-hidden="true"
+                    className="month-tip"
+                    data-edge={i === 0 ? "start" : i === rows.length - 1 ? "end" : undefined}
+                  >
+                    <Money value={r[side]} />
+                  </span>
+                </motion.span>
               </span>
               <span
                 aria-hidden="true"

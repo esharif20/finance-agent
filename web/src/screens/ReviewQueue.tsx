@@ -334,7 +334,7 @@ function OneAtATime() {
 
       {status}
 
-      <Card aria-labelledby="review-title" className="flex flex-col gap-5">
+      <Card data-still aria-labelledby="review-title" className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
           <p className="text-sm text-muted-foreground">
             {label}

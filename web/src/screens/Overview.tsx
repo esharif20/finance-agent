@@ -64,6 +64,7 @@ export function Overview({ account }: { account?: number }) {
   // undefined = the newest month; the switcher sets it. The bars and steppers show `picked` at once;
   // the rest of the view follows `chosen`, deferred, so the selection paints before that re-render
   const [picked, setChosen] = useState<string>();
+  const [hot, setHot] = useState<number>(); // the Account a pointer or keyboard is on, lit in its share
   const chosen = useDeferredValue(picked);
   const client = useQueryClient();
   const summary = useQuery({ ...summaryQuery(chosen, account), placeholderData: keepPreviousData });
@@ -151,7 +152,7 @@ export function Overview({ account }: { account?: number }) {
             spending.refetch();
             months.refetch();
           }}
-          className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground"
+          data-magnetic className="mt-4 min-h-11 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground"
         >
           Try again
         </button>
@@ -187,13 +188,14 @@ export function Overview({ account }: { account?: number }) {
             selected={account}
             onSelect={select}
             onPreview={(id) => preview(undefined, id)}
+            onHot={setHot}
           />
           {/* relative: paints above the stack's WebGL canvas, which overflows below the cards */}
           <div ref={side} className="relative">
             {one ? (
               <AccountDetails account={one} />
             ) : (
-              <AccountShares summary={summary.data} accounts={accounts.data} />
+              <AccountShares summary={summary.data} accounts={accounts.data} hot={hot} onHot={setHot} />
             )}
           </div>
         </div>

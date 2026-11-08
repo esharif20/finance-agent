@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import type { components } from "@/api/schema";
 import { FxProvenance, RateNeeded } from "@/components/FxNote";
 import { Money } from "@/components/Money";
+import { Tilt } from "@/components/Tilt";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Slice } from "@/lib/categories";
 import { PoundStrip } from "./PoundStrip";
@@ -32,6 +33,7 @@ export function MonthCard({
   const { money_in, money_out, net, gaps } = summary;
   const overspent = net.minor < 0;
   return (
+    <Tilt>
     <Card aria-labelledby="month-title" className="flex flex-col gap-6">
       <CardHeader className="mb-0">
         <CardTitle id="month-title">{monthLabel(summary.month)}</CardTitle>
@@ -83,5 +85,6 @@ export function MonthCard({
       )}
       <RateNeeded fx={fx} />
     </Card>
+    </Tilt>
   );
 }
