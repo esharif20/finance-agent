@@ -204,3 +204,30 @@ export const dismissSubscription = (merchant: number) =>
 export const removeSubscription = (merchant: number) => call<SubscriptionEntry>(sub(merchant), { method: "DELETE" });
 export const cancelSubscription = (merchant: number) =>
   call<SubscriptionEntry>(sub(merchant, "/cancel"), { method: "POST" });
+
+// Insights (#150) and the what-if check (#151). A refusal throws the API's own reason.
+export type Insight = components["schemas"]["InsightOut"];
+export type Simulation = components["schemas"]["SimulationOut"];
+export const fetchInsights = () => get<Insight[]>("/api/insights?limit=5");
+
+async function post(url: string, body?: object): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: body && JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Couldn't save that. Try again.");
+}
+export const rateInsight = (id: number, liked: boolean) => post(`/api/insights/${id}/feedback`, { liked });
+export const dismissInsight = (id: number) => post(`/api/insights/${id}/dismiss`);
+
+export async function simulatePurchase(amountMinor: number, on: string, bufferMinor: number): Promise<Simulation> {
+  const q = new URLSearchParams({ amount_minor: String(amountMinor), on, buffer_minor: String(bufferMinor) });
+  const res = await fetch(`/api/cash-flow/simulate-purchase?${q}`);
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => null);
+    const detail = (body as { detail?: unknown } | null)?.detail;
+    throw new Error(typeof detail === "string" ? detail : "Couldn't check that. Try again.");
+  }
+  return (await res.json()) as Simulation;
+}
