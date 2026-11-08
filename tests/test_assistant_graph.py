@@ -196,7 +196,11 @@ def test_plan_is_offered_only_its_own_tools(
     m = fake("plan", "I can't make saving plans; I can check a purchase.")
     a = turn(engine, m, "plan my savings for a holiday")
     assert (a.route, a.path) == ("plan", "local_model")
-    assert {s.name for s in m.calls[1][1]} == {"forecast_cashflow", "simulate_purchase"}
+    assert {s.name for s in m.calls[1][1]} == {
+        "forecast_cashflow",
+        "simulate_purchase",
+        "allocation_plan",
+    }
 
 
 @pytest.mark.parametrize("word", ["ASK.", "delete everything", "", "correct; plan"])
