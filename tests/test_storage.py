@@ -109,7 +109,7 @@ def test_migration_0009_round_trips_registry_rows(tmp_path: Path) -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(storage._MIGRATIONS))  # pyright: ignore[reportPrivateUsage]
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0019"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0020"]
     eng = create_engine(f"sqlite:///{tmp_path / 'ledger.db'}")
     rows = "SELECT id, status FROM subscription_entry"
     with eng.begin() as conn:
@@ -582,4 +582,38 @@ def test_migration_0019_adds_regret_answers_which_go_with_their_transaction(
         conn.execute(text("DELETE FROM note"))
         conn.execute(text('DELETE FROM "transaction" WHERE id = 9'))
         assert conn.execute(text("SELECT * FROM regret_answer")).all() == []
+    eng.dispose()
+
+
+def test_migration_0020_adds_merges_alerts_and_shadow_log_which_go_with_their_source(
+    tmp_path: Path,
+) -> None:
+    """0020 (#108, #158, #115) adds three tables, nothing rebuilt (so no table
+    another references is copied with foreign keys on); each row points at a
+    Transaction or Merchant and is deleted with it."""
+    from sqlalchemy import text
+
+    rows = (
+        "INSERT OR IGNORE INTO merchant (id, user_id, name) VALUES (5, 1, 'SYNTH')",
+        "INSERT OR IGNORE INTO category (id, user_id, name, taxonomy_version)"
+        " VALUES (3, 1, 'Synth', 2)",
+        "INSERT INTO duplicate_merge (user_id, transaction_id, created_at)"
+        " VALUES (1, 9, '2026-01-05')",
+        "INSERT INTO subscription_alert (user_id, merchant_id, code, state,"
+        " alerted_at) VALUES (1, 5, 'price_rise', '2026-01-04', '2026-01-05')",
+        "INSERT INTO shadow_prediction (user_id, merchant_id, category_id,"
+        " confidence, model, created_at) VALUES (1, 5, 3, 900, 'm', '2026-01-05')",
+    )
+    added = {"duplicate_merge", "subscription_alert", "shadow_prediction"}
+    eng = round_trip(tmp_path, "0019", "0020", added, rows)
+    with eng.begin() as conn:
+        with pytest.raises(Exception, match="UNIQUE"):
+            conn.execute(text(rows[3]))  # one alert per state
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM note"))
+        conn.execute(text('DELETE FROM "transaction" WHERE id = 9'))
+        assert conn.execute(text("SELECT * FROM duplicate_merge")).all() == []
+        conn.execute(text("DELETE FROM merchant WHERE id = 5"))
+        assert conn.execute(text("SELECT * FROM subscription_alert")).all() == []
+        assert conn.execute(text("SELECT * FROM shadow_prediction")).all() == []
     eng.dispose()
