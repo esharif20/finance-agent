@@ -5,7 +5,7 @@ import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { routeTable, viewFor } from "@/main";
-import { HEADLINE, Hero } from "./Hero";
+import { HEADLINE, HEADLINE_LINES, Hero } from "./Hero";
 
 const web = path.resolve(import.meta.dirname, "../..");
 
@@ -36,11 +36,11 @@ describe("route split", () => {
 });
 
 describe("hero headline", () => {
-  it("animates letter by letter, with the full text for screen readers", () => {
+  it("rises line by line, with the full text for screen readers", () => {
     vi.stubGlobal("matchMedia", mediaStub(false));
     render(<Hero />);
     const h1 = screen.getByRole("heading", { level: 1, name: HEADLINE });
-    expect(h1.querySelectorAll(".lp-reel-letter").length).toBeGreaterThan(10);
+    expect(h1.querySelectorAll(".lp-line-mask")).toHaveLength(HEADLINE_LINES.length);
   });
 
   it("renders static under prefers-reduced-motion", () => {
@@ -48,8 +48,12 @@ describe("hero headline", () => {
     const { container } = render(<Hero />);
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.textContent).toBe(HEADLINE);
-    expect(h1.children).toHaveLength(0);
-    expect(container.querySelectorAll(".lp-reel-letter, .lp-word")).toHaveLength(0);
+    expect(container.querySelectorAll(".lp-line-mask")).toHaveLength(0);
+    // nothing is held mid-move: no inline transform, opacity or clip on the hero
+    for (const el of container.querySelectorAll<HTMLElement>("*")) {
+      expect(el.style.transform || "none").toBe("none");
+      expect(el.style.clipPath).toBe("");
+    }
   });
 });
 
