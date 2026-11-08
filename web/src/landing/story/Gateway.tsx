@@ -1,6 +1,7 @@
 import { motion, type MotionStyle, type MotionValue, useScroll, useSpring, useTransform } from "motion/react";
 import { type ReactNode, useRef, useState } from "react";
 import { formatMoney } from "@/lib/money";
+import { Field as Ambient } from "../fx";
 import { GATEWAY } from "./story.fixture";
 
 const REAL = { amount: formatMoney(GATEWAY.amount), merchant: GATEWAY.merchant };
@@ -185,6 +186,7 @@ function Still() {
 export function Gateway({ still }: { still: boolean }) {
   return (
     <section className="st-gate" aria-labelledby="st-gate-title" data-still={still ? "" : undefined}>
+      <Ambient tone="lemon" />
       {still ? <Still /> : <Moving />}
     </section>
   );

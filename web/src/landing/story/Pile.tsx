@@ -2,7 +2,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { type Category, CategoryChip } from "@/components/CategoryChip";
 import { Money } from "@/components/Money";
-import { Material } from "../fx";
+import { Field, Material } from "../fx";
 import { ANSWER, GROUPS, OVERVIEW, REVIEW } from "./story.fixture";
 
 /** #76: the pile shows at most this many frosted layers. */
@@ -94,6 +94,7 @@ export function Pile({ still }: { still: boolean }) {
   const slots = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
   return (
     <section className="st-pile" data-still={still ? "" : undefined} aria-labelledby="st-pile-title">
+      <Field tone="night" />
       <div className="lp-wrap st-pile-grid">
         <div className="st-pile-title">
           <h2 id="st-pile-title" className="lp-h2">

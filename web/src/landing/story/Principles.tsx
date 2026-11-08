@@ -1,5 +1,6 @@
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
+import { Field } from "../fx";
 import { PRINCIPLES } from "./story.fixture";
 
 /** #76 focus list: opacity and Manrope's weight axis follow the item's distance from the middle of the screen. */
@@ -18,6 +19,7 @@ function Focused({ text }: { text: string }) {
 export function Principles({ still }: { still: boolean }) {
   return (
     <section className="st-principles" aria-labelledby="st-principles-title">
+      <Field tone="mint" />
       <div className="lp-wrap st-principles-grid">
         <h2 id="st-principles-title" className="lp-h2">
           Five rules it keeps.

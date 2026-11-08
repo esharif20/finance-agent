@@ -1,6 +1,6 @@
 import { useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { Magnetic, Roll, useStill } from "../fx";
+import { Field, Magnetic, Roll, useStill } from "../fx";
 import { TERMINAL } from "./terminal.fixture";
 
 // `fa demo`'s own lines (cli/demo.py), with the address it prints for a local run
@@ -153,6 +153,7 @@ export function Terminal() {
   const done = pos.step >= SCRIPT.length;
   return (
     <section className="tm" aria-labelledby="tm-title">
+      <Field tone="cyan" />
       <div className="lp-wrap tm-grid">
         <div className="tm-copy">
           <h2 id="tm-title" className="lp-h2">

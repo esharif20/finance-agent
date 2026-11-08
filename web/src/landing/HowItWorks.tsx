@@ -1,7 +1,7 @@
 import { motion, useScroll, useSpring, useTransform } from "motion/react";
 import { useRef } from "react";
 import { formatMoney } from "@/lib/money";
-import { useStill } from "./fx";
+import { Field, useStill } from "./fx";
 import { ANSWER, OVERVIEW } from "./story/story.fixture";
 
 // Every statement here is from docs/AI_DESIGN.md, docs/ARCHITECTURE.md and docs/THREAT_MODEL.md.
@@ -84,6 +84,7 @@ export function HowItWorks() {
   const rail = useTransform(fill, (v) => `scaleY(${v})`);
   return (
     <section id="how" className="hw" aria-labelledby="hw-title">
+      <Field tone="paper" />
       <div className="lp-wrap">
         <div className="hw-top">
         <header className="hw-head">

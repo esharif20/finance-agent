@@ -1,6 +1,6 @@
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
-import { Lines, Material, useStill } from "./fx";
+import { Field, Lines, Material, useStill } from "./fx";
 
 const PROMISES = [
   {
@@ -40,6 +40,7 @@ export function Promises() {
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "center center"] });
   return (
     <section ref={ref} id="privacy" className="lp-promises" aria-labelledby="lp-promises-title">
+      <Field tone="night" />
       <div className="lp-wrap lp-promise-grid">
         <h2 id="lp-promises-title" className="lp-h2 lp-promises-title">
           <Lines lines={["Three promises,", "in plain words."]} still={still} />

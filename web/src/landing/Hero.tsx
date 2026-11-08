@@ -6,8 +6,9 @@ import type { Pose } from "@/lib/cardPoses";
 import { formatMoney } from "@/lib/money";
 import type { CardScene } from "@/three/cardScene";
 import { ACCOUNTS } from "./accounts.fixture";
-import { finePointer, Flex, Magnetic, Roll, useStill } from "./fx";
+import { Field, finePointer, Flex, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
+import { OVERVIEW, REVIEW } from "./story/story.fixture";
 
 export const HEADLINE = "All your accounts, in one place.";
 export const HEADLINE_LINES = ["All your accounts,", "in one place."];
@@ -19,6 +20,9 @@ const gbp = (minor: number) => ({ minor, currency: "GBP" });
 const HUES = [150, 28, 192];
 const TOTAL = formatMoney(gbp(ACCOUNTS.balance));
 const MONTH = new Date(`${ACCOUNTS.month}-01T12:00:00Z`).toLocaleString("en-GB", { month: "long", timeZone: "UTC" });
+
+// the ledger behind the cards: rows from the same made-up month, on a plane of their own
+const ROWS = [...REVIEW.map((r) => ({ name: r.merchant, amount: r.amount })), ...OVERVIEW.top.map((c) => ({ name: c.name, amount: c.amount }))];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const ease = (v: number) => v * v * (3 - 2 * v);
@@ -129,6 +133,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const rows = useRef<HTMLUListElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
   const [three, setThree] = useState(false);
@@ -164,7 +169,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const size = () => {
       const r = el.getBoundingClientRect();
       const narrow = r.width < 720;
-      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.21, 340);
+      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.24, 380);
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
@@ -186,6 +191,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         const k = ease(clamp01((since - 200 - i * 140) / 1300));
         return { ...q, y: q.y + (1 - k) * w * 1.6, rz: q.rz * k + (1 - k) * (8 - i * 8), rx: q.rx + (1 - k) * 50, s: q.s * (0.82 + 0.18 * k) };
       });
+      const pv = p.get();
+      // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
+      if (rows.current) rows.current.style.transform = `translate3d(${tilt.x * -40}px, ${-pv * 22 + tilt.y * -24}vh, ${-260 - pv * 200}px)`;
+      el.style.setProperty("--sx", `${((aim.x + 0.5) * 100).toFixed(1)}%`);
+      el.style.setProperty("--sy", `${((aim.y + 0.5) * 100).toFixed(1)}%`);
       const sweep = clamp01((since - 700) / 1500);
       const sweeping = sweep > 0 && sweep < 1;
       poses.forEach((q, i) => {
@@ -256,7 +266,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   return (
     <section ref={track} className="lp-hero" data-still={still ? "" : undefined} aria-labelledby="lp-title">
       <div className="lp-hero-pin">
-        <div className="lp-mesh" aria-hidden="true" />
+        <Field tone="night" />
         <div className="lp-halo" aria-hidden="true" data-phase={phase} />
         <div className="lp-grain" aria-hidden="true" />
         <div className="lp-hero-copy" data-phase={phase}>
@@ -284,7 +294,16 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           <StillStage />
         ) : (
           <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
+            <ul ref={rows} className="lp-rows">
+              {ROWS.map((r, i) => (
+                <li key={r.name} style={{ "--i": i } as React.CSSProperties}>
+                  <span>{r.name}</span>
+                  <Money value={r.amount} />
+                </li>
+              ))}
+            </ul>
             <canvas ref={canvas} className="lp-stage-canvas" />
+            <span className="lp-spot" aria-hidden="true" />
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot">
                 <CardFace i={i} name={a.name} />

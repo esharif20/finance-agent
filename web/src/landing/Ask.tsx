@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useId, useState } from "react";
 import { Money } from "@/components/Money";
 import type { Money as MoneyValue } from "@/lib/money";
-import { Lines, Rise, useStill } from "./fx";
+import { Field, Lines, Rise, useStill } from "./fx";
 import { ANSWER, OVERVIEW } from "./story/story.fixture";
 
 export const EXAMPLES = ["Eating out in October", "Groceries in October", "Bills this month", "Total spent in October"];
@@ -76,6 +76,7 @@ export function Ask() {
   const key = r.kind === "category" ? r.name : r.kind;
   return (
     <section className="lp-ask lp-field" aria-labelledby="lp-ask-title">
+      <Field tone="cyan" />
       <div className="lp-wrap">
         <h2 id="lp-ask-title" className="lp-h2">
           <Lines lines={["Ask it about", "your spending."]} still={still} />

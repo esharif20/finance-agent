@@ -2,7 +2,7 @@ import { LayoutGroup, motion, useInView } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/money";
 import { ACCOUNTS } from "./accounts.fixture";
-import { Material, Rise, useStill } from "./fx";
+import { Field, Material, Rise, useStill } from "./fx";
 import { ANSWER, OVERVIEW } from "./story/story.fixture";
 
 // ---- relevance: Beta(1 + yes, 1 + no) per kind of Insight (engine/ranking.py) ----
@@ -210,6 +210,7 @@ export function Learns() {
   const still = useStill();
   return (
     <section className="lp-learn" aria-labelledby="lp-learn-title">
+      <Field tone="night" />
       <div className="lp-wrap">
         <header className="lp-learn-head">
           <h2 id="lp-learn-title" className="lp-h2">

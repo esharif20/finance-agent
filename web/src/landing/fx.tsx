@@ -250,3 +250,17 @@ export function Flex({
     </span>
   );
 }
+
+/** The app's ambient colour field (index.css `.ambient`: four soft blobs drifting on unequal CSS
+    loops, transform only), held inside one chapter and tinted for it by `tone`, with grain and
+    faint ledger lines. Reduced motion: the blobs hold still. */
+export function Field({ tone }: { tone: string }) {
+  return (
+    <div className="ambient lp-amb" data-tone={tone} aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+    </div>
+  );
+}

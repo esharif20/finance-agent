@@ -1,7 +1,7 @@
 import { type MouseEvent, useCallback, useState } from "react";
 import { Money } from "@/components/Money";
 import { Ask } from "./Ask";
-import { Magnetic, Material, Rise, Roll, useStill } from "./fx";
+import { Field, Magnetic, Material, Rise, Roll, useStill } from "./fx";
 import { Hero } from "./Hero";
 import { HowItWorks } from "./HowItWorks";
 import { Learns } from "./Learns";
@@ -113,6 +113,7 @@ export default function Landing() {
         <Learns />
         <Terminal />
         <section id="what" className="lp-what" aria-labelledby="lp-what-title">
+          <Field tone="paper" />
           <div className="lp-wrap lp-mosaic">
             <Rise still={still} className="lp-tile lp-tile-head">
               <h2 id="lp-what-title" className="lp-h2">
@@ -160,6 +161,7 @@ export default function Landing() {
         </section>
         <Promises />
         <section className="lp-open" aria-labelledby="lp-open-title">
+          <Field tone="orange" />
           <div className="lp-wrap">
             <h2 id="lp-open-title" className="lp-h2 lp-open-title">
               Try it on a<br />
@@ -178,6 +180,7 @@ export default function Landing() {
         </section>
       </main>
       <footer className="lp-foot">
+        <Field tone="night" />
         <div className="lp-wrap">
           <div className="lp-foot-row">
             <p>A personal finance app that runs on your Mac. Open source.</p>
