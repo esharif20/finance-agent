@@ -37,7 +37,7 @@ export function AlwaysAskToggle({ merchantId, name }: { merchantId: number; name
     mutationFn: ({ on, source }: { on: boolean; source?: "user" | "suggestion" }) => setAlwaysAsk(merchantId, on, source),
     onSuccess: (r) => {
       setMessage(r.message);
-      return client.invalidateQueries();
+      void client.invalidateQueries();
     },
   });
   const m = merchants.data?.find((x) => x.id === merchantId);

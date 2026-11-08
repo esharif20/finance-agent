@@ -498,7 +498,9 @@ class ReviewQueue:
         self._scorer = scorer
         self._suggester = suggester
 
-    def items(self) -> list[Item]:
+    def items(self, *, suggest: bool = True) -> list[Item]:
+        """The queue, in order; `suggest=False` leaves suggestions empty (they
+        never change an item's id or version), for checking an answer."""
         txns = self._led.transactions()
         held = self._decisions()
         out: list[Item] = []
@@ -508,7 +510,7 @@ class ReviewQueue:
                 if action == "answer":
                     continue
                 out.append(replace(i, skipped=action == "skip"))
-        return order(self._suggest(out, txns), self._scorer)
+        return order(self._suggest(out, txns) if suggest else out, self._scorer)
 
     def _suggest(self, items: list[Item], txns: Sequence[Transaction]) -> list[Item]:
         """Fill `suggestions` on Category items; a Correction is the only thing
@@ -556,7 +558,7 @@ class ReviewQueue:
         """Apply each answer exactly as `answer` would, or none: returns the ids
         of items no longer in the queue or changed since shown, and applies
         nothing then. The caller's transaction rolls back any later failure."""
-        held = {i.id: i for i in self.items()}
+        held = {i.id: i for i in self.items(suggest=False)}
         stale = [
             id_
             for id_, v, _ in answers
@@ -605,7 +607,7 @@ class ReviewQueue:
         return message
 
     def _current(self, item_id: str, version: str) -> Item:
-        item = next((i for i in self.items() if i.id == item_id), None)
+        item = next((i for i in self.items(suggest=False) if i.id == item_id), None)
         if item is None:
             raise UnknownTarget("no such item in the queue")
         if item.version != version:

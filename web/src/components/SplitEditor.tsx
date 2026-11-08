@@ -67,7 +67,7 @@ export function SplitEditor({
       ),
     onSuccess: () => {
       onDone();
-      return client.invalidateQueries();
+      void client.invalidateQueries();
     },
   });
 
