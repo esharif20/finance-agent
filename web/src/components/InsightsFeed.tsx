@@ -115,13 +115,18 @@ export function InsightsFeed() {
         <h2 id="insights-title" className="text-heading">
           Insights
         </h2>
-        <button
-          type="button"
-          onClick={() => setAsking(true)}
-          className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline"
-        >
-          Check a purchase
-        </button>
+        <div className="flex items-center gap-4">
+          <a href="#briefing" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">
+            Weekly briefing
+          </a>
+          <button
+            type="button"
+            onClick={() => setAsking(true)}
+            className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline"
+          >
+            Check a purchase
+          </button>
+        </div>
       </div>
       {data.length ? (
         <ul className="divide-y divide-border">

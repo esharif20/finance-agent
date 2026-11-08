@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, MessageCircle, Newspaper, Repeat, Settings as SettingsIcon } from "lucide-react";
+import { Eye, EyeOff, Inbox, LayoutDashboard, ListOrdered, MessageCircle, Repeat, Settings as SettingsIcon } from "lucide-react";
 import { Ambient } from "@/components/Ambient";
 import { BackupStatus } from "@/components/BackupStatus";
 import { IconSwap } from "@/components/IconSwap";
@@ -51,7 +51,6 @@ const tabs = (review: number) => [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="size-4" aria-hidden="true" /> },
   { id: "transactions", label: "Transactions", icon: <ListOrdered className="size-4" aria-hidden="true" /> },
   { id: "subscriptions", label: "Subscriptions", icon: <Repeat className="size-4" aria-hidden="true" /> },
-  { id: "briefing", label: "Briefing", icon: <Newspaper className="size-4" aria-hidden="true" /> },
   { id: "assistant", label: "Assistant", icon: <MessageCircle className="size-4" aria-hidden="true" /> },
   { id: "review", label: "Review", icon: <Inbox className="size-4" aria-hidden="true" />, badge: review },
 ];
@@ -60,7 +59,7 @@ function Shell() {
   const route = useRoute();
   const review = useReviewCount();
   const TABS = tabs(review);
-  const tab = route.name === "know" ? "briefing" : route.name === "transactions" || route.name === "briefing" || route.name === "assistant" || route.name === "review" || route.name === "subscriptions" ? route.name : route.name === "settings" ? "" : "overview";
+  const tab = route.name === "transactions" || route.name === "assistant" || route.name === "review" || route.name === "subscriptions" ? route.name : route.name === "settings" || route.name === "briefing" || route.name === "know" ? "" : "overview";
   return (
     <>
       <Ambient />
@@ -96,7 +95,7 @@ function Shell() {
           ) : (
             <>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <h1 className="text-title">{route.name === "settings" ? "Settings" : route.name === "know" ? "How well I know you" : TABS.find((t) => t.id === tab)?.label}</h1>
+                <h1 className="text-title">{route.name === "settings" ? "Settings" : route.name === "briefing" ? "Briefing" : route.name === "know" ? "How well I know you" : TABS.find((t) => t.id === tab)?.label}</h1>
                 {route.name === "overview" && review > 0 && (
                   <a href="#review" className="text-sm font-semibold underline-offset-4 hover:underline">
                     {review} to review
