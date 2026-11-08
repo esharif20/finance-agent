@@ -251,7 +251,7 @@ def test_the_fetch_round_runs_its_reads_at_once(
 
     from finance_agent.assistant import graph
 
-    real = graph.run
+    real = getattr(graph, "run")  # noqa: B009  (the module global the graph calls)
 
     def slow(*a: Any, **k: Any) -> Any:
         time.sleep(0.2)
