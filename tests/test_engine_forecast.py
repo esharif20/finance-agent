@@ -2,7 +2,9 @@
 Synthetic data only."""
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 from hypothesis import given, settings
@@ -15,8 +17,12 @@ from finance_agent.engine.forecast import (
     Band,
     cash_flow,
     forecast_category,
+    gbp_rows,
+    project,
 )
-from finance_agent.ledger import Ledger
+from finance_agent.engine.shortfall import outlook, pace
+from finance_agent.ledger import Categorisation, Ledger, SplitPart, Transaction, fx
+from synthetic_banks import revolut_pockets
 
 SEASON = (100, 95, 100, 100, 100, 100, 110, 130, 100, 100, 105, 160)
 SEASONAL = [30_000 * SEASON[m % 12] // 100 + 37 * (m * 7 % 11) for m in range(30)]
@@ -181,3 +187,91 @@ def test_a_short_seasonal_naive_band_is_not_one_lucky_error() -> None:
     f = forecast_category([*year, year[0]], 3)
     assert f.method == "seasonal_naive"
     assert all(b.lower < b.point < b.upper for b in f.months)
+
+
+# --- FX (#227): a foreign row counts only through its #156 rate -------------
+
+GBP_SPEND = st.lists(
+    st.tuples(st.integers(0, 29), st.integers(1, 28), st.integers(1, 50_000)),
+    max_size=40,
+)
+
+
+def _spend(i: int, on: date, pence: int, currency: str = "GBP") -> Transaction:
+    c = Categorisation(
+        "Spending", f"SYNTH M{i % 3}", ("Shopping", f"S{i % 2}"), "default", 1, i % 3
+    )
+    amount = Decimal(-pence).scaleb(-2)
+    return Transaction(on, "SYNTH", amount, None, frozenset(), i, categorisation=c)
+
+
+def _salary(i: int) -> Transaction:
+    c = Categorisation("Income", None, None, "default", 1)
+    on = _month(i, 25)
+    return Transaction(
+        on,
+        "SYNTH ACME SALARY",
+        Decimal(2100),
+        None,
+        frozenset(),
+        500 + i,
+        categorisation=c,
+    )
+
+
+def _what_if(txns: list[Transaction], as_of: date) -> object:
+    flow = project(txns, {}, as_of)
+    return flow, outlook(100_000, as_of, flow, pace(txns, flow, as_of), 5_000)
+
+
+@settings(max_examples=60, deadline=None)
+@given(GBP_SPEND, st.integers(1, 10**9), st.integers(0, 29), st.integers(1, 10**9))
+def test_a_foreign_row_never_moves_a_gbp_forecast_without_a_rate(
+    rows: list[tuple[int, int, int]], foreign: int, month: int, gbp: int
+) -> None:
+    """The forecast and the what-if alike (verifier #227)."""
+    as_of = date(2026, 7, 14)
+    txns = [_spend(i, _month(m, d), p) for i, (m, d, p) in enumerate(rows, start=1)]
+    txns += [_salary(i) for i in range(30)]
+    eur = replace(_spend(999, _month(month, 9), foreign), currency="EUR")
+    base = _what_if(gbp_rows(txns, {}), as_of)
+    assert _what_if(gbp_rows([*txns, eur], {}), as_of) == base
+    assert _what_if(gbp_rows([*txns, eur], {999: None}), as_of) == base
+    # with a rate it counts exactly as a GBP row of its converted amount
+    converted = _what_if(gbp_rows([*txns, eur], {999: -gbp}), as_of)
+    as_gbp = _spend(999, _month(month, 9), gbp)
+    assert converted == _what_if([*txns, as_gbp], as_of)
+
+
+def test_a_foreign_split_counts_whole_under_its_largest_part() -> None:
+    parts = (SplitPart(-700, ("Shopping", "S0")), SplitPart(-300, ("Food", "F")))
+    t = _spend(1, date(2026, 1, 3), 1_000)
+    assert t.categorisation is not None
+    split = replace(t.categorisation, parts=parts)
+    t = replace(t, currency="EUR", categorisation=split)
+    (out,) = gbp_rows([t], {1: -850})
+    assert out.amount == Decimal("-8.50") and out.currency == "GBP"
+    assert out.categorisation is not None and out.categorisation.parts == ()
+
+
+def test_cash_flow_converts_a_foreign_subscription_at_the_entered_rate(
+    engine: Engine, tmp_path: Path
+) -> None:
+    """A EUR subscription is projected in GBP through the #156 rate, and left
+    out (never counted as pence) while a rate is needed."""
+    rows = [
+        ("CARD_PAYMENT", "EUR", _month(i, 5), "SYNTH STREAMBOX", -1_299)
+        for i in range(20, 26)
+    ]
+    p = tmp_path / "revolut.csv"
+    p.write_text(revolut_pockets(rows))
+    as_of = date(2026, 3, 14)
+    with engine.begin() as conn:
+        assert Ledger(conn, 1).import_files([p]).rejected == []
+        categorise.run(conn, 1)
+        assert cash_flow(Ledger(conn, 1), as_of).recurring == ()
+        Ledger(conn, 2).set_rate("EUR", Decimal("100"), date(2020, 1, 1))
+        assert cash_flow(Ledger(conn, 1), as_of).recurring == ()  # not user 2's
+        Ledger(conn, 1).set_rate("EUR", Decimal("0.85"), date(2020, 1, 1))
+        (sub,) = cash_flow(Ledger(conn, 1), as_of).recurring
+    assert sub.months == (fx.convert(1_299, Decimal("0.85")),) * 3 == (1_104,) * 3

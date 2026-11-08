@@ -2,14 +2,16 @@
 "insufficient" rather than guess. Synthetic data only."""
 
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, update
 
 from finance_agent import api, categorise
 from finance_agent.ledger import Ledger
+from finance_agent.storage import schema
+from synthetic_banks import revolut_pockets
 from synthetic_lloyds import History, Txn, render_export
 from synthetic_lloyds.generator import SORT_CODE
 
@@ -123,3 +125,57 @@ def test_a_simulation_writes_nothing(
     finally:
         event.remove(engine, "before_cursor_execute", spy)
     assert writes == []
+
+
+def test_the_projection_starts_from_the_last_import_and_says_so(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    """Verifier #227: the balance is as of the last import, so starting from
+    today would skip the spend since then and look optimistic."""
+    _load(engine, write_export, 1, 14)
+    with TestClient(api.create_app(engine)) as c:
+        fresh = c.get(URL, params={"amount_minor": 100}).json()
+    stale = date.today() - timedelta(days=10)
+    si = schema.statement_import
+    with engine.begin() as conn:
+        conn.execute(
+            update(si).values(imported_at=datetime.combine(stale, time(9), UTC))
+        )
+    with TestClient(api.create_app(engine)) as c:
+        old = c.get(URL, params={"amount_minor": 100}).json()
+    assert fresh["as_of"] == date.today().isoformat()
+    assert old["status"] == "ok" and old["as_of"] == stale.isoformat()
+
+
+def test_a_purchase_past_the_forecast_horizon_is_refused(
+    engine: Engine, write_export: Callable[[str], Path]
+) -> None:
+    _load(engine, write_export, 1, 14)
+    today = date.today()
+    beyond = date(today.year + (today.month + 2) // 12, (today.month + 2) % 12 + 1, 1)
+    with TestClient(api.create_app(engine)) as c:
+        r = c.get(URL, params={"amount_minor": 100, "on": beyond.isoformat()})
+        assert r.status_code == 422, r.text
+        inside = beyond - timedelta(days=1)
+        r = c.get(URL, params={"amount_minor": 100, "on": inside.isoformat()})
+        assert r.status_code == 200, r.text
+
+
+def test_a_foreign_spend_without_a_rate_never_moves_the_what_if(
+    engine: Engine, write_export: Callable[[str], Path], tmp_path: Path
+) -> None:
+    _load(engine, write_export, 1, 14)
+    with TestClient(api.create_app(engine)) as c:
+        before = c.get(URL, params={"amount_minor": 100}).json()
+    eur = [
+        ("CARD_PAYMENT", "EUR", _month(back, 12), "SYNTH CAFE", -900_000)
+        for back in range(1, 8)
+    ]
+    p = tmp_path / "revolut.csv"
+    p.write_text(revolut_pockets(eur))
+    with engine.begin() as conn:
+        assert Ledger(conn, 1).import_files([p]).rejected == []
+        categorise.run(conn, 1)
+    with TestClient(api.create_app(engine)) as c:
+        after = c.get(URL, params={"amount_minor": 100}).json()
+    assert after == before

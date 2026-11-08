@@ -1,6 +1,9 @@
 """What-if purchases (#151): will this purchase take the projected balance
 below zero, or below the user's buffer, before the next payday? For
-`current_user` only; figures are integer pence from `engine.shortfall`."""
+`current_user` only; figures are integer pence from `engine.shortfall`, in
+GBP: a foreign row counts at its #156 rate, or not at all while one is needed.
+The projection starts from the last import or sync (the balance's date), not
+today, so the spend since then is projected rather than skipped."""
 
 from datetime import date
 from typing import Annotated, Literal
@@ -11,7 +14,7 @@ from pydantic import BaseModel
 from finance_agent.api.subscription_costs import Pence
 from finance_agent.api.subscriptions import Led
 from finance_agent.engine.baselines import Insufficient
-from finance_agent.engine.forecast import cash_flow
+from finance_agent.engine.forecast import cash_flow, in_gbp
 from finance_agent.engine.shortfall import Risk, outlook, pace
 
 router = APIRouter(prefix="/api/cash-flow")
@@ -23,6 +26,7 @@ Minor = Annotated[int, Query(ge=0, le=MAX_MINOR)]
 
 class SimulationOut(BaseModel):
     status: Literal["ok", "insufficient"]
+    as_of: str  # ISO date the projection starts from: the last import or sync
     payday: str | None  # ISO date of the first payday after the purchase
     minimum: Pence | None  # the lowest projected balance before it
     on: str | None  # ISO date it is first reached
@@ -46,20 +50,25 @@ def simulate_purchase(
     # Every GBP account is pooled, a card's debt included: the projection
     # ignores Transfers (a card bill, a savings sweep) and counts card Spending,
     # which is only consistent over the pool. Accounts carry no kind yet.
-    balances = [
-        a.bank_balance if a.bank_balance is not None else a.ledger_balance
+    pool = [
+        (a, a.bank_balance if a.bank_balance is not None else a.ledger_balance)
         for a in led.accounts()
         if a.currency == "GBP"
     ]
-    known = [b for b in balances if b is not None]
+    known = [(a, b) for a, b in pool if b is not None]
     if not known:
         raise HTTPException(404, "No GBP balance yet. Run `fa import` first.")
-    flow = cash_flow(led, today, HORIZON)
+    # the stalest balance decides: a fresher one only makes this pessimistic
+    imported = [a.last_import.date() for a, _ in known if a.last_import is not None]
+    as_of = min([today, *imported])
+    flow = cash_flow(led, as_of, HORIZON)
+    if f"{when:%Y-%m}" not in {m.month for m in flow.months}:
+        raise HTTPException(422, "A purchase is beyond the forecast horizon.")
     o = outlook(
-        int(sum(known) * 100),
-        today,
+        int(sum(b for _, b in known) * 100),
+        as_of,
         flow,
-        pace(led.transactions(), flow, today),
+        pace(in_gbp(led), flow, as_of),
         amount_minor,
         when,
         buffer_minor,
@@ -67,6 +76,7 @@ def simulate_purchase(
     if isinstance(o, Insufficient):
         return SimulationOut(
             status="insufficient",
+            as_of=as_of.isoformat(),
             payday=None,
             minimum=None,
             on=None,
@@ -77,6 +87,7 @@ def simulate_purchase(
         )
     return SimulationOut(
         status="ok",
+        as_of=as_of.isoformat(),
         payday=o.payday.isoformat(),
         minimum=Pence(minor=o.minimum),
         on=o.on.isoformat(),

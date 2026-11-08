@@ -2267,6 +2267,10 @@
       },
       "SimulationOut": {
         "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
           "floor": {
             "anyOf": [
               {
@@ -2352,6 +2356,7 @@
         },
         "required": [
           "status",
+          "as_of",
           "payday",
           "minimum",
           "on",
