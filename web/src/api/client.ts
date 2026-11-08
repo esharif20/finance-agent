@@ -81,6 +81,8 @@ export const postCorrection = (body: {
 
 /** Undo a Correction; the Ledger keeps it in the history, marked reverted. */
 export const revertCorrection = (id: number) => send(`/api/corrections/${id}`, { method: "DELETE" });
+export type Story = components["schemas"]["StoryOut"];
+export const fetchStory = (month: string) => get<Story>(`/api/story/${month}`);
 export const fetchMonths = () => get<string[]>("/api/months");
 export const fetchSyncStatus = () => get<SyncStatus>("/api/sync-status");
 
