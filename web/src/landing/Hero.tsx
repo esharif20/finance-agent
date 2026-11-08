@@ -13,7 +13,7 @@ import { OVERVIEW, REVIEW } from "./story/story.fixture";
 export const HEADLINE = "All your accounts, in one place.";
 export const HEADLINE_LINES = ["All your accounts,", "in one place."];
 const LINE =
-  "Finance Agent brings your current account, card and savings together on your own Mac, adds them up as one, and knows a transfer between them is not spending.";
+  "Every account in one place, worked out on your own Mac. It checks every figure against your ledger, learns from what you accept, and sends nothing anywhere unless you say so.";
 
 const gbp = (minor: number) => ({ minor, currency: "GBP" });
 // Generic faces in the app's hues (oklch), none between 235 and 290

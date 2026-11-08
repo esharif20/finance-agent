@@ -1709,3 +1709,180 @@
     animation: none;
   }
 }
+
+/* ===== ask: the evidence strip, and what makes the answers different ===== */
+.lp-evidence {
+  margin-top: 16px;
+}
+.lp-evidence-strip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lp-black);
+  color: var(--lp-white);
+  font: inherit;
+  font-size: var(--lp-step-small);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 180ms ease, scale 140ms var(--lp-ease-out);
+}
+.lp-evidence-strip > span + span::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-right: 14px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  vertical-align: middle;
+}
+.lp-evidence-more {
+  color: var(--lp-cyan);
+}
+.lp-evidence-more::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(-45deg);
+  transition: transform 220ms var(--lp-ease-out);
+}
+.lp-evidence-strip:active {
+  scale: 0.98;
+}
+.lp-evidence-body {
+  display: grid;
+  max-width: 52ch;
+  max-height: 0;
+  overflow: clip;
+  opacity: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  transition: max-height 320ms var(--lp-ease-out), opacity 220ms ease, margin 320ms var(--lp-ease-out);
+}
+.lp-evidence[data-open] .lp-evidence-body,
+.lp-evidence:focus-within .lp-evidence-body {
+  max-height: 10em;
+  margin-top: 12px;
+  opacity: 1;
+}
+.lp-evidence[data-open] .lp-evidence-more::after,
+.lp-evidence:focus-within .lp-evidence-more::after {
+  transform: translateY(-4px) rotate(45deg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-evidence:hover .lp-evidence-body {
+    max-height: 10em;
+    margin-top: 12px;
+    opacity: 1;
+  }
+  .lp-evidence:hover .lp-evidence-more::after {
+    transform: translateY(-4px) rotate(45deg);
+  }
+  /* the example chips lift toward the pointer */
+  .lp-example {
+    transition: background-color 180ms ease, color 180ms ease, translate 220ms var(--lp-ease-out), box-shadow 220ms ease;
+  }
+  .lp-example:hover {
+    translate: 0 -3px;
+    box-shadow: 0 10px 20px -12px rgb(0 0 0 / 0.5);
+  }
+}
+.lp-example:focus-visible {
+  translate: 0 -3px;
+}
+.lp-special {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: clamp(40px, 6vw, 72px);
+  list-style: none;
+}
+.lp-special li {
+  display: grid;
+  gap: 6px;
+  padding: 20px;
+  border-radius: var(--lp-r-lg);
+  background: rgb(255 255 255 / 0.5);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+.lp-special strong {
+  font-family: var(--lp-display);
+  font-size: 1.25rem;
+  font-weight: 720;
+  letter-spacing: -0.01em;
+}
+.lp-special span {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+@media (min-width: 720px) {
+  .lp-special {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1100px) {
+  .lp-special {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ===== how it works: what stays on the Mac glows under the pointer ===== */
+.hw-home li,
+.hw-out li {
+  transition: box-shadow 260ms ease, background-color 260ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hw-home li:hover {
+    box-shadow:
+      inset 0 0 0 1.5px var(--lp-blue),
+      0 0 0 6px color-mix(in srgb, var(--lp-blue) 14%, transparent);
+  }
+  .hw-out li:hover {
+    background: rgb(255 255 255 / 0.05);
+    box-shadow: inset 3px 0 0 var(--lp-cyan);
+  }
+}
+
+/* ===== terminal: the window lifts under the pointer ===== */
+@media (hover: hover) and (pointer: fine) {
+  .tm-window {
+    transition: transform 400ms var(--lp-ease-out), box-shadow 400ms var(--lp-ease-out);
+  }
+  .tm-window:hover {
+    transform: translateY(-6px);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 0.5),
+      0 70px 120px -40px rgb(0 0 0 / 0.7);
+  }
+}
+.tm-window:focus-within {
+  box-shadow:
+    0 0 0 3px var(--lp-black),
+    0 50px 100px -40px rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-evidence-body,
+  .lp-evidence-more::after,
+  .lp-example,
+  .tm-window {
+    transition: none;
+  }
+  .lp-example:hover,
+  .lp-example:focus-visible,
+  .tm-window:hover {
+    translate: none;
+    transform: none;
+  }
+}
