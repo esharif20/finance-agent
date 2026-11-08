@@ -51,6 +51,16 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
   const [filters, setFilters] = useState<TxnFilters>({});
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(size);
+  // A new scope (the Overview switched Account or month) starts afresh, as a remount did; the
+  // list stays mounted, so the last scope's rows show until the new ones land, never a blank.
+  const scopeKey = `${scope.account_id ?? ""}/${scope.month ?? ""}`;
+  const [lastScope, setLastScope] = useState(scopeKey);
+  if (lastScope !== scopeKey) {
+    setLastScope(scopeKey);
+    setLimit(size);
+    setFilters({});
+    setSearch("");
+  }
   const q = useDebounced(search.trim());
   const applied = { ...filters, ...scope, q };
 

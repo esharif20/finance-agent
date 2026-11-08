@@ -59,12 +59,13 @@ jobs:
         run: |
           uv run python evals/categoriser.py
           uv run python evals/categoriser_gate.py
-      - name: detector, baseline, ranking and forecast evals (results reproduce)
+      - name: detector, baseline, ranking, forecast and playbook evals (results reproduce)
         run: |
           uv run python evals/detectors.py
           uv run python evals/baselines.py
           uv run python evals/ranking.py
           uv run python evals/forecast.py
+          uv run python evals/playbook.py
       - name: assistant benchmark on FakeChatModel (results reproduce)
         run: uv run python evals/assistant_bench.py
 

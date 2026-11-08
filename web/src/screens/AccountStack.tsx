@@ -109,11 +109,13 @@ export function AccountStack({
   balances,
   selected,
   onSelect,
+  onPreview,
 }: {
   accounts: Account[];
   balances?: Balances; // GBP balances from /api/fx/balances, for a mixed-currency total
   selected?: number;
   onSelect: (id: number | undefined) => void;
+  onPreview?: (id: number | undefined) => void; // a pointer is on a card: fetch its view early
 }) {
   const reduce = useReducedMotion() ?? false;
   const all = useMemo(() => faces(accounts, balances), [accounts, balances]);
@@ -253,8 +255,15 @@ export function AccountStack({
     snapTimer.current = window.setTimeout(() => snapNow.current(), SNAP_MS);
   };
   useEffect(() => () => clearTimeout(snapTimer.current), []);
-  const press = useRef<{ id: number; x: number; y: number; from: number; dragging: boolean } | null>(null);
-  const dragged = useRef(false); // the click that ends a drag is not a choice
+  const press = useRef<{ id: number; x: number; y: number; from: number; dragging: boolean; card: number } | null>(null);
+  // A pointer press ends in a choice at pointerup, of the card it went down on. The click
+  // after it is swallowed: while the stack reshuffles the cards move under a still pointer,
+  // so down and up can land on different cards and the browser sends that click to neither.
+  const swallow = useRef(false);
+  const choose = (i: number) => {
+    if (i !== frontIndex) setRising(i);
+    onSelect(all[i]?.id);
+  };
   const widthNow = useRef(width);
   widthNow.current = width || 1;
   // Sideways wheel (a trackpad swipe) turns the card; vertical stays the page's scroll. Not a
@@ -272,9 +281,11 @@ export function AccountStack({
     return () => el.removeEventListener("wheel", wheel);
   }, [accounts.length === 0]); // the stack mounts with the first account; the handler reads refs
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    dragged.current = false;
+    swallow.current = false;
     if (e.button !== 0 || press.current) return; // one pointer at a time
-    press.current = { id: e.pointerId, x: e.clientX, y: e.clientY, from: turnNow.current, dragging: false };
+    const hit = (e.target as Element).closest?.(".account-card");
+    const card = buttons.current.findIndex((b) => b !== null && b === hit);
+    press.current = { id: e.pointerId, x: e.clientX, y: e.clientY, from: turnNow.current, dragging: false, card };
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const p = press.current;
@@ -296,8 +307,13 @@ export function AccountStack({
     const p = press.current;
     if (!p || p.id !== e.pointerId) return;
     press.current = null;
-    dragged.current = p.dragging;
     if (p.dragging || turnNow.current !== 0) armSnap();
+    if (e.type !== "pointerup") return;
+    // the click that follows (a drag's included) is not a second choice; cleared after it,
+    // so a later Enter or Space is never swallowed
+    swallow.current = true;
+    setTimeout(() => (swallow.current = false), 0);
+    if (!p.dragging && turnNow.current === 0 && p.card >= 0) choose(p.card);
   };
 
   // CSS cards show the same art as a background image.
@@ -366,14 +382,12 @@ export function AccountStack({
               type="button"
               aria-pressed={on}
               onClick={(e) => {
-                const wasDrag = dragged.current;
-                dragged.current = false;
-                // detail 0: Enter, Space or a screen reader, never the end of a drag; the drag's
-                // own click can go to the stack (pointer capture), leaving the flag set.
-                if (wasDrag && e.detail !== 0) return;
-                if (!on) setRising(i);
-                onSelect(f.id);
+                // a pointer press already chose at pointerup; detail 0 is Enter, Space or a
+                // screen reader, which always chooses
+                if (swallow.current && e.detail !== 0) return;
+                choose(i);
               }}
+              onPointerEnter={() => onPreview?.(f.id)}
               onPointerMove={point(i)}
               onPointerLeave={() => setHover((h) => (h?.index === i ? null : h))}
               onFocus={(e) => {
