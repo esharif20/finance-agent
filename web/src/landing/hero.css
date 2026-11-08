@@ -48,15 +48,23 @@
     opacity: 1;
   }
 }
-/* under a fine pointer a word lifts a touch as the pointer crosses it: transform only */
-@media (hover: hover) and (pointer: fine) {
-  .lp-hero .lp-flex-word {
-    transition: transform 320ms var(--hero-ease);
-  }
-  .lp-hero .lp-flex-word:hover {
-    transform: translate3d(0, -0.05em, 0);
-  }
+/* --- the ledger field: a dot grid behind the hero that the pointer pulls (drawn by Hero.tsx) --- */
+.lp-ledger-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
+/* reduced motion: the same grid, faint and still */
+.lp-ledger-still {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.07) 0.75px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+}
+
 /* a column that stays clear of the hand: three lines on desktop, balanced */
 .lp-hero .lp-flex-line {
   text-wrap: balance;

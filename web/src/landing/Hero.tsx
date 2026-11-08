@@ -137,6 +137,125 @@ function StillStage() {
   );
 }
 
+/** The ledger field: a fine grid of dots behind the hero that the pointer pulls like iron filings.
+    Dots near the cursor lift, brighten and briefly turn into digits that scramble, then settle as a
+    tally does. One 2D canvas, DPR capped at 1.5, drawn only while something moves and paused off
+    screen. Desktop with a fine pointer only: on touch or under 900px the canvas is never created. */
+function LedgerField() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [on] = useState(() => finePointer() && !liteDevice());
+  useEffect(() => {
+    const cv = ref.current;
+    const ctx = cv?.getContext("2d");
+    if (!on || !cv || !ctx) return;
+    const GAP = 22;
+    const R = 170; // the field's reach, px
+    let w = 0;
+    let h = 0;
+    let dpr = 1;
+    let cols = 0;
+    let rows = 0;
+    let rect = cv.getBoundingClientRect();
+    const size = () => {
+      rect = cv.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      w = rect.width;
+      h = rect.height;
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      cols = Math.ceil(w / GAP) + 1;
+      rows = Math.ceil(h / GAP) + 1;
+    };
+    size();
+    // the pointer, eased (lerp 0.1), and an energy that rises as it moves and decays when it rests
+    const aim = { x: -1e4, y: -1e4 };
+    const at = { x: -1e4, y: -1e4 };
+    let energy = 0;
+    let raf = 0;
+    let visible = true;
+    const draw = (now: number) => {
+      raf = 0;
+      if (!visible) return;
+      if (at.x < -1e3) {
+        at.x = aim.x;
+        at.y = aim.y;
+      }
+      at.x += (aim.x - at.x) * 0.1;
+      at.y += (aim.y - at.y) * 0.1;
+      energy *= 0.965;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const tick = Math.floor(now / 90);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const bx = c * GAP + (r % 2 ? GAP / 2 : 0);
+          const by = r * GAP;
+          const dx = bx - at.x;
+          const dy = by - at.y;
+          const d = Math.hypot(dx, dy);
+          const f = d < R ? (1 - d / R) ** 2 * energy : 0;
+          if (f < 0.01) {
+            ctx.fillStyle = "rgba(255,255,255,0.07)";
+            ctx.fillRect(bx - 0.75, by - 0.75, 1.5, 1.5);
+            continue;
+          }
+          // filings: pushed out along the radius with a ripple that travels outwards
+          const push = f * (10 + 6 * Math.sin(d / 16 - now / 140));
+          const x = bx + (dx / (d || 1)) * push;
+          const y = by + (dy / (d || 1)) * push - f * 6;
+          if (f > 0.32) {
+            // close in: a digit that scrambles, slower as the energy falls, so it settles
+            const n = (c * 7 + r * 13 + Math.floor(tick * (0.4 + energy))) % 10;
+            ctx.fillStyle = `rgba(154,225,135,${Math.min(0.85, f * 1.1).toFixed(3)})`;
+            ctx.fillText(String(n), x, y);
+          } else {
+            const s = 1.5 + f * 2.5;
+            ctx.fillStyle = `rgba(${Math.round(255 - 100 * f)},${Math.round(255 - 30 * f)},${Math.round(255 - 120 * f)},${(0.07 + f * 0.9).toFixed(3)})`;
+            ctx.fillRect(x - s / 2, y - s / 2, s, s);
+          }
+        }
+      }
+      if (energy > 0.004) raf = requestAnimationFrame(draw);
+    };
+    const kick = () => {
+      if (!raf && visible) raf = requestAnimationFrame(draw);
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      aim.x = e.clientX - rect.left;
+      aim.y = e.clientY - rect.top;
+      energy = Math.min(1, energy + 0.08);
+      kick();
+    };
+    const reflow = () => {
+      size();
+      kick();
+    };
+    const resync = () => void (rect = cv.getBoundingClientRect());
+    const io = new IntersectionObserver(([e]) => {
+      visible = Boolean(e?.isIntersecting);
+      if (visible) kick();
+    });
+    io.observe(cv);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("resize", reflow);
+    window.addEventListener("scroll", resync, { passive: true });
+    energy = 0.001;
+    kick(); // one frame for the resting grid
+    return () => {
+      cancelAnimationFrame(raf);
+      io.disconnect();
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("resize", reflow);
+      window.removeEventListener("scroll", resync);
+    };
+  }, [on]);
+  return on ? <canvas ref={ref} className="lp-ledger-field" aria-hidden="true" /> : null;
+}
+
 /** The hero and the page's signature move. The three accounts of one made-up household arrive as
     a fanned hand of cards (WebGL, the app's own card model); scrolling lays them out in a row, each
     with its balance, then gathers them into one stack over the combined view: one total, money in
@@ -329,6 +448,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     <section ref={track} className="lp-hero" data-still={still ? "" : undefined} aria-labelledby="lp-title">
       <div className="lp-hero-pin">
         <Field tone="night" />
+        {still ? <span className="lp-ledger-still" aria-hidden="true" /> : <LedgerField />}
         <div className="lp-halo" aria-hidden="true" data-phase={phase} />
         <div className="lp-grain" aria-hidden="true" />
         <div className="lp-hero-copy" data-phase={phase}>
