@@ -469,6 +469,44 @@
         "title": "BriefingOut",
         "type": "object"
       },
+      "BucketOut": {
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "cap_pence": {
+            "title": "Cap Pence",
+            "type": "integer"
+          },
+          "reserved_pence": {
+            "title": "Reserved Pence",
+            "type": "integer"
+          },
+          "spent_pence": {
+            "title": "Spent Pence",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "warn",
+              "capped"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "cap_pence",
+          "spent_pence",
+          "reserved_pence",
+          "state"
+        ],
+        "title": "BucketOut",
+        "type": "object"
+      },
       "CategoryDetailOut": {
         "properties": {
           "currency": {
@@ -2018,6 +2056,40 @@
           "category"
         ],
         "title": "PartOut",
+        "type": "object"
+      },
+      "PayloadOut": {
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "cost_pence": {
+            "title": "Cost Pence",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "sent_at": {
+            "title": "Sent At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "payload",
+          "model",
+          "cost_pence",
+          "sent_at"
+        ],
+        "title": "PayloadOut",
         "type": "object"
       },
       "Pence": {
@@ -4207,6 +4279,51 @@
         "summary": "Set Rate"
       }
     },
+    "/api/gateway/payloads": {
+      "get": {
+        "operationId": "payloads_api_gateway_payloads_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "conversation",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Conversation",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PayloadOut"
+                  },
+                  "title": "Response Payloads Api Gateway Payloads Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payloads"
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",
@@ -5215,6 +5332,28 @@
           }
         },
         "summary": "Skip"
+      }
+    },
+    "/api/spend": {
+      "get": {
+        "operationId": "spend_api_spend_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BucketOut"
+                  },
+                  "title": "Response Spend Api Spend Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Spend"
       }
     },
     "/api/spending": {
