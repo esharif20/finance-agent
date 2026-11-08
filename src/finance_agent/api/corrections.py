@@ -14,7 +14,7 @@ from finance_agent.categorise.corrections import corrected
 from finance_agent.identity import current_user
 
 
-class CorrectionOut(BaseModel):
+class CorrectionVsModelOut(BaseModel):
     id: int
     merchant_id: int
     category: tuple[str, str]
@@ -23,8 +23,8 @@ class CorrectionOut(BaseModel):
     model: tuple[str, str] | None
 
 
-class CorrectionsOut(BaseModel):
-    corrections: list[CorrectionOut]
+class CorrectionsVsModelOut(BaseModel):
+    corrections: list[CorrectionVsModelOut]
 
 
 def _conn(request: Request) -> Iterator[Connection]:
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api/corrections")
 def list_corrections(
     conn: Conn,
     category: Annotated[str | None, Query(max_length=80)] = None,
-) -> CorrectionsOut:
+) -> CorrectionsVsModelOut:
     """`category`: "Top/Sub" (taxonomy ids), to list one Category's only."""
     want: tuple[str, str] | None = None
     if category is not None:
@@ -48,9 +48,9 @@ def list_corrections(
         if sub not in TAXONOMY.get(top, ()):
             raise HTTPException(422, "category must be a current 'Top/Sub' id")
         want = (top, sub)
-    return CorrectionsOut(
+    return CorrectionsVsModelOut(
         corrections=[
-            CorrectionOut(
+            CorrectionVsModelOut(
                 id=c.id,
                 merchant_id=c.merchant_id,
                 category=c.category,

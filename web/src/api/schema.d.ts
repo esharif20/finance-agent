@@ -1317,10 +1317,44 @@ export interface components {
             /** Transaction Id */
             transaction_id?: number | null;
         };
-        /** CorrectionsOut */
-        CorrectionsOut: {
+        /** CorrectionOut */
+        CorrectionOut: {
+            /** Id */
+            id: number;
+            /** Ledger Version */
+            ledger_version: number;
+        };
+        /** CorrectionVsModelOut */
+        CorrectionVsModelOut: {
+            /** Base */
+            base: [
+                string,
+                string
+            ] | null;
+            /** Category */
+            category: [
+                string,
+                string
+            ];
+            /** Id */
+            id: number;
+            /** Merchant Id */
+            merchant_id: number;
+            /** Model */
+            model: [
+                string,
+                string
+            ] | null;
+            /** Rules */
+            rules: [
+                string,
+                string
+            ] | null;
+        };
+        /** CorrectionsVsModelOut */
+        CorrectionsVsModelOut: {
             /** Corrections */
-            corrections: components["schemas"]["finance_agent__api__corrections__CorrectionOut"][];
+            corrections: components["schemas"]["CorrectionVsModelOut"][];
         };
         /** CostOut */
         CostOut: {
@@ -2084,13 +2118,6 @@ export interface components {
             /** Text */
             text: string;
         };
-        /** CorrectionOut */
-        finance_agent__api__CorrectionOut: {
-            /** Id */
-            id: number;
-            /** Ledger Version */
-            ledger_version: number;
-        };
         /** BandOut */
         finance_agent__api__briefing__BandOut: {
             /** Left Out */
@@ -2116,33 +2143,6 @@ export interface components {
             point: number;
             /** Upper */
             upper: number;
-        };
-        /** CorrectionOut */
-        finance_agent__api__corrections__CorrectionOut: {
-            /** Base */
-            base: [
-                string,
-                string
-            ] | null;
-            /** Category */
-            category: [
-                string,
-                string
-            ];
-            /** Id */
-            id: number;
-            /** Merchant Id */
-            merchant_id: number;
-            /** Model */
-            model: [
-                string,
-                string
-            ] | null;
-            /** Rules */
-            rules: [
-                string,
-                string
-            ] | null;
         };
     };
     responses: never;
@@ -2521,7 +2521,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CorrectionsOut"];
+                    "application/json": components["schemas"]["CorrectionsVsModelOut"];
                 };
             };
             /** @description Validation Error */
@@ -2554,7 +2554,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["finance_agent__api__CorrectionOut"];
+                    "application/json": components["schemas"]["CorrectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -2585,7 +2585,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["finance_agent__api__CorrectionOut"];
+                    "application/json": components["schemas"]["CorrectionOut"];
                 };
             };
             /** @description Validation Error */

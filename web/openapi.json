@@ -790,11 +790,128 @@
         "title": "CorrectionIn",
         "type": "object"
       },
-      "CorrectionsOut": {
+      "CorrectionOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ledger_version": {
+            "title": "Ledger Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "ledger_version"
+        ],
+        "title": "CorrectionOut",
+        "type": "object"
+      },
+      "CorrectionVsModelOut": {
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "category": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Category",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "merchant_id": {
+            "title": "Merchant Id",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          }
+        },
+        "required": [
+          "id",
+          "merchant_id",
+          "category",
+          "base",
+          "rules",
+          "model"
+        ],
+        "title": "CorrectionVsModelOut",
+        "type": "object"
+      },
+      "CorrectionsVsModelOut": {
         "properties": {
           "corrections": {
             "items": {
-              "$ref": "#/components/schemas/finance_agent__api__corrections__CorrectionOut"
+              "$ref": "#/components/schemas/CorrectionVsModelOut"
             },
             "title": "Corrections",
             "type": "array"
@@ -803,7 +920,7 @@
         "required": [
           "corrections"
         ],
-        "title": "CorrectionsOut",
+        "title": "CorrectionsVsModelOut",
         "type": "object"
       },
       "CostOut": {
@@ -3159,24 +3276,6 @@
         "title": "VersionOut",
         "type": "object"
       },
-      "finance_agent__api__CorrectionOut": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "ledger_version": {
-            "title": "Ledger Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "ledger_version"
-        ],
-        "title": "CorrectionOut",
-        "type": "object"
-      },
       "finance_agent__api__briefing__BandOut": {
         "properties": {
           "left_out": {
@@ -3241,105 +3340,6 @@
           "upper"
         ],
         "title": "BandOut",
-        "type": "object"
-      },
-      "finance_agent__api__corrections__CorrectionOut": {
-        "properties": {
-          "base": {
-            "anyOf": [
-              {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base"
-          },
-          "category": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Category",
-            "type": "array"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "merchant_id": {
-            "title": "Merchant Id",
-            "type": "integer"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "rules": {
-            "anyOf": [
-              {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rules"
-          }
-        },
-        "required": [
-          "id",
-          "merchant_id",
-          "category",
-          "base",
-          "rules",
-          "model"
-        ],
-        "title": "CorrectionOut",
         "type": "object"
       }
     }
@@ -3876,7 +3876,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CorrectionsOut"
+                  "$ref": "#/components/schemas/CorrectionsVsModelOut"
                 }
               }
             },
@@ -3912,7 +3912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/finance_agent__api__CorrectionOut"
+                  "$ref": "#/components/schemas/CorrectionOut"
                 }
               }
             },
@@ -3952,7 +3952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/finance_agent__api__CorrectionOut"
+                  "$ref": "#/components/schemas/CorrectionOut"
                 }
               }
             },
