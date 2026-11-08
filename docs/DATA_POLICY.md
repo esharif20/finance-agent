@@ -24,6 +24,8 @@ Status: draft for review.
 | Conversation (the graph's checkpoints, #139) | Current session only: the messages, replies and route of one thread, in the encrypted database (never tool results) | Deleted when the user ends the conversation (`DELETE /api/chat/{thread}`) and purged after a day idle (on the next chat turn); freed pages are zeroed (`secure_delete`). Never logged |
 | Session summaries | 90 days | Automatic |
 | Feedback | Kept (it is the learning signal). A rejected Proposal is recorded by its kind only, never its text (#138) | User can wipe it (`DELETE /api/feedback`), with the rejected Proposals it points at; Insight ratings and dismissals with `DELETE /api/insights/feedback` (#150), which resets relevance to Beta(1, 1) |
+| Regret-review answers ("worth it?" on a discretionary Transaction, #152) | Kept (feedback, never a Memory), with the week it was asked in | User can wipe them (`DELETE /api/briefing/regret`); an answer also goes with its Transaction. Never logged |
+| Weekly briefing (#152) | Not stored: computed on request from the Ledger, the Insights and the forecast | Shown in the app only, never sent anywhere (no email or push) |
 | Assistant traces | 30 days, redacted | Automatic |
 | Gateway payload log | 90 days | Automatic |
 | Backups (external drive) | The newest copy of each of the 7 latest days, plus the newest copy of each of the 4 ISO weeks before those | Deleting data locally reaches the backups within 4 weeks, as older copies are pruned |
