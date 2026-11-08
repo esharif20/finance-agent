@@ -24,7 +24,10 @@ export function RateDialog({ currency, month, onClose }: { currency: string; mon
   const save = useMutation({
     mutationFn: () => putRate(currency, on, rate.trim()),
     // every total, balance and cost reads rates on the server: refetch them all
-    onSuccess: () => client.invalidateQueries().then(onClose),
+    onSuccess: () => {
+      onClose();
+      void client.invalidateQueries();
+    },
   });
 
   // focus goes in on open and back to the opener on close

@@ -191,3 +191,52 @@ describe("ReviewQueue", () => {
     await waitFor(() => expect(calls[1]).toMatchObject({ url: "/api/review-queue/undo", method: "POST" }));
   });
 });
+
+// Writes whose replies the test releases by hand, as a slow server would send them.
+function slowSetup(first: Queue) {
+  const posts: { url: string; release: (r: Response) => void }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "GET") {
+        return Promise.resolve(new Response(JSON.stringify(url === "/api/categories" ? groups : first)));
+      }
+      return new Promise<Response>((release) => posts.push({ url, release }));
+    }),
+  );
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <ReviewQueue />
+    </QueryClientProvider>,
+  );
+  return posts;
+}
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe("ReviewQueue while the server is slow", () => {
+  it("shows the next item at once and keeps every click, in order", async () => {
+    const posts = slowSetup(queue([A, B, C]));
+    await userEvent.click(await screen.findByRole("button", { name: /Groceries/ }));
+    // before any reply: Tesco is gone and Costa is up
+    expect(await screen.findByRole("heading", { name: "Costa" })).toBeInTheDocument();
+    await pause(250); // a second, deliberate click, not a double click
+    await userEvent.click(screen.getByRole("button", { name: /Skip/ }));
+    expect(await screen.findByRole("heading", { name: "Netflix" })).toBeInTheDocument();
+    expect(posts.map((p) => p.url)).toEqual(["/api/review-queue/category%3A1/answer"]); // one at a time
+    posts[0]!.release(new Response(JSON.stringify(queue([B, C]))));
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(posts[1]!.url).toBe("/api/review-queue/category%3A2/skip");
+    // the first reply still lists Costa; it stays hidden until its own skip is answered
+    expect(screen.getByRole("heading", { name: "Netflix" })).toBeInTheDocument();
+    posts[1]!.release(new Response(JSON.stringify(queue([C]))));
+    await waitFor(() => expect(screen.getByText("Skipped Costa.")).toBeInTheDocument());
+  });
+
+  it("puts the item back when the server refuses the answer", async () => {
+    const posts = slowSetup(queue([A, B]));
+    await userEvent.click(await screen.findByRole("button", { name: /Groceries/ }));
+    expect(await screen.findByRole("heading", { name: "Costa" })).toBeInTheDocument();
+    posts[0]!.release(new Response(JSON.stringify({ detail: "the item changed since it was shown" }), { status: 409 }));
+    expect(await screen.findByRole("heading", { name: "Tesco" })).toBeInTheDocument(); // the refetched queue
+  });
+});

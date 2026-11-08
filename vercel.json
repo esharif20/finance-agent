@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm --dir web install --frozen-lockfile",
-  "buildCommand": "sh scripts/build_demo.sh",
+  "framework": null,
+  "buildCommand": "npm i -g pnpm@10.28.2 --prefix /tmp/pn && PATH=/tmp/pn/bin:$PATH sh -c 'pnpm --dir web install --frozen-lockfile && sh scripts/build_demo.sh'",
   "outputDirectory": "web/dist-demo",
   "functions": {
     "api/index.py": {
@@ -10,8 +10,18 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/app", "destination": "/index.html" },
-    { "source": "/app/(.*)", "destination": "/index.html" }
-  ]
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "installCommand": ""
 }

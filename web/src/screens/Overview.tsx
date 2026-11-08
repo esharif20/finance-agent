@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { animate, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   NoData,
   fetchAccounts,
@@ -61,17 +61,20 @@ function useSettle<T extends HTMLElement>(view: unknown, reduce: boolean | null)
  * undefined is All accounts) and everything else follows it. */
 export function Overview({ account }: { account?: number }) {
   const reduce = useReducedMotion();
-  // undefined = the newest month; the switcher sets it
-  const [chosen, setChosen] = useState<string>();
+  // undefined = the newest month; the switcher sets it. The bars and steppers show `picked` at once;
+  // the rest of the view follows `chosen`, deferred, so the selection paints before that re-render
+  const [picked, setChosen] = useState<string>();
+  const chosen = useDeferredValue(picked);
   const client = useQueryClient();
   const summary = useQuery({ ...summaryQuery(chosen, account), placeholderData: keepPreviousData });
-  const month = chosen ?? summary.data?.month;
+  const months = useQuery({ queryKey: ["months"], queryFn: fetchMonths });
+  // the newest month (months are newest first, as the summary's default): spending need not wait for it
+  const month = chosen ?? summary.data?.month ?? months.data?.[0];
   const spending = useQuery({
     ...spendingQuery(month as string, account),
     enabled: !!month,
     placeholderData: keepPreviousData,
   });
-  const months = useQuery({ queryKey: ["months"], queryFn: fetchMonths });
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: fetchAccounts });
   // FX provenance and "rate needed" (#156), only once a foreign-currency Account exists
   const foreign = !!accounts.data?.some((a) => a.currency !== "GBP");
@@ -167,7 +170,7 @@ export function Overview({ account }: { account?: number }) {
   const one = accounts.data.find((a) => a.id === account);
   // The month just chosen shows on the steppers at once, so a second click steps on from it;
   // the figures keep the last month's, dimmed, until the new ones land.
-  const shown = chosen ?? summary.data.month;
+  const shown = picked ?? summary.data.month;
   const waiting = summary.isPlaceholderData || spending.isPlaceholderData;
   // The view under the stack settles with the card (useSettle): same spring, a short rise, no
   // travel under reduced motion.

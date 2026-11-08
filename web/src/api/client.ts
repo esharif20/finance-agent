@@ -320,6 +320,15 @@ export const resetRegretAnswers = () => wipe("/api/briefing/regret");
 export const resetAssistantFeedback = () => wipe("/api/feedback");
 export const forgetMemory = (id: number) => wipe(`/api/memories/${id}`);
 
+export type KnowYou = components["schemas"]["KnowYouOut"];
+export type Learned = components["schemas"]["LearnedOut"];
+export const fetchKnowYou = () => get<KnowYou>("/api/know-you");
+export const fetchLearned = () => get<Learned>("/api/preferences?question=cut");
+export const resetPreferences = () => wipe("/api/preferences");
+export const resetBandit = () => wipe("/api/know-you/bandit");
+export const resetLifeChanges = () => wipe("/api/know-you/life-changes");
+export const resetMap = () => wipe("/api/know-you/map");
+
 export type Pair = components["schemas"]["PairOut"];
 export const fetchNextPair = () => get<Pair | null>("/api/preferences/next-pair?question=cut");
 export const answerPair = async (pairId: number, choice: string): Promise<void> => {

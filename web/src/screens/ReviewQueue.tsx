@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight, CircleCheck, SkipForward, Undo2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -43,39 +43,62 @@ const typing = (t: EventTarget | null) =>
 // aria-disabled (not disabled) while a write is pending: the button keeps focus and does not flash
 export const btn =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:opacity-50 aria-disabled:cursor-progress aria-disabled:active:scale-100 [@media(hover:hover)]:hover:bg-active";
+const DOUBLE_PRESS_MS = 200;
 const kbd = "hidden rounded-md bg-card px-1.5 text-xs sm:inline font-medium text-muted-foreground";
 
 /**
- * One review write at a time. The lock is a ref, so a key repeat or double click in the same tick can't
- * slip past `isPending`. The write's reply is the new queue, so it is not fetched again: only the other
- * screens' data is refreshed (a failure refreshes everything, the queue too, to show what changed).
+ * Review writes run one after another, in click order, and a click is never dropped: one made while a
+ * write is in flight waits its turn. A write naming an `item` takes it off the shown queue at once, so
+ * the next item is there before the server replies; the same item is never written twice (a double
+ * click or key repeat in one tick, a second accept of the same rows). The last reply is the new queue, so it is not fetched again and only
+ * the other screens refresh, in the background: the next click never waits on them. A failure refetches
+ * everything, the queue too, which puts back what the server did not take.
  */
-export function useReviewWrite<V extends { call: () => Promise<ReviewQueueOut> }>(
+export function useReviewWrite<V extends { call: () => Promise<ReviewQueueOut>; items?: string[] }>(
   onOk: (q: ReviewQueueOut, v: V) => void,
   onFail: (e: Error) => void,
 ) {
   const client = useQueryClient();
-  const busy = useRef(false);
-  const m = useMutation({
-    mutationFn: ({ call }: V) => call(),
-    onSuccess: (q, v) => {
-      client.setQueryData(REVIEW_KEY, q);
-      onOk(q, v);
-    },
-    onError: onFail,
-    onSettled: (_q, error) => {
-      busy.current = false;
-      return client.invalidateQueries(
-        error ? undefined : { predicate: (x) => x.queryKey.length > 1 || x.queryKey[0] !== REVIEW_KEY[0] },
-      );
-    },
-  });
+  const chain = useRef<Promise<void>>(Promise.resolve());
+  const inFlight = useRef(0);
+  const taken = useRef(new Set<string>()); // items written or waiting, until the server's queue is back
+  const [isPending, setPending] = useState(false);
   const run = (v: V) => {
-    if (busy.current) return;
-    busy.current = true;
-    m.mutate(v);
+    const ids = v.items ?? [];
+    if (ids.some((id) => taken.current.has(id))) return;
+    if (ids.length) {
+      for (const id of ids) taken.current.add(id);
+      client.setQueryData<ReviewQueueOut>(REVIEW_KEY, (q) => {
+        if (!q) return q;
+        const left = q.items.filter((i) => !ids.includes(i.id));
+        return { ...q, items: left, remaining: Math.max(q.remaining - (q.items.length - left.length), 0) };
+      });
+    }
+    inFlight.current += 1;
+    setPending(true);
+    chain.current = chain.current
+      .then(v.call)
+      .then(
+        (q) => {
+          inFlight.current -= 1;
+          // a queued write's item stays hidden until its own reply: only the last reply is the queue
+          if (inFlight.current === 0) {
+            client.setQueryData(REVIEW_KEY, q);
+            taken.current.clear();
+          }
+          onOk(q, v);
+          void client.invalidateQueries({ predicate: (x) => x.queryKey.length > 1 || x.queryKey[0] !== REVIEW_KEY[0] });
+        },
+        (e: unknown) => {
+          inFlight.current -= 1;
+          for (const id of ids) taken.current.delete(id);
+          onFail(e instanceof Error ? e : new Error(String(e)));
+          void client.invalidateQueries();
+        },
+      )
+      .finally(() => setPending(inFlight.current > 0));
   };
-  return { run, isPending: m.isPending };
+  return { run, isPending };
 }
 
 /** The queue's count, shared by the nav badge and the Overview line. */
@@ -186,11 +209,8 @@ function OneAtATime() {
   const [all, setAll] = useState(true); // "Apply to N similar" (the Merchant) or just this one
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
 
-  const act = useReviewWrite<{ call: () => Promise<ReviewQueueOut>; text: string }>(
-    (q, { text }) => {
-      setNote({ text: q.message ?? text }); // an undo that found nothing to undo says why
-      setAll(true);
-    },
+  const act = useReviewWrite<{ call: () => Promise<ReviewQueueOut>; text: string; items?: string[] }>(
+    (q, { text }) => setNote({ text: q.message ?? text }), // an undo that found nothing to undo says why
     (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
   );
 
@@ -202,27 +222,39 @@ function OneAtATime() {
   const picks = asksCategory ? suggestions(groups, (item?.suggestions ?? []) as Cat[]) : [];
   const many = (item?.weight ?? 0) > 1 && item?.transaction_ids.length;
   const justOne = !all && !!many;
+  // The next item shows the moment one is answered, so the second press of a double click would land
+  // on it: an answer to another item that soon after the last is that second press, and is ignored.
+  const last = useRef({ id: "", at: -Infinity });
+  const fresh = (id: string) => {
+    const now = performance.now();
+    if (id !== last.current.id && now - last.current.at < DOUBLE_PRESS_MS) return false;
+    last.current = { id, at: now };
+    return true;
+  };
 
   const pick = (cat: Cat) => {
-    if (!item) return;
+    if (!item || !fresh(item.id)) return;
     recent.unshift(cat);
     recent.splice(8);
     const txn = justOne ? item.transaction_ids[0] : undefined;
     act.run({
       call: () => answerReview(item, { category: cat, ...(txn === undefined ? {} : { transaction_id: txn }) }),
       text: `${item.display_name || "This payment"}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
+      items: [item.id],
     });
+    setAll(true); // the next item starts on its whole Merchant again
   };
   const choose = (choice: string) => {
-    if (!item) return;
+    if (!item || !fresh(item.id)) return;
     act.run({
       call: () => answerReview(item, { choice }),
       text: `${item.display_name || TYPE_LABEL[item.type] || "Item"}: ${CHOICE_LABEL[choice] ?? choice}.`,
+      items: [item.id],
     });
   };
   const skip = () => {
-    if (!item) return;
-    act.run({ call: () => skipReview(item), text: `Skipped ${item.display_name || "this item"}.` });
+    if (!item || !fresh(item.id)) return;
+    act.run({ call: () => skipReview(item), text: `Skipped ${item.display_name || "this item"}.`, items: [item.id] });
   };
   const undo = () => {
     act.run({ call: () => undoReview(), text: "Undid the last change." });
@@ -361,7 +393,7 @@ function OneAtATime() {
                   type="button"
                   title={cat[0]}
                   aria-keyshortcuts={String(i + 1)}
-                  aria-disabled={act.isPending}
+                 
                   onClick={() => pick(cat)}
                   className={`${btn} min-h-14 justify-between bg-raised`}
                 >
@@ -374,7 +406,7 @@ function OneAtATime() {
               <span className="sr-only">Another category</span>
               <select
                 value=""
-                aria-disabled={act.isPending}
+               
                 onChange={(e) => {
                   const [g, s] = e.target.value.split(".").map(Number);
                   const sub = groups[g ?? -1]?.subs[s ?? -1];
@@ -412,7 +444,7 @@ function OneAtATime() {
                 key={c}
                 type="button"
                 aria-keyshortcuts={String(i + 1)}
-                aria-disabled={act.isPending}
+               
                 onClick={() => choose(c)}
                 className={`${btn} min-h-14 justify-between bg-raised`}
               >
@@ -425,12 +457,12 @@ function OneAtATime() {
       </Card>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={skip} aria-disabled={act.isPending} aria-keyshortcuts="S" className={`${btn} glass`}>
+        <button type="button" onClick={skip} aria-keyshortcuts="S" className={`${btn} glass`}>
           <SkipForward className="size-4" aria-hidden="true" />
           Skip
           <kbd className={kbd}>S</kbd>
         </button>
-        <button type="button" onClick={undo} aria-disabled={act.isPending} aria-keyshortcuts="U" className={`${btn} glass`}>
+        <button type="button" onClick={undo} aria-keyshortcuts="U" className={`${btn} glass`}>
           <Undo2 className="size-4" aria-hidden="true" />
           Undo
           <kbd className={kbd}>U</kbd>

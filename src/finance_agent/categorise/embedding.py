@@ -29,6 +29,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 
+import numpy as np
 from sqlalchemy import Connection, Engine
 
 from finance_agent.ledger import Ledger
@@ -424,17 +425,77 @@ def ranked(
     if not by_model:
         return None, {}
     model, vecs = max(by_model.items(), key=lambda kv: (len(kv[1]), kv[0]))
+    return model, rank_all(vecs, targets, labelled)
+
+
+# below this norm the integer pre-filter's bound loosens; such vectors (never a
+# quantised one) take `rank`'s exact path
+_MIN_NORM = 1000
+# thousandths: with norms >= _MIN_NORM, dot // (isqrt|a| * isqrt|b|) is within 3
+# of `similarity`, so the best pair is always among those kept
+_SLACK = 5
+_NEVER = -(2**62)  # below any similarity: marks a Merchant's own label
+
+
+def rank_all(
+    vecs: Mapping[int, Vector],
+    targets: Mapping[str, int],
+    labelled: Mapping[int, set[tuple[str, str]]],
+) -> dict[str, list[tuple[int, tuple[str, str]]]]:
+    """For each target (key -> Merchant id): `rank` against every other
+    labelled Merchant, top SUGGESTIONS. Same answer as calling `rank` per
+    target; the dot products are one integer matrix product, and `similarity`
+    runs only on each Category's few best candidates (#review-perf)."""
+    lab = [(n, vecs[n], cats) for n, cats in labelled.items() if n in vecs]
     out: dict[str, list[tuple[int, tuple[str, str]]]] = {}
-    for key, m in targets.items():
-        if m not in vecs:
+    for dim in {len(vecs[m]) for m in targets.values() if m in vecs}:
+        keys = [(k, m) for k, m in targets.items() if m in vecs and len(vecs[m]) == dim]
+        same = [x for x in lab if len(x[1]) == dim]
+        if not same:
             continue
-        scored = rank(
-            vecs[m],
-            [(vecs[n], cats) for n, cats in labelled.items() if n != m and n in vecs],
+        na = [sum(x * x for x in vecs[m]) for _, m in keys]
+        nb = [sum(x * x for x in v) for _, v, _ in same]
+        ra, rb = [math.isqrt(n) for n in na], [math.isqrt(n) for n in nb]
+        if min(ra + rb) < _MIN_NORM:  # toy vectors: the exact loop is cheap anyway
+            for k, m in keys:
+                found = rank(vecs[m], [(v, c) for n, v, c in same if n != m])
+                if found:
+                    out[k] = found[:SUGGESTIONS]
+            continue
+        a = np.array([vecs[m] for _, m in keys], dtype=np.int64)
+        b = np.array([v for _, v, _ in same], dtype=np.int64)
+        # exact: |component| <= SCALE and dim <= MAX_DIMS keep every sum in int64
+        dots = a @ b.T
+        approx = dots * SIMILARITY // np.outer(ra, rb)
+        own = np.array([m for _, m in keys])[:, None] == np.array(
+            [n for n, _, _ in same]
         )
-        if scored:
-            out[key] = scored[:SUGGESTIONS]
-    return model, out
+        approx[own] = _NEVER  # never a Merchant's own label
+        cols: dict[tuple[str, str], list[int]] = {}
+        for j, (_, _, cats) in enumerate(same):
+            for c in cats:
+                cols.setdefault(c, []).append(j)
+        best: list[dict[tuple[str, str], int]] = [{} for _ in keys]
+        for c, js in cols.items():
+            sub = approx[:, js]
+            top = sub.max(axis=1, keepdims=True)
+            near = (sub >= top - _SLACK) & (top > _NEVER)
+            rows, at = np.nonzero(near)
+            got = cast(list[int], dots[:, js][rows, at].tolist())
+            for i, k, dot in zip(rows.tolist(), at.tolist(), got, strict=True):
+                # `similarity`, exactly, from the exact dot and the norms
+                s = max(
+                    -SIMILARITY,
+                    min(SIMILARITY, dot * SIMILARITY // math.isqrt(na[i] * nb[js[k]])),
+                )
+                best[i][c] = max(best[i].get(c, s), s)
+        for (k, _), b_ in zip(keys, best, strict=True):
+            found = sorted(
+                ((s, c) for c, s in b_.items() if s > 0), key=lambda x: (-x[0], x[1])
+            )
+            if found:
+                out[k] = found[:SUGGESTIONS]
+    return out
 
 
 def rank(

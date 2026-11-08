@@ -21,7 +21,7 @@ function Regret({ item }: { item: RegretItem }) {
   const client = useQueryClient();
   const save = useMutation({
     mutationFn: (worth: boolean) => answerRegret(item.transaction_id, worth),
-    onSettled: () => client.invalidateQueries({ queryKey: BRIEFING_KEY }),
+    onSettled: () => void client.invalidateQueries({ queryKey: BRIEFING_KEY }),
   });
   const name = item.display_name ?? item.merchant ?? item.description;
   const mark = save.isPending ? save.variables : item.worth_it;

@@ -44,7 +44,7 @@ export function SplitParts({ txn, id, open, onClose, onResplit }: { txn: number;
     mutationFn: () => revertSplit(txn),
     onSuccess: () => {
       onClose();
-      return client.invalidateQueries();
+      void client.invalidateQueries();
     },
   });
   return (
