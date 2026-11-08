@@ -108,10 +108,11 @@ try {
     await page.waitForTimeout(1200);
     if ((await donut()) === first.donut) fail(`${scheme}: the change did not show`);
     const reset = page.waitForResponse((r: { url(): string }) => r.url().endsWith("/api/demo/reset"));
+    const reloaded = page.waitForEvent("load"); // Reset reloads the page
     await page.getByRole("button", { name: "Reset" }).click();
     const done = await reset;
     if (!done.ok()) fail(`${scheme}: Reset answered ${done.status()}`);
-    await page.waitForLoadState("load"); // Reset reloads the page
+    await reloaded;
     await page.getByLabel("Net").waitFor();
     await page.waitForTimeout(1200);
     const after = { net: await net(), donut: await donut() };
