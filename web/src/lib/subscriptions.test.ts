@@ -69,6 +69,15 @@ describe("buildView", () => {
     expect(view([entry(1)], [cost(1)]).bands.map((b) => b.name)).toEqual(["Active"]);
   });
 
+  it("lists a first-charge guess in its own band, filterable, never counted (#310)", () => {
+    const e = [entry(1, { status: "likely", evidence: { on: "2026-03-01", charge_count: null, interval: null } }), entry(2)];
+    const c = [cost(1, { status: "likely", counted: false, next_due_on: "2026-04-01" }), cost(2)];
+    expect(names(view(e, c))).toEqual({ Active: [2], "Likely (new)": [1] });
+    expect(names(view(e, c, { status: "likely" }))).toEqual({ "Likely (new)": [1] });
+    // a guess that lapsed is no longer new
+    expect(names(view(e, [cost(1, { status: "lapsed", counted: false }), cost(2)]))).toEqual({ Active: [2], Ended: [1] });
+  });
+
   it("keeps suggestions and removed entries out of the bands", () => {
     const e = [
       entry(1, { status: "suggested", reason: "pattern" }),

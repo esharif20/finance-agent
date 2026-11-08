@@ -67,7 +67,7 @@ def by_name(entries: list[SubscriptionEntry]) -> dict[str, SubscriptionEntry]:
     return {e.merchant: e for e in entries}
 
 
-def test_a_known_service_is_listed_from_its_first_charge(
+def test_a_known_service_is_likely_from_its_first_charge(
     engine: Engine, write_export: Export
 ) -> None:
     e = by_name(
@@ -78,13 +78,13 @@ def test_a_known_service_is_listed_from_its_first_charge(
         "subscription",
         "Streaming",
         "known_service",
-        "active",
+        "likely",
         "detection",
     )
     assert x.evidence_on == date(2026, 1, 3)
 
 
-def test_a_descriptor_pattern_is_asked_about_straight_away(
+def test_a_descriptor_pattern_is_likely_straight_away(
     engine: Engine, write_export: Export
 ) -> None:
     e = by_name(
@@ -95,7 +95,7 @@ def test_a_descriptor_pattern_is_asked_about_straight_away(
         )
     )
     x = e["SYNTH CLUB MEMBERSHIP"]
-    assert (x.group, x.reason, x.status) == ("Memberships", "pattern", "suggested")
+    assert (x.group, x.reason, x.status) == ("Memberships", "pattern", "likely")
 
 
 def test_an_unknown_monthly_charge_is_suggested_with_its_evidence(
@@ -156,7 +156,11 @@ def test_rerunning_recognition_writes_nothing_new(
 DECISIONS = st.sampled_from(["not", "add", "confirm"])
 
 
-@settings(max_examples=25, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(
+    max_examples=25,
+    deadline=None,  # a Ledger per example: slow under xdist load
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
 @given(
     DECISIONS,
     st.sampled_from(["NETFLIX.COM", "SYNTH VIDEO CO", "SYNTH GYM MEMBERSHIP"]),

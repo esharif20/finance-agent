@@ -102,21 +102,75 @@ def _upper(description: str) -> str:
     return "".join(ch.upper() if ch.isascii() else ch for ch in description)
 
 
-_PROCESSOR = re.compile(r"^(SQ|SUMUP|ZTL|IZ) (?=\S)")
+# Leading tokens that name how a card paid, not who was paid (#310): wallets
+# (WL *, GPAY, APPLEPAY, CRV*, CURVE) and card processors (SQ *, SP *, ZTL*...).
+# A trailing GOOG is Google Pay's wallet tag ("WL *VUE*GOOG" is Vue).
+_WALLETS = frozenset({"WL", "GPAY", "APPLEPAY", "CRV", "CURVE"})
+PROCESSORS = {"SQ": "Square", "SP": "Shopify", "SUMUP": "SumUp", "ZTL": "Zettle",
+              "IZ": "Zettle", "PAYPAL": "PayPal"}  # fmt: skip
+# Stores whose descriptor names a product after the platform: "GOOGLE *Colab"
+STORES = {"GOOGLE": "Google", "APPLE.COM/BILL": "Apple", "AMZN DIGITAL": "Amazon",
+          "AMAZON DIGITAL": "Amazon"}  # fmt: skip
+_STORE_SEEDS = frozenset({"Google", "Apple", "Amazon"})
+
+
+def _bare(words: list[str], processors: bool = True) -> list[str]:
+    """Wallet (and processor) tokens dropped from the front, a wallet tag from
+    the end. PAYPAL stays: its own patterns handle "PAYPAL *NETFLIX"."""
+    while (
+        len(words) > 1
+        and words[0] != "PAYPAL"
+        and (words[0] in _WALLETS or (processors and words[0] in PROCESSORS))
+    ):
+        words = words[1:]
+    return words[:-1] if len(words) > 1 and words[-1] == "GOOG" else words
 
 
 def _squash(upper: str) -> str:
     """Matching form: `*` and apostrophes dropped, spaces collapsed, so
     "SAINSBURY'S S/MKTS" and "AMAZON PRIME*AB12" meet one pattern."""
-    plain = upper.replace("'", "").replace("\u2019", "").replace("*", " ")
-    # card-processor prefixes hide the start of the descriptor
-    return _PROCESSOR.sub("", " ".join(plain.split()))
+    plain = upper.replace("'", "").replace("’", "").replace("*", " ")
+    return " ".join(_bare(plain.split()))
+
+
+def platform(description: str) -> str | None:
+    """The platform or processor a descriptor was paid through, if any:
+    "GOOGLE *Colab" is Google, "SQ *SYNTH CAFE" is Square."""
+    words = _upper(description).replace("*", " ").split()
+    while len(words) > 1 and words[0] in _WALLETS:
+        words = words[1:]
+    text = " ".join(words)
+    for name, p in (*STORES.items(), *PROCESSORS.items()):
+        if text == name or text.startswith(name + " "):
+            return p
+    return None
+
+
+def _seed(squashed: str) -> str | None:
+    return next((m for m, (p, _) in MERCHANTS.items() if p.search(squashed)), None)
+
+
+def _product(squashed: str) -> str | None:
+    """The product after a store's name, when it names one (not only a ref)."""
+    for name in STORES:
+        if squashed.startswith(name + " "):
+            rest = squashed[len(name) + 1 :]
+            if any(not re.search(r"\d", w) for w in rest.split()):
+                return rest
+    return None
 
 
 def merchant_for(description: str) -> str | None:
-    """The seeded Merchant a raw Bank descriptor is an alias of, if any."""
+    """The seeded Merchant a raw Bank descriptor is an alias of, if any. A
+    store's product is its own Merchant (#310): "GOOGLE *Google One" is Google
+    One, and an unseeded product ("GOOGLE *CLOUD") is no seed, not Google."""
     d = _squash(_upper(description))
-    return next((m for m, (p, _) in MERCHANTS.items() if p.search(d)), None)
+    if (rest := _product(d)) is not None:
+        if found := _seed(rest):
+            return found
+        found = _seed(d)
+        return None if found in _STORE_SEEDS else found
+    return _seed(d)
 
 
 # Tokens that say where, not who. shortcut: a short list; extend from real exports.
@@ -125,16 +179,21 @@ LOCATIONS = frozenset({"GB", "GBR", "UK", "LONDON", "MANCHESTER", "BIRMINGHAM"})
 
 def normalise(description: str) -> str:
     """The Merchant name for a descriptor: a seeded alias, else the descriptor
-    without store numbers, payment references, locations and "REFUND".
-    Deterministic, so the same shop maps to the same Merchant row on every
-    import; "" when nothing is left to name."""
+    without wallet prefixes, store numbers, payment references, locations and
+    "REFUND". Deterministic, so the same shop maps to the same Merchant row on
+    every import; "" when nothing is left to name. shortcut: a processor
+    prefix ("SQ *") stays in an unseeded name, as before #310, because the
+    categoriser gate's committed model signals are keyed by these names; drop
+    it with the next local `categoriser_gate.py --collect` run."""
     known = merchant_for(description)
     if known is not None:
         return known
     words = [
         w
-        for w in re.split(r"[\s*]+", _upper(description))
-        if w and w != "REFUND" and w not in LOCATIONS and not re.search(r"\d", w)
+        for w in _bare(
+            [w for w in re.split(r"[\s*]+", _upper(description)) if w], processors=False
+        )
+        if w != "REFUND" and w not in LOCATIONS and not re.search(r"\d", w)
     ]
     return " ".join(words)[:64]
 
@@ -195,7 +254,7 @@ def classify(
         return Classification("Transfer", None, None, "rule:transfer")
     if bank_type.upper() in FEE_TYPES:
         return Classification("Fee", None, None, "rule:fee")
-    if amount > 0 and merchant_for(d) is None and not REFUND.search(d):
+    if amount > 0 and _seed(_squash(d)) is None and not REFUND.search(d):
         return Classification("Income", None, None, "default")
     kind = "Spending" if amount <= 0 else "Refund"
     merchant = normalise(d) or None

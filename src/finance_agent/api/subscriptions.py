@@ -29,7 +29,7 @@ class SubscriptionOut(BaseModel):
     display_name: str  # readable, for showing only (#210)
     kind: str | None  # None for a negative entry
     group: str | None
-    status: str  # suggested, active, user_cancelled or not_subscription
+    status: str  # suggested, likely, active, user_cancelled or not_subscription
     reason: str | None  # known_service, user_confirmed, pattern or user_added
     source: str  # "user" or "detection"
     evidence: EvidenceOut
