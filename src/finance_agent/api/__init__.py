@@ -35,6 +35,7 @@ from finance_agent.api import (
     plan,
     proposals,
     review_queue,
+    search,
     splits,
     subscription_costs,
     subscriptions,
@@ -639,6 +640,7 @@ def create_app(
     app.include_router(cash_flow.router)
     app.include_router(plan.router)
     app.include_router(goals.router)
+    app.include_router(search.router)
     app.include_router(guidance.router)
     app.include_router(insights.router)
     app.include_router(briefing.router)

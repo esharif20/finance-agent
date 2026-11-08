@@ -1806,6 +1806,40 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "HitOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "integer"
+          },
+          "snippet": {
+            "$ref": "#/components/schemas/SnippetOut"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          }
+        },
+        "required": [
+          "kind",
+          "ref",
+          "transaction_id",
+          "snippet"
+        ],
+        "title": "HitOut",
+        "type": "object"
+      },
       "InsightOut": {
         "properties": {
           "category": {
@@ -3039,6 +3073,22 @@
         ],
         "type": "string"
       },
+      "SearchOut": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/HitOut"
+            },
+            "title": "Hits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hits"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
       "SimulationOut": {
         "properties": {
           "as_of": {
@@ -3140,6 +3190,19 @@
           "need"
         ],
         "title": "SimulationOut",
+        "type": "object"
+      },
+      "SnippetOut": {
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SnippetOut",
         "type": "object"
       },
       "SpendingOut": {
@@ -5952,6 +6015,62 @@
           }
         },
         "summary": "Skip"
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "find_api_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find",
+        "tags": [
+          "search"
+        ]
       }
     },
     "/api/spending": {

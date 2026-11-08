@@ -27,7 +27,9 @@ const query = (month?: string, accountId?: number) => {
 
 export const fetchSummary = (month?: string, accountId?: number) =>
   get<Summary>(`/api/summary${query(month, accountId)}`);
-export const fetchAccounts = () => get<Account[]>("/api/accounts");
+export type SearchHits = components["schemas"]["SearchOut"];
+export const fetchSearch = (q: string) => get<SearchHits>(`/api/search?${new URLSearchParams({ q })}`);
+export const fetchAccounts =() => get<Account[]>("/api/accounts");
 export const fetchSpending = (month: string, accountId?: number) =>
   get<Spending>(`/api/spending${query(month, accountId)}`);
 

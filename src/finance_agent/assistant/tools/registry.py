@@ -130,6 +130,15 @@ TOOLS = {
             engine=True,
         ),
         Tool(
+            "search",
+            "Find the user's own Transactions, Merchants, Notes, Split parts and"
+            " Memories by words, best match first. Hits carry no amounts: use"
+            " another tool for figures." + _DATA,
+            read.SearchIn,
+            read.search_ledger,
+            engine=True,
+        ),
+        Tool(
             "forecast_cashflow",
             "Money out and recurring money in for the coming months, with an 80%"
             " band, in minor units. left_out counts Categories with too little"
@@ -198,6 +207,7 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
         "explain_insight",
         "list_guidance",
         "explain_card",
+        "search",
     ),
     "plan": ("forecast_cashflow", "simulate_purchase", "allocation_plan"),
     "correct": ("find_transactions", "propose_correction"),

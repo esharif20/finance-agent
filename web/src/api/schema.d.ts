@@ -922,6 +922,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find */
+        get: operations["find_api_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spending": {
         parameters: {
             query?: never;
@@ -1729,6 +1746,16 @@ export interface components {
             /** App */
             app: string;
         };
+        /** HitOut */
+        HitOut: {
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: number;
+            snippet: components["schemas"]["SnippetOut"];
+            /** Transaction Id */
+            transaction_id: number | null;
+        };
         /** InsightOut */
         InsightOut: {
             /** Category */
@@ -2152,6 +2179,11 @@ export interface components {
         };
         /** @enum {string} */
         Risk: "none" | "below_buffer" | "below_zero";
+        /** SearchOut */
+        SearchOut: {
+            /** Hits */
+            hits: components["schemas"]["HitOut"][];
+        };
         /** SimulationOut */
         SimulationOut: {
             /** As Of */
@@ -2172,6 +2204,11 @@ export interface components {
              * @enum {string}
              */
             status: "ok" | "insufficient";
+        };
+        /** SnippetOut */
+        SnippetOut: {
+            /** Data */
+            data: string;
         };
         /** SpendingOut */
         SpendingOut: {
@@ -3904,6 +3941,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_api_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
                 };
             };
             /** @description Validation Error */

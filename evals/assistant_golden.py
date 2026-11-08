@@ -20,7 +20,7 @@ import json
 from datetime import date
 from typing import Any, Literal, NamedTuple
 
-DATASET_VERSION = 6
+DATASET_VERSION = 7
 TODAY = date(2026, 1, 20)
 TXN = "$txn:"
 
@@ -95,6 +95,13 @@ CASES: tuple[Case, ...] = (
         (Call("category_trend", FOOD),),
         "Food & Drink was £92.34 in January 2026, against £0.00 in December 2025.",
         ("£92.34",),
+    ),
+    Case(
+        "ask-search",
+        "Find anything I have from Tesco.",
+        "ask",
+        (Call("search", {"query": "tesco"}),),
+        "I found Transactions and a Merchant matching Tesco in your records.",
     ),
     Case(
         "ask-subscriptions",

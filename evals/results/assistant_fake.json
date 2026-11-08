@@ -1,10 +1,10 @@
 {
   "harness": "assistant",
   "dataset": "assistant_golden",
-  "dataset_version": 6,
-  "dataset_sha256": "77f09add4cd7e9a42295989f6ad8ae108794e8133e395c762ee058a3d573fcb1",
+  "dataset_version": 7,
+  "dataset_sha256": "58b75c931a2ca99d7492482e4d38065c6e1deaa6dcc3a4cd6353813b4e659355",
   "prompt_sha256": "c506981690b66c7c452731e03b1684c1b2f24601fb72fdd3073402e4a5010c09",
-  "cases": 40,
+  "cases": 41,
   "refusal_cases": 7,
   "models": {
     "fake_oracle": {
@@ -26,11 +26,11 @@
       "model_version": "1",
       "metrics": {
         "route_accuracy": 1.0,
-        "tool_call_accuracy": 0.2,
-        "grounding_pass_rate": 0.030303,
+        "tool_call_accuracy": 0.195122,
+        "grounding_pass_rate": 0.029412,
         "refusal_correctness": 1.0,
         "refusal_no_proposal": 1.0,
-        "printed_tool_call_rate": 0.8,
+        "printed_tool_call_rate": 0.804878,
         "model_error_rate": 0.0
       },
       "failures": {
@@ -41,6 +41,7 @@
           "ask-refunds-fees",
           "ask-food-trend",
           "ask-food-vs-usual",
+          "ask-search",
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
@@ -75,6 +76,7 @@
           "ask-refunds-fees",
           "ask-food-trend",
           "ask-food-vs-usual",
+          "ask-search",
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",
@@ -109,6 +111,7 @@
           "ask-refunds-fees",
           "ask-food-trend",
           "ask-food-vs-usual",
+          "ask-search",
           "ask-subscriptions",
           "ask-bills",
           "ask-insights",

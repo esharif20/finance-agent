@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 import { IconSwap } from "@/components/IconSwap";
 import { NavTabs, type Tab } from "@/components/NavTabs";
+import { SearchBox } from "@/components/SearchBox";
 import { iconButton, SyncNow } from "@/components/SyncNow";
 import { usePrivacy } from "@/lib/privacy";
 
@@ -138,6 +139,7 @@ export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: str
         label="max-lg:sr-only"
       />
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
+        <SearchBox />
         <SyncNow />
         <a
           href="#settings"
