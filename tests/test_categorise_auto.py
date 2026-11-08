@@ -386,7 +386,9 @@ _OP = st.one_of(
     st.tuples(st.just("threshold"), st.integers(0, OFF)),
     st.tuples(st.just("merchant"), st.sampled_from(GUESSED), st.sampled_from(CATS)),
     st.tuples(st.just("row"), st.sampled_from(GUESSED), st.sampled_from(CATS)),
+    st.just(("import",)),
 )
+NEW_MERCHANT = "ZZQ MARKET HILL"  # arrives with the first new import
 
 type _Row = tuple[object, str, str | None, Decimal]
 
@@ -407,6 +409,27 @@ def _latest_batch(conn: Connection) -> set[str]:
         " WHERE undone_at IS NULL AND batch IS NOT NULL)"
     )
     return {names[m] for m in conn.execute(text(sql)).scalars()}
+
+
+def _batches(conn: Connection) -> dict[int, int]:
+    sql = (
+        "SELECT id, batch FROM category_prediction"
+        " WHERE batch IS NOT NULL AND undone_at IS NULL"
+    )
+    return {i: b for i, b in conn.execute(text(sql)).all()}
+
+
+def _new_import(conn: Connection, folder: Path, n: int) -> None:
+    """A sync: new rows (the import pass), then new vectors and their pass,
+    in which any Category change must bump ledger_version."""
+    folder.mkdir()
+    rows = [(name, -(901 + n)) for name in [*GUESSED, NEW_MERCHANT]]
+    _import(conn, folder, 1, rows)
+    state, version = _state(conn), Ledger(conn, 1).ledger_version()
+    embedding.refresh(conn, 1, TrigramEmbedder())
+    auto.apply(conn, 1, categorise.seed_taxonomy(conn, 1))
+    if _state(conn) != state:
+        assert Ledger(conn, 1).ledger_version() > version
 
 
 def _step(conn: Connection, op: tuple[Any, ...], before: Mapping[int, _Row]) -> None:
@@ -436,10 +459,11 @@ def _step(conn: Connection, op: tuple[Any, ...], before: Mapping[int, _Row]) -> 
 def test_any_interleaving_of_syncs_corrections_undos_and_suspensions_holds(
     start: int, ops: list[tuple[Any, ...]]
 ) -> None:
-    """Verifier: after every step amounts and the total never move; no
-    Merchant newly auto-applies below the threshold, after its undo or once
-    the version is suspended; a Correction always shows; and an undo resets
-    its own batch's auto rows and nothing else."""
+    """Verifier: after every step existing amounts never move and the total
+    moves only by imported rows; no Merchant newly auto-applies below the
+    threshold, after its undo or once the version is suspended; after a
+    suspension a sync leaves no auto rows; a Correction always shows; one
+    sync is one batch; and an undo resets its own batch's auto rows only."""
     with pytest.MonkeyPatch.context() as mp, tempfile.TemporaryDirectory() as d:
         mp.setitem(auto.THRESHOLDS, MODEL, start)
         eng = open_db(Path(d) / "db" / "ledger.db")
@@ -452,11 +476,27 @@ def test_any_interleaving_of_syncs_corrections_undos_and_suspensions_holds(
                 suspended = False
                 fixed: set[int] = set()
                 decided: set[str | None] = set()
+                imports = 0
                 for op in ops:
                     before = _state(conn)
                     was_auto = {s[2] for s in before.values() if s[1] == AUTO}
                     batch = _latest_batch(conn) if op[0] == "undo" else set[str]()
-                    _step(conn, op, before)
+                    batches = _batches(conn)
+                    if op[0] == "import":
+                        imports += 1
+                        _new_import(conn, Path(d) / f"imp{imports}", imports)
+                        new = {
+                            t: s[3] for t, s in _state(conn).items() if t not in before
+                        }
+                        assert len(new) == len(GUESSED) + 1
+                        amounts |= new
+                        total += sum(new.values(), Decimal(0))
+                        moved = {
+                            b for i, b in _batches(conn).items() if batches.get(i) != b
+                        }
+                        assert len(moved) <= 1, moved  # one sync, one batch
+                    else:
+                        _step(conn, op, before)
                     undone |= batch
                     suspended |= op[0] == "suspend"
                     if op[0] == "merchant":
@@ -467,6 +507,8 @@ def test_any_interleaving_of_syncs_corrections_undos_and_suspensions_holds(
                     threshold = auto.THRESHOLDS[MODEL]
                     assert {t: s[3] for t, s in after.items()} == amounts
                     assert sum((s[3] for s in after.values()), Decimal(0)) == total
+                    if suspended and op[0] in ("sync", "import"):
+                        assert all(s[1] != AUTO for s in after.values()), op
                     for tid, (cat, src, m, _) in after.items():
                         if tid in fixed or m in decided:
                             assert src == "correction", (op, m)
