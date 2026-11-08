@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from finance_agent import api
 from finance_agent.ledger.exposure import Exposures, Shown
@@ -124,3 +124,35 @@ def test_resetting_pairwise_answers_touches_no_other_store(
     with engine.begin() as conn:
         assert Pairwise(conn, OTHER).forget() == 1  # theirs survived
     assert _counts(engine, ME) == before and _counts(engine, OTHER) == theirs
+
+
+def _rows(engine: Engine) -> dict[str, list[Any]]:
+    q = {
+        "proposal": "SELECT id, user_id, kind FROM proposal WHERE kind != 'map_edge'",
+        "memory": "SELECT id, user_id, text FROM memory",
+        "transaction": 'SELECT id, user_id, amount_minor FROM "transaction"',
+        "correction": "SELECT * FROM correction",
+    }
+    with engine.begin() as conn:
+        return {k: list(conn.execute(text(v)).all()) for k, v in q.items()}
+
+
+@pytest.mark.usefixtures("stores")
+@pytest.mark.parametrize("path", ["bandit", "life-changes", "map"])
+def test_a_reset_ignores_smuggled_ids_and_spares_the_ledger(
+    client: TestClient, engine: Engine, path: str
+) -> None:
+    """#282 verifier: ids or a user in the query or body never widen a reset,
+    and no reset reaches Transactions, Corrections, Memories or a Proposal of
+    another kind (the map's own Proposals go with its edges). Synthetic."""
+    before, theirs, rows = _counts(engine, ME), _counts(engine, OTHER), _rows(engine)
+    got = client.request(
+        "DELETE",
+        f"/api/know-you/{path}?user_id={OTHER}&id=1&kind=memory",
+        json={"user_id": OTHER, "ids": [1, 2, 3], "all": True},
+    )
+    assert got.json() == {"deleted": 1}
+    assert _counts(engine, OTHER) == theirs
+    assert _rows(engine) == rows
+    mine = _counts(engine, ME)
+    assert sum(before[k] - mine[k] for k in before) == 1

@@ -20,6 +20,7 @@ down_revision = "0030"
 branch_labels = None
 depends_on = None
 
+OLD = ("memory", "correction")  # Proposal kinds before this migration
 KINDS = "('merchant', 'category', 'goal', 'life_change')"
 NODES = {  # node kind -> the table its id points at
     "merchant": "merchant",
@@ -54,14 +55,30 @@ def _kinds(*kinds: str) -> str:
     return "kind IN (" + ", ".join(f"'{k}'" for k in kinds) + ")"
 
 
+def _swap_kinds(old: str, new: str) -> None:
+    """Change only `proposal`'s kind CHECK, in place, by SQLite's documented
+    writable_schema procedure for constraint-only changes. A batch rebuild
+    drops `proposal`, which Memory and feedback rows pin: with foreign keys on
+    (they can't be turned off inside this transaction) that DROP fails, and
+    the app never opens again (#282 verifier)."""
+    bind = op.get_bind()
+    where = " WHERE type = 'table' AND name = 'proposal'"  # constant
+    sql = bind.exec_driver_sql("SELECT sql FROM sqlite_master" + where).scalar_one()  # noqa: S608
+    if sql.count(old) != 1:
+        raise RuntimeError("unexpected proposal schema")
+    version = int(bind.exec_driver_sql("PRAGMA schema_version").scalar_one())
+    bind.exec_driver_sql("PRAGMA writable_schema = ON")
+    bind.exec_driver_sql(
+        "UPDATE sqlite_master SET sql = ?" + where,  # noqa: S608
+        (sql.replace(old, new),),
+    )
+    bind.exec_driver_sql(f"PRAGMA schema_version = {version + 1}")
+    bind.exec_driver_sql("PRAGMA writable_schema = OFF")
+
+
 def upgrade() -> None:
-    # the batch rebuild drops and renames `proposal`; FKs are checked at commit
-    op.execute("PRAGMA defer_foreign_keys = ON")
-    with op.batch_alter_table("proposal", recreate="always") as b:
-        b.drop_constraint("ck_proposal_kind", type_="check")
-        b.create_check_constraint(
-            "ck_proposal_kind", _kinds("memory", "correction", "map_edge")
-        )
+    op.execute("DROP TABLE IF EXISTS _alembic_tmp_proposal")  # an old failed run's
+    _swap_kinds(_kinds(*OLD), _kinds(*OLD, "map_edge"))
     op.create_table(
         "map_edge",
         sa.Column("id", sa.Integer, primary_key=True),
@@ -95,7 +112,4 @@ def downgrade() -> None:
             op.execute(f"DROP TRIGGER IF EXISTS map_edge_{kind}_gone")
     op.drop_table("map_edge")
     op.execute("DELETE FROM proposal WHERE kind = 'map_edge'")
-    op.execute("PRAGMA defer_foreign_keys = ON")
-    with op.batch_alter_table("proposal", recreate="always") as b:
-        b.drop_constraint("ck_proposal_kind", type_="check")
-        b.create_check_constraint("ck_proposal_kind", _kinds("memory", "correction"))
+    _swap_kinds(_kinds(*OLD, "map_edge"), _kinds(*OLD))
