@@ -271,6 +271,8 @@ export type Briefing = components["schemas"]["BriefingOut"];
 export type RegretItem = components["schemas"]["RegretItemOut"];
 export type Memory = components["schemas"]["MemoryOut"];
 export const fetchForecast = () => get<ForecastBand[]>("/api/cash-flow/forecast");
+export type Goals = components["schemas"]["GoalsOut"];
+export const fetchGoals = () => get<Goals>("/api/goals");
 export const fetchBriefing = () => get<Briefing>("/api/briefing");
 export const fetchMemories = () => get<{ items: Memory[] }>("/api/memories").then((r) => r.items);
 
