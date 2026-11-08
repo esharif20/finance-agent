@@ -61,7 +61,7 @@ class PaydayBaseline:
         return self.by_day[day] if 0 <= day < len(self.by_day) else self.cycle
 
 
-def _median(values: Sequence[int]) -> int:
+def median(values: Sequence[int]) -> int:
     s = sorted(values)
     mid = len(s) // 2
     # half a penny rounds to even, as Decimal's default does
@@ -99,9 +99,9 @@ def seasonal_baseline(
     same = [spend.get(target - 12 * y, 0) for y in range(1, SEASONAL_YEARS + 1)]
     same = same[: (target - first) // 12]
     if same:
-        return SeasonalBaseline(_median(same), have, True)
+        return SeasonalBaseline(median(same), have, True)
     trailing = [spend.get(target - i, 0) for i in range(1, TRAILING + 1)]
-    return SeasonalBaseline(_median(trailing[: target - first]), have, False)
+    return SeasonalBaseline(median(trailing[: target - first]), have, False)
 
 
 def payday_baseline(
@@ -134,7 +134,7 @@ def payday_baseline(
     # would often be 0 for a Category with a few charges a cycle
     total = sum(sum(c) for c in daily)
     by_day = [sum(sum(c[: i + 1]) for c in daily) for i in range(length)]
-    cycle = _median([sum(c) for c in daily])
+    cycle = median([sum(c) for c in daily])
     return PaydayBaseline(
         tuple(_round(cycle * s, total) if total else 0 for s in by_day),
         cycle,
