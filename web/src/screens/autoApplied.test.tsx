@@ -55,7 +55,7 @@ describe("Auto-categorised line", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Undo all auto-categorising" }));
     await waitFor(() => expect(calls).toEqual(["/api/review-queue/undo-auto"]));
     expect(await screen.findByText("Put 3 merchants back in the queue.")).toBeInTheDocument();
-    expect(invalidate).toHaveBeenCalledWith();
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) }); // everything but the queue the reply replaced
     expect(screen.queryByRole("button", { name: "Undo all auto-categorising" })).not.toBeInTheDocument();
   });
 

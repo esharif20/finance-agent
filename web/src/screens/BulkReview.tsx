@@ -1,60 +1,84 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Undo2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type ReviewItem, type ReviewQueueOut, answerReviewBatch, undoReview } from "@/api/client";
 import { Money } from "@/components/Money";
 import { Card } from "@/components/ui/card";
-import { type BulkGroup, groupBySuggestion, selected } from "@/lib/bulkReview";
-import { REVIEW_KEY } from "./ReviewQueue";
+import {
+  type BulkGroup,
+  GROUP_CAP,
+  groupBySuggestion,
+  isBig,
+  pages,
+  payments,
+  selected,
+  shown,
+  ticked,
+} from "@/lib/bulkReview";
+import { btn, useReviewWrite } from "./ReviewQueue";
 
-const btn =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:opacity-50 [@media(hover:hover)]:hover:bg-active";
 const kbd = "hidden rounded-md bg-card px-1.5 text-xs sm:inline font-medium text-muted-foreground";
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-const SHOWN = 12; // rows a group shows before "Show all"
 
 /** Bulk Review: Category items grouped by the model's top suggestion; one tap accepts a group's ticked rows. */
 export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: () => void }) {
-  const client = useQueryClient();
   const groups = groupBySuggestion(queue.items);
-  const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set()); // groups showing every row
+  // rows the user flipped from their default: ticked ones the user unticked, and the other way round
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set()); // big groups whose rows are showing
+  const [pageAt, setPageAt] = useState<ReadonlyMap<string, number>>(new Map());
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
   const [batch, setBatch] = useState(0); // answers the last accept wrote; Undo takes them all back
+  const refocus = useRef<number | null>(null); // the accepted group's place, so focus does not fall to <body>
 
-  const act = useMutation({
-    mutationFn: ({ call }: { call: () => Promise<ReviewQueueOut>; text: string; batch?: boolean }) => call(),
-    onSuccess: (q, { text, batch: wrote }) => {
-      client.setQueryData(REVIEW_KEY, q);
+  const act = useReviewWrite<{ call: () => Promise<ReviewQueueOut>; text: string; batch?: boolean }>(
+    (q, { text, batch: wrote }) => {
       setNote({ text: q.message ?? text });
       setBatch(wrote ? q.applied : 0);
     },
-    onError: (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
-    onSettled: () => client.invalidateQueries(),
-  });
+    (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
+  );
+
+  const pageOf = (g: BulkGroup) => Math.min(pageAt.get(g.key) ?? 0, pages(g) - 1);
+  // a big group is accepted only once its rows are on screen, and then only the page shown
+  const canAccept = (g: BulkGroup) => !isBig(g) || open.has(g.key);
 
   const accept = (g: BulkGroup) => {
-    const items = selected(g, unticked);
-    if (!items.length || act.isPending) return;
-    act.mutate({
+    const items = selected(g, flipped, pageOf(g));
+    if (!items.length || !canAccept(g)) return;
+    const at = document.activeElement?.closest("[data-group]");
+    refocus.current = at ? groups.indexOf(g) : null;
+    act.run({
       call: () => answerReviewBatch(items, g.category),
       text: `Accepted ${plural(items.length, "Merchant", "Merchants")} as ${g.category[1]}.`,
       batch: true,
     });
   };
-  const undo = () => {
-    if (!act.isPending) act.mutate({ call: () => undoReview(batch || 1), text: "Undid the last change." });
-  };
-  const toggle = (id: string) =>
-    setUnticked((u) => {
+  const undo = () => act.run({ call: () => undoReview(batch || 1), text: "Undid the last change." });
+  const flip = (id: string) =>
+    setFlipped((u) => {
       const next = new Set(u);
       if (!next.delete(id)) next.add(id);
       return next;
     });
+  const toggleOpen = (key: string) =>
+    setOpen((o) => {
+      const next = new Set(o);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
+  // keep keyboard focus on the Accept button in the same place once the accepted rows have gone
+  useEffect(() => {
+    const at = refocus.current;
+    if (at === null) return;
+    refocus.current = null;
+    const buttons = document.querySelectorAll<HTMLElement>('[data-group] button[aria-keyshortcuts="A"]');
+    buttons[Math.min(at, buttons.length - 1)]?.focus();
+  }, [queue.items]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return; // a held key must not accept the next group too
       const k = e.key.toLowerCase();
       const t = e.target;
       if (t instanceof HTMLElement && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName))) return;
@@ -71,7 +95,7 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const total = groups.reduce((n, g) => n + selected(g, unticked).length, 0);
+  const total = groups.reduce((n, g) => n + g.items.filter((i) => ticked(g, flipped, i.id)).length, 0);
   const rest = queue.items.length - groups.reduce((n, g) => n + g.items.length, 0);
 
   return (
@@ -92,7 +116,7 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
           {note?.text}
         </p>
         {batch > 0 && (
-          <button type="button" onClick={undo} disabled={act.isPending} aria-keyshortcuts="U" className={`${btn} glass`}>
+          <button type="button" onClick={undo} aria-disabled={act.isPending} aria-keyshortcuts="U" className={`${btn} glass`}>
             <Undo2 className="size-4" aria-hidden="true" />
             Undo {plural(batch, "answer", "answers")}
             <kbd className={kbd}>U</kbd>
@@ -101,9 +125,13 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
       </div>
 
       {groups.map((g) => {
-        const picked = selected(g, unticked);
-        const all = open.has(g.key);
-        const rows = all ? g.items : g.items.slice(0, SHOWN);
+        const picked = selected(g, flipped, pageOf(g));
+        const big = isBig(g);
+        const expanded = open.has(g.key);
+        const page = pageOf(g);
+        const rows = big ? (expanded ? shown(g, page) : []) : g.items;
+        const blocked = act.isPending || picked.length === 0 || !canAccept(g);
+        const count = `${plural(picked.length, "merchant", "merchants")} (${plural(payments(picked), "payment", "payments")})`;
         return (
           <Card key={g.key} data-group={g.key} aria-labelledby={`g-${g.key}`} className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -112,40 +140,59 @@ export function BulkReview({ queue, others }: { queue: ReviewQueueOut; others: (
                   {g.category[1]}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  {g.category[0]} · {plural(g.items.length, "Merchant", "Merchants")}
+                  {g.category[0]} · {plural(g.items.length, "Merchant", "Merchants")} ·{" "}
+                  {plural(payments(g.items), "payment", "payments")}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => accept(g)}
-                disabled={act.isPending || picked.length === 0}
+                aria-disabled={blocked}
+                title={big && !expanded ? `Show the ${g.items.length} Merchants first` : undefined}
                 aria-keyshortcuts="A"
-                className={`${btn} bg-foreground text-background`}
+                className={`${btn} bg-foreground text-background ${blocked ? "opacity-50" : ""}`}
               >
-                Accept {picked.length} as {g.category[1]}
+                {big ? `Accept ${picked.length} shown (${plural(payments(picked), "payment", "payments")})` : `Accept ${count}`} as{" "}
+                {g.category[1]}
                 <kbd className={`${kbd} bg-transparent text-background/70`}>A</kbd>
               </button>
             </div>
-            <ul className="flex flex-col">
-              {rows.map((i) => (
-                <Row key={i.id} item={i} on={!unticked.has(i.id)} toggle={() => toggle(i.id)} />
-              ))}
-            </ul>
-            {g.items.length > SHOWN && (
-              <button
-                type="button"
-                aria-expanded={all}
-                onClick={() =>
-                  setOpen((o) => {
-                    const next = new Set(o);
-                    if (!next.delete(g.key)) next.add(g.key);
-                    return next;
-                  })
-                }
-                className={`${btn} self-start`}
-              >
-                {all ? "Show fewer" : `Show all ${g.items.length}`}
-              </button>
+            {big && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" aria-expanded={expanded} onClick={() => toggleOpen(g.key)} className={btn}>
+                  {expanded ? "Hide Merchants" : `Show the ${g.items.length} Merchants`}
+                </button>
+                {expanded && (
+                  <>
+                    <span className="text-sm text-muted-foreground">
+                      {page * GROUP_CAP + 1} to {Math.min((page + 1) * GROUP_CAP, g.items.length)} of {g.items.length}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page === 0}
+                      onClick={() => setPageAt(new Map(pageAt).set(g.key, page - 1))}
+                      className={btn}
+                    >
+                      Previous {GROUP_CAP}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page >= pages(g) - 1}
+                      onClick={() => setPageAt(new Map(pageAt).set(g.key, page + 1))}
+                      className={btn}
+                    >
+                      Next {GROUP_CAP}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {rows.length > 0 && (
+              <ul className="flex flex-col">
+                {rows.map((i) => (
+                  <Row key={i.id} item={i} on={ticked(g, flipped, i.id)} toggle={() => flip(i.id)} />
+                ))}
+              </ul>
             )}
           </Card>
         );

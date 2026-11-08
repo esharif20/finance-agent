@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight, CircleCheck, SkipForward, Undo2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type ReviewItem,
   type ReviewQueueOut,
@@ -39,9 +39,43 @@ const recent: Cat[] = [];
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
-const btn =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:opacity-50 [@media(hover:hover)]:hover:bg-active";
+// aria-disabled (not disabled) while a write is pending: the button keeps focus and does not flash
+export const btn =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:opacity-50 aria-disabled:cursor-progress aria-disabled:active:scale-100 [@media(hover:hover)]:hover:bg-active";
 const kbd = "hidden rounded-md bg-card px-1.5 text-xs sm:inline font-medium text-muted-foreground";
+
+/**
+ * One review write at a time. The lock is a ref, so a key repeat or double click in the same tick can't
+ * slip past `isPending`. The write's reply is the new queue, so it is not fetched again: only the other
+ * screens' data is refreshed (a failure refreshes everything, the queue too, to show what changed).
+ */
+export function useReviewWrite<V extends { call: () => Promise<ReviewQueueOut> }>(
+  onOk: (q: ReviewQueueOut, v: V) => void,
+  onFail: (e: Error) => void,
+) {
+  const client = useQueryClient();
+  const busy = useRef(false);
+  const m = useMutation({
+    mutationFn: ({ call }: V) => call(),
+    onSuccess: (q, v) => {
+      client.setQueryData(REVIEW_KEY, q);
+      onOk(q, v);
+    },
+    onError: onFail,
+    onSettled: (_q, error) => {
+      busy.current = false;
+      return client.invalidateQueries(
+        error ? undefined : { predicate: (x) => x.queryKey.length > 1 || x.queryKey[0] !== REVIEW_KEY[0] },
+      );
+    },
+  });
+  const run = (v: V) => {
+    if (busy.current) return;
+    busy.current = true;
+    m.mutate(v);
+  };
+  return { run, isPending: m.isPending };
+}
 
 /** The queue's count, shared by the nav badge and the Overview line. */
 export function useReviewCount(): number {
@@ -62,20 +96,16 @@ function suggestions(groups: { name: string; subs: string[] }[], model: Cat[] = 
 
 /** After a sync: what the model filed by itself, with one way back. The count is the API's. */
 function AutoApplied() {
-  const client = useQueryClient();
   const reduce = useReducedMotion();
   const batch = useQuery({ queryKey: AUTO_KEY, queryFn: fetchAutoBatch });
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
-  const undo = useMutation({
-    mutationFn: undoAutoBatch,
-    onSuccess: (q) => {
-      client.setQueryData(REVIEW_KEY, q);
+  const undo = useReviewWrite<{ call: () => Promise<ReviewQueueOut> }>(
+    (q) => {
       const back = `${q.applied} ${q.applied === 1 ? "merchant" : "merchants"}`;
       setNote({ text: q.applied ? `Put ${back} back in the queue.` : (q.message ?? "Nothing to undo.") });
     },
-    onError: (e) => setNote({ text: `${e.message} Nothing was changed.`, bad: true }),
-    onSettled: () => client.invalidateQueries(), // like an import: lists and totals may have changed
-  });
+    (e) => setNote({ text: `${e.message} Nothing was changed.`, bad: true }),
+  );
   const n = batch.data?.count ?? 0;
   const fade = reduce ? { duration: 0 } : { duration: 0.2, ease: [0.23, 1, 0.32, 1] as const };
   return (
@@ -97,7 +127,7 @@ function AutoApplied() {
             {note?.text ?? `Auto-categorised ${n} ${n === 1 ? "merchant" : "merchants"}`}
           </p>
           {n > 0 && (
-            <button type="button" aria-label="Undo all auto-categorising" disabled={undo.isPending} onClick={() => undo.mutate()} className={`${btn} glass`}>
+            <button type="button" aria-label="Undo all auto-categorising" aria-disabled={undo.isPending} onClick={() => undo.run({ call: undoAutoBatch })} className={`${btn} glass`}>
               <Undo2 className="size-4" aria-hidden="true" />
               Undo all
             </button>
@@ -111,10 +141,15 @@ function AutoApplied() {
 /** Bulk by default when a queue is mostly suggested Category rows; one at a time otherwise, or by choice. */
 export function ReviewQueue() {
   const queue = useQuery({ queryKey: REVIEW_KEY, queryFn: fetchReviewQueue });
+  const auto = useQuery({ queryKey: AUTO_KEY, queryFn: fetchAutoBatch });
   const [mode, setMode] = useState<"bulk" | "single" | null>(null);
   if (!queue.data) return <OneAtATime />; // loading and error states live there
+  // the "Auto-categorised" line sits above the list: wait for it, or it shoves the buttons down mid-click
+  if (auto.isPending) return <Skeleton className="h-80 w-full rounded-card" />;
   const eligible = queue.data.items.filter(bulkable).length >= BULK_MIN;
-  const view = mode ?? (eligible ? "bulk" : "single");
+  // Bulk sticks once chosen: accepting the last group must not swap the screen (and drop its Undo) under the user
+  if (eligible && mode === null) setMode("bulk");
+  const view = mode ?? "single";
   return (
     <div className="flex flex-col gap-4">
       <AutoApplied />
@@ -144,24 +179,19 @@ export function ReviewQueue() {
 }
 
 function OneAtATime() {
-  const client = useQueryClient();
   const queue = useQuery({ queryKey: REVIEW_KEY, queryFn: fetchReviewQueue });
   const categories = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
   const [at, setAt] = useState(0);
   const [all, setAll] = useState(true); // "Apply to N similar" (the Merchant) or just this one
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
 
-  const act = useMutation({
-    mutationFn: ({ call }: { call: () => Promise<ReviewQueueOut>; text: string }) => call(),
-    onSuccess: (q, { text }) => {
-      client.setQueryData(REVIEW_KEY, q);
+  const act = useReviewWrite<{ call: () => Promise<ReviewQueueOut>; text: string }>(
+    (q, { text }) => {
       setNote({ text: q.message ?? text }); // an undo that found nothing to undo says why
       setAll(true);
     },
-    onError: (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
-    // like an import: totals and lists everywhere may have changed
-    onSettled: () => client.invalidateQueries(),
-  });
+    (e) => setNote({ text: `${e.message} Showing the latest queue.`, bad: true }),
+  );
 
   const items = queue.data?.items ?? [];
   const idx = Math.min(at, Math.max(items.length - 1, 0));
@@ -173,28 +203,28 @@ function OneAtATime() {
   const justOne = !all && !!many;
 
   const pick = (cat: Cat) => {
-    if (!item || act.isPending) return;
+    if (!item) return;
     recent.unshift(cat);
     recent.splice(8);
     const txn = justOne ? item.transaction_ids[0] : undefined;
-    act.mutate({
+    act.run({
       call: () => answerReview(item, { category: cat, ...(txn === undefined ? {} : { transaction_id: txn }) }),
       text: `${item.display_name || "This payment"}: ${cat[1]}${justOne ? ", just this one" : many ? `, ${item.weight} transactions` : ""}.`,
     });
   };
   const choose = (choice: string) => {
-    if (!item || act.isPending) return;
-    act.mutate({
+    if (!item) return;
+    act.run({
       call: () => answerReview(item, { choice }),
       text: `${item.display_name || TYPE_LABEL[item.type] || "Item"}: ${CHOICE_LABEL[choice] ?? choice}.`,
     });
   };
   const skip = () => {
-    if (!item || act.isPending) return;
-    act.mutate({ call: () => skipReview(item), text: `Skipped ${item.display_name || "this item"}.` });
+    if (!item) return;
+    act.run({ call: () => skipReview(item), text: `Skipped ${item.display_name || "this item"}.` });
   };
   const undo = () => {
-    if (!act.isPending) act.mutate({ call: undoReview, text: "Undid the last change." });
+    act.run({ call: () => undoReview(), text: "Undid the last change." });
   };
   const move = (by: number) => setAt(Math.max(0, Math.min(items.length - 1, idx + by)));
 
@@ -202,6 +232,7 @@ function OneAtATime() {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
       const k = e.key.toLowerCase();
+      if (e.repeat && !k.startsWith("arrow")) return; // holding a key must not answer the next item too
       const n = Number(k);
       if (n >= 1 && n <= 3) {
         const cat = picks[n - 1];
@@ -313,7 +344,7 @@ function OneAtATime() {
                   type="button"
                   title={cat[0]}
                   aria-keyshortcuts={String(i + 1)}
-                  disabled={act.isPending}
+                  aria-disabled={act.isPending}
                   onClick={() => pick(cat)}
                   className={`${btn} min-h-14 justify-between bg-raised`}
                 >
@@ -326,7 +357,7 @@ function OneAtATime() {
               <span className="sr-only">Another category</span>
               <select
                 value=""
-                disabled={act.isPending}
+                aria-disabled={act.isPending}
                 onChange={(e) => {
                   const [g, s] = e.target.value.split(".").map(Number);
                   const sub = groups[g ?? -1]?.subs[s ?? -1];
@@ -364,7 +395,7 @@ function OneAtATime() {
                 key={c}
                 type="button"
                 aria-keyshortcuts={String(i + 1)}
-                disabled={act.isPending}
+                aria-disabled={act.isPending}
                 onClick={() => choose(c)}
                 className={`${btn} min-h-14 justify-between bg-raised`}
               >
@@ -377,12 +408,12 @@ function OneAtATime() {
       </Card>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={skip} disabled={act.isPending} aria-keyshortcuts="S" className={`${btn} glass`}>
+        <button type="button" onClick={skip} aria-disabled={act.isPending} aria-keyshortcuts="S" className={`${btn} glass`}>
           <SkipForward className="size-4" aria-hidden="true" />
           Skip
           <kbd className={kbd}>S</kbd>
         </button>
-        <button type="button" onClick={undo} disabled={act.isPending} aria-keyshortcuts="U" className={`${btn} glass`}>
+        <button type="button" onClick={undo} aria-disabled={act.isPending} aria-keyshortcuts="U" className={`${btn} glass`}>
           <Undo2 className="size-4" aria-hidden="true" />
           Undo
           <kbd className={kbd}>U</kbd>
