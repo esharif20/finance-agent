@@ -36,9 +36,9 @@ log = logging.getLogger(__name__)  # counts only
 # model name -> threshold in similarity thousandths, copied from the committed
 # synthetic calibration (a test keeps them equal)
 THRESHOLDS: dict[str, int] = {
-    "nomic-embed-text": 720,
+    "nomic-embed-text": 920,  # held out (#287): the in-sample 720 leaked errors
     "hashed-trigrams-v1": 611,
-    "nomic-embed-text+qwen3.5:4b-q4_K_M": 681,  # kNN and LLM agree
+    "nomic-embed-text+qwen3.5:4b-q4_K_M": 1061,  # agreement: none held out at 95%
 }
 MIN_DECISIONS = 50
 PRECISION = 95  # percent
@@ -46,11 +46,12 @@ SOURCE = "auto:"
 LOW = "auto-low:"  # a best guess the gate is not sure of (#215 F)
 LOW_MODEL = "low:"  # its log rows: "low:<the version that guessed>"
 REVIEW_CAP = 10  # at most this many Merchants per sync are asked about
+LOW_FLOOR = 50  # percent: a low-tier version under this (eval: 57-64) is stopped
 # The low tier, from the committed synthetic gate results (a test keeps them
 # equal): which guess to file on a disagreement, and how often each kind of
 # low guess is right (percent), for spend x (1 - confidence).
 LOW_PREFERS = "llm"
-LOW_CONFIDENCE: dict[str, int] = {"agree": 64, "llm": 57}  # no kNN-only low guess: 0
+LOW_CONFIDENCE: dict[str, int] = {"agree": 77, "knn": 0, "llm": 66}
 
 type Category = tuple[str, str]
 UNCATEGORISED = (_NONE, _NONE)
@@ -83,6 +84,40 @@ def _suspended(db: Scoped, model: str, threshold: int) -> bool:
     db.insert(ms, model=model, decisions=len(judged), suspended_at=datetime.now(UTC))
     log.info("auto-apply suspended decisions=%d", len(judged))
     return True
+
+
+def _low_suspended(db: Scoped, model: str) -> bool:
+    """The monitor for a low-tier version ("low:<version>"): its filed guesses
+    are judged by overrides, an untouched row counting as accepted. Once it
+    has filed MIN_DECISIONS and fewer than LOW_FLOOR% stand, it files no more
+    and its rows go back to Review, for good."""
+    p, ms = schema.category_prediction, schema.model_suspension
+    if db.execute(db.select(ms, ms.c.id).where(ms.c.model == model)).first():
+        return True
+    filed = db.execute(
+        db.select(p, p.c.category_id, p.c.decided_category_id).where(
+            p.c.model == model, p.c.batch.is_not(None)
+        )
+    ).all()
+    wrong = sum(
+        r.decided_category_id is not None and r.decided_category_id != r.category_id
+        for r in filed
+    )
+    n = len(filed)
+    if n < MIN_DECISIONS or (n - wrong) * 100 >= LOW_FLOOR * n:
+        return False
+    db.insert(ms, model=model, decisions=n, suspended_at=datetime.now(UTC))
+    log.info("auto-low suspended decisions=%d", n)
+    return True
+
+
+def _parts(version: str) -> list[str]:
+    """The versions a guess rests on: a gate version is its embedder's and
+    its LLM's ("<emb>+<llm>" -> emb, "llm:<llm>"), each alone otherwise."""
+    if "+" not in version:
+        return [version]
+    emb, chat = version.split("+", 1)
+    return [version, emb, llm.PREFIX + chat]
 
 
 def _set(db: Scoped, merchant_id: int, category_id: int, source: str) -> int:
@@ -189,8 +224,31 @@ def apply(
     suspended = {
         m
         for m in db.execute(db.select(p, p.c.model).distinct()).scalars()
-        if (t := threshold(m)) is not None and _suspended(db, m, t)
+        if (
+            _low_suspended(db, m)
+            if m.startswith(LOW_MODEL)
+            else (t := threshold(m)) is not None and _suspended(db, m, t)
+        )
     }
+
+    def blocked(version: str, low: bool = False) -> bool:
+        return any(v in suspended for v in _parts(version)) or (
+            low and LOW_MODEL + version in suspended
+        )
+
+    # rows a now-stopped version filed earlier go back to Review at once,
+    # not only on the next full recompute
+    c = schema.categorisation
+    for src in db.execute(db.select(c, c.c.source).distinct()).scalars():
+        low = src.startswith(LOW)
+        if (low or src.startswith(SOURCE)) and blocked(
+            src.removeprefix(LOW if low else SOURCE), low
+        ):
+            db.execute(
+                db.update(c)
+                .where(c.c.source == src)
+                .values(source="default", category_id=ids[UNCATEGORISED])
+            )
     done = 0
     for r in db.execute(
         db.select(p, p.c.merchant_id, p.c.category_id, p.c.model).where(
@@ -199,7 +257,7 @@ def apply(
     ):
         low = r.model.startswith(LOW_MODEL)
         version = r.model.removeprefix(LOW_MODEL)
-        if version not in suspended:  # a stopped version's rows go back to Review
+        if not blocked(version, low):  # a stopped version's rows go back to Review
             source = (LOW if low else SOURCE) + version
             done += _set(db, r.merchant_id, r.category_id, source)
     found: dict[str, list[tuple[int, Category]]] = {}
@@ -229,7 +287,7 @@ def apply(
     gate = f"{emb}+{lv.removeprefix(llm.PREFIX)}" if emb and lv else None
 
     def live(version: str | None) -> int | None:
-        if version is None or version in suspended:
+        if version is None or blocked(version):
             return None
         return threshold(version)
 
@@ -301,11 +359,18 @@ def apply(
             kind, guess, version = "knn", knn[1], emb
         else:
             kind, guess, version = "none", None, ""
+        if guess is not None and blocked(version, low=True):
+            kind, guess, version = "none", None, ""  # a stopped version guesses nothing
         sure = LOW_CONFIDENCE.get(kind, 0)
         ask.append((i.spend * (100 - sure), i.key, m, guess, version))
     if final:
-        ask.sort(key=lambda a: (-a[0], a[1]))  # the most expected impact first
-        for _, _, m, guess, version in ask[REVIEW_CAP:]:
+        # Merchants with no guess stay in Review whatever happens, so they take
+        # their places in the cap first; the rest go to the most expected impact
+        guessed = sorted(
+            (a for a in ask if a[3] is not None), key=lambda a: (-a[0], a[1])
+        )
+        room = max(0, REVIEW_CAP - (len(ask) - len(guessed)))
+        for _, _, m, guess, version in guessed[room:]:
             if guess is not None:
                 new += place(LOW_MODEL + version, m, guess, 0, LOW + version)
     pending = (p.c.batch == -1,)  # placed this pass, before it has an id

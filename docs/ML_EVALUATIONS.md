@@ -56,25 +56,28 @@ Dataset v4, 326 test rows:
 
 Nearest neighbours fill noisy descriptors almost perfectly (noise accuracy 0.76 → 0.99) and help on unseen Merchants (0.25 → 0.50 with nomic), but raw similarity is a poor confidence: ECE quadruples. It does not beat the baseline on calibration, so it stays a suggester until #115 calibrates a threshold. Lookalikes stay at 0: a rule or a seeded alias decides them before any neighbour is asked.
 
-**Dataset v4 (#215 F)** adds the long tail a real sync is mostly made of: 45 fictional independents (clean and noisy), 10 vague processor payees ("SQ *THE KITCHEN") and 8 look-alikes of another Category ("PETROLHEAD MONTHLY", "GREEN TRAIN MODELS"). The kNN and the few-shot now label the base Merchants that appear, as the app does, not only Corrections. Recalibrated thresholds: nomic-embed-text 720 (was 861 on v3), trigrams 611.
+**Dataset v4 (#215 F)** adds the long tail a real sync is mostly made of: 45 fictional independents (clean and noisy), 10 vague processor payees ("SQ *THE KITCHEN") and 8 look-alikes of another Category ("PETROLHEAD MONTHLY", "GREEN TRAIN MODELS"). The kNN and the few-shot now label the base Merchants that appear, as the app does, not only Corrections. Recalibrated in-sample thresholds: nomic-embed-text 720 (was 861 on v3), trigrams 611. The app uses the held-out nomic threshold below (920).
 
 ### The agreement gate (#215 F)
 
-`evals/categoriser_gate.py` scores, per Merchant, what Corrections, rules and the UK base leave on dataset v4 (125 Merchants, 163 rows): the nomic-embed-text kNN, the local LLM with retrieval few-shot (`categorise/llm.py`, qwen3.5:4b-q4_K_M, the 5 nearest labelled Merchants as examples) and the gate. The local run (`--collect`) stores each Merchant's signals (kNN top score and Category, LLM answer) in the results file. CI recomputes every metric from those committed signals plus the rules, so a rule change that moves the residual set fails until it is re-run locally. Rows weight each Merchant; precision is over assigned rows, coverage over all 326 test rows.
+`evals/categoriser_gate.py` scores, per Merchant, what Corrections, rules and the UK base leave on dataset v4 (125 Merchants, 163 rows): the nomic-embed-text kNN, the local LLM with retrieval few-shot (`categorise/llm.py`, qwen3.5:4b-q4_K_M, prompt v2: bank text sanitised and quoted as `{"data": ...}`, the 5 nearest labelled Merchants as examples) and the gate. The local run (`--collect`, in resumable batches) stores each Merchant's signals (kNN top score and Category, LLM answer) in the results file. CI recomputes every metric from those committed signals plus the rules, so a rule or prompt change fails until it is re-run locally.
+
+**Thresholds are held out (#287 verifier).** In-sample calibration claimed 0.96 on the residual Merchants, but thresholds fit on other Merchants gave only 0.93. The harness now runs 5-fold cross-validation over Merchants, 20 seeded splits. Thresholds are calibrated on the other folds, raised by a margin, and scored on the held-out Merchants. The smallest margin whose pooled held-out precision is at least 95% is chosen, and the app's thresholds are that margin over a fit on all Merchants. It needs the largest margin, 200: kNN alone at 920, and agreement never (1061). Both are copied into `auto.THRESHOLDS`, and a test keeps them equal. The one-sided 95% Wilson lower bound on that held-out precision is only 0.53, because one split holds about 3 confident rows. That bound is reported, not gated.
 
 | Stage | Precision | Coverage |
 | --- | --- | --- |
 | Corrections + rules + base | 0.994 | 0.750 |
-| + kNN at its threshold (720) | 0.991 | 0.822 |
-| + LLM alone, every answer | 0.925 | 0.997 |
-| Gate, confident tier (`auto`) | 0.991 | 0.830 |
-| Gate, both tiers (`auto` + `auto-low`) | 0.926 | 0.997 |
+| Confident tier, held out (`auto`) | 0.994 | 0.755 |
+| (residual Merchants only, held out) | 0.968 | 0.020 |
+| + LLM alone, every answer | 0.932 | 0.994 |
+| Both tiers (`auto` + `auto-low`) | 0.929 | 0.997 |
 
-- **Confident tier.** The kNN alone at 720, or the kNN and the LLM agreeing at 681 or above. The LLM alone is 0.72 precise on the residual Merchants (90 of 125), below 95%, so it never applies by itself. Agreement adds little coverage here (0.822 to 0.830): where the kNN is unsure, the two rarely agree. Per sub-Category, 32 of the 37 the tier assigns are at 1.00 and the lowest is Travel › Flights at 0.92.
-- **Low tier.** Every other Merchant gets the LLM's guess on a disagreement (it beats the kNN there) and its accuracy is 0.61. This is what the user sees without reviewing. By kind: agreement below the threshold is right 64% of the time, the LLM alone 57%. These are `LOW_CONFIDENCE` in the app. The LLM never answered "unsure", so every Merchant has a guess (0 with no signal). The weakest sub-Categories in both tiers are Cloud storage (0.40), Maintenance (0.50) and Hobbies (0.60).
-- **Review load.** At most `REVIEW_CAP` = 10 Merchants per sync, chosen by spend × (1 − confidence). With no Merchant lacking a signal, a sync of about 4,000 rows from 575 Merchants asks about 10.
-- **Groceries lean.** Groceries is 7.2% of the gold residual and 10.1% of the low guesses: a mild lean, not the heavy one seen in real suggestions. That one came mostly from one bulk accept that filed 471 Merchants as Groceries, which turned every Groceries Correction into a near neighbour. Labelling the base Merchants gives every Category examples. Real-data numbers are never committed.
-- **Cost.** 1.8 s per Merchant on the 16 GB M1 Pro with nothing else loaded, so about 17.5 minutes for 575 Merchants on a first sync. That runs in the background and once per Merchant; later syncs ask only about new ones. The eval has no dates, so its cadence words say "irregular, any day" for everyone; the app passes real dates. Thresholds are calibrated and scored on the same synthetic Merchants (as in #115), so they are optimistic.
+- **Confident tier.** On held-out Merchants the models add almost nothing: only the very top kNN matches. Agreement between the kNN and the LLM is common (77 Merchants) but not clean enough at any score to hold 95% on unseen Merchants, so it files `auto-low`. The LLM alone is right on 91 of 125 residual Merchants and never applies by itself.
+- **Low tier.** Every other Merchant gets the LLM's guess on a disagreement (it beats the kNN there), at 0.72 accuracy. This is what the user sees without reviewing. By kind, agreement below the bar is right 77% of the time and the LLM alone 66%; these are `LOW_CONFIDENCE`. Those figures are in-sample. The LLM answered "unsure" once, so every Merchant has a guess.
+- **Review load.** `REVIEW_CAP` is 10 Merchants per sync, chosen by spend × (1 − confidence). Merchants with no guess take their places inside the cap first. A sync of about 4,000 rows from 575 Merchants asks about 10.
+- **Groceries lean.** Groceries is 7.2% of the gold residual and 7.7% of the low guesses. The heavy lean in real suggestions came mostly from one bulk accept that filed 471 Merchants as Groceries. Labelling the base Merchants gives every Category examples. Real-data numbers are never committed.
+- **Monitoring.** A suspended version files nothing in either tier, and that includes a gate version whose embedder or LLM is suspended. Low-tier versions have their own record: once one has filed 50 Merchants and fewer than 50% stand (an override counts against it), it stops and its rows go back to Review.
+- **Cost.** 1.9 s per Merchant on the 16 GB M1 Pro with nothing else loaded, so about 18 minutes for 575 Merchants on a first sync. That runs in the background and once per Merchant. The eval has no dates, so its cadence words say "irregular, any day" for everyone; the app passes real dates.
 
 ### Recurring detection (#104)
 

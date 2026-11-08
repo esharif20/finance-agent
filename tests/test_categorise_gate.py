@@ -203,7 +203,49 @@ def test_the_app_gate_constants_are_the_committed_synthetic_calibration(
         cal = r["calibration"]
         gate = auto._name(r["model_version"])  # pyright: ignore[reportPrivateUsage]
         assert auto.THRESHOLDS[gate] == cal["agree_threshold"]
-        assert r["models"]["gate"]["metrics"]["gate_confident.precision"] >= 0.95
+        assert auto.THRESHOLDS[r["embedder"].split("@")[0]] == cal["knn_threshold"]
+        # the bar is held out: thresholds fit on other Merchants (#287 verifier)
+        assert cal["held_out"]["precision"] >= 0.95
         if r["llm"].split("@")[0] == llm.PREFIX + llm.MODEL:  # the app's model
             assert auto.LOW_PREFERS == cal["low_prefers"]
             assert auto.LOW_CONFIDENCE == cal["low_confidence"]
+
+
+LLM_LOW = f"low:{llm.PREFIX}{LLM}@abc123"
+
+
+def test_llm_only_low_rows_are_monitored_and_stopped_when_overridden(
+    engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(auto, "MIN_DECISIONS", 3)
+    monkeypatch.setattr(auto, "REVIEW_CAP", 0)
+    _setup(engine, tmp_path)
+    _final(engine, dict.fromkeys(GUESSED, COFFEE))  # LLM-only low guesses
+    assert all(_sources(engine)[n][1] == "auto-low:" + LLM_LOW[4:] for n in GUESSED)
+    wrong = GUESSED[:8]  # more than half overridden: below LOW_FLOOR
+    with engine.begin() as c:
+        led = Ledger(c, 1)
+        ids = {m.name: m.id for m in led.merchants()}
+        for n in wrong:
+            led.correct_merchant(ids[n], GROCERIES)
+        categorise.run(c, 1)
+        stopped = c.exec_driver_sql("SELECT model FROM model_suspension").scalars()
+        assert list(stopped) == [LLM_LOW]
+    _final(engine, dict.fromkeys(GUESSED, COFFEE))
+    got = _sources(engine)
+    assert all(got[n] == (UNCAT, "default") for n in GUESSED[8:])  # back to Review
+    assert all(got[n][1] == "correction" for n in wrong)
+
+
+def test_merchants_with_no_guess_count_inside_the_review_cap(
+    engine: Engine, tmp_path: Path
+) -> None:
+    _setup(engine, tmp_path)
+    blind = [f"WWV NOVEC {c}" for c in "XYZ"]
+    with engine.begin() as c:  # imported after the vectors: no kNN signal
+        _import(c, tmp_path, 1, [(n, -50_000) for n in blind])
+    _final(engine, {})  # and the LLM unsure: no guess at all
+    asked = _review(engine)
+    assert len(asked) == auto.REVIEW_CAP
+    assert set(blind) <= asked
+    assert asked - set(blind) == set(GUESSED[-(auto.REVIEW_CAP - len(blind)) :])

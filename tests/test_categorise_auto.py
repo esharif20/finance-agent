@@ -116,7 +116,12 @@ def test_the_app_thresholds_are_the_committed_synthetic_calibration(
     for name in ("categoriser_baseline.json", "categoriser_ollama.json"):
         nn = json.loads((RESULTS / name).read_text())["models"]["nn"]
         model = nn["model_version"].split("@")[0]
-        assert auto.THRESHOLDS[model] == nn["calibration"]["threshold"]
+        # nomic's comes from the held-out gate calibration (#287 verifier), which
+        # is stricter than this in-sample one; the trigram stand-in's is this
+        if model == embedding.MODEL:
+            assert auto.THRESHOLDS[model] >= nn["calibration"]["threshold"]
+        else:
+            assert auto.THRESHOLDS[model] == nn["calibration"]["threshold"]
         assert nn["calibration"]["precision"] >= 0.95
 
 

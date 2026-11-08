@@ -26,6 +26,7 @@ change moves the residual set without a fresh local run.
 import hashlib
 import json
 import math
+import random
 import re
 import sys
 import time
@@ -44,6 +45,9 @@ from metrics import per_category
 
 HERE = Path(__file__).parent
 CAP = auto.REVIEW_CAP
+TARGET = 950  # permille: the confident tier's held-out precision bar
+FOLDS, REPEATS = 5, 20  # cross-validation over Merchants
+MARGINS = (*range(0, 201, 5), 2001)  # thousandths; the last admits nothing
 REAL_MERCHANTS = 575  # the user's first sync (#215, a count only)
 type Category = tuple[str, str]
 type Signals = dict[str, dict[str, Any]]
@@ -156,22 +160,42 @@ def _llm(s: Mapping[str, Any]) -> str | None:
     return a if a and a != llm.UNSURE else None
 
 
-def tiers(signals: Signals) -> dict[str, Any]:
-    """Calibrate the confident tier, choose the low tier's best guess, and
-    say which tier each Merchant lands in."""
-    t_knn = cz.calibrate(
-        [(sc, ok) for sc, ok, _, _ in _rows(signals, lambda s: s["knn"])]
+def _calibrate(scored: Sequence[tuple[int, bool]], target: int) -> int:
+    """`cz.calibrate` at `target` permille: the lowest score at which every
+    band from there up keeps that precision; above any score when none does."""
+    best = embedding.SIMILARITY + 1
+    hits = n = 0
+    for score in sorted({sc for sc, _ in scored}, reverse=True):
+        band = [ok for sc, ok in scored if sc == score]
+        hits, n = hits + sum(band), n + len(band)
+        if hits * 1000 < target * n:
+            break
+        best = score
+    return best
+
+
+def tiers(signals: Signals, margin: int = 0, target: int = TARGET) -> dict[str, Any]:
+    """Calibrate the confident tier at `target` permille on `signals`, raised
+    by `margin` (thousandths, chosen by held-out cross-validation), choose the
+    low tier's best guess, and say which tier each Merchant lands in."""
+    t_knn = margin + _calibrate(
+        [(sc, ok) for sc, ok, _, _ in _rows(signals, lambda s: s["knn"])], target
     )
 
     def agree(s: Mapping[str, Any]) -> tuple[int, str] | None:
         k = s["knn"]
         return (k[0], k[1]) if k and k[0] < t_knn and _llm(s) == k[1] else None
 
-    t_agree = cz.calibrate([(sc, ok) for sc, ok, _, _ in _rows(signals, agree)])
+    t_agree = margin + _calibrate(
+        [(sc, ok) for sc, ok, _, _ in _rows(signals, agree)], target
+    )
     alone = _rows(signals, lambda s: (llm.ANSWERED, a) if (a := _llm(s)) else None)
-    llm_alone_ok = bool(alone) and sum(
-        ok for _, ok, _, _ in alone
-    ) * 100 >= cz.TARGET_PRECISION * len(alone)
+    # the LLM alone has no score a margin could raise: any margin stops it
+    llm_alone_ok = (
+        margin == 0
+        and bool(alone)
+        and sum(ok for _, ok, _, _ in alone) * 1000 >= target * len(alone)
+    )
 
     def confident(s: Mapping[str, Any]) -> tuple[str, str] | None:
         k, a = s["knn"], _llm(s)
@@ -220,6 +244,51 @@ def tiers(signals: Signals) -> dict[str, Any]:
     }
 
 
+def _folds(names: Sequence[str], seed: int) -> list[set[str]]:
+    order = sorted(names)
+    random.Random(seed).shuffle(order)  # noqa: S311 - a reproducible split
+    return [set(order[f::FOLDS]) for f in range(FOLDS)]
+
+
+def held_out(signals: Signals, margin: int) -> tuple[int, int, int]:
+    """Cross-validation over Merchants (FOLDS folds, REPEATS seeded splits):
+    thresholds calibrated (plus `margin`) on the other folds, the confident tier
+    scored on the held-out Merchants. Returns pooled (right rows, confident
+    rows, all rows), every row counted once per repeat."""
+    hits = n = total = 0
+    for seed in range(REPEATS):
+        for fold in _folds(list(signals), seed):
+            cal = {m: v for m, v in signals.items() if m not in fold}
+            t = tiers(cal, margin)
+            for m in fold:
+                v = signals[m]
+                total += v["rows"]
+                if (got := t["confident"](v)) is not None:
+                    n += v["rows"]
+                    hits += (got[1] == v["gold"]) * v["rows"]
+    return hits, n, total
+
+
+def choose(signals: Signals) -> tuple[int, tuple[int, int, int]]:
+    """The smallest margin over the in-sample thresholds whose pooled held-out
+    precision is at least 95%; at the largest, nothing is confident."""
+    for margin in MARGINS:
+        hits, n, total = held_out(signals, margin)
+        if n == 0 or hits * 1000 >= TARGET * n:
+            return margin, (hits, n, total)
+    raise AssertionError("unreachable: the last margin admits nothing")
+
+
+def wilson_lower(hits: int, n: int, z: float = 1.645) -> float:
+    """One-sided 95% lower bound on a proportion (0 when n is 0)."""
+    if n == 0:
+        return 0.0
+    p = hits / n
+    centre = p + z * z / (2 * n)
+    margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    return (centre - margin) / (1 + z * z / n)
+
+
 def _stage(
     test: Sequence[cz.Row], gold: Sequence[str], preds: Sequence[str | None]
 ) -> dict[str, float]:
@@ -241,7 +310,8 @@ def evaluate(
     left = residual(rows)
     missing = sorted(set(left) - set(signals))
     sig = {m: signals[m] for m in sorted(left) if m in signals}
-    t = tiers(sig)
+    margin, (ho_hits, ho_n, ho_total) = choose(sig)
+    t = tiers(sig, margin)  # the app's thresholds: all Merchants, chosen margin
     merchants = [_merchant(r) for r in test]
 
     def fill(pick: Pick) -> list[str | None]:
@@ -273,6 +343,20 @@ def evaluate(
         if t["confident"](s) is None and t["low"](s) is not None
     ]
     share = len(no_signal) / len(sig) if sig else 0.0
+    ruled = sum(p is not None for p in base)
+    ruled_right = sum(p == g for p, g in zip(base, gold, strict=True))
+    per = REPEATS  # held-out rows were counted once per repeat
+    held = {
+        "precision": round(ho_hits / ho_n, 6) if ho_n else 0.0,
+        "coverage": round(ho_n / ho_total, 6) if ho_total else 0.0,  # of residual
+        "wilson_lower_95": round(wilson_lower(ho_hits // per, ho_n // per), 6),
+        "overall_precision": round(
+            (ruled_right + ho_hits / per) / (ruled + ho_n / per), 6
+        )
+        if ruled + ho_n
+        else 0.0,
+        "overall_coverage": round((ruled + ho_n / per) / len(gold), 6),
+    }
     stages = {
         "rules": _stage(test, gold, base),
         "rules+knn": _stage(test, gold, knn),
@@ -303,15 +387,21 @@ def evaluate(
         "prompt_version": llm.PROMPT_VERSION,
         "residual_merchants": len(sig),
         "missing_signals": missing,
-        "calibration": {k: v for k, v in t.items() if k not in ("confident", "low")},
+        "calibration": {
+            **{k: v for k, v in t.items() if k not in ("confident", "low")},
+            "margin": margin,
+            "folds": FOLDS,
+            "repeats": REPEATS,
+            "held_out": held,
+        },
         "review": {
             "cap": CAP,
             "low_tier_merchants": len(low_merchants),
             "no_signal_merchants": len(no_signal),
             # a sync of about 4,000 rows from 575 Merchants, all of them left by
-            # the rules (the worst case): the cap plus those with no signal
-            "items_per_sync_575": min(CAP, round((1 - share) * REAL_MERCHANTS))
-            + math.ceil(share * REAL_MERCHANTS),
+            # the rules (the worst case): Merchants with no guess count inside
+            # the cap, so it is the cap unless more than that have none
+            "items_per_sync_575": max(CAP, math.ceil(share * REAL_MERCHANTS)),
         },
         "low_tier_accuracy": round(sum(g == f for g, f in lowonly) / len(lowonly), 6)
         if lowonly
@@ -332,6 +422,9 @@ def evaluate(
                 "model_version": header.get("model_version", ""),
                 "metrics": {
                     **{f"{s}.{k}": v for s, m in stages.items() for k, v in m.items()},
+                    "gate_confident_held_out.precision": held["overall_precision"],
+                    "gate_confident_held_out.coverage": held["overall_coverage"],
+                    "gate_confident_held_out.residual_precision": held["precision"],
                     **per_sub,
                 },
                 "by_case": {

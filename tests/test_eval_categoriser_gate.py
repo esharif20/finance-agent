@@ -41,6 +41,18 @@ def test_the_confident_tier_keeps_95_percent_on_any_signals(
         assert sum(ok * r for ok, r in picked) * 100 >= 95 * n
 
 
+@settings(max_examples=15, deadline=None)
+@given(st.dictionaries(st.text("xyz", min_size=1, max_size=4), merchant, max_size=15))
+def test_the_chosen_margin_keeps_95_percent_on_held_out_merchants(
+    signals: dict[str, dict[str, Any]],
+) -> None:
+    """#287 verifier: precision is measured on Merchants the thresholds were
+    not fit on, never in-sample."""
+    margin, (hits, n, _) = g.choose(signals)
+    assert margin in g.MARGINS
+    assert n == 0 or hits * 100 >= 95 * n
+
+
 def test_the_committed_run_has_signals_for_every_residual_merchant() -> None:
     for path in sorted(categoriser.HERE.glob("results/categoriser_gate_*.json")):
         r = json.loads(path.read_text())

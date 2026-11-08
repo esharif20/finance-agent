@@ -16,7 +16,6 @@ from typing import Annotated, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Connection
 
-from finance_agent.assistant.tools.sanitise import sanitise
 from finance_agent.categorise.display_names import display_name
 from finance_agent.ledger import (
     CURRENCY,
@@ -27,6 +26,7 @@ from finance_agent.ledger import (
     Transaction,
     TransactionPage,
 )
+from finance_agent.sanitise import sanitise
 
 MAX_ROWS = 20
 _STRICT = ConfigDict(extra="forbid", frozen=True)
