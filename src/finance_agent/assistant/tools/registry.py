@@ -9,7 +9,14 @@ from pydantic import BaseModel
 from sqlalchemy import Connection
 
 from finance_agent.assistant.chat_model import ToolCall, ToolSpec
-from finance_agent.assistant.tools import guidance, insight, plan, propose, read
+from finance_agent.assistant.tools import (
+    advice,
+    guidance,
+    insight,
+    plan,
+    propose,
+    read,
+)
 from finance_agent.identity import current_user
 from finance_agent.ledger import Ledger
 from finance_agent.ledger.proposals import Proposals
@@ -71,6 +78,16 @@ TOOLS = {
             "The user's Subscriptions and Bills, with status and interval." + _DATA,
             read.ListSubscriptionsIn,
             read.list_subscriptions,
+        ),
+        Tool(
+            "subscription_advice",
+            "Options for one Subscriptions group under the user's monthly cap"
+            " (a constraint they confirmed): which to keep, review or cancel,"
+            " each option's new monthly total and saving, and each step's"
+            " reason codes. Explain the options; nothing is cancelled." + _DATA,
+            advice.SubscriptionAdviceIn,
+            advice.subscription_advice,
+            engine=True,
         ),
         Tool(
             "find_transactions",
@@ -166,6 +183,7 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
         "category_trend",
         "category_detail",
         "list_subscriptions",
+        "subscription_advice",
         "list_insights",
         "explain_insight",
         "list_guidance",
