@@ -214,7 +214,7 @@ class Assistant:
             calls = list(r.tool_calls[:MAX_CALLS])
             d.rounds.append([c.model_dump() for c in calls])
             if self._cacheable(route, d) and len(d.rounds) == 1:
-                hit = self._cache().get(route, d.rounds[0], self.today)
+                hit = self._cache().get(route, s["message"], d.rounds[0], self.today)
                 if hit is not None:
                     d.reply, d.cached = hit
                     return d
@@ -284,7 +284,9 @@ class Assistant:
             }
         # one round only: the key (its tool calls) then holds everything read
         if self._cacheable(route, d) and len(d.rounds) == 1 and d.proposal_id is None:
-            self._cache().put(route, d.rounds[0], self.today, d.reply, res.evidence_ids)
+            self._cache().put(
+                route, s["message"], d.rounds[0], self.today, d.reply, res.evidence_ids
+            )
         return {
             "reply": d.reply,
             "path": "local_model",
