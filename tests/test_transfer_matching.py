@@ -3,6 +3,7 @@
 exact opposite in two of the user's Accounts within TRANSFER_DAYS pair once;
 merged Possible Duplicates never pair, and a user's "not a Transfer" wins."""
 
+import contextlib
 import json
 from collections import Counter
 from datetime import date, datetime, time
@@ -14,7 +15,13 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from finance_agent.ledger import TRANSFER_DAYS, Ledger, Transaction, UnknownTarget
+from finance_agent.ledger import (
+    TRANSFER_DAYS,
+    InvalidMerge,
+    Ledger,
+    Transaction,
+    UnknownTarget,
+)
 from finance_agent.storage import schema
 from test_dedupe import temp_ledger
 
@@ -166,12 +173,13 @@ def test_a_rejected_row_is_never_paired_again_until_undone(
         assert all(by_id[i].transfer_with is None for i in picked)
         s = led.summarise_month("2026-01")
         assert (s.money_in, s.money_out) == expected(led, rows)
-        kept = links(led)
         for m in made:
             led.revert_not_a_transfer(m)
         check_pairs(led)
-        assert kept <= links(led)  # undoing adds pairs back, never moves one
         after = links(led)
+        with temp_ledger() as (fresh, _):  # undoing every rejection restores
+            fresh.apply_sync(payload(rows))  # the pairing of untouched rows
+            assert links(fresh) == after
         led.apply_sync(payload(rows) + b"  ")
         assert links(led) == after
 
@@ -195,8 +203,8 @@ def test_rejecting_a_leg_unpairs_both_and_frees_the_other_leg(
     with pytest.raises(UnknownTarget):
         led.revert_not_a_transfer(rejected)  # already undone
     by_id = {t.id: t for t in led.transactions()}
-    assert by_id[a.id].transfer_with == c.id  # existing pairs stay put
-    assert by_id[b.id].transfer_with is None  # nothing left for B
+    assert by_id[a.id].transfer_with == b.id  # the undo restores A and B
+    assert by_id[c.id].transfer_with is None
 
 
 def test_another_users_row_cannot_be_rejected(ledger_for: Any) -> None:
@@ -227,10 +235,114 @@ def test_a_merged_duplicate_is_never_paired_and_its_live_twin_is(
     leg = next(t for t in led.transactions() if t.amount > 0)
     paired = leg.transfer_with
     assert paired in group
-    led.merge_duplicate(paired)
-    led.apply_sync(raw + b" ")  # the next sync relinks
+    m = led.merge_duplicate(paired)  # relinks at once, before any sync
     by_id = check_pairs(led)
     (twin,) = group - {paired}
     assert by_id[paired].transfer_with is None
     assert by_id[twin].transfer_with == leg.id
     assert all(paired not in p for p in links(led))
+    s = led.summarise_month("2026-01")
+    assert s.transfers_in == s.transfers_out == Decimal("12.50")
+    assert (s.money_in, s.money_out) == (0, 0)  # nothing counted as Income
+    led.revert_merge(m)  # the twin is back; the pair stays a pair
+    check_pairs(led)
+    assert {leg for p in links(led) for leg in p} & set(group)
+
+
+def test_a_rejection_moves_to_the_row_that_survives_a_csv_synced_merge(
+    ledger_for: Any,
+) -> None:
+    """ADR 0014: a bank-file row and its synced copy become one Transaction;
+    the user's "not a Transfer" on the copy stays with the survivor."""
+    led: Ledger = ledger_for(1)
+    led.apply_sync(payload([(0, 5, -1250), (1, 5, 1250), (1, 6, 1250)]))
+    by_desc = {t.description: t for t in led.transactions()}
+    a, b, c = (by_desc[f"SYNTH MOVE {n}"].id for n in range(3))
+    made = led.not_a_transfer(b)
+    assert led.transaction(a).transfer_with == c  # pyright: ignore[reportOptionalMemberAccess]
+    # c stands in for the bank-file row; b is its synced copy
+    led._merge(c, b)  # pyright: ignore[reportPrivateUsage]
+    led._link_transfers()  # pyright: ignore[reportPrivateUsage]
+    r = schema.transfer_rejection
+    db = led._db  # pyright: ignore[reportPrivateUsage]
+    rows = db.execute(db.select(r, r.c.id, r.c.transaction_id)).all()
+    assert [(x.id, x.transaction_id) for x in rows] == [(made, c)]
+    assert links(led) == set()  # the survivor carries the user's word
+    led.revert_not_a_transfer(made)
+    assert links(led) == {(a, c)}
+    (row,) = db.execute(db.select(r, r.c.reverted_at)).all()
+    assert row.reverted_at is not None  # history kept
+
+
+# few amounts and close days, so legs compete and twins hold pairs
+CROWDED = st.lists(
+    st.tuples(
+        st.integers(0, len(ACCOUNTS) - 1),
+        st.integers(5, 8),
+        st.sampled_from([-1250, 1250]),
+    ),
+    min_size=2,
+    max_size=8,
+)
+
+
+@settings(max_examples=60, deadline=None)
+@given(rows=CROWDED, twins=st.data())
+def test_any_sequence_of_merges_rejections_and_undos_matches_a_fresh_pairing(
+    rows: list[Row], twins: st.DataObject
+) -> None:
+    """Adversarial (#215 C verifier): after any history of merge, unmerge,
+    reject, revert and resync, the pairs equal those of a fresh ledger given
+    only the end state, so money out never depends on the order of events."""
+    doubled = twins.draw(
+        st.lists(st.booleans(), min_size=len(rows), max_size=len(rows))
+    )
+    body = json.loads(payload(rows))
+    for acc in body["accounts"]:
+        for t in list(acc["transactions"]):
+            if doubled[int(t["id"][1:])]:
+                acc["transactions"].append(t | {"id": t["id"] + "-twin"})
+    raw = json.dumps(body).encode()
+    with temp_ledger() as (led, _):
+        led.apply_sync(raw)
+        ids = sorted(t.id for t in led.transactions(merged=True))
+        if not ids:
+            return
+        merges: dict[int, int] = {}
+        rejections: dict[int, int] = {}
+        ops = twins.draw(
+            st.lists(
+                st.tuples(
+                    st.sampled_from(["merge", "unmerge", "reject", "revert", "sync"]),
+                    st.sampled_from(ids),
+                ),
+                max_size=12,
+            )
+        )
+        for n, (op, tid) in enumerate(ops):
+            if op == "merge" and tid not in merges:
+                with contextlib.suppress(InvalidMerge):  # not a mergeable copy
+                    merges[tid] = led.merge_duplicate(tid)
+            elif op == "unmerge" and tid in merges:
+                led.revert_merge(merges.pop(tid))
+            elif op == "reject" and tid not in rejections:
+                rejections[tid] = led.not_a_transfer(tid)
+            elif op == "revert" and tid in rejections:
+                led.revert_not_a_transfer(rejections.pop(tid))
+            elif op == "sync":
+                led.apply_sync(raw + b" " * (n + 1))
+            by_id = check_pairs(led)
+            legs = {leg for p in links(led) for leg in p}
+            assert not legs & (set(merges) | set(rejections))
+            assert all(i in by_id for i in legs)
+            s = led.summarise_month("2026-01")
+            live = [t.amount for t in led.transactions() if t.id not in legs]
+            assert s.money_out == -sum((a for a in live if a < 0), Decimal(0))
+            assert s.money_in == sum((a for a in live if a > 0), Decimal(0))
+        with temp_ledger() as (fresh, _):
+            fresh.apply_sync(raw)
+            for tid in merges:
+                fresh.merge_duplicate(tid)
+            for tid in rejections:
+                fresh.not_a_transfer(tid)
+            assert links(fresh) == links(led)

@@ -838,6 +838,7 @@ class Ledger:
             transaction_id=transaction_id,
             created_at=datetime.now(UTC),
         )
+        self._link_transfers()  # its pair, if any, goes to the live twin now
         self._db.bump_ledger_version()
         log.info("duplicate merged")  # never the amount or the description
         return merge_id
@@ -852,6 +853,7 @@ class Ledger:
         )
         if res.rowcount != 1:
             raise UnknownTarget("no such active merge")
+        self._link_transfers()
         self._db.bump_ledger_version()
 
     def transaction(self, transaction_id: int) -> Transaction | None:
@@ -2973,17 +2975,13 @@ class Ledger:
         descriptions, then the closest date win; each leg pairs at most once.
 
         Uses raw Bank fields only. Never pairs a merged Possible Duplicate
-        (#224) or a row the user said is no Transfer (#215 C), and drops a
-        link that holds one, so its leg can pair again.
+        (#224) or a row the user said is no Transfer (#215 C). Links are
+        derived, so every run rebuilds them all: the pairing is a function of
+        the live rows alone, and an undo restores exactly the pairs it took.
         """
-        t, tl = schema.transaction, schema.transfer_link
+        t = schema.transaction
         off = self._not_pairable()
-        self._db.execute(
-            self._db.delete(tl).where(
-                tl.c.from_transaction_id.in_(off) | tl.c.to_transaction_id.in_(off)
-            )
-        )
-        linked = self._transfer_legs()
+        self._db.execute(self._db.delete(schema.transfer_link))
         rows = [
             r
             for r in self._db.execute(
@@ -2998,7 +2996,7 @@ class Ledger:
                     t.c.currency,
                 ).order_by(t.c.posted_on, t.c.id)
             )
-            if r.id not in linked and r.id not in off
+            if r.id not in off
         ]
         incoming: dict[tuple[str, int], list[Any]] = {}
         for r in rows:
