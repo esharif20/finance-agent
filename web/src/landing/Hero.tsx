@@ -59,7 +59,7 @@ const span = (p: number, a: number, b: number) => ease(clamp01((p - a) / (b - a)
 function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }, ox = 0): Pose & { label: number } {
   const n = i - 1;
   // desktop: the whole move happens right of the copy column (ox); a phone keeps it centred
-  const fan = { x: ox + (narrow ? n * w * 0.16 : n * w * 0.44), y: narrow ? -w * 0.1 - n * 14 : -w * 0.12 - n * 22, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
+  const fan = { x: ox + (narrow ? n * w * 0.3 : n * w * 0.44), y: narrow ? -w * 0.1 - n * 22 : -w * 0.12 - n * 22, rz: narrow ? -2 + n * 8 : -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
   const gap = narrow ? w * 0.14 : w * 0.1;
   // on a phone the row is a column, cards on the left and each label beside its card
   const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: ox + n * (w + gap), y: w * 0.02, rz: 0, rx: 0, ry: 0, z: 0 };
@@ -102,6 +102,7 @@ function CardFace({ i, name }: { i: number; name: string }) {
       <span className="lp-card-chip" />
       <span className="lp-card-name" data-text={name} />
       <span className="lp-card-num" data-text="•••• 0000" />
+      <span className="lp-acard-spec" />
     </div>
   );
 }
@@ -385,11 +386,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const narrow = r.width < 720;
       // the row of three must fit the frame; the CSS stand-ins take the same width through --cw.
       // Capped by height too, so a short window never squeezes the hand
-      const w = Math.min(narrow ? r.width * 0.4 : r.width * 0.165, r.height * 0.27 * ASPECT, 330);
+      // a big screen keeps the composition to 1760px, centred (hero.css does the same for the copy)
+      const w = Math.min(narrow ? r.width * 0.4 : Math.min(r.width, 1760) * (r.width >= 1680 ? 0.18 : 0.165), r.height * 0.27 * ASPECT, 360);
       el.style.setProperty("--cw", `${w.toFixed(1)}px`);
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
+    const specs = Array.from(el.querySelectorAll<HTMLElement>(".lp-acard-slot > .lp-acard .lp-acard-spec"));
     // render on demand: the loop runs only while something moves, and sleeps when the scroll,
     // the pointer tilt and the deal have all settled
     let drawn = false;
@@ -439,7 +442,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // ambient life: once dealt, the hand breathes and turns slowly for as long as the hero is in
       // view and the tab is visible (the IO and visibilitychange stop and wake the loop)
       const sway = narrow ? 0 : clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08) * 0.7);
-      const ox = narrow ? 0 : r.width * 0.19;
+      const ox = narrow ? 0 : Math.min(r.width, 1760) * 0.19;
       const base = ACCOUNTS.accounts.map((_, i) => pose(i, pv, w, narrow, tilt, ox));
       // hit test, front card first: the scaled card's box, a little generous
       let hit = -1;
@@ -488,7 +491,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // them go as the hand opens, before the column of cards)
       worn.current.forEach((c, i) => {
         if (!c) return;
-        const f = narrow ? span(pv, 0.03, 0.1) : span(pv, 0.42 + i * 0.03, 0.5 + i * 0.03);
+        const f = narrow ? span(pv, 0.08 + i * 0.02, 0.16 + i * 0.02) : span(pv, 0.42 + i * 0.03, 0.5 + i * 0.03);
         c.style.opacity = String(1 - f);
         c.style.setProperty("--in", f.toFixed(3));
       });
@@ -498,6 +501,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // contact shadows on the floor under the fan; they gather as each card lands, gone once the hand opens
       const onFloor = 1 - clamp01((pv - 0.04) / 0.16);
       poses.forEach((q, i) => {
+        // the glass catches the light as the card turns: the specular band slides with its rotation
+        const sp = specs[i];
+        if (sp) sp.style.transform = `translate3d(${(-q.ry * 1.4 - q.rz * 2 + q.rx * 0.8).toFixed(1)}%, 0, 0)`;
         const f = floors.current[i];
         if (f) {
           f.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.rest + dims.h * 0.78}px, 0) scale(${(1.25 - 0.25 * q.deal) * q.s}, ${0.22 * q.s})`;
@@ -695,6 +701,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
             <span key={h} className={`lp-wash lp-wash-${i}`} style={{ "--h": h } as React.CSSProperties} />
           ))}
           <span className="lp-wash lp-wash-pool" />
+          {[150, 28, 192, 80].map((h, i) => (
+            <span key={h} className={`lp-aura lp-aura-${i}`} style={{ "--h": h } as React.CSSProperties} />
+          ))}
         </div>
         {(
           <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
@@ -782,6 +791,10 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           </div>
         )}
         <div className="lp-hero-col">
+          {/* phones have no section links in the bar: a quiet way to the architecture page, up top */}
+          <a className="lp-hero-arch" href="/architecture">
+            How it's built <span aria-hidden="true">→</span>
+          </a>
           {rail}
           <div className="lp-hero-slot">
             {copy}

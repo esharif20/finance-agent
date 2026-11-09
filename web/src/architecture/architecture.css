@@ -1862,3 +1862,10 @@
     animation: none;
   }
 }
+
+/* big screens keep the page to a 1760px frame, centred: layout width only */
+@media (min-width: 1680px) {
+  .ar {
+    --ar-gutter: max(48px, calc((100vw - 1760px) / 2 + 48px));
+  }
+}

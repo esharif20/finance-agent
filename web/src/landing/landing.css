@@ -103,6 +103,18 @@
   margin-inline: auto;
   padding-inline: var(--lp-gutter);
 }
+/* big screens: the gutter grows so everything (nav, hero, sections) keeps to one 1760px frame,
+   centred, with backgrounds still full bleed */
+@media (min-width: 1680px) {
+  .lp {
+    --lp-gutter: max(48px, calc((100vw - 1760px) / 2 + 48px));
+  }
+  /* the preloader's corner marks stay at the screen's corners */
+  .lp .pl-plane .lp-corners > i,
+  .lp .op .lp-corners > i {
+    margin: 30px;
+  }
+}
 
 /* type */
 .lp-display,

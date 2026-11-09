@@ -800,3 +800,180 @@
     animation: none;
   }
 }
+
+/* ===== round 5: drifting light, and glass faces for the DOM cards =====
+   Four large, soft pools in the card hues and a hint of gold drift very slowly behind everything
+   (transform only, 40 s and up). Paused while the hero is off screen; browsers stop them on a hidden
+   tab. Phones and reduced motion keep them as one still layer. */
+.lp-aura {
+  position: absolute;
+  width: 72vmax;
+  aspect-ratio: 1;
+  margin: -36vmax 0 0 -36vmax;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(0.6 0.12 var(--h) / 0.13), oklch(0.5 0.1 var(--h) / 0.04) 60%, transparent);
+  animation: lp-aura 44s ease-in-out infinite alternate;
+}
+.lp-aura-0 { left: 12%; top: 78%; }
+.lp-aura-1 { left: 88%; top: 6%; animation-duration: 52s; animation-delay: -18s; }
+.lp-aura-2 { left: 92%; top: 92%; animation-duration: 47s; animation-delay: -30s; }
+.lp-aura-3 {
+  left: 18%;
+  top: 8%;
+  background: radial-gradient(closest-side, oklch(0.78 0.09 var(--h) / 0.07), transparent);
+  animation-duration: 60s;
+  animation-delay: -9s;
+}
+@keyframes lp-aura {
+  from {
+    transform: translate3d(-6vmax, 3vmax, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vmax, -4vmax, 0) scale(1.12);
+  }
+}
+.lp-hero[data-off] .lp-aura {
+  animation-play-state: paused;
+}
+@media (max-width: 899.98px), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .lp-aura {
+    animation: none;
+  }
+}
+
+/* the DOM card face, after the WebGL one: deep tinted glass, a ruled band on the right, a bright
+   rim, and a specular band that Hero.tsx slides with the card's turn (transform only) */
+.lp .lp-hero .lp-acard {
+  background:
+    repeating-linear-gradient(118deg, transparent 0 9%, rgb(255 255 255 / 0.06) 9% 18%) 100% 0 / 46% 100% no-repeat,
+    radial-gradient(120% 90% at 18% 0%, oklch(0.7 0.12 var(--h) / 0.55), transparent 60%),
+    linear-gradient(140deg, oklch(0.52 0.12 var(--h)), oklch(0.3 0.08 var(--h)));
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.42);
+  color: rgb(255 255 255 / 0.82);
+}
+.lp-acard-spec {
+  position: absolute;
+  inset: -20% -40%;
+  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.2) 47%, rgb(255 255 255 / 0.06) 53%, transparent 62%);
+  pointer-events: none;
+}
+.lp .lp-hero .lp-card-chip {
+  background: linear-gradient(135deg, oklch(0.9 0.08 88), oklch(0.7 0.09 72));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+}
+/* contactless mark, right of centre, as on the WebGL face */
+.lp .lp-hero .lp-acard::after {
+  content: "";
+  position: absolute;
+  right: 9%;
+  top: 36%;
+  width: 5%;
+  aspect-ratio: 0.6;
+  border: solid rgb(255 255 255 / 0.55);
+  border-width: 0 1.5px 0 0;
+  border-radius: 0 60% 60% 0;
+  box-shadow: 4px 0 0 -1px rgb(255 255 255 / 0.3);
+}
+
+/* phones: both outer cards wear their rows below them, the front card's higher than the back's */
+@media (max-width: 899.98px), (pointer: coarse) {
+  .lp-worn[data-at="l"] {
+    display: block;
+    bottom: auto;
+    top: 100%;
+    margin: 10px 0 0;
+  }
+  .lp-hero-pin[data-phase="0"] .lp-hero-scene > .lp-stage {
+    transform: translateY(22%);
+  }
+}
+
+/* the way to /architecture where the bar has dropped its section links: understated, but a full
+   44px target */
+.lp-hero-arch {
+  display: none;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin: -8px 0 -16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.62);
+  pointer-events: auto;
+  text-decoration: underline;
+  text-decoration-color: rgb(154 225 135 / 0.4);
+  text-underline-offset: 4px;
+}
+.lp-hero-arch:hover,
+.lp-hero-arch:focus-visible {
+  color: var(--lp-white);
+}
+@media (max-width: 1099.98px) {
+  .lp-hero-arch {
+    display: inline-flex;
+  }
+}
+/* phones: it sits at the right end of the step rail, which drops its stage words to make room */
+@media (max-width: 899.98px), (pointer: coarse) {
+  .lp .lp-hero-col {
+    padding-top: 72px;
+  }
+  .lp-hero-arch {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    margin: 0;
+    padding-left: 12px;
+  }
+  .lp .lp-hero-rail > span:nth-of-type(2) {
+    display: none;
+  }
+  .lp-worn[data-at="l"] {
+    display: none;
+  }
+  .lp-hero-pin[data-phase="0"] .lp-hero-scene > .lp-stage {
+    transform: translateY(28%);
+  }
+}
+
+/* ===== big screens: the same composition, kept to 1760px and centred =====
+   Below 1680px nothing here applies. Above it the copy column, the hand (Hero.tsx caps its width
+   the same way), the light and the total all measure from a 1760px frame, and the total sits up
+   under the stack instead of at the foot of a tall window. */
+@media (min-width: 1680px) and (pointer: fine) {
+  .lp .lp-hero-col {
+    width: calc(min(100vw, 1760px) * 0.34);
+    gap: 32px;
+  }
+  .lp .lp-hero .lp-display {
+    font-size: clamp(5.4rem, 3.4vw, 6.2rem);
+  }
+  .lp-hero-say {
+    font-size: clamp(4.2rem, 2.6vw, 4.8rem);
+  }
+  .lp .lp-hero .lp-lede,
+  .lp-hero-say-body {
+    font-size: 1.25rem;
+  }
+  .lp .lp-hero-rail {
+    font-size: 0.8125rem;
+  }
+  .lp-wash {
+    left: calc(50% + min(100vw, 1760px) * 0.19);
+    width: 900px;
+    margin: -346px 0 0 -450px;
+  }
+  .lp .lp-hero .lp-combined {
+    left: calc(50% + min(100vw, 1760px) * 0.19);
+    top: calc(50% - var(--cw, 300px) * 0.3 + 48px);
+    bottom: auto;
+    width: 560px;
+    padding: 28px 32px;
+  }
+  .lp .lp-hero .lp-combined .lp-combined-total {
+    font-size: 4.2rem;
+  }
+}
