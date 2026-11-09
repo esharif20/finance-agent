@@ -1,6 +1,6 @@
 /* Pieces shared by the map, the question's path and the chapters. */
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { type ArchNode, REPO, STATUS_LABEL, type Status } from "./nodes";
 
 export const EASE = [0.22, 1, 0.36, 1] as const;
@@ -38,7 +38,7 @@ export function StatusTag({ status }: { status: Status }) {
   );
 }
 
-export function Detail({ node, id }: { node: ArchNode; id: string }) {
+export function Detail({ node, id, visual }: { node: ArchNode; id: string; visual?: ReactNode }) {
   return (
     <motion.div
       id={id}
@@ -54,6 +54,7 @@ export function Detail({ node, id }: { node: ArchNode; id: string }) {
         <h3>{node.title}</h3>
         <StatusTag status={node.status} />
       </div>
+      {visual && <div className="ar-detail-visual">{visual}</div>}
       <div className="ar-pair">
         <h4>Decision</h4>
         <p>{node.decision}</p>
