@@ -128,11 +128,11 @@ def _front_door(args: argparse.Namespace) -> int | None:
     if c == "demo":
         from finance_agent.cli import demo
 
-        return (
-            demo.list_personas()
-            if args.list
-            else demo.run(args.persona, open_browser=not args.no_open)
-        )
+        if args.list:
+            return demo.list_personas()
+        if args.local or args.persona is not None:
+            return demo.run(args.persona, open_browser=not args.no_open)
+        return demo.hosted(open_browser=not args.no_open)
     if c == "setup":
         from finance_agent.cli import banner, setup
 
@@ -258,8 +258,11 @@ def _add_front_door(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") 
         "--token-stdin", action="store_true", help="read the setup token from stdin"
     )
     st.add_argument("--restart", action="store_true", help="run every step again")
-    de = sub.add_parser("demo", help="try it on synthetic data, no setup")
-    de.add_argument("--persona", type=int, metavar="N", help="pick a persona")
+    de = sub.add_parser("demo", help="open the public demo (synthetic data, no setup)")
+    de.add_argument(
+        "--local", action="store_true", help="run the demo on this Mac instead"
+    )
+    de.add_argument("--persona", type=int, metavar="N", help="pick a persona (local)")
     de.add_argument("--list", action="store_true", help="list the personas")
     de.add_argument("--no-open", action="store_true", help="don't open the browser")
     sub.add_parser("status", help="a terminal dashboard")

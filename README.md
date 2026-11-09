@@ -17,7 +17,7 @@ macOS on Apple Silicon. The script is short, needs no sudo, can be run again, an
 Try it first on synthetic data, with no setup:
 
 ```sh
-fa demo            # opens the full app on a fictional household; Ctrl-C deletes it
+fa demo            # opens the public demo in your browser (fictional household)
 ```
 
 Then set up for real:
@@ -48,7 +48,7 @@ fa setup           # database key, bank, local AI, optional cloud, background jo
 | --- | --- |
 | `fa` | Starts the app if needed and opens it, after the banner and a one-line status |
 | `fa setup` | Guided setup; safe to re-run |
-| `fa demo [--persona N] [--list]` | The synthetic demo, locally |
+| `fa demo [--local] [--persona N] [--list]` | Open the public demo; `--local` runs it on this Mac |
 | `fa status` | A terminal dashboard: last sync, accounts, this month, review count, subscriptions, cloud, model, backup |
 | `fa month [YYYY-MM]` | A month by Category, with bars |
 | `fa subs` | Subscriptions, active and likely, the monthly total and the AI tools cap |
@@ -61,7 +61,7 @@ fa setup           # database key, bank, local AI, optional cloud, background jo
 
 ## Demo
 
-`fa demo` runs the public demo's backend on this Mac over six fictional households. The hosted demo link arrives with the Vercel deployment (#299).
+`fa demo` opens the public demo at https://finance-agent-demo-chi.vercel.app. `fa demo --local` (or `--persona N`) runs the same demo on this Mac over six fictional households; Ctrl-C deletes it.
 
 ## Uninstall
 
