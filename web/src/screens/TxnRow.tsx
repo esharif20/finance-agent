@@ -88,7 +88,7 @@ export function TxnRow({
             aria-controls={panel}
             aria-label={`Details for ${t.display_name ?? t.merchant ?? t.description}`}
             onClick={() => setOpen((o) => !o)}
-            className="row-action ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full [@media(hover:hover)]:hover:bg-active"
+            className="row-action ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[background-color,scale] duration-150 ease-out active:scale-[0.94] [@media(hover:hover)]:hover:bg-active"
           >
             <ChevronDown className={`size-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           </button>
@@ -108,7 +108,7 @@ export function TxnRow({
         />
       )}
       {open && categorised(t) && (
-        <div id={panel} className="order-5 col-span-full mt-1 flex flex-col gap-4 rounded-[14px] bg-card p-4 sm:order-none">
+        <div id={panel} className="panel-reveal order-5 col-span-full mt-1 flex flex-col gap-4 rounded-[14px] bg-card p-4 sm:order-none">
           <NoteField txn={t.id} />
           {editing ? (
             <SplitEditor

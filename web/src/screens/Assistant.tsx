@@ -298,6 +298,7 @@ export function Assistant() {
   const end = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
   const [cloud, setCloud] = useState(false);
+  const [sent, setSent] = useState(0);
   const spend = useQuery({
     queryKey: ["spend"],
     enabled: !DEMO,
@@ -330,7 +331,9 @@ export function Assistant() {
   function say(text: string) {
     // cloud rides along only once the toggle is on; switching off a thread that used it sends false
     const optIn = cloud && !capped ? true : chat.messages.some((m) => m.path === "cloud") ? false : undefined;
-    return sendMessage(text, optIn);
+    const ok = sendMessage(text, optIn);
+    if (ok) setSent((n) => n + 1);
+    return ok;
   }
   function send(e: React.FormEvent) {
     e.preventDefault();
@@ -396,7 +399,18 @@ export function Assistant() {
           disabled={chat.busy || !draft.trim()}
           className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-[0.97] disabled:opacity-40"
         >
-          <ArrowUp className="size-5" aria-hidden="true" />
+          {/* each send lifts the arrow out the top and a fresh one rises in: the message went */}
+          <span className="relative inline-flex overflow-hidden">
+            <motion.span
+              key={sent}
+              initial={sent && !reduceMotion ? { y: 14, opacity: 0 } : false}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ type: "spring", duration: 0.35, bounce: 0 }}
+              className="inline-flex"
+            >
+              <ArrowUp className="size-5" aria-hidden="true" />
+            </motion.span>
+          </span>
         </button>
       </form>
     </Card>
