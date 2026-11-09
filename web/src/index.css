@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/manrope";
+@import "@fontsource-variable/bricolage-grotesque/standard.css";
 
 /* Pocket tokens (docs/design/DIRECTIONS.md). Light first; true black in dark. */
 :root {
@@ -39,7 +40,9 @@
   --rim-hi: rgb(255 255 255 / 0.95);
   --rim-lo: rgb(27 29 31 / 0.05);
   --card-sheen: rgb(255 255 255 / 0.5);
-  --card-depth: 0 1px 2px rgb(27 29 31 / 0.04), 0 14px 32px -20px rgb(27 29 31 / 0.18);
+  /* depth in three layers (contact, key, ambient) and a faint floor line under the glass */
+  --card-depth: 0 1px 2px rgb(27 29 31 / 0.04), 0 6px 14px -8px rgb(27 29 31 / 0.08), 0 18px 40px -24px rgb(27 29 31 / 0.16);
+  --card-floor: rgb(27 29 31 / 0.035);
   --card-lift: 0 2px 4px rgb(27 29 31 / 0.05), 0 22px 44px -22px rgb(27 29 31 / 0.28);
   --glow-on: rgb(14 111 138 / 0.07);
   --rich-sheen: rgb(14 150 170 / 0.07);
@@ -82,7 +85,8 @@
     --rim-hi: rgb(255 255 255 / 0.22);
     --rim-lo: rgb(255 255 255 / 0.03);
     --card-sheen: rgb(255 255 255 / 0.035);
-    --card-depth: 0 1px 1px rgb(0 0 0 / 0.5), 0 18px 40px -22px rgb(0 0 0 / 0.9);
+    --card-depth: 0 1px 1px rgb(0 0 0 / 0.5), 0 8px 18px -10px rgb(0 0 0 / 0.6), 0 22px 48px -26px rgb(0 0 0 / 0.9);
+    --card-floor: rgb(0 0 0 / 0.35);
     --card-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 28px 56px -24px rgb(0 0 0 / 0.95), 0 0 0 1px rgb(92 195 220 / 0.1);
     --glow-on: rgb(120 205 230 / 0.075);
     --rich-sheen: rgb(60 175 205 / 0.11);
@@ -94,6 +98,7 @@
 
 @theme inline {
   --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-card: var(--card);
   --color-raised: var(--raised);
@@ -257,6 +262,39 @@
 .figure {
   font-variant-numeric: proportional-nums;
 }
+/* The product's display face (the landing and /architecture headings) on the app's page titles
+   and big figures only; rows, labels and columns stay Manrope. Pence keep the body face. */
+.figure,
+.text-title,
+.account-card[data-front="true"] .account-balance {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+.figure .money-minor {
+  font-family: var(--font-sans);
+}
+
+/* Panel reveal (adapted from transitions.dev): a panel that opens under its row rises 4px out
+   of a 2px blur. @starting-style, not keyframes, so a quick close-and-open retargets. */
+.panel-reveal {
+  transition:
+    opacity 200ms var(--ease-out),
+    translate 240ms var(--ease-out),
+    filter 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    translate: 0 -4px;
+    filter: blur(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-reveal {
+    transition: opacity 150ms ease;
+    @starting-style {
+      opacity: 0;
+    }
+  }
+}
 .money-minor {
   font-size: max(0.58em, 11px);
   font-weight: 500;
@@ -293,7 +331,7 @@
       linear-gradient(180deg, var(--card-sheen), transparent 120px);
     -webkit-backdrop-filter: blur(16px) saturate(1.4);
     backdrop-filter: blur(16px) saturate(1.4);
-    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-depth);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), inset 0 -1px 0 var(--card-floor), var(--card-depth);
     transition:
       transform 280ms var(--ease-out),
       box-shadow 280ms var(--ease-out),
@@ -323,15 +361,22 @@
     }
     .card-glass:not([data-still]):hover {
       transform: translateY(-2px);
-      box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-lift);
+      box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), inset 0 -1px 0 var(--card-floor), var(--card-lift);
     }
+    /* Spotlight border (after React Bits' SpotlightCard, MIT): the rim brightens where the
+       pointer is. --mx/--my are non-inherited, so the rim asks for its card's values. */
     .card-glass:hover::before {
+      --mx: inherit;
+      --my: inherit;
       opacity: 1;
+      background:
+        radial-gradient(220px circle at var(--mx) var(--my), var(--rich-rim), transparent 70%),
+        linear-gradient(150deg, var(--rim-hi), var(--rim-lo) 34%, transparent 60%, var(--rim-lo));
     }
   }
   .card-glass:not([data-still]):has(:focus-visible) {
     transform: translateY(-2px);
-    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-lift);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), inset 0 -1px 0 var(--card-floor), var(--card-lift);
   }
   .card-glass:has(:focus-visible)::before {
     opacity: 1;

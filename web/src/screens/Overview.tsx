@@ -161,9 +161,19 @@ export function Overview({ account }: { account?: number }) {
   }
   if (stale || !summary.data || !accounts.data || !spending.data || !months.data) {
     return (
-      <div className="grid gap-6 lg:grid-cols-[7fr_5fr]" aria-busy="true">
-        <Skeleton className="h-[440px] rounded-card" />
-        <Skeleton className="h-[240px] rounded-card" />
+      // the same frame the view lands in (switcher, bars, month card and cards), so nothing jumps
+      <div className="flex flex-col gap-6" aria-busy="true">
+        <Skeleton className="h-11 w-56 rounded-full" />
+        <Skeleton className="h-[184px] rounded-card" />
+        <div className="grid items-start gap-6 lg:grid-cols-[7fr_5fr]">
+          <div className="flex flex-col gap-6 lg:col-start-2 lg:row-start-1">
+            <Skeleton className="h-[280px] rounded-card" />
+          </div>
+          <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
+            <Skeleton className="h-[200px] rounded-card" />
+            <Skeleton className="h-[260px] rounded-card" />
+          </div>
+        </div>
       </div>
     );
   }

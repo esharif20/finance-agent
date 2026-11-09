@@ -28,9 +28,12 @@ export function TxnRow({
   mask,
   groups,
   onCategory,
+  dated = true,
 }: {
   t: Txn;
   mask?: string;
+  /** false under a day heading: the date stays for screen readers, not on screen */
+  dated?: boolean;
   groups: CategoryGroup[];
   onCategory: (c: Category, all: boolean) => void;
 }) {
@@ -46,9 +49,9 @@ export function TxnRow({
   return (
     <li
       aria-label={`${t.description}, ${day(t.posted_on)}`}
-      className="txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised sm:grid-cols-[96px_1fr_auto_auto]"
+      className={`txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised ${dated ? "sm:grid-cols-[96px_1fr_auto_auto]" : "sm:grid-cols-[1fr_auto_auto]"}`}
     >
-      <time dateTime={t.posted_on} className="order-3 text-label text-muted-foreground sm:order-none">
+      <time dateTime={t.posted_on} className={dated ? "order-3 text-label text-muted-foreground sm:order-none" : "sr-only"}>
         {day(t.posted_on)}
       </time>
       <div className="order-1 min-w-0 sm:order-none">
@@ -85,7 +88,7 @@ export function TxnRow({
             aria-controls={panel}
             aria-label={`Details for ${t.display_name ?? t.merchant ?? t.description}`}
             onClick={() => setOpen((o) => !o)}
-            className="row-action ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full [@media(hover:hover)]:hover:bg-active"
+            className="row-action ml-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[background-color,scale] duration-150 ease-out active:scale-[0.94] [@media(hover:hover)]:hover:bg-active"
           >
             <ChevronDown className={`size-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           </button>
@@ -105,7 +108,7 @@ export function TxnRow({
         />
       )}
       {open && categorised(t) && (
-        <div id={panel} className="order-5 col-span-full mt-1 flex flex-col gap-4 rounded-[14px] bg-card p-4 sm:order-none">
+        <div id={panel} className="panel-reveal order-5 col-span-full mt-1 flex flex-col gap-4 rounded-[14px] bg-card p-4 sm:order-none">
           <NoteField txn={t.id} />
           {editing ? (
             <SplitEditor
