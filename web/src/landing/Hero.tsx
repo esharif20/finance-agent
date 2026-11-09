@@ -43,12 +43,12 @@ const BEATS = [
 ];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-/** The agent's steps, lit as the cards reach them: what really runs when the app syncs. */
-const TRACE = [
-  { step: "sync", what: "Three accounts read", phase: 0 },
-  { step: "categorise", what: "Two sure, one to review", phase: 0 },
-  { step: "pair", what: "Transfers matched", phase: 1 },
-  { step: "total", what: "Summed by the Ledger", phase: 2 },
+/** One made-up row per card, worn by the card it came from: it rides the card through the deal and
+    the row, then is read into it as the hand gathers. */
+const WORN = [
+  { merchant: CHIPS[0]!.merchant, amount: CHIPS[0]!.amount, note: CHIPS[0]!.category[1], ok: true, at: "l" },
+  { merchant: CHIPS[2]!.merchant, amount: CHIPS[2]!.amount, note: "To review", ok: false, at: "c" },
+  { merchant: "Transfer paired", amount: null, note: "not spending", ok: true, at: "r" },
 ];
 const ease = (v: number) => v * v * (3 - 2 * v);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -58,26 +58,30 @@ const span = (p: number, a: number, b: number) => ease(clamp01((p - a) / (b - a)
     stack over the combined view. `w` is a card's width; returns offsets from the stage centre. */
 function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }, ox = 0): Pose & { label: number } {
   const n = i - 1;
-  // the fan sits right of centre on desktop, beside the headline; the row and the stack are centred
-  const fan = { x: ox + (narrow ? n * w * 0.16 : n * w * 0.3), y: narrow ? -w * 0.1 - n * 14 : -w * 0.22 - n * 18, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
+  // desktop: the whole move happens right of the copy column (ox); a phone keeps it centred
+  const fan = { x: ox + (narrow ? n * w * 0.16 : n * w * 0.44), y: narrow ? -w * 0.1 - n * 14 : -w * 0.12 - n * 22, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
   const gap = narrow ? w * 0.14 : w * 0.1;
   // on a phone the row is a column, cards on the left and each label beside its card
-  const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: w * 0.14, rz: 0, rx: 0, ry: 0, z: 0 };
-  const stack = { x: narrow ? n * 8 : n * 14, y: narrow ? -w * 0.55 + n * 10 : -w * 0.34 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
-  const a = span(p, 0.06, 0.26);
-  const b = span(p, 0.56, 0.74);
+  const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: ox + n * (w + gap), y: w * 0.02, rz: 0, rx: 0, ry: 0, z: 0 };
+  const stack = { x: ox + (narrow ? n * 8 : n * 14), y: narrow ? -w * 0.55 + n * 10 : -w * 0.62 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
+  // even pace: deal out 0.04 to 0.28, the labelled row drifts toward you to 0.5, gather to 0.72,
+  // then the totals hold while the stack rises; no stretch of scroll leaves the frame still
+  const a = span(p, 0.04, 0.28);
+  const drift = span(p, 0.26, 0.52);
+  const b = span(p, 0.5, 0.72);
+  const rise = span(p, 0.72, 1);
   const k = (key: keyof typeof row) => mix(mix(fan[key], row[key], a), stack[key], b);
   return {
     x: k("x"),
-    y: k("y"),
+    y: k("y") - w * 0.05 * drift * (1 - b) - w * 0.08 * rise,
     z: k("z"),
     rx: k("rx") + tilt.y * 8,
     // gathering, each card turns right over once, back and all, one after the other
-    ry: k("ry") + tilt.x * 12 + (narrow ? 0 : 360 * span(p, 0.54 + i * 0.05, 0.72 + i * 0.05)),
+    ry: k("ry") + tilt.x * 12 + (narrow ? 0 : 360 * span(p, 0.48 + i * 0.05, 0.66 + i * 0.05)),
     rz: k("rz"),
-    s: mix(mix(narrow ? 1.1 : 1.32, 1, a), narrow ? 0.82 : 0.78, b),
+    s: mix(mix(narrow ? 1.1 : 1.45, 1 + (narrow ? 0 : 0.06 * drift), a), narrow ? 0.82 : 1, b),
     layer: i,
-    label: clamp01((p - 0.2) / 0.06) * (1 - clamp01((p - 0.54) / 0.05)),
+    label: clamp01((p - 0.2) / 0.06) * (1 - clamp01((p - 0.47) / 0.05)),
   };
 }
 
@@ -102,9 +106,9 @@ function CardFace({ i, name }: { i: number; name: string }) {
   );
 }
 
-function Combined({ landed }: { landed: number }) {
+function Combined({ landed, innerRef }: { landed: number; innerRef?: React.Ref<HTMLDivElement> }) {
   return (
-    <div className="lp-combined">
+    <div ref={innerRef} className="lp-combined">
       <p className="lp-combined-label">All accounts</p>
       <Tally text={TOTAL} landed={landed} className="pl-count lp-combined-total" />
       <dl className="lp-combined-grid">
@@ -292,8 +296,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const backs = useRef<(HTMLSpanElement | null)[]>([]);
   const sheens = useRef<(HTMLSpanElement | null)[]>([]);
   const peek = useRef<HTMLDivElement>(null);
-  const chips = useRef<(HTMLLIElement | null)[]>([]);
-  const ghost = useRef<HTMLParagraphElement>(null);
+  const worn = useRef<(HTMLSpanElement | null)[]>([]);
+  const combined = useRef<HTMLDivElement>(null);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
@@ -309,23 +313,51 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     () => {
       if (still) return;
       gsap.registerPlugin(ScrollTrigger); // here, not at import: it reads matchMedia on register
+      // the cards' run ends one screen early: the last screen of the track is the hand-over, where
+      // the next section rises over the frame as one move (no cut)
       const st = ScrollTrigger.create({
         trigger: track.current,
         start: "top top",
-        end: "bottom bottom",
+        end: "bottom 200%",
         onUpdate: (self) => {
           goal.current = self.progress;
           kicker.current?.();
         },
       });
+      // the light: each card's hue pools on the dark under it and follows the move, scrubbed on the
+      // same run (scrub 0.35 s, about the playhead's own lag); transform and opacity only
+      const light = gsap.timeline({
+        defaults: { ease: "none" },
+        scrollTrigger: { trigger: track.current, start: "top top", end: "bottom 200%", scrub: 0.35 },
+      });
+      light
+        .fromTo(".lp-hero-rail i", { scaleX: 0.04 }, { scaleX: 1, duration: 1 }, 0)
+        .to(".lp-wash-0", { xPercent: -30, yPercent: 6, duration: 0.24 }, 0.04)
+        .to(".lp-wash-2", { xPercent: 30, yPercent: 6, duration: 0.24 }, 0.04)
+        .to(".lp-wash-1", { yPercent: 8, scale: 1.1, duration: 0.24 }, 0.04)
+        .to(".lp-wash-0, .lp-wash-2", { xPercent: 0, yPercent: -14, scale: 0.75, opacity: 0.5, duration: 0.22 }, 0.5)
+        .to(".lp-wash-1", { yPercent: -14, scale: 0.75, opacity: 0.5, duration: 0.22 }, 0.5)
+        .fromTo(".lp-wash-pool", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.24 }, 0.6)
+        .to({}, { duration: 0.16 });
+      // the hand-over: the frame settles back and dims as the next section's sheet rises over it
+      const mm = gsap.matchMedia();
+      mm.add({ fine: "(min-width: 900px) and (pointer: fine)", any: "all" }, (ctx) => {
+        const out = gsap.timeline({
+          defaults: { ease: "none" },
+          scrollTrigger: { trigger: track.current, start: "bottom 200%", end: "bottom bottom", scrub: 0.35 },
+        });
+        if (ctx.conditions?.fine) out.to(".lp-hero-scene", { scale: 0.92, yPercent: -3, duration: 1 }, 0);
+        out.fromTo(".lp-hero-dim", { opacity: 0 }, { opacity: 0.72, duration: 1 }, 0);
+      });
       return () => {
         st.kill();
+        mm.revert();
       };
     },
-    { dependencies: [still] },
+    { scope: track, dependencies: [still] },
   );
   const [phase, setPhase] = useState(0);
-  useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.68 ? 1 : 2));
+  useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.64 ? 1 : 2));
 
   // the odometer rolls up as the combined view arrives, a wheel every 70 ms
   const rolled = phase >= 2;
@@ -353,7 +385,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const narrow = r.width < 720;
       // the row of three must fit the frame; the CSS stand-ins take the same width through --cw.
       // Capped by height too, so a short window never squeezes the hand
-      const w = Math.min(narrow ? r.width * 0.4 : r.width * 0.2, r.height * 0.36 * ASPECT, 400);
+      const w = Math.min(narrow ? r.width * 0.4 : r.width * 0.165, r.height * 0.27 * ASPECT, 330);
       el.style.setProperty("--cw", `${w.toFixed(1)}px`);
       return { r, narrow, w, h: w / ASPECT };
     };
@@ -363,21 +395,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     let drawn = false;
     let last = 0;
     const faces = () => ACCOUNTS.accounts.map((_, i) => ({ art: null, hue: HUES[i] ?? null, h: dims.h }));
-    // each chip's offset to the combined total (bottom centre of the frame), measured on resize only
-    let chipAt: { x: number; y: number }[] = [];
-    const measureChips = () => {
-      const r = el.getBoundingClientRect();
-      chipAt = chips.current.map((c) => {
-        if (!c) return { x: 0, y: 0 };
-        const b = c.getBoundingClientRect();
-        return { x: r.left + r.width / 2 - (b.left + b.width / 2), y: r.bottom - 160 - (b.top + b.height / 2) };
-      });
-    };
     const sizeScene = () => {
       const was = dims.w;
-      for (const c of chips.current) if (c) c.style.transform = "";
       dims = size();
-      measureChips();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
       // the faces carry the card height: rebuilt with the width, so every card stays 85.6 x 53.98
       if (scene && was !== dims.w) scene.setFaces(faces(), "#000000");
@@ -419,7 +439,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // ambient life: once dealt, the hand breathes and turns slowly for as long as the hero is in
       // view and the tab is visible (the IO and visibilitychange stop and wake the loop)
       const sway = narrow ? 0 : clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08) * 0.7);
-      const ox = narrow ? 0 : r.width * 0.17;
+      const ox = narrow ? 0 : r.width * 0.19;
       const base = ACCOUNTS.accounts.map((_, i) => pose(i, pv, w, narrow, tilt, ox));
       // hit test, front card first: the scaled card's box, a little generous
       let hit = -1;
@@ -464,17 +484,14 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // the peek: the hovered card's balance and categories, beside the cursor
       const pk = peek.current;
       if (pk) pk.style.transform = `translate3d(${Math.min(cur.x + 28, r.width / 2 - 300).toFixed(1)}px, ${(cur.y + 24).toFixed(1)}px, 0)`;
-      // the ledger chips fly into the total as the hand gathers, one after another
-      chips.current.forEach((c, i) => {
-        const at = chipAt[i];
-        if (!c || !at) return;
-        const f = narrow ? 0 : span(pv, 0.5 + i * 0.04, 0.7 + i * 0.04);
-        c.style.transform = f ? `translate3d(${(at.x * f).toFixed(1)}px, ${(at.y * f).toFixed(1)}px, 0) scale(${(1 - 0.7 * f).toFixed(3)})` : "";
-        c.style.opacity = f ? String(1 - f * f) : "";
+      // each worn row is read into its card as the hand gathers, one after another (a phone lets
+      // them go as the hand opens, before the column of cards)
+      worn.current.forEach((c, i) => {
+        if (!c) return;
+        const f = narrow ? span(pv, 0.03, 0.1) : span(pv, 0.42 + i * 0.03, 0.5 + i * 0.03);
+        c.style.opacity = String(1 - f);
+        c.style.setProperty("--in", f.toFixed(3));
       });
-      // the ghost total behind the hand drifts against the pointer: a slower, farther plane
-      const gh = ghost.current;
-      if (gh) gh.style.transform = `translate3d(${(-tilt.x * 40).toFixed(1)}px, ${(-tilt.y * 24).toFixed(1)}px, 0)`;
       // a light sweeps across the foil on the deal, then again every 7 s while the hand idles
       const sweep = clamp01(since > 2600 ? ((since - 2600) % 7000) / 1500 : (since - 1100) / 1500);
       const sweeping = sweep > 0 && sweep < 1 && hover < 0;
@@ -547,6 +564,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       cur.x = e.clientX - b.left - b.width / 2;
       cur.y = e.clientY - b.top - b.height / 2;
       cur.in = e.clientY >= b.top && e.clientY <= b.bottom;
+      // the total's spotlight follows the pointer (after React Bits' SpotlightCard, MIT)
+      const cb = combined.current;
+      if (cb && el.dataset.phase === "2") {
+        const q = cb.getBoundingClientRect();
+        cb.style.setProperty("--mx", `${(e.clientX - q.left).toFixed(0)}px`);
+        cb.style.setProperty("--my", `${(e.clientY - q.top).toFixed(0)}px`);
+      }
       kick();
     };
     const leave = () => {
@@ -604,10 +628,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     return () => io.disconnect();
   }, [still]);
 
-  const meta = (
-    <p className="lp-hero-meta" aria-hidden="true">
-      <span>The made-up household</span>
+  const rail = (
+    <p className="lp-hero-rail" aria-hidden="true">
+      <span className="lp-hero-step">
+        <b>0{(still ? 2 : phase) + 1}</b> / 03
+      </span>
       <span>{BEATS[still ? 2 : phase]?.stage}</span>
+      <i />
     </p>
   );
   const copy = (
@@ -645,7 +672,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     return (
       <section ref={track} className="lp-hero" data-still="" aria-labelledby="lp-title">
         <div className="lp-hero-pin">
-          {meta}
+          {rail}
           {copy}
           <StillStage />
           {beats}
@@ -657,48 +684,18 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     <section ref={track} className="lp-hero" data-lite={lite ? "" : undefined} data-off={near ? undefined : ""} aria-labelledby="lp-title">
       {/* one sticky frame holds every plane, so nothing slides against anything while it is pinned */}
       <div className="lp-hero-pin" data-phase={phase}>
+        <div className="lp-hero-scene">
         <div className="lp-hero-ground" aria-hidden="true">
           <LedgerField />
         </div>
-        <div className="lp-hero-board" aria-hidden="true">
-          <span>Ledger · October</span>
-          <span>3 accounts · 1 file on your Mac</span>
+        {/* the cards' own light on the dark: green, red and teal pools that follow the hand, then
+            one pool under the total */}
+        <div className="lp-hero-light" aria-hidden="true">
+          {HUES.map((h, i) => (
+            <span key={h} className={`lp-wash lp-wash-${i}`} style={{ "--h": h } as React.CSSProperties} />
+          ))}
+          <span className="lp-wash lp-wash-pool" />
         </div>
-        <ol className="lp-trace" aria-label="What the agent did">
-          <li className="lp-trace-head">
-            <span>Agent trace</span>
-            <span>local</span>
-          </li>
-          {TRACE.map((t, i) => (
-            <li key={t.step} data-on={phase >= t.phase ? "" : undefined} style={{ "--k": i } as React.CSSProperties}>
-              <span className="lp-trace-tick" />
-              <code>{t.step}</code>
-              <span>{t.what}</span>
-            </li>
-          ))}
-        </ol>
-        <p ref={ghost} className="lp-hero-ghost" aria-hidden="true">
-          {TOTAL}
-        </p>
-        <ul className="lp-chips" aria-hidden="true">
-          {CHIPS.map((c, i) => (
-            <li key={c.merchant} ref={(n) => void (chips.current[i] = n)} style={{ "--k": i } as React.CSSProperties}>
-              <span className="lp-chip">
-                <span className="lp-chip-tick" data-ok={c.category[0] !== "To review" ? "" : undefined} />
-                <span>{c.merchant}</span>
-                <Money value={c.amount} />
-                <em>{c.category[0] === "To review" ? "To review" : c.category[1]}</em>
-              </span>
-            </li>
-          ))}
-          <li ref={(n) => void (chips.current[3] = n)} style={{ "--k": 3 } as React.CSSProperties}>
-            <span className="lp-chip">
-              <span className="lp-chip-tick" data-ok="" />
-              <span>Transfer paired</span>
-              <em>not spending</em>
-            </span>
-          </li>
-        </ul>
         {(
           <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
             {!lite &&
@@ -714,6 +711,16 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
                 <CardFace i={i} name={a.name} />
+                {WORN[i] && (
+                  <span ref={(n) => void (worn.current[i] = n)} className="lp-worn" data-at={WORN[i].at}>
+                    <span className="lp-chip">
+                      <span className="lp-chip-tick" data-ok={WORN[i].ok ? "" : undefined} />
+                      <span>{WORN[i].merchant}</span>
+                      {WORN[i].amount && <Money value={WORN[i].amount} />}
+                      <em>{WORN[i].note}</em>
+                    </span>
+                  </span>
+                )}
                 {!lite && (
                   <span className="lp-acard-light">
                     <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
@@ -722,7 +729,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
               </div>
             ))}
             {ACCOUNTS.accounts.map((a, i) => (
-              <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
+              <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct" style={{ "--h": HUES[i] } as React.CSSProperties}>
                 <p className="lp-acct-name">{a.name}</p>
                 <p className="lp-acct-bal">
                   <Money value={gbp(a.balance)} />
@@ -771,12 +778,21 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
               ))}
             </div>
             )}
-            <Combined landed={landed} />
+            <Combined landed={landed} innerRef={combined} />
           </div>
         )}
-        {meta}
-        {copy}
-        {beats}
+        <div className="lp-hero-col">
+          {rail}
+          <div className="lp-hero-slot">
+            {copy}
+            {beats}
+          </div>
+        </div>
+        <p className="lp-hero-note" aria-hidden="true">
+          A made-up household · every figure summed by the Ledger
+        </p>
+        </div>
+        <span className="lp-hero-dim" aria-hidden="true" />
       </div>
       <p className="lp-sr">
         {ACCOUNTS.accounts.map((a) => `${a.name}: ${formatMoney(gbp(a.balance))}.`).join(" ")} Together: {TOTAL}.

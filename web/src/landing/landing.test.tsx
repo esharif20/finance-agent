@@ -88,6 +88,10 @@ describe("hero on phones", () => {
     for (const a of ACCOUNTS.accounts) expect(screen.getAllByText(a.name).length).toBeGreaterThan(0);
     // no light layers or hover peek on touch: a few transformed divs only
     expect(container.querySelector(".lp-acard-light, .lp-acard-back, .lp-acard-floor, .lp-peek")).toBeNull();
+    // each card wears its own made-up row, inside its slot, so the row moves with the card
+    expect(container.querySelectorAll(".lp-acard-slot > .lp-worn")).toHaveLength(ACCOUNTS.accounts.length);
+    // the old scattered planes are gone: no trace tile, no board, no ghost figures
+    expect(container.querySelector(".lp-trace, .lp-hero-board, .lp-hero-ghost")).toBeNull();
   });
 });
 
