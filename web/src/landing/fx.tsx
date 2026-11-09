@@ -263,28 +263,8 @@ export function Flex({
   );
 }
 
-/** The app's ambient colour field (index.css `.ambient`: four soft blobs drifting on unequal CSS
-    loops, transform only), held inside one chapter and tinted for it by `tone`, with grain and
-    faint ledger lines. Reduced motion: the blobs hold still. */
+/** A chapter's ground texture: /architecture's faint 22px dot grid over the chapter's flat colour,
+    inked for that colour by `tone`. Static, no blobs, nothing to animate or pause. */
 export function Field({ tone }: { tone: string }) {
-  // off screen the blobs pause, so only the chapters in view keep a compositor animation running
-  const el = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const n = el.current;
-    if (!n || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => {
-      if (e?.isIntersecting) delete n.dataset.paused;
-      else n.dataset.paused = "";
-    });
-    io.observe(n);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={el} className="ambient lp-amb" data-tone={tone} aria-hidden="true">
-      <i />
-      <i />
-      <i />
-      <i />
-    </div>
-  );
+  return <div className="lp-dots" data-tone={tone} aria-hidden="true" />;
 }

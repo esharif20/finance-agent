@@ -2232,3 +2232,97 @@
   overflow: clip;
   padding-bottom: 0.04em;
 }
+
+/* ===== full-page pass: /architecture's grounds everywhere =====
+   Every chapter keeps its flat colour; the drifting blobs are gone and a faint 22px dot grid (the
+   same texture /architecture uses) sits under the content, inked for the colour it lies on. */
+.lp-dots {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px, var(--dot, rgb(120 128 118 / 0.22)) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+}
+.lp-dots[data-tone="night"] {
+  --dot: rgb(201 207 198 / 0.13);
+}
+.lp-dots[data-tone="cyan"],
+.lp-dots[data-tone="mint"],
+.lp-dots[data-tone="orange"] {
+  --dot: rgb(0 0 0 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  .lp-dots[data-tone="paper"] {
+    --dot: rgb(201 207 198 / 0.13);
+  }
+}
+
+/* what it does on its own: the heading holds, six verbs pass and light up in the middle */
+.lp-verbs {
+  position: relative;
+  isolation: isolate;
+  padding-block: clamp(96px, 12vw, 176px);
+  background: var(--lp-paper);
+  color: var(--lp-paper-ink);
+}
+.lp-verbs-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(32px, 5vw, 96px);
+  align-items: start;
+}
+.lp-verbs-head {
+  position: sticky;
+  top: clamp(96px, 16svh, 160px);
+  display: grid;
+  gap: 20px;
+}
+.lp-verbs-head p {
+  max-width: 36ch;
+  font-size: var(--lp-step-lead);
+  line-height: 1.4;
+}
+.lp-verbs-list {
+  display: grid;
+  gap: clamp(28px, 4svh, 48px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-verb {
+  display: grid;
+  gap: 8px;
+}
+.lp-verb-name {
+  font-family: var(--lp-display);
+  font-size: clamp(3rem, 1rem + 6vw, 7.5rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+}
+.lp-verb-tip {
+  max-width: 40ch;
+  font-size: var(--lp-step-body);
+  line-height: 1.5;
+}
+@media (max-width: 899.98px) {
+  .lp-verbs-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-verbs-head {
+    position: static;
+  }
+}
+
+.lp-verbs {
+  border-radius: clamp(20px, 3vw, 36px) clamp(20px, 3vw, 36px) 0 0;
+}
+.lp-dots {
+  border-radius: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  .lp-verbs {
+    background: #161915; /* /architecture night-1: a tone step off the black hero */
+  }
+}
