@@ -63,7 +63,7 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
   const gap = narrow ? w * 0.14 : w * 0.1;
   // on a phone the row is a column, cards on the left and each label beside its card
   const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: w * 0.14, rz: 0, rx: 0, ry: 0, z: 0 };
-  const stack = { x: narrow ? n * 8 : n * 14, y: narrow ? -w * 0.86 + n * 10 : -w * 0.34 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
+  const stack = { x: narrow ? n * 8 : n * 14, y: narrow ? -w * 0.55 + n * 10 : -w * 0.34 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
   const a = span(p, 0.06, 0.26);
   const b = span(p, 0.56, 0.74);
   const k = (key: keyof typeof row) => mix(mix(fan[key], row[key], a), stack[key], b);
@@ -393,7 +393,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       last = now;
       const target = goal.current;
       const v = p.get();
-      const next = Math.abs(target - v) < 0.0004 ? target : v + (target - v) * (1 - Math.exp(-dt / 110));
+      // phones follow the finger more tightly (native momentum already smooths the scroll)
+      const next = Math.abs(target - v) < 0.0004 ? target : v + (target - v) * (1 - Math.exp(-dt / (dims.narrow ? 45 : 110)));
       p.set(next);
       return next;
     };

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Inbox, MessageCircle, LayoutDashboard, ListOrdered, Repeat } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef } from "react";
 import { Ambient } from "@/components/Ambient";
 import { MotionFx } from "@/components/MotionFx";
 import { BackupStatus } from "@/components/BackupStatus";
@@ -21,7 +22,10 @@ import { Story } from "@/screens/Story";
 import { Subscriptions } from "@/screens/Subscriptions";
 import { Transactions } from "@/screens/Transactions";
 
-const queryClient = new QueryClient();
+// Screens keep their data across tab switches: a tab returns to what it showed, with no skeleton,
+// and refreshes quietly in the background once the data is a minute old. Mutations still
+// invalidate what they change.
+export const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } });
 
 const tabs = (review: number) => [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="size-4" aria-hidden="true" /> },
@@ -37,6 +41,13 @@ function Shell() {
   const TABS = tabs(review);
   const reduced = useReducedMotion();
   const tab = route.name === "transactions" || route.name === "review" || route.name === "subscriptions" || route.name === "assistant" ? route.name : route.name === "settings" || route.name === "briefing" || route.name === "know" || route.name === "goals" || route.name === "plan" || route.name === "story" ? "" : "overview";
+  // after the first screen change the app is "settled": entrance animations (cards rising,
+  // odometers rolling up) played once on load and do not replay on every tab switch
+  const screen = route.name === "category" ? `category/${route.category}` : route.name;
+  const first = useRef(screen);
+  useEffect(() => {
+    if (screen !== first.current) document.documentElement.dataset.settled = "";
+  }, [screen]);
   return (
     <>
       <Ambient />
@@ -46,9 +57,10 @@ function Shell() {
         <motion.main
           // a short fade and lift on every screen change; reduced motion keeps only the fade
           key={route.name === "category" ? `category/${route.category}` : route.name}
-          initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduced ? 0.12 : 0.24, ease: [0.23, 1, 0.32, 1] }}
+          // one quick crossfade between screens: no lift, nothing that reads as a reload
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: reduced ? 0.1 : 0.16, ease: [0.23, 1, 0.32, 1] }}
         >
           {route.name === "category" ? (
             <CategoryScreen

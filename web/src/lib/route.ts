@@ -57,6 +57,16 @@ export function goHash(href: string) {
   window.dispatchEvent(new HashChangeEvent("hashchange", { oldURL: old, newURL: window.location.href }));
 }
 
+/** A tab or menu link's click: an in-page hash route through goHash, never a navigation, so the
+    app is not torn down and rebuilt. Modified clicks (new tab, new window) keep the browser's own. */
+export function onHashLink(e: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; defaultPrevented: boolean; preventDefault(): void; currentTarget: { getAttribute(name: string): string | null } }) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const href = e.currentTarget.getAttribute("href");
+  if (!href?.startsWith("#")) return;
+  e.preventDefault();
+  goHash(href);
+}
+
 export function useRoute(): Route {
   const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => {

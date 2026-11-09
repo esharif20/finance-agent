@@ -1122,3 +1122,9 @@ html[data-scrolling] .ambient i {
     will-change: auto;
   }
 }
+
+/* after the first tab switch, entrance animations do not replay (App.tsx sets data-settled) */
+:root[data-settled] .account-mini,
+:root[data-settled] .odometer[data-play] .odo-reel {
+  animation: none;
+}

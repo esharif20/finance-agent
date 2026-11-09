@@ -24,6 +24,21 @@ afterEach(() => {
 });
 
 describe("BottomBar", () => {
+  it("switches tabs in the page: pushState and a hashchange, never a navigation", async () => {
+    const changes: string[] = [];
+    const on = () => changes.push(window.location.hash);
+    window.addEventListener("hashchange", on);
+    const marker = Symbol("page");
+    (window as unknown as Record<symbol, boolean>)[marker] = true;
+    await userEvent.click(screen.getByRole("link", { name: /^Review/ }));
+    window.removeEventListener("hashchange", on);
+    expect(window.location.hash).toBe("#review");
+    expect(changes).toEqual(["#review"]);
+    // the same window: nothing reloaded
+    expect((window as unknown as Record<symbol, boolean>)[marker]).toBe(true);
+    window.history.replaceState(null, "", "#");
+  });
+
   it("labels each tab, marks the current one and announces the Review badge", () => {
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /^Review\s*, 3 to review$/ })).toHaveAttribute("href", "#review");

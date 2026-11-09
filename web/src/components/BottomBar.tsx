@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
+import { onHashLink } from "@/lib/route";
 import type { Tab } from "@/components/NavTabs";
 
 const MORE = [
@@ -84,7 +85,10 @@ function More({ current }: { current: string }) {
                 key={to}
                 href={`#${to}`}
                 aria-current={current === to ? "page" : undefined}
-                onClick={() => setOpen(false)}
+                onClick={(e) => {
+                  setOpen(false);
+                  onHashLink(e);
+                }}
                 className={`${row} ${current === to ? "bg-active" : ""}`}
               >
                 <Icon className="size-[18px]" aria-hidden="true" />
@@ -110,6 +114,7 @@ export function BottomBar({ tabs, tab, current }: { tabs: readonly Tab[]; tab: s
         <a
           key={id}
           href={`#${id}`}
+          onClick={onHashLink}
           aria-current={tab === id ? "page" : undefined}
           className={`${item} ${tab === id ? "text-foreground" : "text-muted-foreground"}`}
         >

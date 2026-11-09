@@ -641,6 +641,22 @@
   .lp-hero-pin:not([data-phase="0"]) > .lp-stage {
     transform: translateY(14%);
   }
+  /* the totals: the stage sits back at the frame so the combined card is whole at its hold, well
+     before the pin lets go; the statement keeps only its title above the stack */
+  .lp-hero-pin[data-phase="2"] > .lp-stage {
+    transform: none;
+  }
+  .lp-hero-beat:last-child .lp-hero-say-body {
+    display: none;
+  }
+  /* scroll cost: the hero paints and lays out on its own, and the cards carry no big blurred
+     shadow to repaint as they move */
+  .lp .lp-hero {
+    contain: layout paint;
+  }
+  .lp .lp-hero .lp-acard {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+  }
   .lp .lp-hero .lp-acard-slot {
     will-change: auto;
   }
