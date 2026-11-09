@@ -28,9 +28,12 @@ export function TxnRow({
   mask,
   groups,
   onCategory,
+  dated = true,
 }: {
   t: Txn;
   mask?: string;
+  /** false under a day heading: the date stays for screen readers, not on screen */
+  dated?: boolean;
   groups: CategoryGroup[];
   onCategory: (c: Category, all: boolean) => void;
 }) {
@@ -46,9 +49,9 @@ export function TxnRow({
   return (
     <li
       aria-label={`${t.description}, ${day(t.posted_on)}`}
-      className="txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised sm:grid-cols-[96px_1fr_auto_auto]"
+      className={`txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised ${dated ? "sm:grid-cols-[96px_1fr_auto_auto]" : "sm:grid-cols-[1fr_auto_auto]"}`}
     >
-      <time dateTime={t.posted_on} className="order-3 text-label text-muted-foreground sm:order-none">
+      <time dateTime={t.posted_on} className={dated ? "order-3 text-label text-muted-foreground sm:order-none" : "sr-only"}>
         {day(t.posted_on)}
       </time>
       <div className="order-1 min-w-0 sm:order-none">

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Check, ChevronDown, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, MessageCircle, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
 import { CloudToggle } from "@/components/CloudToggle";
@@ -284,6 +284,14 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
 // the public demo answers on the deterministic path only: no local model, no cloud
 const DEMO = import.meta.env.VITE_DEMO === "1";
 
+/** First questions for an empty chat: each one maps to a read tool, in the app and in the demo. */
+const STARTERS: [string, string][] = [
+  ["Spending", "How much did I spend last month?"],
+  ["A category", "What did I spend on Eating out last month?"],
+  ["Subscriptions", "Which subscriptions do I pay for?"],
+  ["Insights", "Anything unusual this month?"],
+];
+
 export function Assistant() {
   const chat = useChat(); // lives above the router: a turn in flight survives a tab change
   const [draft, setDraft] = useState("");
@@ -336,11 +344,28 @@ export function Assistant() {
       )}
       <ol aria-label="Conversation" aria-live="polite" aria-busy={chat.busy} className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
         {chat.messages.length === 0 && (
-          <li className="m-auto max-w-sm py-16 text-center">
-            <p className="text-heading">Ask about your money</p>
-            <p className="mt-1 text-label text-muted-foreground">
+          <li className="m-auto flex w-full max-w-xl flex-col items-center py-10 text-center sm:py-14">
+            <span className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground" aria-hidden="true">
+              <MessageCircle className="size-6" />
+            </span>
+            <p className="mt-4 text-heading">Ask about your money</p>
+            <p className="mt-1 max-w-sm text-label text-muted-foreground">
               Every figure comes from your ledger. Changes only happen when you confirm them.
             </p>
+            <div className="mt-8 grid w-full gap-2 text-left sm:grid-cols-2" role="group" aria-label="Try asking">
+              {STARTERS.map(([kind, q]) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={chat.busy}
+                  onClick={() => say(q)}
+                  className="group flex min-h-16 flex-col justify-between gap-1 rounded-2xl border border-border bg-raised px-4 py-3 text-left transition-[transform,background-color,border-color] duration-150 ease-out hover:border-ring hover:bg-active active:scale-[0.98] disabled:opacity-50 motion-reduce:transition-none"
+                >
+                  <span className="text-meta font-semibold uppercase tracking-wider text-muted-foreground">{kind}</span>
+                  <span className="text-row font-medium">{q}</span>
+                </button>
+              ))}
+            </div>
           </li>
         )}
         {chat.messages.map((m, i) => (
