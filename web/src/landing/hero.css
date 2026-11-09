@@ -1,219 +1,226 @@
-/* The hero, a poster: the claim set huge on the left, the agent's mint block on the right, a
-   legend of six verbs along the foot. Transform and opacity only move; nothing reacts to hover. */
-.hp {
-  position: relative;
-  isolation: isolate;
-  min-height: 100svh;
-  overflow: clip;
-  background: var(--lp-black);
-  color: var(--lp-white);
-}
-.hp-in {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: 1fr auto auto;
-  column-gap: clamp(12px, 1.6vw, 24px);
-  row-gap: clamp(28px, 3.4vw, 48px);
-  min-height: 100svh;
-  padding: clamp(96px, 11vh, 132px) var(--lp-gutter) clamp(24px, 3vw, 40px);
-  transform-origin: 50% 0%;
-}
-.hp-in > .lp-corners > i {
-  margin: clamp(76px, 9vh, 100px) max(4px, calc(var(--lp-gutter) - 18px)) 0;
-  font-size: 0.75rem;
-  opacity: 0.6;
-}
-.hp-in > .lp-corners > [data-c="bl"],
-.hp-in > .lp-corners > [data-c="br"] {
-  margin-top: 0;
-  margin-bottom: 4px;
+/* ===== the hero's visual layer: headline reveal, card lighting, pointer light, chips =====
+   Compositor-only: every moving thing here animates transform or opacity. Reduced motion renders the still hero
+   (useStill), which carries none of these elements or animations. */
+
+.lp-hero {
+  --hero-ease: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.hp-title {
-  grid-column: 1 / span 8;
-  grid-row: 1;
-  align-self: end;
-  margin: 0;
-  font-family: var(--lp-display);
-  font-size: clamp(3.2rem, 0.4rem + 8.6vw, 11.5rem);
-  font-weight: 800;
-  font-stretch: 78%;
-  line-height: 0.84;
-  letter-spacing: -0.045em;
+/* --- headline: each word slides up out of its line's mask; transform and opacity only --- */
+.lp-hero .lp-flex[data-play] .lp-flex-line {
+  /* the line is the mask; padding keeps descenders inside it */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+  clip-path: inset(-0.5em -0.5em 0 -0.5em);
 }
-.hp-line {
-  display: block;
-  overflow: clip;
-  padding-block: 0.04em 0.07em;
-  white-space: nowrap;
+.lp-hero .lp-flex[data-play] .lp-flex-word {
+  --w: 0;
+  animation: hero-word 640ms var(--hero-ease) backwards;
+  /* 0.45 s: the preloader's sheet clears the headline before the first word moves */
+  animation-delay: calc(var(--hd, 0s) + 0.45s + var(--w) * 70ms);
 }
-.hp-line:nth-child(2) {
-  padding-left: 0.62em;
-  color: var(--lp-mint);
+.lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word {
+  --w: 6;
 }
-.hp-line:nth-child(3) {
-  padding-left: 0.18em;
+.lp-hero .lp-flex[data-play] .lp-flex-word:nth-child(2) { --w: 1; }
+.lp-hero .lp-flex[data-play] .lp-flex-word:nth-child(3) { --w: 2; }
+.lp-hero .lp-flex[data-play] .lp-flex-word:nth-child(4) { --w: 3; }
+.lp-hero .lp-flex[data-play] .lp-flex-word:nth-child(5) { --w: 4; }
+.lp-hero .lp-flex[data-play] .lp-flex-word:nth-child(6) { --w: 5; }
+.lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(2) { --w: 7; }
+.lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(3) { --w: 8; }
+.lp-hero .lp-flex[data-play] .lp-flex-line:nth-child(3) .lp-flex-word:nth-child(4) { --w: 9; }
+/* the letters keep their final weight from the first frame: no weight, width or variation change on
+   load or under the pointer, so the headline never reflows (this overrides fx.tsx's inline swell) */
+.lp-hero .lp-flex [data-l] {
+  font-variation-settings: normal !important;
+  transition: none;
 }
-.hp-word {
-  white-space: pre;
+.lp-hero .lp-flex[data-play] [data-l] {
+  animation: none;
 }
-.hp-ch {
-  display: inline-block;
-}
-
-/* the agent: a confident mint block, where a question is answered as you watch */
-.hp-agent {
-  grid-column: 9 / span 4;
-  grid-row: 1;
-  align-self: end;
-  color: var(--lp-black);
-}
-.hp-agent-in {
-  position: relative;
-  display: grid;
-  gap: 14px;
-  min-height: clamp(320px, 44vh, 460px);
-  align-content: end;
-  padding: 52px clamp(18px, 1.8vw, 26px) clamp(18px, 1.8vw, 26px);
-  border-radius: clamp(14px, 1.6vw, 22px);
-  background: var(--lp-mint);
-}
-.hp-agent .lp-corners > i {
-  opacity: 0.7;
-}
-.hp-q {
-  position: relative;
-  justify-self: end;
-  max-width: 92%;
-  margin: 0 0 6px;
-  padding: 10px 14px;
-  border-radius: 18px 18px 6px 18px;
-  background: var(--lp-black);
-  color: var(--lp-white);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  line-height: 1.35;
-}
-.hp-q-ghost {
-  visibility: hidden;
-}
-.hp-q-typed {
-  position: absolute;
-  inset: 10px 14px;
-}
-.hp-steps {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.hp-step {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-}
-.hp-step::before {
-  content: "";
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lp-black);
-  translate: 0 -1px;
-}
-.hp-answer {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-  padding-top: 14px;
-  border-top: 1.5px solid rgb(0 0 0 / 0.85);
-}
-.hp-fig {
-  font-family: var(--lp-display);
-  font-size: clamp(2.6rem, 1rem + 3.4vw, 4.75rem);
-  font-weight: 800;
-  font-stretch: 82%;
-  line-height: 0.95;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-.hp-fig-note {
-  max-width: 34ch;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-/* the foot: the line, the two actions, and the legend of verbs */
-.hp-foot {
-  grid-column: 1 / span 5;
-  grid-row: 2 / span 2;
-  display: grid;
-  gap: 24px;
-  align-content: start;
-}
-.hp-lede {
-  max-width: 46ch;
-  margin: 0;
-  font-size: var(--lp-step-body);
-  line-height: 1.5;
-  color: rgb(255 255 255 / 0.78);
-}
-.hp-caps {
-  grid-column: 7 / span 6;
-  grid-row: 2 / span 2;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px clamp(12px, 1.6vw, 24px);
-  align-content: start;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.hp-cap {
-  display: grid;
-  gap: 4px;
-  padding-top: 10px;
-  border-top: 1px solid rgb(255 255 255 / 0.22);
-}
-.hp-cap b {
-  font-family: var(--lp-display);
-  font-size: 1.125rem;
-  font-weight: 750;
-}
-.hp-cap span {
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: rgb(255 255 255 / 0.62);
-}
-
-/* phones and tablets: one column, the claim first, then the agent; no scroll drift (set in Hero.tsx) */
-@media (max-width: 899.98px) {
-  .hp-in {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-    padding-top: 104px;
+@keyframes hero-word {
+  from {
+    transform: translate3d(0, 118%, 0) rotate(7deg);
+    opacity: 0;
   }
-  .hp-in > .lp-corners {
+  35% {
+    opacity: 1;
+  }
+}
+/* --- the ledger field: a dot grid behind the hero that the pointer pulls (drawn by Hero.tsx) --- */
+.lp-ledger-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* reduced motion: the same grid, faint and still */
+.lp-ledger-still {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.07) 0.75px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+}
+
+/* a column that stays clear of the hand: three lines on desktop, balanced */
+.lp-hero .lp-flex-line {
+  text-wrap: balance;
+}
+@media (min-width: 720px) {
+  .lp-hero .lp-hero-copy {
+    max-width: min(52rem, 46%);
+  }
+  .lp-hero .lp-display {
+    font-size: clamp(3.4rem, 0.4rem + 6.6vw, 8rem);
+  }
+}
+
+/* touch and small screens get none of the light layers: no extra layers, nothing to composite */
+@media not ((hover: hover) and (pointer: fine)), (max-width: 719.98px) {
+  .lp-acard-light,
+  .lp-acard-back,
+  .lp-acard-floor {
     display: none;
   }
-  .hp-title,
-  .hp-agent,
-  .hp-foot,
-  .hp-caps {
-    grid-column: 1;
-    grid-row: auto;
+}
+
+/* a bigger hand on desktop; Hero.tsx sizes the WebGL cards to match */
+@media (min-width: 720px) {
+  .lp-hero .lp-acard-slot {
+    width: min(28vw, 440px);
   }
-  .hp-title {
-    font-size: clamp(2.9rem, 0.2rem + 13.4vw, 6.5rem);
+}
+
+/* --- card lighting, layered over the WebGL card (and the CSS stand-in). The DOM slot tracks the
+   WebGL card only approximately, so nothing here draws a hard edge: the sweep is a soft highlight
+   kept off the rims, the edge light is a backlight behind the canvas. Fine pointers only. --- */
+.lp-acard-light {
+  position: absolute;
+  inset: 6%;
+  border-radius: 7% / 11%;
+  overflow: clip;
+  pointer-events: none;
+}
+/* specular sweep: a soft highlight crosses each card once, as it lands */
+.lp-acard-light::before {
+  content: "";
+  position: absolute;
+  inset: 4% auto 4% 0;
+  width: 50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.14) 55%, transparent);
+  transform: translate3d(-110%, 0, 0) skewX(-16deg);
+}
+.lp-stage[data-play] .lp-acard-light::before {
+  animation: hero-sweep 1.6s var(--hero-ease) both;
+  animation-delay: calc(1.5s + var(--i) * 170ms);
+}
+@keyframes hero-sweep {
+  0% {
+    transform: translate3d(-110%, 0, 0) skewX(-16deg);
   }
-  .hp-agent-in {
-    min-height: 0;
+  100% {
+    transform: translate3d(260%, 0, 0) skewX(-16deg);
   }
-  .hp-caps {
-    grid-template-columns: 1fr 1fr;
+}
+/* the sheen: a faint band on the face that the pointer's tilt slides across (Hero.tsx sets its
+   transform each frame); it shows only once a mouse has moved over the page */
+.lp-acard-sheen {
+  position: absolute;
+  inset: -20% 25%;
+  background: linear-gradient(100deg, transparent 10%, rgb(255 255 255 / 0.16) 45%, rgb(255 255 255 / 0.05) 60%, transparent 90%);
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.lp-stage[data-lit] .lp-acard-sheen {
+  opacity: 1;
+}
+/* edge light: a glow in the card's own hue, behind it, that rims its silhouette */
+.lp-acard-back {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: min(38vw, 600px);
+  aspect-ratio: 1.55;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(0.82 0.15 var(--h) / 0.6), oklch(0.72 0.13 var(--h) / 0.2) 58%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+/* the floor: a soft contact shadow and a faint coloured bounce under each card of the fan */
+.lp-acard-floor {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: min(30vw, 480px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.35) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.lp-acard-floor::after {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(0.8 0.14 var(--h) / 0.4), transparent);
+  transform: translateY(-30%);
+}
+
+/* --- capability chips: a soft glow wakes under the chip as it lifts --- */
+.lp-hero .lp-cap-name {
+  position: relative;
+  isolation: isolate;
+}
+.lp-hero .lp-cap-name::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.5),
+    0 8px 28px -6px rgb(154 225 135 / 0.55),
+    0 0 22px 2px rgb(147 241 247 / 0.22);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lp-hero .lp-caps li:hover .lp-cap-name::before {
+    opacity: 1;
+  }
+  .lp-hero .lp-caps li:hover .lp-cap-name {
+    translate: 0 -3px;
+  }
+}
+.lp-hero .lp-caps li:focus-visible .lp-cap-name::before {
+  opacity: 1;
+}
+.lp-hero .lp-caps li:active .lp-cap-name {
+  scale: 0.97;
+  transition: scale 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero .lp-flex-word,
+  .lp-acard-light::before {
+    animation: none;
+  }
+  .lp-acard-light,
+  .lp-acard-back,
+  .lp-acard-floor {
+    display: none;
+  }
+  .lp-hero .lp-caps li:hover .lp-cap-name,
+  .lp-hero .lp-caps li:active .lp-cap-name {
+    translate: none;
+    scale: none;
   }
 }
