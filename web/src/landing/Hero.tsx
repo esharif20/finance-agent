@@ -43,12 +43,12 @@ const BEATS = [
 ];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-/** Phones: the card sequence, pre-rendered from the film (web/scripts/hero-frames.sh). */
-const FRAMES = 36;
-/** Key frames the playhead rests on going forward: the row with every balance, then the totals. */
-const HOLDS = [
-  { at: 0.3, ms: 420 },
-  { at: 0.78, ms: 900 },
+/** The agent's steps, lit as the cards reach them: what really runs when the app syncs. */
+const TRACE = [
+  { step: "sync", what: "Three accounts read", phase: 0 },
+  { step: "categorise", what: "Two sure, one to review", phase: 0 },
+  { step: "pair", what: "Transfers matched", phase: 1 },
+  { step: "total", what: "Summed by the Ledger", phase: 2 },
 ];
 const ease = (v: number) => v * v * (3 - 2 * v);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -72,7 +72,8 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
     y: k("y"),
     z: k("z"),
     rx: k("rx") + tilt.y * 8,
-    ry: k("ry") + tilt.x * 12,
+    // gathering, each card turns right over once, back and all, one after the other
+    ry: k("ry") + tilt.x * 12 + (narrow ? 0 : 360 * span(p, 0.54 + i * 0.05, 0.72 + i * 0.05)),
     rz: k("rz"),
     s: mix(mix(narrow ? 1.1 : 1.32, 1, a), narrow ? 0.82 : 0.78, b),
     layer: i,
@@ -291,29 +292,23 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const backs = useRef<(HTMLSpanElement | null)[]>([]);
   const sheens = useRef<(HTMLSpanElement | null)[]>([]);
   const peek = useRef<HTMLDivElement>(null);
+  const chips = useRef<(HTMLLIElement | null)[]>([]);
   const ghost = useRef<HTMLParagraphElement>(null);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
   const [landed, setLanded] = useState(0);
   const [lite] = useState(liteDevice);
-  // phones: the pre-rendered film. "wait" until it can play, "ok" once primed, "off" when it errors
-  // or is not ready in 1.5 s: then the poster stays, the hero unpins and scrolls as a page
-  const [film, setFilm] = useState<"wait" | "ok" | "off">("wait");
   // one scroll driver: GSAP ScrollTrigger (stepped by Lenis's tick on desktop) writes the raw
   // progress through the hero to `goal`; the frame loop below moves a playhead `p` after it (see
   // PLAYHEAD), so every stage plays in full however fast the scroll
   const goal = useRef(0);
-  const filmOk = useRef(false);
   const kicker = useRef<(() => void) | null>(null);
-  const seqCanvas = useRef<HTMLCanvasElement>(null);
-  const drawAt = useRef<((v: number) => void) | null>(null);
   const p = useMotionValue(0);
   useGSAP(
     () => {
       if (still) return;
       gsap.registerPlugin(ScrollTrigger); // here, not at import: it reads matchMedia on register
-      let seek = 0;
       const st = ScrollTrigger.create({
         trigger: track.current,
         start: "top top",
@@ -321,21 +316,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         onUpdate: (self) => {
           goal.current = self.progress;
           kicker.current?.();
-          // phones: the pre-rendered card frames, one draw per animation frame
-          if (lite && !seek)
-            seek = requestAnimationFrame(() => {
-              seek = 0;
-              drawAt.current?.(goal.current);
-              p.set(goal.current);
-            });
         },
       });
       return () => {
-        cancelAnimationFrame(seek);
         st.kill();
       };
     },
-    { dependencies: [still, lite] },
+    { dependencies: [still] },
   );
   const [phase, setPhase] = useState(0);
   useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.68 ? 1 : 2));
@@ -366,7 +353,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       const narrow = r.width < 720;
       // the row of three must fit the frame; the CSS stand-ins take the same width through --cw.
       // Capped by height too, so a short window never squeezes the hand
-      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.2, r.height * 0.36 * ASPECT, 400);
+      const w = Math.min(narrow ? r.width * 0.4 : r.width * 0.2, r.height * 0.36 * ASPECT, 400);
       el.style.setProperty("--cw", `${w.toFixed(1)}px`);
       return { r, narrow, w, h: w / ASPECT };
     };
@@ -375,11 +362,22 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     // the pointer tilt and the deal have all settled
     let drawn = false;
     let last = 0;
-    let held: { at: number; since: number } | null = null;
     const faces = () => ACCOUNTS.accounts.map((_, i) => ({ art: null, hue: HUES[i] ?? null, h: dims.h }));
+    // each chip's offset to the combined total (bottom centre of the frame), measured on resize only
+    let chipAt: { x: number; y: number }[] = [];
+    const measureChips = () => {
+      const r = el.getBoundingClientRect();
+      chipAt = chips.current.map((c) => {
+        if (!c) return { x: 0, y: 0 };
+        const b = c.getBoundingClientRect();
+        return { x: r.left + r.width / 2 - (b.left + b.width / 2), y: r.bottom - 160 - (b.top + b.height / 2) };
+      });
+    };
     const sizeScene = () => {
       const was = dims.w;
+      for (const c of chips.current) if (c) c.style.transform = "";
       dims = size();
+      measureChips();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
       // the faces carry the card height: rebuilt with the width, so every card stays 85.6 x 53.98
       if (scene && was !== dims.w) scene.setFaces(faces(), "#000000");
@@ -388,24 +386,16 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         sequence in 0.7 s, and going forward it rests at each key frame (the labelled row, the
         totals) for a minimum dwell, so a fast flick still shows every stage. Going back it just
         follows. Transform and opacity only downstream; no layout reads here. */
+    /** PLAYHEAD: p chases the scroll with one constant smoothing (about Lenis's own lerp), so every
+        stretch of scroll moves the cards at the same pace. No holds, no speed cap. */
     const advance = (now: number) => {
       const dt = last ? Math.min(64, now - last) : 16;
       last = now;
       const target = goal.current;
-      let v = p.get();
-      if (held) {
-        if (target < held.at || now - held.since >= (HOLDS.find((h) => h.at === held?.at)?.ms ?? 0)) held = null;
-        else return v;
-      }
-      const step = Math.max(-dt / 700, Math.min(dt / 700, (target - v) * (1 - Math.exp(-dt / 90))));
-      const next = Math.abs(target - v) < 0.0004 ? target : v + step;
-      const hold = step > 0 ? HOLDS.find((h) => v < h.at && next >= h.at && target > h.at) : undefined;
-      if (hold) {
-        held = { at: hold.at, since: now };
-        v = hold.at;
-      } else v = next;
-      p.set(v);
-      return v;
+      const v = p.get();
+      const next = Math.abs(target - v) < 0.0004 ? target : v + (target - v) * (1 - Math.exp(-dt / 110));
+      p.set(next);
+      return next;
     };
     // the pointer over the stage (stage px, from its centre) and which card it is over; `lift`
     // eases each card toward the cursor when hovered, so the hand answers the mouse, not the page
@@ -473,6 +463,14 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // the peek: the hovered card's balance and categories, beside the cursor
       const pk = peek.current;
       if (pk) pk.style.transform = `translate3d(${Math.min(cur.x + 28, r.width / 2 - 300).toFixed(1)}px, ${(cur.y + 24).toFixed(1)}px, 0)`;
+      // the ledger chips fly into the total as the hand gathers, one after another
+      chips.current.forEach((c, i) => {
+        const at = chipAt[i];
+        if (!c || !at) return;
+        const f = narrow ? 0 : span(pv, 0.5 + i * 0.04, 0.7 + i * 0.04);
+        c.style.transform = f ? `translate3d(${(at.x * f).toFixed(1)}px, ${(at.y * f).toFixed(1)}px, 0) scale(${(1 - 0.7 * f).toFixed(3)})` : "";
+        c.style.opacity = f ? String(1 - f * f) : "";
+      });
       // the ghost total behind the hand drifts against the pointer: a slower, farther plane
       const gh = ghost.current;
       if (gh) gh.style.transform = `translate3d(${(-tilt.x * 40).toFixed(1)}px, ${(-tilt.y * 24).toFixed(1)}px, 0)`;
@@ -509,7 +507,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           l.style.opacity = String(q.label);
         }
       });
-      const moving = held !== null || Math.abs(goal.current - pv) > 0.0004;
+      const moving = Math.abs(goal.current - pv) > 0.0004;
       // idle sway alone renders at half rate
       const idleOnly = sway > 0 && !settling && !lifting && !sweeping && !moving;
       if (scene && (!drawn || tick++ % (idleOnly ? 2 : 1) === 0)) {
@@ -596,80 +594,6 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   }, [still, p, playing]);
 
   // the ambient chips and the loop pause while the hero is off screen
-  // the film, as an image sequence on a 2D canvas (iOS blanks a <video> while it seeks). Every
-  // frame is fetched and decoded up front; a frame is drawn only once decoded, and the canvas is
-  // cleared only in the same tick as the next draw, so it is never empty. The poster sits under it
-  // throughout. Not decoded within 1.5 s, or any frame fails: the hero unpins and shows the poster.
-  useEffect(() => {
-    const cv = seqCanvas.current;
-    const ctx = cv?.getContext("2d");
-    if (!lite || still || !cv) return;
-    if (!ctx) {
-      setFilm("off"); // no 2D canvas: the poster, unpinned
-      return;
-    }
-    let alive = true;
-    const imgs = Array.from({ length: FRAMES }, (_, i) => {
-      const im = new Image();
-      im.decoding = "async";
-      im.src = `/hero/frames/${String(i + 1).padStart(2, "0")}.webp`;
-      return im;
-    });
-    const fit = () => {
-      const r = cv.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      cv.width = Math.round(r.width * dpr);
-      cv.height = Math.round(r.height * dpr);
-    };
-    let shown = -1;
-    const draw = (v: number) => {
-      const i = Math.round(clamp01(v) * (FRAMES - 1));
-      const im = imgs[i];
-      if (!filmOk.current || i === shown || !im?.complete || !im.naturalWidth) return;
-      shown = i;
-      // contain: the whole frame, centred, at its own aspect
-      const k = Math.min(cv.width / im.naturalWidth, cv.height / im.naturalHeight);
-      const w = im.naturalWidth * k;
-      const h = im.naturalHeight * k;
-      ctx.clearRect(0, 0, cv.width, cv.height);
-      ctx.drawImage(im, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
-    };
-    fit();
-    const timer = window.setTimeout(() => alive && !filmOk.current && setFilm("off"), 1500);
-    Promise.all(imgs.map((im) => im.decode()))
-      .then(() => {
-        if (!alive) return;
-        window.clearTimeout(timer);
-        if (filmDone.current) return; // already fell back to the poster: stay a page
-        filmOk.current = true;
-        setFilm("ok");
-        drawAt.current = draw;
-        draw(goal.current);
-      })
-      .catch(() => alive && setFilm("off"));
-    const ro =
-      typeof ResizeObserver === "function"
-        ? new ResizeObserver(() => {
-            fit();
-            shown = -1;
-            draw(goal.current);
-          })
-        : null;
-    ro?.observe(cv);
-    return () => {
-      alive = false;
-      drawAt.current = null;
-      window.clearTimeout(timer);
-      ro?.disconnect();
-    };
-  }, [lite, still]);
-  const filmDone = useRef(false);
-  if (film === "off") filmDone.current = true;
-  // the hero's height changes when it unpins: everything below must re-measure
-  useEffect(() => {
-    if (film !== "wait") ScrollTrigger.refresh();
-  }, [film]);
-
   const [near, setNear] = useState(true);
   useEffect(() => {
     const el = track.current;
@@ -729,51 +653,71 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     );
 
   return (
-    <section ref={track} className="lp-hero" data-lite={lite ? "" : undefined} data-film={lite ? film : undefined} data-off={near ? undefined : ""} aria-labelledby="lp-title">
+    <section ref={track} className="lp-hero" data-lite={lite ? "" : undefined} data-off={near ? undefined : ""} aria-labelledby="lp-title">
       {/* one sticky frame holds every plane, so nothing slides against anything while it is pinned */}
       <div className="lp-hero-pin" data-phase={phase}>
         <div className="lp-hero-ground" aria-hidden="true">
           <LedgerField />
         </div>
+        <div className="lp-hero-board" aria-hidden="true">
+          <span>Ledger · October</span>
+          <span>3 accounts · 1 file on your Mac</span>
+        </div>
+        <ol className="lp-trace" aria-label="What the agent did">
+          <li className="lp-trace-head">
+            <span>Agent trace</span>
+            <span>local</span>
+          </li>
+          {TRACE.map((t, i) => (
+            <li key={t.step} data-on={phase >= t.phase ? "" : undefined} style={{ "--k": i } as React.CSSProperties}>
+              <span className="lp-trace-tick" />
+              <code>{t.step}</code>
+              <span>{t.what}</span>
+            </li>
+          ))}
+        </ol>
         <p ref={ghost} className="lp-hero-ghost" aria-hidden="true">
           {TOTAL}
         </p>
         <ul className="lp-chips" aria-hidden="true">
           {CHIPS.map((c, i) => (
-            <li key={c.merchant} style={{ "--k": i } as React.CSSProperties}>
-              <span className="lp-chip-tick" data-ok={c.category[0] !== "To review" ? "" : undefined} />
-              <span>{c.merchant}</span>
-              <Money value={c.amount} />
-              <em>{c.category[0] === "To review" ? "To review" : c.category[1]}</em>
+            <li key={c.merchant} ref={(n) => void (chips.current[i] = n)} style={{ "--k": i } as React.CSSProperties}>
+              <span className="lp-chip">
+                <span className="lp-chip-tick" data-ok={c.category[0] !== "To review" ? "" : undefined} />
+                <span>{c.merchant}</span>
+                <Money value={c.amount} />
+                <em>{c.category[0] === "To review" ? "To review" : c.category[1]}</em>
+              </span>
             </li>
           ))}
-          <li style={{ "--k": 3 } as React.CSSProperties}>
-            <span className="lp-chip-tick" data-ok="" />
-            <span>Transfer paired</span>
-            <em>not spending</em>
+          <li ref={(n) => void (chips.current[3] = n)} style={{ "--k": 3 } as React.CSSProperties}>
+            <span className="lp-chip">
+              <span className="lp-chip-tick" data-ok="" />
+              <span>Transfer paired</span>
+              <em>not spending</em>
+            </span>
           </li>
         </ul>
-        {lite ? (
-          <div className="lp-stage lp-stage-film" data-phase={phase} aria-hidden="true">
-            <img className="lp-film-poster" src="/hero/cards.webp" alt="" />
-            <canvas ref={seqCanvas} className="lp-film-frames" />
-            <span className="lp-film-sheen" />
-          </div>
-        ) : (
+        {(
           <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
-            {ACCOUNTS.accounts.map((a, i) => (
-              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
-            ))}
-            {ACCOUNTS.accounts.map((a, i) => (
-              <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
-            ))}
-            <canvas ref={canvas} className="lp-stage-canvas" />
+            {!lite &&
+              ACCOUNTS.accounts.map((a, i) => (
+                <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
+              ))}
+            {!lite &&
+              ACCOUNTS.accounts.map((a, i) => (
+                <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
+              ))}
+            {/* phones: no canvas at all; the cards are the DOM faces below, moved by transform */}
+            {!lite && <canvas ref={canvas} className="lp-stage-canvas" />}
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
                 <CardFace i={i} name={a.name} />
-                <span className="lp-acard-light">
-                  <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
-                </span>
+                {!lite && (
+                  <span className="lp-acard-light">
+                    <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
+                  </span>
+                )}
               </div>
             ))}
             {ACCOUNTS.accounts.map((a, i) => (
@@ -793,6 +737,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
               </div>
             ))}
             {/* hover a card: its balance, money in and out, and where the money went */}
+            {!lite && (
             <div ref={peek} className="lp-peek">
               {ACCOUNTS.accounts.map((a, i) => (
                 <div key={a.name} className="lp-peek-card" data-i={i} style={{ "--h": HUES[i] } as React.CSSProperties}>
@@ -824,6 +769,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                 </div>
               ))}
             </div>
+            )}
             <Combined landed={landed} />
           </div>
         )}

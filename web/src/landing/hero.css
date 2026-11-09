@@ -232,7 +232,7 @@
    statements scrolled past it, which read as the cards drifting). Planes, back to front: ground,
    ghost total, chips, cards, peek, copy. */
 .lp .lp-hero {
-  height: 340svh;
+  height: 280svh;
   background: var(--lp-black);
   color: var(--lp-white);
 }
@@ -390,11 +390,11 @@
   pointer-events: none;
   transition: opacity 0.6s var(--lp-ease-out);
 }
-.lp-hero-pin:not([data-phase="0"]) .lp-chips {
-  opacity: 0;
-}
+/* desktop: the chips stay up through the row and fly into the total (Hero.tsx moves each li) */
 .lp-chips li {
   position: absolute;
+}
+.lp-chip {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -446,8 +446,7 @@
     transform: translate3d(8px, 12px, 0) rotate(1.5deg);
   }
 }
-.lp-hero[data-off] .lp-chips li,
-.lp-hero[data-off] .lp-film-sheen {
+.lp-hero[data-off] .lp-chip {
   animation-play-state: paused;
 }
 
@@ -601,8 +600,8 @@
 }
 
 /* ===== phones and tablets: a composition of their own =====
-   Headline at the top, the pre-rendered film of the cards in the middle, the statements under it.
-   No WebGL, no canvas, no will-change; the chips and the film's sheen are CSS transform only. */
+   Headline at the top, the cards as live DOM in the lower part, the statements over them.
+   No WebGL, no canvas, no will-change; transform and opacity only. */
 @media (max-width: 899.98px), (pointer: coarse) {
   /* a short runway: every stretch of the pin changes something */
   .lp .lp-hero {
@@ -632,71 +631,24 @@
     font-size: 0.9375rem;
     max-width: 34ch;
   }
-  /* the film fills the lower part of the frame, centred, at its own aspect */
-  .lp .lp-hero-pin > .lp-stage-film {
-    inset: auto 0 0;
-    top: 46%;
-    transition: top 0.6s var(--lp-ease-out);
-    display: grid;
-    place-items: center;
+  /* the cards: live DOM faces moved by transform (no WebGL, no raster), in the lower part of the
+     frame; a soft glow on the panel gives depth, nothing is baked */
+  .lp .lp-hero-pin > .lp-stage {
+    transform: translateY(24%);
+    transition: transform 0.6s var(--lp-ease-out);
+    background: radial-gradient(60% 40% at 50% 52%, rgb(154 225 135 / 0.1), transparent 70%);
   }
-  /* the copy steps aside after the deal; the film takes the room */
-  .lp-hero-pin:not([data-phase="0"]) > .lp-stage-film {
-    top: 30%;
+  .lp-hero-pin:not([data-phase="0"]) > .lp-stage {
+    transform: translateY(14%);
   }
-  /* the poster is always painted under the frames; nothing on the scroll path hides either */
-  .lp-film-frames,
-  .lp-film-poster {
-    grid-area: 1 / 1;
+  .lp .lp-hero .lp-acard-slot {
+    will-change: auto;
   }
-  /* no film: the hero stops pinning and reads as a page, the poster in place of the cards */
-  .lp .lp-hero[data-film="off"] {
-    height: auto;
+  .lp .lp-hero .lp-acct {
+    max-width: calc(50vw - 24px);
   }
-  .lp .lp-hero[data-film="off"] .lp-hero-pin {
-    position: relative;
-    height: auto;
-    display: grid;
-    gap: 24px;
-    padding: 96px var(--lp-gutter) 48px;
-  }
-  .lp .lp-hero[data-film="off"] :is(.lp-hero-meta, .lp-hero-copy, .lp-hero-says, .lp-hero-beat, .lp-hero-pin > .lp-stage-film) {
-    position: relative;
-    inset: auto;
-    top: auto;
-    opacity: 1;
-    transform: none;
-  }
-  .lp .lp-hero[data-film="off"] .lp-hero-pin > .lp-stage-film {
-    order: 2;
-    height: min(70svh, 560px);
-  }
-  .lp .lp-hero[data-film="off"] .lp-hero-meta {
-    order: 0;
-  }
-  .lp .lp-hero[data-film="off"] .lp-hero-copy {
-    order: 1;
-  }
-  .lp .lp-hero[data-film="off"] .lp-hero-says {
-    order: 3;
-  }
-  .lp .lp-hero[data-film="off"] .lp-hero-says {
-    display: grid;
-    gap: 32px;
-  }
-  .lp .lp-hero[data-film="off"] .lp-chips {
-    display: none;
-  }
-  .lp-film-frames,
-  .lp-film-poster {
-    /* feathered edges: the film's own ground melts into the page's black, no box seam */
-    -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent);
-    mask-image: radial-gradient(closest-side, #000 72%, transparent);
-    width: auto;
-    height: 100%;
-    max-width: 100%;
-    aspect-ratio: 632 / 960;
-    object-fit: contain;
+  .lp .lp-hero .lp-acct-bal {
+    font-size: 1.125rem;
   }
   .lp-hero-says {
     top: 100px;
@@ -714,43 +666,176 @@
   .lp-hero-say-body {
     font-size: 0.9375rem;
   }
-  .lp-chips li {
+  .lp-hero-pin:not([data-phase="0"]) .lp-chips {
+    opacity: 0;
+  }
+  .lp-chip {
     font-size: 0.6875rem;
     padding: 6px 10px 6px 6px;
   }
-  .lp-chips li:nth-child(1) { left: 3%; top: 50%; }
-  .lp-chips li:nth-child(2) { right: 3%; top: 84%; left: auto; }
+  .lp-chips li:nth-child(2) { right: 3%; top: 92%; left: auto; }
+  .lp-chips li:nth-child(1),
   .lp-chips li:nth-child(3),
   .lp-chips li:nth-child(4) { display: none; }
   .lp .lp-hero[data-still] .lp-hero-pin {
     padding-top: 104px;
   }
 }
-/* the film's sheen: one soft band crossing the cards now and then */
-.lp-stage-film {
-  overflow: clip;
-}
-.lp-film-sheen {
-  position: absolute;
-  inset: 20% auto 20% 0;
-  width: 30%;
-  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.1), transparent);
-  transform: translate3d(-120%, 0, 0) skewX(-14deg);
-  animation: lp-film-sheen 6s ease-in-out 2s infinite;
-  pointer-events: none;
-}
-@keyframes lp-film-sheen {
-  0%,
-  60% {
-    transform: translate3d(-120%, 0, 0) skewX(-14deg);
+@media (prefers-reduced-motion: reduce) {
+  .lp-chip {
+    animation: none;
   }
-  100% {
-    transform: translate3d(420%, 0, 0) skewX(-14deg);
+}
+
+/* ===== round 3: layered surfaces on the black, the agent trace, the board =====
+   After /architecture's tiles: tinted panels with spec-sheet meta in their corners. */
+.lp-hero-board {
+  position: absolute;
+  z-index: 0;
+  top: 76px;
+  right: var(--lp-gutter);
+  bottom: 24px;
+  left: 34%;
+  border-radius: 28px;
+  background-color: #121611;
+  background-image: radial-gradient(circle at 1px 1px, rgb(201 227 190 / 0.16) 1px, transparent 1.5px);
+  background-size: 14px 14px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  transition: opacity 0.7s var(--lp-ease-out);
+}
+.lp-hero-board span {
+  position: absolute;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.38);
+}
+.lp-hero-board span:first-child {
+  left: 20px;
+  bottom: 16px;
+}
+.lp-hero-board span:last-child {
+  right: 20px;
+  bottom: 16px;
+}
+.lp-hero-pin:not([data-phase="0"]) .lp-hero-board {
+  opacity: 0.55;
+}
+/* the meta row sits above the board now; the board takes its place top right */
+.lp .lp-hero-meta {
+  z-index: 4;
+}
+
+/* the agent trace: a mint-ruled tile, top left beside the headline; it drops to the bottom left
+   once the copy steps aside, and lights each step as the cards reach it */
+.lp-trace {
+  position: absolute;
+  z-index: 5;
+  top: 128px;
+  left: var(--lp-gutter);
+  width: min(23rem, 30vw);
+  display: grid;
+  gap: 2px;
+  padding: 14px;
+  border-radius: 20px;
+  background: #1a2119;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.07),
+    0 30px 60px -30px rgb(0 0 0 / 0.8);
+  list-style: none;
+  transition: transform 0.9s var(--lp-ease-out);
+}
+.lp-hero-pin:not([data-phase="0"]) .lp-trace {
+  transform: translateY(calc(100svh - 128px - 100% - 40px));
+}
+.lp-trace li {
+  display: grid;
+  grid-template-columns: 18px 6.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: rgb(255 255 255 / 0.42);
+  transition:
+    color 0.4s var(--lp-ease-out),
+    background-color 0.4s var(--lp-ease-out);
+}
+.lp-trace li[data-on] {
+  color: rgb(255 255 255 / 0.9);
+}
+.lp-trace li[data-on]:last-of-type,
+.lp-hero-pin[data-phase="0"] .lp-trace li[data-on]:nth-child(3),
+.lp-hero-pin[data-phase="1"] .lp-trace li:nth-child(4) {
+  background: rgb(154 225 135 / 0.1);
+}
+.lp-trace code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lp-mint);
+}
+.lp-trace li:not([data-on]) code {
+  color: rgb(255 255 255 / 0.35);
+}
+.lp-trace .lp-trace-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 10px 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.45);
+}
+.lp-trace-tick {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.3);
+  transform: scale(0.85);
+  transition:
+    transform 0.4s var(--lp-ease-out),
+    background-color 0.4s var(--lp-ease-out);
+}
+li[data-on] > .lp-trace-tick {
+  background: var(--lp-mint);
+  box-shadow: none;
+  transform: none;
+}
+/* the trace's ticks land one after another on load */
+.lp-hero-pin[data-phase="0"] .lp-trace li[data-on] > .lp-trace-tick {
+  animation: lp-tick 0.5s var(--lp-ease-out) backwards;
+  animation-delay: calc(1.4s + var(--k) * 0.35s);
+}
+@keyframes lp-tick {
+  from {
+    transform: scale(0.4);
+    background-color: transparent;
+  }
+}
+@media (max-width: 1199.98px) {
+  .lp-trace {
+    width: min(20rem, 34vw);
+  }
+  .lp-trace li {
+    grid-template-columns: 18px 5.5rem minmax(0, 1fr);
+    font-size: 0.8125rem;
+  }
+}
+@media (max-width: 899.98px), (pointer: coarse) {
+  .lp-hero-board,
+  .lp-trace {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp-chips li,
-  .lp-film-sheen {
-    animation: none;
+  .lp-trace-tick {
+    animation: none !important;
   }
+}
+.lp .lp-hero[data-still] .lp-trace,
+.lp .lp-hero[data-still] .lp-hero-board {
+  display: none;
 }

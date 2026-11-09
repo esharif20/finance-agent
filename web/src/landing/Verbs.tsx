@@ -27,7 +27,7 @@ export function Verbs() {
       gsap.registerPlugin(ScrollTrigger); // here, not at import: it reads matchMedia on register
       for (const row of gsap.utils.toArray<HTMLElement>(".lp-verb", ref.current)) {
         gsap
-          .timeline({ scrollTrigger: { trigger: row, start: "top 85%", end: "bottom 15%", scrub: 0.4 } })
+          .timeline({ scrollTrigger: { trigger: row, start: "top 85%", end: "bottom 15%", scrub: 0.6 } })
           .fromTo(row, { opacity: 0.18, x: -24 }, { opacity: 1, x: 0, ease: "power2.out", duration: 0.4 })
           .to(row, { opacity: 1, duration: 0.2 })
           .to(row, { opacity: 0.18, ease: "power2.in", duration: 0.4 });

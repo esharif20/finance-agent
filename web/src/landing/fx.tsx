@@ -31,7 +31,7 @@ export function useSmoothWheel(off: boolean) {
     let dead = false;
     void Promise.all([import("gsap"), import("gsap/ScrollTrigger"), import("lenis")]).then(([{ default: gsap }, { ScrollTrigger }, { default: Lenis }]) => {
       if (dead) return;
-      const lenis = new Lenis({ lerp: 0.12, anchors: true, autoRaf: false });
+      const lenis = new Lenis({ lerp: 0.1, wheelMultiplier: 1, anchors: true, autoRaf: false });
       const tick = (t: number) => lenis.raf(t * 1000);
       lenis.on("scroll", ScrollTrigger.update);
       gsap.ticker.add(tick);

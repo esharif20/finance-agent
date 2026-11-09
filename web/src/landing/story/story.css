@@ -27,7 +27,7 @@
 }
 /* the pin: one screen of stage held for about two more screens of scroll, three stages on it */
 .st-pile-track {
-  height: 290svh;
+  height: 240svh;
 }
 .st-pile-stage {
   position: sticky;

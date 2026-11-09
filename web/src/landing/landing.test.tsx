@@ -72,64 +72,22 @@ describe("hero headline", () => {
   });
 });
 
-describe("hero film on phones", () => {
+describe("hero on phones", () => {
   // a phone: coarse pointer, no reduced motion
   const phone = (q: string) => ({ ...mediaStub(false)(q), matches: q.includes("pointer: coarse") });
-  const ctx2d = { clearRect: vi.fn(), drawImage: vi.fn() };
-  const withCanvas = () =>
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((t: string) => (t === "2d" ? ctx2d : null)) as never);
-  // jsdom has no img.decode(): give each test its own
-  const decodes = (impl: () => Promise<void>) =>
-    Object.defineProperty(HTMLImageElement.prototype, "decode", { configurable: true, writable: true, value: impl });
-  afterEach(() => {
-    vi.restoreAllMocks();
-    delete (HTMLImageElement.prototype as { decode?: unknown }).decode;
-  });
 
-  it("paints the poster under the frames from the first render, and no <video>", () => {
+  it("draws the cards as live DOM: no canvas, no video, no raster frames", () => {
     vi.stubGlobal("matchMedia", phone);
     vi.stubGlobal("IntersectionObserver", NoObserver);
-    withCanvas();
-    decodes(() => new Promise(() => {}));
     const { container } = render(<Hero />);
-    expect(container.querySelector(".lp-hero")?.getAttribute("data-film")).toBe("wait");
-    expect(container.querySelector(".lp-film-poster")?.getAttribute("src")).toBe("/hero/cards.webp");
-    expect(container.querySelector("canvas.lp-film-frames")).toBeTruthy();
+    expect(container.querySelector("canvas")).toBeNull();
     expect(container.querySelector("video")).toBeNull();
-  });
-
-  it("keeps the poster and releases the pin when a frame fails to load", async () => {
-    vi.stubGlobal("matchMedia", phone);
-    vi.stubGlobal("IntersectionObserver", NoObserver);
-    withCanvas();
-    decodes(() => Promise.reject(new Error("404")));
-    const { container } = render(<Hero />);
-    const { waitFor } = await import("@testing-library/react");
-    await waitFor(() => expect(container.querySelector(".lp-hero")?.getAttribute("data-film")).toBe("off"));
-    expect(container.querySelector(".lp-film-poster")).toBeTruthy();
-  });
-
-  it("falls back to the poster when the frames are not decoded in 1.5 s", async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", phone);
-    vi.stubGlobal("IntersectionObserver", NoObserver);
-    withCanvas();
-    decodes(() => new Promise(() => {}));
-    const { act } = await import("@testing-library/react");
-    const { container } = render(<Hero />);
-    act(() => void vi.advanceTimersByTime(1600));
-    vi.useRealTimers();
-    expect(container.querySelector(".lp-hero")?.getAttribute("data-film")).toBe("off");
-  });
-
-  it("scrubs once every frame has decoded", async () => {
-    vi.stubGlobal("matchMedia", phone);
-    vi.stubGlobal("IntersectionObserver", NoObserver);
-    withCanvas();
-    decodes(() => Promise.resolve());
-    const { container } = render(<Hero />);
-    const { waitFor } = await import("@testing-library/react");
-    await waitFor(() => expect(container.querySelector(".lp-hero")?.getAttribute("data-film")).toBe("ok"));
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelectorAll(".lp-acard-slot .lp-acard")).toHaveLength(ACCOUNTS.accounts.length);
+    // every balance is live text
+    for (const a of ACCOUNTS.accounts) expect(screen.getAllByText(a.name).length).toBeGreaterThan(0);
+    // no light layers or hover peek on touch: a few transformed divs only
+    expect(container.querySelector(".lp-acard-light, .lp-acard-back, .lp-acard-floor, .lp-peek")).toBeNull();
   });
 });
 
