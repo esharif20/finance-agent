@@ -1421,3 +1421,16 @@ html[data-scrolling] .ambient i {
     transform: none;
   }
 }
+
+/* Phones: the Overview never scrolls sideways. Grid columns may shrink below their content (the
+   rail and the strip scroll or truncate inside them), the rail never reaches past its 16px
+   bleed, and the page clips whatever still pokes past the edge. */
+[class*="grid-cols-[7fr_5fr]"] > * {
+  min-width: 0;
+}
+.account-rail {
+  max-width: calc(100% + 32px);
+}
+body:has(.account-rail) {
+  overflow-x: clip;
+}
