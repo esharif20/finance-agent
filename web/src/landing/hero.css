@@ -225,69 +225,110 @@
   }
 }
 
-/* ===== the hero, as /architecture's night band: three beats scroll past a pinned panel =====
-   The ground is black in both themes with the same 22px dot texture /architecture uses; the cards
-   sit in one tinted panel (its night-1 tone) under a meta row. The panel holds; the statements on
-   the left scroll by and the one in step with the cards is in full ink. Nothing but the cards moves. */
+/* ===== the hero: one pinned night frame, every plane inside it =====
+   The section is the scroll track; .lp-hero-pin is the one sticky frame. The dot ground, the ghost
+   total, the chips, the cards, the copy and the statements all live inside it, so while it is pinned
+   nothing can slide against anything (the old layout pinned a panel while the dotted ground and the
+   statements scrolled past it, which read as the cards drifting). Planes, back to front: ground,
+   ghost total, chips, cards, peek, copy. */
 .lp .lp-hero {
-  height: auto;
-  background-color: var(--lp-black);
-  background-image: radial-gradient(circle at 1px 1px, rgb(201 207 198 / 0.13) 1px, transparent 1.5px);
-  background-size: 22px 22px;
+  height: 340svh;
+  background: var(--lp-black);
   color: var(--lp-white);
 }
-.lp .lp-hero-ground {
+.lp .lp-hero-pin {
   position: sticky;
   top: 0;
   height: 100svh;
-  margin-bottom: -100svh;
+  min-height: 600px;
+  overflow: clip;
+  background-color: var(--lp-black);
+  background-image: radial-gradient(circle at 1px 1px, rgb(201 207 198 / 0.13) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+}
+.lp .lp-hero-ground {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
 }
-.lp .lp-hero-grid {
-  position: relative;
+/* the stage fills the frame: the hand is the centrepiece, not a picture in a box */
+.lp .lp-hero-pin > .lp-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.lp .lp-hero .lp-acard-slot {
+  width: var(--cw, 240px);
+}
+
+/* the ghost total: the household's one figure, huge and outlined, a far plane behind the hand */
+.lp-hero-ghost {
+  position: absolute;
   z-index: 1;
+  right: -0.04em;
+  top: 50%;
+  margin-top: -0.62em;
+  font-family: var(--lp-display);
+  font-size: clamp(6rem, 17vw, 19rem);
+  font-weight: 800;
+  font-stretch: 88%;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(255 255 255 / 0.1);
+  pointer-events: none;
+  transition: opacity 0.8s var(--lp-ease-out);
+}
+.lp-hero-pin:not([data-phase="0"]) .lp-hero-ghost {
+  opacity: 0.35;
+}
+
+/* meta row under the bar, brand-board style */
+.lp .lp-hero-meta {
+  position: absolute;
+  z-index: 4;
+  top: 84px;
+  left: var(--lp-gutter);
+  right: var(--lp-gutter);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.5);
+}
+
+/* the copy, poster-size, bottom left; it steps aside as the hand lays out */
+.lp .lp-hero-copy {
+  position: absolute;
+  z-index: 5;
+  top: auto;
+  bottom: clamp(28px, 6svh, 72px);
+  left: var(--lp-gutter);
+  right: var(--lp-gutter);
+  max-width: none;
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  column-gap: clamp(32px, 4vw, 72px);
-  padding-inline: var(--lp-gutter);
-}
-.lp .lp-hero-beat {
-  grid-column: 1;
-  display: grid;
-  align-content: center;
-  gap: 20px;
-  min-height: 100svh;
-  padding-block: 96px 48px;
-  opacity: 0.3;
-  transition: opacity 0.6s var(--lp-ease-out);
-}
-.lp .lp-hero-beat[data-on] {
-  opacity: 1;
-}
-.lp .lp-hero-lead {
-  grid-row: 1;
-  align-content: end;
-  padding-bottom: clamp(48px, 10svh, 112px);
-}
-.lp .lp-hero-beat:nth-of-type(2) {
-  grid-row: 2;
-}
-.lp .lp-hero-beat:nth-of-type(3) {
-  grid-row: 3;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
+  align-items: end;
+  column-gap: clamp(24px, 4vw, 64px);
 }
 .lp .lp-hero .lp-display {
-  font-size: clamp(2.6rem, 0.4rem + 4.3vw, 4.9rem);
-  line-height: 0.94;
-  letter-spacing: -0.04em;
+  font-size: clamp(3rem, 0.6rem + 5.4vw, 7.6rem);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
 }
+/* each line its own block: an inline line that wrapped lost its last word to the reveal's mask */
 .lp .lp-hero .lp-flex-line {
-  display: inline;
-}
-.lp .lp-hero .lp-flex-line::after {
-  content: " ";
+  display: block;
 }
 .lp .lp-hero-foot {
-  margin-top: 8px;
+  display: grid;
+  gap: 20px;
+  margin: 0;
   transition:
     opacity 0.7s var(--lp-ease-out) 0.5s,
     transform 0.7s var(--lp-ease-out) 0.5s;
@@ -297,80 +338,260 @@
   transform: translateY(16px);
 }
 .lp .lp-hero .lp-lede {
-  max-width: 38ch;
   font-size: var(--lp-step-body);
   line-height: 1.5;
-  color: rgb(255 255 255 / 0.82);
+  color: rgb(255 255 255 / 0.8);
+}
+
+/* the two statements, top left, in step with the cards; their words rise as each one lands */
+.lp-hero-says {
+  position: absolute;
+  z-index: 5;
+  top: 128px;
+  left: var(--lp-gutter);
+  width: min(30rem, 36vw);
+  pointer-events: none;
+}
+.lp .lp-hero-beat {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: grid;
+  gap: 16px;
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.45s var(--lp-ease-out),
+    transform 0.6s var(--lp-ease-out);
+}
+.lp .lp-hero-beat[data-on] {
+  opacity: 1;
+  transform: none;
 }
 .lp-hero-say {
-  max-width: 15ch;
   font-family: var(--lp-display);
-  font-size: clamp(1.9rem, 0.9rem + 2.3vw, 3.25rem);
+  font-size: clamp(2rem, 0.9rem + 2.4vw, 3.6rem);
   font-weight: 800;
-  line-height: 1;
+  line-height: 0.98;
   letter-spacing: -0.035em;
 }
 .lp-hero-say-body {
-  max-width: 40ch;
+  max-width: 36ch;
   font-size: var(--lp-step-body);
   line-height: 1.5;
-  color: rgb(255 255 255 / 0.78);
+  color: rgb(255 255 255 / 0.74);
 }
 
-/* the panel: pinned for the whole hero, a meta row over a tinted stage */
-.lp .lp-hero-panel {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: start;
-  position: sticky;
-  top: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100svh;
-  min-height: 560px;
-  margin: 0;
-  padding: 92px 0 clamp(16px, 3svh, 32px);
+/* ambient ledger chips: made-up rows drifting round the hand, ticks settling as they're checked */
+.lp-chips {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  list-style: none;
+  pointer-events: none;
+  transition: opacity 0.6s var(--lp-ease-out);
 }
-.lp-hero-meta {
+.lp-hero-pin:not([data-phase="0"]) .lp-chips {
+  opacity: 0;
+}
+.lp-chips li {
+  position: absolute;
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 4px 12px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 999px;
+  background: rgb(28 31 28 / 0.86);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: rgb(255 255 255 / 0.86);
+  animation: lp-chip 9s ease-in-out infinite alternate;
+  animation-delay: calc(var(--k) * -2.3s);
+}
+.lp-chips em {
+  font-style: normal;
+  font-weight: 500;
+  color: rgb(255 255 255 / 0.5);
+}
+.lp-chips li:nth-child(1) { left: 40%; top: 22%; }
+.lp-chips li:nth-child(2) { right: 3%; top: 50%; }
+.lp-chips li:nth-child(3) { left: 42%; top: 58%; }
+.lp-chips li:nth-child(4) { right: 8%; top: 15%; }
+.lp-chip-tick {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.12);
+}
+.lp-chip-tick[data-ok] {
+  background: rgb(154 225 135 / 0.9);
+}
+.lp-chip-tick[data-ok]::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border: solid #0d1a0c;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg);
+}
+@keyframes lp-chip {
+  from {
+    transform: translate3d(0, -10px, 0) rotate(-1.5deg);
+  }
+  to {
+    transform: translate3d(8px, 12px, 0) rotate(1.5deg);
+  }
+}
+.lp-hero[data-off] .lp-chips li,
+.lp-hero[data-off] .lp-film-sheen {
+  animation-play-state: paused;
+}
+
+/* the peek: hover a card for its balance, money in and out, and where the money went */
+.lp-peek {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  width: 272px;
+  pointer-events: none;
+}
+.lp-peek-card {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  padding: 16px 18px 18px;
+  border-radius: 18px;
+  background: rgb(20 22 20 / 0.94);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.1),
+    inset 0 2px 0 -1px oklch(0.8 0.14 var(--h) / 0.7),
+    0 24px 48px -20px rgb(0 0 0 / 0.8);
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transform-origin: top left;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.25s var(--hero-ease);
+}
+.lp-stage[data-hover="0"] .lp-peek-card[data-i="0"],
+.lp-stage[data-hover="1"] .lp-peek-card[data-i="1"],
+.lp-stage[data-hover="2"] .lp-peek-card[data-i="2"] {
+  opacity: 1;
+  transform: none;
+}
+.lp-peek-name {
   font-size: 0.8125rem;
   font-weight: 600;
   color: rgb(255 255 255 / 0.62);
 }
-.lp .lp-hero-panel .lp-stage {
-  position: relative;
-  inset: auto;
-  border-radius: clamp(16px, 1.6vw, 24px);
-  background: #161915;
-  overflow: clip;
+.lp-peek-bal {
+  margin-top: 2px;
+  font-family: var(--lp-display);
+  font-size: 1.75rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
-.lp .lp-hero .lp-acard-slot {
-  width: var(--cw, 240px);
+.lp-peek-flow {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+  font-size: 0.8125rem;
+  color: rgb(255 255 255 / 0.66);
+  font-variant-numeric: tabular-nums;
 }
+.lp-peek-cats {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  list-style: none;
+}
+.lp-peek-cats li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.lp-peek-cats li span:last-of-type {
+  color: rgb(255 255 255 / 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.lp-peek-cats i {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: oklch(0.8 0.14 var(--h));
+  transform: scaleX(var(--s));
+  transform-origin: left;
+}
+.lp-peek-note {
+  margin-top: 12px;
+  font-size: 0.8125rem;
+  color: rgb(255 255 255 / 0.6);
+}
+/* the labelled row and the totals carry their own figures: the peek is for the fanned hand */
+.lp-stage:not([data-phase="0"]) .lp-peek {
+  display: none;
+}
+@media not ((hover: hover) and (pointer: fine)) {
+  .lp-peek {
+    display: none;
+  }
+}
+
 .lp .lp-hero .lp-combined {
-  bottom: clamp(16px, 3svh, 28px);
-  width: min(480px, calc(100% - 32px));
+  bottom: clamp(20px, 5svh, 56px);
+  width: min(500px, calc(100% - 32px));
   padding: 22px 26px;
-  background: #232722;
-  box-shadow: none;
+  background: #1d201c;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
 }
 .lp .lp-hero .lp-combined .lp-combined-total {
   font-size: clamp(2.4rem, 1.4rem + 2.6vw, 3.75rem);
 }
-.lp-stage-film video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+
+/* desktop at a narrower width: the lede goes under the headline */
+@media (max-width: 1199.98px) {
+  .lp .lp-hero-copy {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 20px;
+  }
+  .lp .lp-hero-foot {
+    max-width: 30rem;
+  }
 }
 
-/* reduced motion: the finished composition in the panel, every statement in full ink */
-.lp .lp-hero[data-still] .lp-hero-panel {
+/* reduced motion: the finished composition, unpinned, every statement in full ink */
+.lp .lp-hero[data-still] {
+  height: auto;
+}
+.lp .lp-hero[data-still] .lp-hero-pin {
   position: relative;
   height: auto;
+  display: grid;
+  gap: 48px;
+  padding: 120px var(--lp-gutter) 96px;
+}
+.lp .lp-hero[data-still] .lp-hero-meta,
+.lp .lp-hero[data-still] .lp-hero-copy,
+.lp .lp-hero[data-still] .lp-hero-says,
+.lp .lp-hero[data-still] .lp-hero-beat {
+  position: relative;
+  inset: auto;
+  width: auto;
+  opacity: 1;
+  transform: none;
+}
+.lp .lp-hero[data-still] .lp-hero-says {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 40px;
 }
 .lp .lp-hero[data-still] .lp-hero-still {
   grid-template-columns: minmax(0, 1fr);
@@ -379,57 +600,112 @@
   background: #161915;
 }
 
-/* phones and tablets: the panel pins under the bar and the statements pass beneath it */
-@media (max-width: 899.98px) {
-  .lp .lp-hero-grid {
+/* ===== phones and tablets: a composition of their own =====
+   Headline at the top, the pre-rendered film of the cards in the middle, the statements under it.
+   No WebGL, no canvas, no will-change; the chips and the film's sheen are CSS transform only. */
+@media (max-width: 899.98px), (pointer: coarse) {
+  .lp .lp-hero {
+    height: 300svh;
+  }
+  .lp .lp-hero-pin {
+    min-height: 0;
+  }
+  .lp-hero-ghost {
+    display: none;
+  }
+  .lp .lp-hero-meta {
+    top: 72px;
+    font-size: 0.6875rem;
+  }
+  .lp .lp-hero-copy {
+    top: 96px;
+    bottom: auto;
     grid-template-columns: minmax(0, 1fr);
+    row-gap: 14px;
+    transition: opacity 0.4s var(--lp-ease-out), transform 0.5s var(--lp-ease-out);
+  }
+  .lp .lp-hero .lp-display {
+    font-size: clamp(2.3rem, 10.4vw, 3.6rem);
+  }
+  .lp .lp-hero .lp-lede {
+    font-size: 0.9375rem;
+    max-width: 34ch;
+  }
+  /* the film fills the lower part of the frame, centred, at its own aspect */
+  .lp .lp-hero-pin > .lp-stage-film {
+    inset: auto 0 0;
+    top: 46%;
+    transition: top 0.6s var(--lp-ease-out);
+    display: grid;
+    place-items: center;
+  }
+  /* the copy steps aside after the deal; the film takes the room */
+  .lp-hero-pin:not([data-phase="0"]) > .lp-stage-film {
+    top: 30%;
+  }
+  .lp-stage-film video {
+    /* feathered edges: the film's own ground melts into the page's black, no box seam */
+    -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent);
+    mask-image: radial-gradient(closest-side, #000 72%, transparent);
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    aspect-ratio: 632 / 960;
+    object-fit: contain;
+  }
+  .lp-hero-says {
+    top: 100px;
+    left: var(--lp-gutter);
+    right: var(--lp-gutter);
+    width: auto;
   }
   .lp .lp-hero-beat {
-    min-height: 0;
-    padding-block: 0;
+    inset: 0 0 auto 0;
+    gap: 8px;
   }
-  .lp .lp-hero-lead {
-    padding: 112px 0 32px;
+  .lp-hero-say {
+    font-size: clamp(1.5rem, 6.6vw, 2.1rem);
   }
-  .lp .lp-hero-panel {
-    grid-column: 1;
-    grid-row: 2 / span 2;
-    z-index: 2;
-    top: 60px;
-    height: auto;
-    min-height: 0;
-    padding: 8px 0 0;
-    background: var(--lp-black);
+  .lp-hero-say-body {
+    font-size: 0.9375rem;
   }
-  .lp .lp-hero-panel .lp-stage {
-    aspect-ratio: 420 / 640;
-    width: min(100%, calc(52svh * 420 / 640));
-    justify-self: center;
+  .lp-chips li {
+    font-size: 0.6875rem;
+    padding: 6px 10px 6px 6px;
   }
-  .lp .lp-hero-beat:nth-of-type(2),
-  .lp .lp-hero-beat:nth-of-type(3) {
-    grid-column: 1;
-    align-content: end;
-    min-height: 95svh;
-    padding-bottom: 8svh;
+  .lp-chips li:nth-child(1) { left: 3%; top: 50%; }
+  .lp-chips li:nth-child(2) { right: 3%; top: 84%; left: auto; }
+  .lp-chips li:nth-child(3),
+  .lp-chips li:nth-child(4) { display: none; }
+  .lp .lp-hero[data-still] .lp-hero-pin {
+    padding-top: 104px;
   }
-  .lp .lp-hero-beat:nth-of-type(2) {
-    grid-row: 2;
+}
+/* the film's sheen: one soft band crossing the cards now and then */
+.lp-stage-film {
+  overflow: clip;
+}
+.lp-film-sheen {
+  position: absolute;
+  inset: 20% auto 20% 0;
+  width: 30%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.1), transparent);
+  transform: translate3d(-120%, 0, 0) skewX(-14deg);
+  animation: lp-film-sheen 6s ease-in-out 2s infinite;
+  pointer-events: none;
+}
+@keyframes lp-film-sheen {
+  0%,
+  60% {
+    transform: translate3d(-120%, 0, 0) skewX(-14deg);
   }
-  .lp .lp-hero-beat:nth-of-type(3) {
-    grid-row: 3;
+  100% {
+    transform: translate3d(420%, 0, 0) skewX(-14deg);
   }
-  .lp .lp-hero[data-still] .lp-hero-panel {
-    grid-row: 2;
-  }
-  .lp .lp-hero[data-still] .lp-hero-beat:nth-of-type(2) {
-    grid-row: 3;
-    min-height: 0;
-    padding-top: 40px;
-  }
-  .lp .lp-hero[data-still] .lp-hero-beat:nth-of-type(3) {
-    grid-row: 4;
-    min-height: 0;
-    padding-top: 32px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-chips li,
+  .lp-film-sheen {
+    animation: none;
   }
 }

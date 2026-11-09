@@ -9,6 +9,7 @@ import type { Pose } from "@/lib/cardPoses";
 import { formatMoney } from "@/lib/money";
 import type { CardScene } from "@/three/cardScene";
 import { ACCOUNTS } from "./accounts.fixture";
+import { CHIPS, SPLITS } from "./hero.fixture";
 import { finePointer, Flex, liteDevice, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
 import "./hero.css";
@@ -53,12 +54,13 @@ const span = (p: number, a: number, b: number) => ease(clamp01((p - a) / (b - a)
 
 /** The three stages of the move for card i: a fanned hand, a row with each account labelled, one
     stack over the combined view. `w` is a card's width; returns offsets from the stage centre. */
-function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }): Pose & { label: number } {
+function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }, ox = 0): Pose & { label: number } {
   const n = i - 1;
-  const fan = { x: narrow ? n * w * 0.16 : n * w * 0.3, y: narrow ? -w * 0.1 - n * 14 : -w * 0.12 - n * 18, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
+  // the fan sits right of centre on desktop, beside the headline; the row and the stack are centred
+  const fan = { x: ox + (narrow ? n * w * 0.16 : n * w * 0.3), y: narrow ? -w * 0.1 - n * 14 : -w * 0.22 - n * 18, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
   const gap = narrow ? w * 0.14 : w * 0.1;
   // on a phone the row is a column, cards on the left and each label beside its card
-  const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: -w * 0.08, rz: 0, rx: 0, ry: 0, z: 0 };
+  const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: w * 0.14, rz: 0, rx: 0, ry: 0, z: 0 };
   const stack = { x: narrow ? n * 8 : n * 14, y: narrow ? -w * 0.86 + n * 10 : -w * 0.34 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
   const a = span(p, 0.06, 0.26);
   const b = span(p, 0.56, 0.74);
@@ -286,6 +288,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const floors = useRef<(HTMLSpanElement | null)[]>([]);
   const backs = useRef<(HTMLSpanElement | null)[]>([]);
   const sheens = useRef<(HTMLSpanElement | null)[]>([]);
+  const peek = useRef<HTMLDivElement>(null);
+  const ghost = useRef<HTMLParagraphElement>(null);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
@@ -354,8 +358,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const size = () => {
       const r = el.getBoundingClientRect();
       const narrow = r.width < 720;
-      // the row of three must fit the panel; the CSS stand-ins take the same width through --cw
-      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.3, 320);
+      // the row of three must fit the frame; the CSS stand-ins take the same width through --cw.
+      // Capped by height too, so a short window never squeezes the hand
+      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.2, r.height * 0.36 * ASPECT, 400);
       el.style.setProperty("--cw", `${w.toFixed(1)}px`);
       return { r, narrow, w, h: w / ASPECT };
     };
@@ -365,9 +370,13 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     let drawn = false;
     let last = 0;
     let held: { at: number; since: number } | null = null;
+    const faces = () => ACCOUNTS.accounts.map((_, i) => ({ art: null, hue: HUES[i] ?? null, h: dims.h }));
     const sizeScene = () => {
+      const was = dims.w;
       dims = size();
       scene?.setSize(dims.w, dims.h, (dims.r.width - dims.w) / 2, (dims.r.height - dims.h) / 2);
+      // the faces carry the card height: rebuilt with the width, so every card stays 85.6 x 53.98
+      if (scene && was !== dims.w) scene.setFaces(faces(), "#000000");
     };
     /** PLAYHEAD: p chases the scroll with a short ease (90 ms) but never faster than the whole
         sequence in 0.7 s, and going forward it rests at each key frame (the labelled row, the
@@ -392,35 +401,78 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       p.set(v);
       return v;
     };
+    // the pointer over the stage (stage px, from its centre) and which card it is over; `lift`
+    // eases each card toward the cursor when hovered, so the hand answers the mouse, not the page
+    const cur = { x: 0, y: 0, in: false };
+    const lift = [0, 0, 0];
+    let hover = -1;
+    let tick = 0;
     const frame = () => {
       raf = 0;
-      if (!alive || !visible) return;
+      if (!alive || !visible || document.hidden) return;
       tilt.x += (aim.x - tilt.x) * 0.08;
       tilt.y += (aim.y - tilt.y) * 0.08;
       const settling = Math.abs(aim.x - tilt.x) + Math.abs(aim.y - tilt.y) > 0.0005;
-      const { w, narrow } = dims;
+      const { w, narrow, r } = dims;
       const now = performance.now();
       if (playing.current && !dealt) dealt = now;
       // the deal waits out the preloader's sheet as it lifts off the top of the page
       const since = dealt ? now - dealt - 450 : 0;
       const pv = advance(now);
-      // on idle the fan turns slowly in place, desktop and fine pointer only, and only while it is a fan
-      // it settles after a few turns, so an idle page renders nothing
-      const sway = finePointer() && !narrow ? clamp01((since - 2200) / 1800) * (1 - clamp01((since - 7000) / 2000)) * (1 - clamp01((pv - 0.02) / 0.08)) : 0;
-      const poses = ACCOUNTS.accounts.map((_, i) => {
-        const q0 = pose(i, pv, w, narrow, tilt);
-        // magnetic depth: each card sits at its own depth, so the eased tilt shifts the front card most (2 to 6 px)
-        const d = 4 + 4 * i;
-        const q1 = { ...q0, x: q0.x + tilt.x * d, y: q0.y + tilt.y * d };
-        const q = sway ? { ...q1, ry: q1.ry + Math.sin(now / 2600) * 9 * sway, rz: q1.rz + Math.sin(now / 3400 + i * 1.3) * 2.2 * sway, y: q1.y + Math.sin(now / 2100 + i) * 6 * sway } : q1;
+      // ambient life: once dealt, the hand breathes and turns slowly for as long as the hero is in
+      // view and the tab is visible (the IO and visibilitychange stop and wake the loop)
+      const sway = narrow ? 0 : clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08) * 0.7);
+      const ox = narrow ? 0 : r.width * 0.17;
+      const base = ACCOUNTS.accounts.map((_, i) => pose(i, pv, w, narrow, tilt, ox));
+      // hit test, front card first: the scaled card's box, a little generous
+      let hit = -1;
+      if (cur.in && pv < 0.56)
+        for (let i = base.length - 1; i >= 0; i--) {
+          const q = base[i];
+          if (q && Math.abs(cur.x - q.x) < (w * q.s) / 2 + 8 && Math.abs(cur.y - q.y) < (w * q.s) / ASPECT / 2 + 8) {
+            hit = i;
+            break;
+          }
+        }
+      if (hit !== hover) {
+        hover = hit;
+        el.dataset.hover = String(hit);
+      }
+      let lifting = false;
+      const poses = base.map((q0, i) => {
+        const to = hover === i ? 1 : 0;
+        const L = (lift[i] = (lift[i] ?? 0) + (to - (lift[i] ?? 0)) * 0.14);
+        if (Math.abs(to - L) > 0.002) lifting = true;
+        // magnetic depth: each card sits at its own depth, so the eased tilt pulls the front card most
+        const d = 10 + 10 * i;
+        // a hovered card rises toward the cursor and turns to face it (after React Bits' Magnet, MIT)
+        const q1 = {
+          ...q0,
+          x: q0.x + tilt.x * d + (cur.x - q0.x) * 0.1 * L,
+          y: q0.y + tilt.y * d + (cur.y - q0.y) * 0.1 * L - 18 * L,
+          z: q0.z + 90 * L,
+          s: q0.s * (1 + 0.05 * L),
+          rx: q0.rx * (1 - 0.6 * L),
+          ry: q0.ry * (1 - 0.6 * L),
+          layer: hover === i ? 9 : q0.layer,
+        };
+        const q = sway
+          ? { ...q1, ry: q1.ry + Math.sin(now / 2600) * 7 * sway, rz: q1.rz + Math.sin(now / 3400 + i * 1.3) * 1.8 * sway, y: q1.y + Math.sin(now / 2100 + i) * 7 * sway }
+          : q1;
         // a dealt card: thrown up from below and out of depth, spinning flat as it lands (quartic ease-out)
         const k = 1 - (1 - clamp01((since - 160 - i * 170) / 1400)) ** 4;
         const u = 1 - k;
         return { ...q, rest: q.y, deal: k, y: q.y + u * w * 2.1, z: q.z - u * 520, rz: q.rz * k + u * (14 - i * 14), rx: q.rx + u * 64, ry: q.ry + u * (i - 1) * 18, s: q.s * (0.78 + 0.22 * k) };
       });
-      // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
-      const sweep = clamp01((since - 1100) / 1500);
-      const sweeping = sweep > 0 && sweep < 1;
+      // the peek: the hovered card's balance and categories, beside the cursor
+      const pk = peek.current;
+      if (pk) pk.style.transform = `translate3d(${Math.min(cur.x + 28, r.width / 2 - 300).toFixed(1)}px, ${(cur.y + 24).toFixed(1)}px, 0)`;
+      // the ghost total behind the hand drifts against the pointer: a slower, farther plane
+      const gh = ghost.current;
+      if (gh) gh.style.transform = `translate3d(${(-tilt.x * 40).toFixed(1)}px, ${(-tilt.y * 24).toFixed(1)}px, 0)`;
+      // a light sweeps across the foil on the deal, then again every 7 s while the hand idles
+      const sweep = clamp01(since > 2600 ? ((since - 2600) % 7000) / 1500 : (since - 1100) / 1500);
+      const sweeping = sweep > 0 && sweep < 1 && hover < 0;
       // contact shadows on the floor under the fan; they gather as each card lands, gone once the hand opens
       const onFloor = 1 - clamp01((pv - 0.04) / 0.16);
       poses.forEach((q, i) => {
@@ -433,13 +485,16 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         const bk = backs.current[i];
         if (bk) {
           bk.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, 0) rotate(${q.rz}deg) scale(${q.s})`;
-          bk.style.opacity = String(q.deal);
+          bk.style.opacity = String(q.deal * (0.7 + 0.3 * (lift[i] ?? 0)));
         }
         // a sheen slides across the face in step with the tilt, opposite the pointer like a real reflection
         const sh = sheens.current[i];
         if (sh) sh.style.transform = `translate3d(${(-tilt.x * 150).toFixed(1)}%, ${(-tilt.y * 50).toFixed(1)}%, 0) skewX(-14deg)`;
         const c = cards.current[i];
-        if (c) c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
+        if (c) {
+          c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
+          c.style.zIndex = String(q.layer + 1);
+        }
         const l = labels.current[i];
         if (l) {
           l.style.transform = narrow
@@ -448,13 +503,15 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           l.style.opacity = String(q.label);
         }
       });
-      if (scene) {
-        // the scene's box is one card at the stage centre: offsets are from its top-left
+      const moving = held !== null || Math.abs(goal.current - pv) > 0.0004;
+      // idle sway alone renders at half rate
+      const idleOnly = sway > 0 && !settling && !lifting && !sweeping && !moving;
+      if (scene && (!drawn || tick++ % (idleOnly ? 2 : 1) === 0)) {
         scene.update(
-          poses.map((q) => ({ ...q, x: q.x, y: q.y })),
+          poses,
           sweeping
-            ? { x: mix(-dims.r.width * 0.4, dims.r.width * 0.9, ease(sweep)), y: dims.h * 0.2, on: 1.8 }
-            : { x: dims.w / 2 + tilt.x * 260, y: dims.h / 2 - tilt.y * 200, on: finePointer() ? 1 : 0.4 },
+            ? { x: mix(-r.width * 0.4, r.width * 0.9, ease(sweep)), y: dims.h * 0.2, on: 1.8 }
+            : { x: dims.w / 2 + (cur.in ? cur.x : tilt.x * 260), y: dims.h / 2 + (cur.in ? cur.y : -tilt.y * 200), on: finePointer() ? 1 : 0.4 },
           poses.map(() => null),
         );
         scene.render();
@@ -463,11 +520,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           el.dataset.drawn = ""; // the canvas fades in over the CSS cards only once it has a frame
         }
       }
-      // the last card lands at 160 + 2 * 170 + 1400 ms; the WebGL sweep ends at 1100 + 1500 ms
+      // the last card lands at 160 + 2 * 170 + 1400 ms; the idle sway then keeps the loop alive
       const dealing = !dealt || since < 2800;
-      const idling = sway > 0;
-      const moving = held !== null || Math.abs(goal.current - pv) > 0.0004;
-      if (dealing || idling || moving || settling || (scene && !drawn)) raf = requestAnimationFrame(frame);
+      if (dealing || sway > 0 || moving || settling || lifting || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
       if (!raf) raf = requestAnimationFrame(frame);
@@ -482,25 +537,39 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       if (!el.dataset.lit) el.dataset.lit = "";
       aim.x = e.clientX / window.innerWidth - 0.5;
       aim.y = e.clientY / window.innerHeight - 0.5;
+      // a pointer event, not a scroll handler: one rect read here is fine
+      const b = el.getBoundingClientRect();
+      cur.x = e.clientX - b.left - b.width / 2;
+      cur.y = e.clientY - b.top - b.height / 2;
+      cur.in = e.clientY >= b.top && e.clientY <= b.bottom;
       kick();
     };
-    const resize = () => {
-      sizeScene();
+    const leave = () => {
+      cur.in = false;
       kick();
     };
+    // the stage's own box, not the window: a box that changed without a window resize left the
+    // canvas buffer stretched, which squared the cards off. The buffer now always matches the box.
+    const ro =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(() => {
+            sizeScene();
+            kick();
+          })
+        : null;
+    ro?.observe(el);
+    const wake = () => kick();
     kicker.current = kick;
     window.addEventListener("pointermove", move);
-    window.addEventListener("resize", resize);
+    document.documentElement.addEventListener("pointerleave", leave);
+    document.addEventListener("visibilitychange", wake);
     if (canvas.current && !liteDevice() && webgl()) {
       import("@/three/cardScene")
         .then(({ createCardScene }) => {
           if (!alive || !canvas.current) return;
           scene = createCardScene(canvas.current, 1600);
           sizeScene();
-          scene.setFaces(
-            ACCOUNTS.accounts.map((_, i) => ({ art: null, hue: HUES[i] ?? null, h: dims.h })),
-            "#000000",
-          );
+          scene.setFaces(faces(), "#000000");
           setThree(true);
           kick();
         })
@@ -512,69 +581,145 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       kicker.current = null;
       cancelAnimationFrame(raf);
       io.disconnect();
+      ro?.disconnect();
       window.removeEventListener("pointermove", move);
-      window.removeEventListener("resize", resize);
+      document.documentElement.removeEventListener("pointerleave", leave);
+      document.removeEventListener("visibilitychange", wake);
       scene?.dispose();
     };
   }, [still, p, playing]);
 
-  return (
-    <section ref={track} className="lp-hero" data-still={still ? "" : undefined} data-lite={lite ? "" : undefined} aria-labelledby="lp-title">
-      <div className="lp-hero-ground" aria-hidden="true">
-        {!still && <LedgerField />}
-      </div>
-      <div className="lp-hero-grid">
-        <div className="lp-hero-beat lp-hero-lead" data-on={still || phase === 0 ? "" : undefined}>
-          <h1 id="lp-title" className="lp-display" style={{ "--hd": `${delay}s` } as React.CSSProperties}>
-            <Flex lines={HEADLINE_LINES} label={HEADLINE} still={still} play={play} delay={delay} />
-          </h1>
-          <div className="lp-hero-foot" data-play={play || still ? "" : undefined}>
-            <p className="lp-lede">{LINE}</p>
-            <div className="lp-actions">
-              <Magnetic href="/app" className="lp-pill lp-pill-primary">
-                <Roll text="Open the demo" />
-              </Magnetic>
-              <a className="lp-link" href="#what">
-                <Roll text="See what it does" />
-              </a>
-            </div>
-          </div>
+  // the ambient chips and the loop pause while the hero is off screen
+  const [near, setNear] = useState(true);
+  useEffect(() => {
+    const el = track.current;
+    if (!el || still) return;
+    const io = new IntersectionObserver(([e]) => setNear(Boolean(e?.isIntersecting)));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [still]);
+
+  const meta = (
+    <p className="lp-hero-meta" aria-hidden="true">
+      <span>The made-up household</span>
+      <span>{BEATS[still ? 2 : phase]?.stage}</span>
+    </p>
+  );
+  const copy = (
+    <div className="lp-hero-copy" data-phase={still ? 0 : phase}>
+      <h1 id="lp-title" className="lp-display" style={{ "--hd": `${delay}s` } as React.CSSProperties}>
+        <Flex lines={HEADLINE_LINES} label={HEADLINE} still={still} play={play} delay={delay} />
+      </h1>
+      <div className="lp-hero-foot" data-play={play || still ? "" : undefined}>
+        <p className="lp-lede">{LINE}</p>
+        <div className="lp-actions">
+          <Magnetic href="/app" className="lp-pill lp-pill-primary">
+            <Roll text="Open the demo" />
+          </Magnetic>
+          <a className="lp-link" href="#what">
+            <Roll text="See what it does" />
+          </a>
         </div>
-        <figure className="lp-hero-panel">
-          <figcaption className="lp-hero-meta">
-            <span>The made-up household</span>
-            <span>{BEATS[still ? 2 : phase]?.stage}</span>
-          </figcaption>
-          {still ? (
-            <StillStage />
-          ) : lite ? (
-            <div className="lp-stage lp-stage-film" data-phase={phase} aria-hidden="true">
-              <video ref={video} src="/hero/cards.mp4" poster="/hero/cards.webp" muted playsInline preload="auto" />
-            </div>
-          ) : (
-            <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
-              {ACCOUNTS.accounts.map((a, i) => (
-                <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
-              ))}
-              {ACCOUNTS.accounts.map((a, i) => (
-                <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
-              ))}
-              <canvas ref={canvas} className="lp-stage-canvas" />
-              {ACCOUNTS.accounts.map((a, i) => (
-                <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
-                  <CardFace i={i} name={a.name} />
-                  <span className="lp-acard-light">
-                    <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
+      </div>
+    </div>
+  );
+  const beats = (
+    <div className="lp-hero-says">
+      {BEATS.slice(1).map((b, k) => (
+        <div key={b.stage} className="lp-hero-beat" data-on={still || phase === k + 1 ? "" : undefined}>
+          <h2 className="lp-hero-say" style={{ "--hd": "-0.35s" } as React.CSSProperties}>
+            <Flex lines={[b.title ?? ""]} label={b.title ?? ""} still={still} play={still || phase === k + 1} delay={-0.4} />
+          </h2>
+          <p className="lp-hero-say-body">{b.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+
+  if (still)
+    return (
+      <section ref={track} className="lp-hero" data-still="" aria-labelledby="lp-title">
+        <div className="lp-hero-pin">
+          {meta}
+          {copy}
+          <StillStage />
+          {beats}
+        </div>
+      </section>
+    );
+
+  return (
+    <section ref={track} className="lp-hero" data-lite={lite ? "" : undefined} data-off={near ? undefined : ""} aria-labelledby="lp-title">
+      {/* one sticky frame holds every plane, so nothing slides against anything while it is pinned */}
+      <div className="lp-hero-pin" data-phase={phase}>
+        <div className="lp-hero-ground" aria-hidden="true">
+          <LedgerField />
+        </div>
+        <p ref={ghost} className="lp-hero-ghost" aria-hidden="true">
+          {TOTAL}
+        </p>
+        <ul className="lp-chips" aria-hidden="true">
+          {CHIPS.map((c, i) => (
+            <li key={c.merchant} style={{ "--k": i } as React.CSSProperties}>
+              <span className="lp-chip-tick" data-ok={c.category[0] !== "To review" ? "" : undefined} />
+              <span>{c.merchant}</span>
+              <Money value={c.amount} />
+              <em>{c.category[0] === "To review" ? "To review" : c.category[1]}</em>
+            </li>
+          ))}
+          <li style={{ "--k": 3 } as React.CSSProperties}>
+            <span className="lp-chip-tick" data-ok="" />
+            <span>Transfer paired</span>
+            <em>not spending</em>
+          </li>
+        </ul>
+        {lite ? (
+          <div className="lp-stage lp-stage-film" data-phase={phase} aria-hidden="true">
+            <video ref={video} src="/hero/cards.mp4" poster="/hero/cards.webp" muted playsInline preload="auto" />
+            <span className="lp-film-sheen" />
+          </div>
+        ) : (
+          <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
+            {ACCOUNTS.accounts.map((a, i) => (
+              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
+            ))}
+            {ACCOUNTS.accounts.map((a, i) => (
+              <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
+            ))}
+            <canvas ref={canvas} className="lp-stage-canvas" />
+            {ACCOUNTS.accounts.map((a, i) => (
+              <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
+                <CardFace i={i} name={a.name} />
+                <span className="lp-acard-light">
+                  <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
+                </span>
+              </div>
+            ))}
+            {ACCOUNTS.accounts.map((a, i) => (
+              <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
+                <p className="lp-acct-name">{a.name}</p>
+                <p className="lp-acct-bal">
+                  <Money value={gbp(a.balance)} />
+                </p>
+                <p className="lp-acct-flow">
+                  <span>
+                    In <Money value={gbp(a.in)} />
                   </span>
-                </div>
-              ))}
+                  <span>
+                    Out <Money value={gbp(a.out)} />
+                  </span>
+                </p>
+              </div>
+            ))}
+            {/* hover a card: its balance, money in and out, and where the money went */}
+            <div ref={peek} className="lp-peek">
               {ACCOUNTS.accounts.map((a, i) => (
-                <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
-                  <p className="lp-acct-name">{a.name}</p>
-                  <p className="lp-acct-bal">
+                <div key={a.name} className="lp-peek-card" data-i={i} style={{ "--h": HUES[i] } as React.CSSProperties}>
+                  <p className="lp-peek-name">{a.name}</p>
+                  <p className="lp-peek-bal">
                     <Money value={gbp(a.balance)} />
                   </p>
-                  <p className="lp-acct-flow">
+                  <p className="lp-peek-flow">
                     <span>
                       In <Money value={gbp(a.in)} />
                     </span>
@@ -582,18 +727,28 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                       Out <Money value={gbp(a.out)} />
                     </span>
                   </p>
+                  {(SPLITS[a.name] ?? []).length ? (
+                    <ul className="lp-peek-cats">
+                      {(SPLITS[a.name] ?? []).map((c) => (
+                        <li key={c.name} style={{ "--s": c.share } as React.CSSProperties}>
+                          <span>{c.name}</span>
+                          <span>{Math.round(c.share * 100)}%</span>
+                          <i />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="lp-peek-note">Interest in, nothing spent</p>
+                  )}
                 </div>
               ))}
-              <Combined landed={landed} />
             </div>
-          )}
-        </figure>
-        {BEATS.slice(1).map((b, k) => (
-          <div key={b.stage} className="lp-hero-beat" data-on={still || phase === k + 1 ? "" : undefined}>
-            <h2 className="lp-hero-say">{b.title}</h2>
-            <p className="lp-hero-say-body">{b.body}</p>
+            <Combined landed={landed} />
           </div>
-        ))}
+        )}
+        {meta}
+        {copy}
+        {beats}
       </div>
       <p className="lp-sr">
         {ACCOUNTS.accounts.map((a) => `${a.name}: ${formatMoney(gbp(a.balance))}.`).join(" ")} Together: {TOTAL}.
