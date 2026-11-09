@@ -43,6 +43,8 @@ const BEATS = [
 ];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+/** Phones: the card sequence, pre-rendered from the film (web/scripts/hero-frames.sh). */
+const FRAMES = 36;
 /** Key frames the playhead rests on going forward: the row with every balance, then the totals. */
 const HOLDS = [
   { at: 0.3, ms: 420 },
@@ -295,12 +297,17 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   playing.current = play;
   const [landed, setLanded] = useState(0);
   const [lite] = useState(liteDevice);
+  // phones: the pre-rendered film. "wait" until it can play, "ok" once primed, "off" when it errors
+  // or is not ready in 1.5 s: then the poster stays, the hero unpins and scrolls as a page
+  const [film, setFilm] = useState<"wait" | "ok" | "off">("wait");
   // one scroll driver: GSAP ScrollTrigger (stepped by Lenis's tick on desktop) writes the raw
   // progress through the hero to `goal`; the frame loop below moves a playhead `p` after it (see
   // PLAYHEAD), so every stage plays in full however fast the scroll
   const goal = useRef(0);
+  const filmOk = useRef(false);
   const kicker = useRef<(() => void) | null>(null);
-  const video = useRef<HTMLVideoElement>(null);
+  const seqCanvas = useRef<HTMLCanvasElement>(null);
+  const drawAt = useRef<((v: number) => void) | null>(null);
   const p = useMotionValue(0);
   useGSAP(
     () => {
@@ -314,12 +321,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         onUpdate: (self) => {
           goal.current = self.progress;
           kicker.current?.();
-          // phones: the pre-rendered card sequence, scrubbed one seek per frame
-          const v = video.current;
-          if (v && !seek)
+          // phones: the pre-rendered card frames, one draw per animation frame
+          if (lite && !seek)
             seek = requestAnimationFrame(() => {
               seek = 0;
-              if (v.duration) v.currentTime = goal.current * (v.duration - 0.04);
+              drawAt.current?.(goal.current);
               p.set(goal.current);
             });
         },
@@ -329,7 +335,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         st.kill();
       };
     },
-    { dependencies: [still] },
+    { dependencies: [still, lite] },
   );
   const [phase, setPhase] = useState(0);
   useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.68 ? 1 : 2));
@@ -590,6 +596,80 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   }, [still, p, playing]);
 
   // the ambient chips and the loop pause while the hero is off screen
+  // the film, as an image sequence on a 2D canvas (iOS blanks a <video> while it seeks). Every
+  // frame is fetched and decoded up front; a frame is drawn only once decoded, and the canvas is
+  // cleared only in the same tick as the next draw, so it is never empty. The poster sits under it
+  // throughout. Not decoded within 1.5 s, or any frame fails: the hero unpins and shows the poster.
+  useEffect(() => {
+    const cv = seqCanvas.current;
+    const ctx = cv?.getContext("2d");
+    if (!lite || still || !cv) return;
+    if (!ctx) {
+      setFilm("off"); // no 2D canvas: the poster, unpinned
+      return;
+    }
+    let alive = true;
+    const imgs = Array.from({ length: FRAMES }, (_, i) => {
+      const im = new Image();
+      im.decoding = "async";
+      im.src = `/hero/frames/${String(i + 1).padStart(2, "0")}.webp`;
+      return im;
+    });
+    const fit = () => {
+      const r = cv.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      cv.width = Math.round(r.width * dpr);
+      cv.height = Math.round(r.height * dpr);
+    };
+    let shown = -1;
+    const draw = (v: number) => {
+      const i = Math.round(clamp01(v) * (FRAMES - 1));
+      const im = imgs[i];
+      if (!filmOk.current || i === shown || !im?.complete || !im.naturalWidth) return;
+      shown = i;
+      // contain: the whole frame, centred, at its own aspect
+      const k = Math.min(cv.width / im.naturalWidth, cv.height / im.naturalHeight);
+      const w = im.naturalWidth * k;
+      const h = im.naturalHeight * k;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(im, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+    };
+    fit();
+    const timer = window.setTimeout(() => alive && !filmOk.current && setFilm("off"), 1500);
+    Promise.all(imgs.map((im) => im.decode()))
+      .then(() => {
+        if (!alive) return;
+        window.clearTimeout(timer);
+        if (filmDone.current) return; // already fell back to the poster: stay a page
+        filmOk.current = true;
+        setFilm("ok");
+        drawAt.current = draw;
+        draw(goal.current);
+      })
+      .catch(() => alive && setFilm("off"));
+    const ro =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(() => {
+            fit();
+            shown = -1;
+            draw(goal.current);
+          })
+        : null;
+    ro?.observe(cv);
+    return () => {
+      alive = false;
+      drawAt.current = null;
+      window.clearTimeout(timer);
+      ro?.disconnect();
+    };
+  }, [lite, still]);
+  const filmDone = useRef(false);
+  if (film === "off") filmDone.current = true;
+  // the hero's height changes when it unpins: everything below must re-measure
+  useEffect(() => {
+    if (film !== "wait") ScrollTrigger.refresh();
+  }, [film]);
+
   const [near, setNear] = useState(true);
   useEffect(() => {
     const el = track.current;
@@ -649,7 +729,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     );
 
   return (
-    <section ref={track} className="lp-hero" data-lite={lite ? "" : undefined} data-off={near ? undefined : ""} aria-labelledby="lp-title">
+    <section ref={track} className="lp-hero" data-lite={lite ? "" : undefined} data-film={lite ? film : undefined} data-off={near ? undefined : ""} aria-labelledby="lp-title">
       {/* one sticky frame holds every plane, so nothing slides against anything while it is pinned */}
       <div className="lp-hero-pin" data-phase={phase}>
         <div className="lp-hero-ground" aria-hidden="true">
@@ -675,7 +755,8 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         </ul>
         {lite ? (
           <div className="lp-stage lp-stage-film" data-phase={phase} aria-hidden="true">
-            <video ref={video} src="/hero/cards.mp4" poster="/hero/cards.webp" muted playsInline preload="auto" />
+            <img className="lp-film-poster" src="/hero/cards.webp" alt="" />
+            <canvas ref={seqCanvas} className="lp-film-frames" />
             <span className="lp-film-sheen" />
           </div>
         ) : (

@@ -604,8 +604,9 @@
    Headline at the top, the pre-rendered film of the cards in the middle, the statements under it.
    No WebGL, no canvas, no will-change; the chips and the film's sheen are CSS transform only. */
 @media (max-width: 899.98px), (pointer: coarse) {
+  /* a short runway: every stretch of the pin changes something */
   .lp .lp-hero {
-    height: 300svh;
+    height: 220svh;
   }
   .lp .lp-hero-pin {
     min-height: 0;
@@ -643,7 +644,51 @@
   .lp-hero-pin:not([data-phase="0"]) > .lp-stage-film {
     top: 30%;
   }
-  .lp-stage-film video {
+  /* the poster is always painted under the frames; nothing on the scroll path hides either */
+  .lp-film-frames,
+  .lp-film-poster {
+    grid-area: 1 / 1;
+  }
+  /* no film: the hero stops pinning and reads as a page, the poster in place of the cards */
+  .lp .lp-hero[data-film="off"] {
+    height: auto;
+  }
+  .lp .lp-hero[data-film="off"] .lp-hero-pin {
+    position: relative;
+    height: auto;
+    display: grid;
+    gap: 24px;
+    padding: 96px var(--lp-gutter) 48px;
+  }
+  .lp .lp-hero[data-film="off"] :is(.lp-hero-meta, .lp-hero-copy, .lp-hero-says, .lp-hero-beat, .lp-hero-pin > .lp-stage-film) {
+    position: relative;
+    inset: auto;
+    top: auto;
+    opacity: 1;
+    transform: none;
+  }
+  .lp .lp-hero[data-film="off"] .lp-hero-pin > .lp-stage-film {
+    order: 2;
+    height: min(70svh, 560px);
+  }
+  .lp .lp-hero[data-film="off"] .lp-hero-meta {
+    order: 0;
+  }
+  .lp .lp-hero[data-film="off"] .lp-hero-copy {
+    order: 1;
+  }
+  .lp .lp-hero[data-film="off"] .lp-hero-says {
+    order: 3;
+  }
+  .lp .lp-hero[data-film="off"] .lp-hero-says {
+    display: grid;
+    gap: 32px;
+  }
+  .lp .lp-hero[data-film="off"] .lp-chips {
+    display: none;
+  }
+  .lp-film-frames,
+  .lp-film-poster {
     /* feathered edges: the film's own ground melts into the page's black, no box seam */
     -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent);
     mask-image: radial-gradient(closest-side, #000 72%, transparent);
