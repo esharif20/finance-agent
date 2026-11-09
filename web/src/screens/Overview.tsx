@@ -194,6 +194,11 @@ export function Overview({ account }: { account?: number }) {
   // the figures keep the last month's, dimmed, until the new ones land.
   const shown = picked ?? summary.data.month;
   const waiting = summary.isPlaceholderData || spending.isPlaceholderData;
+  const merchants = (
+    <div ref={top} className="waiting" data-waiting={waiting}>
+      <TopMerchants spending={spending.data} />
+    </div>
+  );
   // The view under the stack settles with the card (useSettle): same spring, a short rise, no
   // travel under reduced motion.
   return (
@@ -220,8 +225,11 @@ export function Overview({ account }: { account?: number }) {
               <AccountShares summary={summary.data} accounts={accounts.data} hot={hot} onHot={setHot} />
             )}
           </div>
-          {/* two columns: the forecast sits on the right, so the columns end about level */}
+          {/* two columns: the forecast, subscriptions and merchants sit on the right, so the columns
+              end about level (measured: within about 6% at 1440 and 1920) */}
           {wide && <ForecastPanel />}
+          {wide && <SubscriptionsCard />}
+          {wide && merchants}
         </div>
         <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
           <div className="waiting flex flex-col gap-6" aria-busy={waiting} data-waiting={waiting}>
@@ -233,10 +241,8 @@ export function Overview({ account }: { account?: number }) {
           <GuidanceCards />
           <InsightsFeed />
           {!wide && <ForecastPanel />}
-          <SubscriptionsCard />
-          <div ref={top} className="waiting" data-waiting={waiting}>
-            <TopMerchants spending={spending.data} />
-          </div>
+          {!wide && <SubscriptionsCard />}
+          {!wide && merchants}
         </div>
       </div>
       <section ref={list} aria-labelledby="txns-title" className="flex flex-col gap-4">

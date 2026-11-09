@@ -1319,7 +1319,7 @@ html[data-scrolling] .ambient i {
 }
 /* hover spotlight on list rows: MotionFx sets --mx/--my on the [data-spot] under the mouse */
 @media (hover: hover) and (pointer: fine) {
-  [data-spot] {
+  [data-spot]:hover {
     background-image: radial-gradient(260px circle at var(--mx) var(--my), color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%);
   }
 }
