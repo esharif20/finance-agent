@@ -8,15 +8,15 @@ import {
   type MotionValue,
   motion,
   useInView,
+  useMotionValue,
   useMotionValueEvent,
-  useScroll,
-  useSpring,
   useTransform,
 } from "motion/react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { QuestionChart } from "./Diagrams";
 import { FLOW, GROUPS, SAMPLE } from "./nodes";
 import { Detail, EASE, NodeButton, StatusTag } from "./parts";
+import { gsap, smoothScroller, useGSAP } from "./smooth";
 
 const STEP_MS = 1500;
 const N = FLOW.length;
@@ -54,10 +54,21 @@ export default function Flow({ scene, wide, still, playKey }: { scene: boolean; 
 
 function Scene({ playKey }: { playKey: number }) {
   const track = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
-  // sprung, so a fast flick still sweeps through every stop instead of jumping past them
-  const smooth = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.0005 });
-  const t = useTransform(smooth, [0, 1], [-0.5, N]);
+  const t = useMotionValue(-0.5);
+  // ScrollTrigger is the one scroll reader; its scrub lag means a fast flick still sweeps through
+  // every stop instead of jumping past them. Motion only renders the value it writes.
+  useGSAP(
+    () => {
+      const at = { p: 0 };
+      gsap.to(at, {
+        p: 1,
+        ease: "none",
+        scrollTrigger: { trigger: track.current, start: "top top", end: "bottom bottom", scrub: 0.6 },
+        onUpdate: () => t.set(-0.5 + at.p * (N + 0.5)),
+      });
+    },
+    { scope: track },
+  );
   const [stop, setStop] = useState(-1);
   const [open, setOpen] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -77,6 +88,13 @@ function Scene({ playKey }: { playKey: number }) {
     setPlaying(false);
   };
 
+  // Play writes through Lenis when it runs, so the smoothing never fights the programmed scroll
+  const scrollTo = (v: number) => {
+    const l = smoothScroller();
+    if (l) l.scrollTo(v, { immediate: true });
+    else window.scrollTo(0, v);
+  };
+
   const play = (fromTop: boolean) => {
     const el = track.current;
     if (!el) return;
@@ -94,7 +112,7 @@ function Scene({ playKey }: { playKey: number }) {
       duration: lead + seconds,
       times: inside ? [0, 1] : [0, lead / (lead + seconds), 1],
       ease: inside ? "linear" : ["easeInOut", "linear"],
-      onUpdate: (v: number) => window.scrollTo(0, v),
+      onUpdate: scrollTo,
       onComplete: () => {
         run.current = null;
         setPlaying(false);
@@ -173,10 +191,11 @@ function Scene({ playKey }: { playKey: number }) {
                 className="ar-note"
                 role="region"
                 aria-label={noteNode.title}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2, ease: EASE }}
+                // the text-states swap from transitions.dev: out up, in from below, through a 2px blur
+                initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -4, filter: "blur(2px)" }}
+                transition={{ duration: 0.16, ease: "easeInOut" }}
               >
                 <div className="ar-detail-head">
                   <h3>{noteNode.title}</h3>
