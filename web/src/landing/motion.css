@@ -346,7 +346,7 @@
     0 40px 80px -30px rgb(0 0 0 / 0.7);
   opacity: 0;
   transform: translate(-50%, 32px);
-  transition: opacity 0.5s var(--lp-ease-out), transform 0.8s var(--lp-ease-expo);
+  transition: opacity 0.35s var(--lp-ease-out), transform 0.5s var(--lp-ease-expo);
 }
 .lp-stage[data-phase="2"] .lp-combined {
   opacity: 1;
@@ -1474,8 +1474,8 @@
   inset: 0;
   border-radius: inherit;
   background: var(--halo);
-  -webkit-mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.45) 40%, transparent 70%);
-  mask: radial-gradient(closest-side, #000 0%, rgb(0 0 0 / 0.45) 40%, transparent 70%);
+  -webkit-mask: radial-gradient(closest-side, transparent 0%, rgb(0 0 0 / 0.55) 22%, rgb(0 0 0 / 0.4) 42%, transparent 70%);
+  mask: radial-gradient(closest-side, transparent 0%, rgb(0 0 0 / 0.55) 22%, rgb(0 0 0 / 0.4) 42%, transparent 70%);
   will-change: transform;
   animation: lp-spin 40s linear infinite;
 }
@@ -1495,7 +1495,6 @@
 .lp-combined .lp-combined-total {
   font-size: clamp(2.75rem, 12vw, 6.25rem);
   font-weight: 800;
-  text-shadow: 0 0 40px rgb(154 225 135 / 0.35);
 }
 @media (min-width: 720px) {
   .lp-combined {
@@ -2207,3 +2206,29 @@
   }
 }
 
+
+/* ===== UI wave: brand-board corners on the tally and the opener ===== */
+.pl-plane .lp-corners > i,
+.op .lp-corners > i {
+  margin: max(4px, calc(var(--lp-gutter) - 18px));
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+.pl-pct::after {
+  counter-reset: pct var(--pct, 0);
+  content: counter(pct) "%";
+  font-variant-numeric: tabular-nums;
+}
+.op > .lp-corners {
+  transition: color 0.2s ease;
+}
+.op[data-full] > .lp-corners {
+  color: var(--lp-black);
+}
+.lp-mark-ch {
+  display: inline-block;
+}
+.lp-bar-mark {
+  overflow: clip;
+  padding-bottom: 0.04em;
+}

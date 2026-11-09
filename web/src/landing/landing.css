@@ -501,6 +501,78 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   grid-area: n;
   --tile: var(--lp-lemon);
 }
+.lp-tile-figure .lp-figure {
+  font-size: clamp(3rem, 1rem + 4.6vw, 6rem);
+}
+
+/* corner meta: the small print of a brand board, laid over its parent and out of its flow */
+.lp-corners {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.lp-tile:has(> .lp-corners) {
+  position: relative;
+  padding-top: 44px;
+}
+.lp-corners > i {
+  position: absolute;
+  font-family: var(--lp-text);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  opacity: 0.72;
+  pointer-events: none;
+}
+.lp-corners > [data-c="tl"] {
+  top: 16px;
+  left: 18px;
+}
+.lp-corners > [data-c="tr"] {
+  top: 16px;
+  right: 18px;
+}
+.lp-corners > [data-c="bl"] {
+  bottom: 16px;
+  left: 18px;
+}
+.lp-corners > [data-c="br"] {
+  bottom: 16px;
+  right: 18px;
+}
+
+/* a dark tile with a halftone picture: dots that swell toward one corner, drawn once in CSS */
+.lp-halftone {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.lp-halftone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(circle, #2f7d43 0 1.6px, transparent 2.2px);
+  background-size: 9px 9px;
+  -webkit-mask-image: radial-gradient(120% 90% at 100% 100%, #000 0%, rgb(0 0 0 / 0.55) 38%, transparent 72%);
+  mask-image: radial-gradient(120% 90% at 100% 100%, #000 0%, rgb(0 0 0 / 0.55) 38%, transparent 72%);
+  opacity: 0.85;
+}
+.lp-halftone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(circle, var(--lp-mint) 0 2.6px, transparent 3.2px);
+  background-size: 9px 9px;
+  background-position: 4.5px 4.5px;
+  -webkit-mask-image: radial-gradient(60% 55% at 100% 100%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(60% 55% at 100% 100%, #000 0%, transparent 70%);
+  opacity: 0.6;
+}
 .lp-slot > .lp-tile {
   background: var(--tile);
   color: var(--tile-ink, var(--lp-black));
@@ -526,10 +598,8 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   font-size: 1.25rem;
   font-weight: 600;
 }
-@media (prefers-color-scheme: dark) {
-  .lp-tile-assistant {
-    --tile: #1c1c1c;
-  }
+.lp-tile-assistant {
+  --tile: #050f08;
 }
 
 /* promises: tiles that grow like bars on a chart */
@@ -558,26 +628,35 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   color: #d9ddd6;
 }
 .lp-bar {
-  display: flex;
-  align-items: flex-end;
-  padding: 20px;
+  position: relative;
   margin-bottom: 12px;
   border-radius: 8px;
   overflow: clip;
+}
+.lp-bar-fill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--bar);
   color: var(--lp-black);
-  will-change: clip-path;
+}
+.lp-bar-fill .lp-corners > i {
+  opacity: 0.8;
 }
 .lp-promise[data-i="0"] .lp-bar {
   height: 30vh;
-  background: var(--lp-mint);
+  --bar: var(--lp-mint);
 }
 .lp-promise[data-i="1"] .lp-bar {
   height: 44vh;
-  background: var(--lp-cyan);
+  --bar: var(--lp-cyan);
 }
 .lp-promise[data-i="2"] .lp-bar {
   height: 60vh;
-  background: var(--lp-orange);
+  --bar: var(--lp-orange);
 }
 .lp-bar-mark {
   font-family: var(--lp-display);
@@ -725,4 +804,11 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   .lp-pill::before {
     transition: none;
   }
+}
+
+/* the hand-off from the hero: the next chapter arrives as a sheet with rounded top corners,
+   sliding over the hero as it sinks back (Hero.tsx); no gradient, just depth */
+.lp-ask {
+  border-radius: clamp(20px, 3vw, 36px) clamp(20px, 3vw, 36px) 0 0;
+  overflow: clip;
 }

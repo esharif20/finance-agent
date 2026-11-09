@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatMoney } from "@/lib/money";
+import { Corners } from "./fx";
 import { OVERVIEW } from "./story/story.fixture";
 
 const MIN_MS = 1200;
@@ -94,7 +95,10 @@ export function Preloader({ still, onGo, onDone }: { still: boolean; onGo: () =>
     // the 2.5 s cap runs from navigation, as the visitor feels it, but the tally always gets its 1.2 s
     const capAt = Math.max(MAX_MS - t0, MIN_MS);
     // the water's surface, in % of the sheet from the top: 100 is dry, 0 is full
-    const seam = (p: number) => root.current?.style.setProperty("--seam", (100 - p * 100).toFixed(2));
+    const seam = (p: number) => {
+      root.current?.style.setProperty("--seam", (100 - p * 100).toFixed(2));
+      root.current?.style.setProperty("--pct", String(Math.round(p * 100)));
+    };
     const leave = () => {
       if (left) return;
       left = true;
@@ -144,6 +148,7 @@ export function Preloader({ still, onGo, onDone }: { still: boolean; onGo: () =>
       <div className="pl-water" />
       {[false, true].map((under) => (
         <div key={String(under)} className={under ? "pl-plane pl-below" : "pl-plane pl-above"}>
+          <Corners tl="Finance Agent" tr={<b className="pl-pct" />} bl="A made-up household" br="Synthetic data" />
           <div className="pl-mask">
             <Tally text={TALLY} landed={landed} />
           </div>

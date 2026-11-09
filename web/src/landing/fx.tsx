@@ -21,6 +21,46 @@ export function liteDevice() {
 
 export const useStill = () => useState(prefersReducedMotion)[0];
 
+/** Smooth wheel scroll on desktop only (Lenis), stepped by GSAP's ticker so Lenis and ScrollTrigger
+    run as one loop. Lenis still moves the window's native scroll, so motion's useScroll reads the
+    same single source; touch keeps native momentum, and reduced motion keeps native scroll. */
+export function useSmoothWheel(off: boolean) {
+  useEffect(() => {
+    if (off || liteDevice() || !finePointer()) return;
+    let stop = () => {};
+    let dead = false;
+    void Promise.all([import("gsap"), import("gsap/ScrollTrigger"), import("lenis")]).then(([{ default: gsap }, { ScrollTrigger }, { default: Lenis }]) => {
+      if (dead) return;
+      const lenis = new Lenis({ lerp: 0.12, anchors: true, autoRaf: false });
+      const tick = (t: number) => lenis.raf(t * 1000);
+      lenis.on("scroll", ScrollTrigger.update);
+      gsap.ticker.add(tick);
+      gsap.ticker.lagSmoothing(0);
+      stop = () => {
+        gsap.ticker.remove(tick);
+        lenis.destroy();
+      };
+    });
+    return () => {
+      dead = true;
+      stop();
+    };
+  }, [off]);
+}
+
+/** Spec-sheet meta in a tile's corners, like the small print on a brand-guideline board.
+    Decoration: the tile's own text carries the meaning, so screen readers skip it. */
+export function Corners({ tl, tr, bl, br }: { tl?: ReactNode; tr?: ReactNode; bl?: ReactNode; br?: ReactNode }) {
+  return (
+    <span className="lp-corners" aria-hidden="true">
+      {tl && <i data-c="tl">{tl}</i>}
+      {tr && <i data-c="tr">{tr}</i>}
+      {bl && <i data-c="bl">{bl}</i>}
+      {br && <i data-c="br">{br}</i>}
+    </span>
+  );
+}
+
 /** Letters that roll up to a copy of themselves on hover or focus (CSS only). */
 export function Roll({ text }: { text: string }) {
   return (
