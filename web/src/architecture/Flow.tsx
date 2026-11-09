@@ -10,9 +10,11 @@ import {
   useInView,
   useMotionValueEvent,
   useScroll,
+  useSpring,
   useTransform,
 } from "motion/react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { QuestionChart } from "./Diagrams";
 import { FLOW, GROUPS, SAMPLE } from "./nodes";
 import { Detail, EASE, NodeButton, StatusTag } from "./parts";
 
@@ -27,11 +29,14 @@ export function stopAt(t: number) {
   return t < 0 ? -1 : Math.min(N - 1, Math.floor(t));
 }
 
-function Head() {
+function Head({ live }: { live: boolean }) {
   return (
     <div className="ar-flow-head">
       <h2 id="ar-h-flow">{FLOW_GROUP?.title}</h2>
-      <p className="ar-lede">{FLOW_GROUP?.lede}</p>
+      <div className="ar-flow-side">
+        <p className="ar-lede">{FLOW_GROUP?.lede}</p>
+        <QuestionChart live={live} />
+      </div>
     </div>
   );
 }
@@ -39,7 +44,7 @@ function Head() {
 export default function Flow({ scene, wide, still, playKey }: { scene: boolean; wide: boolean; still: boolean; playKey: number }) {
   return (
     <section className="ar-chapter ar-flow" aria-labelledby="ar-h-flow" id="flow" data-scene={scene || undefined}>
-      <Head />
+      <Head live={scene} />
       {scene ? <Scene playKey={playKey} /> : <Steps wide={wide} still={still} playKey={playKey} />}
     </section>
   );
@@ -50,7 +55,9 @@ export default function Flow({ scene, wide, still, playKey }: { scene: boolean; 
 function Scene({ playKey }: { playKey: number }) {
   const track = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
-  const t = useTransform(scrollYProgress, [0, 1], [-0.5, N]);
+  // sprung, so a fast flick still sweeps through every stop instead of jumping past them
+  const smooth = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.0005 });
+  const t = useTransform(smooth, [0, 1], [-0.5, N]);
   const [stop, setStop] = useState(-1);
   const [open, setOpen] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);

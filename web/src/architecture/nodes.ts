@@ -21,8 +21,6 @@ export interface Group {
 export interface ArchNode {
   id: string;
   group: GroupId;
-  /** parts this one feeds, reads or guards: the map's edges (undirected on screen) */
-  links: string[];
   title: string;
   /** one line, shown on the node itself */
   short: string;
@@ -81,7 +79,6 @@ export const NODES: ArchNode[] = [
   {
     id: "planner",
     group: "flow",
-    links: ["tools", "cache"],
     title: "Planner",
     short: "References resolved in code, 0 model calls",
     decision:
@@ -105,7 +102,6 @@ export const NODES: ArchNode[] = [
   {
     id: "tools",
     group: "flow",
-    links: ["writer", "l1", "l2", "l3"],
     title: "One round of Engine reads",
     short: "Up to 3 read-only calls, chosen by code",
     decision:
@@ -123,7 +119,6 @@ export const NODES: ArchNode[] = [
   {
     id: "writer",
     group: "flow",
-    links: ["grounding", "order", "local", "cloud"],
     title: "One writer call",
     short: "No tool schemas, the model only writes",
     decision:
@@ -140,7 +135,6 @@ export const NODES: ArchNode[] = [
   {
     id: "grounding",
     group: "flow",
-    links: ["reply", "cache"],
     title: "Grounding check",
     short: "Every figure matches a tool result",
     decision:
@@ -160,7 +154,6 @@ export const NODES: ArchNode[] = [
   {
     id: "reply",
     group: "flow",
-    links: [],
     title: "Reply and evidence",
     short: "Streamed only after the check",
     decision:
@@ -175,7 +168,6 @@ export const NODES: ArchNode[] = [
   {
     id: "l0",
     group: "knowledge",
-    links: ["l1"],
     title: "L0 Profile",
     short: "What it always knows, in under 800 tokens",
     decision:
@@ -193,7 +185,6 @@ export const NODES: ArchNode[] = [
   {
     id: "l1",
     group: "knowledge",
-    links: ["l3"],
     title: "L1 Summaries",
     short: "Pre-computed tables, exact, milliseconds",
     decision:
@@ -208,7 +199,6 @@ export const NODES: ArchNode[] = [
   {
     id: "l2",
     group: "knowledge",
-    links: ["l3", "local"],
     title: "L2 Meaning index",
     short: "FTS5 and local embeddings, fused",
     decision:
@@ -223,7 +213,6 @@ export const NODES: ArchNode[] = [
   {
     id: "l3",
     group: "knowledge",
-    links: [],
     title: "L3 Raw Ledger",
     short: "SQL, the exact drill-down",
     decision:
@@ -239,7 +228,6 @@ export const NODES: ArchNode[] = [
   {
     id: "local",
     group: "models",
-    links: [],
     title: "Local models",
     short: "qwen3.5 9b by default, 4b for speed",
     decision:
@@ -255,7 +243,6 @@ export const NODES: ArchNode[] = [
   {
     id: "router",
     group: "models",
-    links: ["planner", "local", "proposals"],
     title: "Router",
     short: "Keywords first, then one word from the model",
     decision:
@@ -269,7 +256,6 @@ export const NODES: ArchNode[] = [
   {
     id: "cloud",
     group: "models",
-    links: ["placeholders", "egress"],
     title: "Cloud wording",
     short: "Opt-in per conversation, placeholders only",
     decision:
@@ -293,7 +279,6 @@ export const NODES: ArchNode[] = [
   {
     id: "order",
     group: "context",
-    links: ["l0", "warm"],
     title: "Append-only prompt",
     short: "Prefix, profile, Memories, summary, turns, facts",
     decision:
@@ -312,7 +297,6 @@ export const NODES: ArchNode[] = [
   {
     id: "warm",
     group: "context",
-    links: ["local"],
     title: "Warm model",
     short: "Loaded while the chat is open",
     decision:
@@ -326,7 +310,6 @@ export const NODES: ArchNode[] = [
   {
     id: "cache",
     group: "context",
-    links: ["reply"],
     title: "Answer cache",
     short: "Keyed by the data, never by wording",
     decision:
@@ -344,7 +327,6 @@ export const NODES: ArchNode[] = [
   {
     id: "bandit",
     group: "learning",
-    links: ["tools", "beta"],
     title: "Contextual Thompson bandit",
     short: "Chooses what to suggest, in shadow",
     decision:
@@ -366,7 +348,6 @@ export const NODES: ArchNode[] = [
   {
     id: "bt",
     group: "learning",
-    links: ["tools"],
     title: "Bradley-Terry preferences",
     short: "\"Which would you cut first?\"",
     decision:
@@ -381,7 +362,6 @@ export const NODES: ArchNode[] = [
   {
     id: "beta",
     group: "learning",
-    links: ["tools"],
     title: "Beta relevance",
     short: "Thumbs move it, nothing else",
     decision:
@@ -394,7 +374,6 @@ export const NODES: ArchNode[] = [
   {
     id: "lora",
     group: "learning",
-    links: ["planner", "bench"],
     title: "LoRA fine-tunes",
     short: "Small, local, eval first",
     decision:
@@ -410,7 +389,6 @@ export const NODES: ArchNode[] = [
   {
     id: "bench",
     group: "evals",
-    links: ["router", "tools", "grounding", "local"],
     title: "Assistant benchmark",
     short: "Golden set, scored per model",
     decision:
@@ -423,7 +401,6 @@ export const NODES: ArchNode[] = [
   {
     id: "gate",
     group: "evals",
-    links: ["bench"],
     title: "Results gate",
     short: "Committed results must reproduce",
     decision:
@@ -436,7 +413,6 @@ export const NODES: ArchNode[] = [
   {
     id: "judge",
     group: "evals",
-    links: ["cloud", "gate"],
     title: "Calibrated judge",
     short: "Agreement with hand labels first",
     decision:
@@ -450,7 +426,6 @@ export const NODES: ArchNode[] = [
   {
     id: "ci",
     group: "evals",
-    links: ["gate", "egress"],
     title: "CI jobs",
     short: "One aggregate check guards main",
     decision:
@@ -465,7 +440,6 @@ export const NODES: ArchNode[] = [
   {
     id: "egress",
     group: "security",
-    links: [],
     title: "Three hosts",
     short: "Ollama, one aggregator, Gemini",
     decision:
@@ -483,7 +457,6 @@ export const NODES: ArchNode[] = [
   {
     id: "keychain",
     group: "security",
-    links: ["sqlcipher", "cloud"],
     title: "Keychain",
     short: "Every secret, never in a file",
     decision:
@@ -496,7 +469,6 @@ export const NODES: ArchNode[] = [
   {
     id: "sqlcipher",
     group: "security",
-    links: ["l3", "cache"],
     title: "Encrypted database",
     short: "SQLCipher, before any real data",
     decision:
@@ -509,7 +481,6 @@ export const NODES: ArchNode[] = [
   {
     id: "placeholders",
     group: "security",
-    links: ["egress"],
     title: "Gateway placeholders",
     short: "{P1}, {M1}, {D1} leave; values stay",
     decision:
@@ -526,7 +497,6 @@ export const NODES: ArchNode[] = [
   {
     id: "injection",
     group: "security",
-    links: ["order", "l3"],
     title: "Injection sanitising",
     short: "Bank text is data, never instructions",
     decision:
@@ -539,7 +509,6 @@ export const NODES: ArchNode[] = [
   {
     id: "nopay",
     group: "security",
-    links: ["egress", "proposals"],
     title: "No payments",
     short: "No transfer capability exists",
     decision: "No payment or transfer capability exists anywhere in the app. Bank access is read-only.",
@@ -551,7 +520,6 @@ export const NODES: ArchNode[] = [
   {
     id: "proposals",
     group: "security",
-    links: ["reply"],
     title: "Proposals only",
     short: "Every write waits for a click",
     decision:

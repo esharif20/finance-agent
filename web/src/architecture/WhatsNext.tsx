@@ -11,6 +11,8 @@ interface Item {
   text: string;
   kind: Kind;
   issues?: number[];
+  /** a 24 x 24 stroke path, for the idea tiles */
+  glyph?: string;
 }
 interface Next {
   id: string;
@@ -130,13 +132,13 @@ export const NEXT: Next[] = [
       </svg>
     ),
     items: [
-      { title: "Forecast with a range", text: "Cash flow to payday with confidence bands, and a warning before an overdraft.", kind: "exploring" },
-      { title: "Price creep and duplicates", text: "Notices when a recurring payment rises, or two services overlap.", kind: "exploring" },
-      { title: "Weekly \"what changed\"", text: "New Merchants, unusual payments and recurring changes, every figure from the Engine.", kind: "exploring" },
-      { title: "What-if in chat", text: "\"If I halve takeaways\" gives the saving and the date a goal is reached.", kind: "exploring" },
-      { title: "Goal coach", text: "Progress checked against actual spending, with nudges you can switch off.", kind: "exploring" },
-      { title: "At-the-till notes", text: "A Shortcut and local speech-to-text add purpose notes and splits as an overlay.", kind: "exploring", issues: [80] },
-      { title: "Why is this month higher?", text: "The gap broken down by Category and Merchant.", kind: "exploring" },
+      { title: "Forecast with a range", text: "Cash flow to payday with confidence bands, and a warning before an overdraft.", kind: "exploring", glyph: "M3 17l5-5 4 3 8-8M3 21h18" },
+      { title: "Price creep and duplicates", text: "Notices when a recurring payment rises, or two services overlap.", kind: "exploring", glyph: "M4 18h4V9H4zM10 18h4V6h-4zM16 18h4V3h-4z" },
+      { title: "Weekly \"what changed\"", text: "New Merchants, unusual payments and recurring changes, every figure from the Engine.", kind: "exploring", glyph: "M4 4h16v16H4zM4 9h16M9 4v5" },
+      { title: "What-if in chat", text: "\"If I halve takeaways\" gives the saving and the date a goal is reached.", kind: "exploring", glyph: "M4 5h16v10H9l-5 4z" },
+      { title: "Goal coach", text: "Progress checked against actual spending, with nudges you can switch off.", kind: "exploring", glyph: "M12 3a9 9 0 1 0 9 9M12 8a4 4 0 1 0 4 4M12 12l8-8" },
+      { title: "At-the-till notes", text: "A Shortcut and local speech-to-text add purpose notes and splits as an overlay.", kind: "exploring", issues: [80], glyph: "M9 3h6v10H9zM5 11a7 7 0 0 0 14 0M12 18v3" },
+      { title: "Why is this month higher?", text: "The gap broken down by Category and Merchant.", kind: "exploring", glyph: "M5 20V10M12 20V4M19 20v-7M3 20h18" },
     ],
   },
 ];
@@ -149,7 +151,37 @@ const RULES = [
 
 const LABEL: Record<Kind, string> = { planned: "Planned", exploring: "Exploring" };
 
+function KindTag({ kind }: { kind: Kind }) {
+  return (
+    <span className="ar-kind" data-kind={kind}>
+      <span className="ar-kind-mark" aria-hidden="true" />
+      {LABEL[kind]}
+    </span>
+  );
+}
+
+function Issues({ issues }: { issues?: number[] }) {
+  return (
+    <>
+      {issues?.map((n) => (
+        <a key={n} className="ar-issue" href={`${REPO}/issues/${n}`}>
+          #{n}
+        </a>
+      ))}
+    </>
+  );
+}
+
+const rise = (i: number) => ({
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.2 },
+  transition: { duration: 0.5, delay: i * 0.06, ease: EASE },
+});
+
 export default function WhatsNext() {
+  const groups = NEXT.filter((g) => g.id !== "ideas");
+  const ideas = NEXT.find((g) => g.id === "ideas");
   return (
     <section className="ar-chapter ar-next" id="ar-next" aria-labelledby="ar-h-next">
       <div className="ar-chapter-text">
@@ -159,37 +191,25 @@ export default function WhatsNext() {
         </p>
       </div>
       <div className="ar-next-grid">
-        {NEXT.map((g, i) => (
-          <motion.article
-            key={g.id}
-            className="ar-next-card"
-            aria-labelledby={`ar-h-n-${g.id}`}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: 0.5, delay: (i % 2) * 0.08, ease: EASE }}
-          >
+        {groups.map((g, i) => (
+          <motion.article key={g.id} className="ar-next-card" aria-labelledby={`ar-h-n-${g.id}`} {...rise(i)}>
             <div className="ar-next-head">
               <span className="ar-glyph" aria-hidden="true">
                 {g.glyph}
               </span>
               <h3 id={`ar-h-n-${g.id}`}>{g.title}</h3>
             </div>
-            <p>{g.lede}</p>
+            <p className="ar-next-lede">{g.lede}</p>
             <ul>
               {g.items.map((it) => (
                 <li key={it.title}>
                   <div className="ar-next-item-head">
                     <h4>{it.title}</h4>
-                    <span className={`ar-kind ar-kind-${it.kind}`}>{LABEL[it.kind]}</span>
+                    <KindTag kind={it.kind} />
                   </div>
                   <p>
                     {it.text}
-                    {it.issues?.map((n) => (
-                      <a key={n} className="ar-issue" href={`${REPO}/issues/${n}`}>
-                        #{n}
-                      </a>
-                    ))}
+                    <Issues issues={it.issues} />
                   </p>
                 </li>
               ))}
@@ -197,11 +217,42 @@ export default function WhatsNext() {
           </motion.article>
         ))}
       </div>
-      <ul className="ar-rules" aria-label="What stays true">
-        {RULES.map((r) => (
-          <li key={r}>{r}</li>
-        ))}
-      </ul>
+      {ideas && (
+        <div className="ar-ideas">
+          <div className="ar-next-head">
+            <span className="ar-glyph" aria-hidden="true">
+              {ideas.glyph}
+            </span>
+            <h3 id="ar-h-n-ideas">{ideas.title}</h3>
+          </div>
+          <p className="ar-next-lede">{ideas.lede}</p>
+          <ul className="ar-idea-grid" aria-labelledby="ar-h-n-ideas">
+            {ideas.items.map((it, i) => (
+              <motion.li key={it.title} className="ar-idea" {...rise(i % 4)}>
+                {it.glyph && (
+                  <svg viewBox="0 0 24 24" {...G} strokeWidth={2} aria-hidden="true">
+                    <path d={it.glyph} />
+                  </svg>
+                )}
+                <h4>{it.title}</h4>
+                <p>
+                  {it.text}
+                  <Issues issues={it.issues} />
+                </p>
+                <KindTag kind={it.kind} />
+              </motion.li>
+            ))}
+            <li className="ar-idea ar-idea-rules">
+              <h4>What stays true</h4>
+              <ul>
+                {RULES.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </li>
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

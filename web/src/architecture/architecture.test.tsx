@@ -68,17 +68,31 @@ describe("architecture page", () => {
     expect(screen.getByRole("region", { name: "Planner" })).toBeInTheDocument();
   });
 
-  it("lights a part's neighbours on the map and opens its decision", async () => {
+  it("lights a box's neighbours in a chart and shows its one-line note", async () => {
     setup(false, true);
     render(<Architecture />);
-    const map = screen.getByRole("group", { name: /Map of the Assistant/ });
-    const dot = within(map).getByRole("button", { name: "Grounding check" });
-    await userEvent.hover(dot);
-    expect(within(map).getByRole("button", { name: "Reply and evidence" })).not.toHaveAttribute("data-dim");
-    expect(within(map).getByRole("button", { name: "Keychain" })).toHaveAttribute("data-dim");
-    await userEvent.click(dot);
-    expect(dot).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getAllByRole("region", { name: "Grounding check" }).length).toBeGreaterThan(0);
+    const chart = screen.getByRole("group", { name: /^The system/ });
+    const ledger = within(chart).getByRole("img", { name: /^Ledger\./ });
+    await userEvent.hover(ledger);
+    expect(within(chart).getByRole("img", { name: /^Engine\./ })).not.toHaveAttribute("data-dim");
+    expect(within(chart).getByRole("img", { name: /^Gemini\./ })).toHaveAttribute("data-dim");
+    expect(screen.getByText(/integer pence, in one SQLCipher database/)).toBeInTheDocument();
+  });
+
+  it("draws planned orchestration apart from the built graph", () => {
+    setup(false, true);
+    render(<Architecture />);
+    const chart = screen.getByRole("group", { name: /Assistant's graph/ });
+    expect(within(chart).getByText("Orchestration")).toBeInTheDocument();
+    expect(within(chart).getByText("Planned")).toBeInTheDocument();
+    expect(within(chart).getByRole("img", { name: /^Learned model router\. Planned/ })).toHaveAttribute("data-outside");
+  });
+
+  it("shows a picture beside a security decision", async () => {
+    setup(false, false);
+    render(<Architecture />);
+    await userEvent.click(screen.getByRole("button", { name: /Gateway placeholders.+/ }));
+    expect(screen.getByRole("region", { name: "Gateway placeholders" })).toHaveTextContent("{P1} at {M1} on {D1}");
   });
 
   it("rests on the whole path, lit, with reduced motion", () => {

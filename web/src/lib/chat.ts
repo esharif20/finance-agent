@@ -32,6 +32,9 @@ export type Counted = { evidence_id: string; total_minor: number; transactions: 
 /** Server-measured time for one turn (#317): monotonic ms per phase, never content. */
 export type Timing = { total_ms: number; phases: Record<string, number>; model_calls: number; model: string | null };
 
+/** A figure reply's inline chart (#317): bars that sum to the stated total. */
+export type Chart = { title: string; currency: string; total_minor: number; bars: { label: string; minor: number }[] };
+
 export type Message = {
   id: number;
   role: "user" | "assistant";
@@ -45,6 +48,7 @@ export type Message = {
   chips?: string[]; // follow-ups the server can answer, sent as typed when tapped
   resolved?: string[]; // how the question was read, e.g. "Transport › Fuel"
   timing?: Timing;
+  chart?: Chart;
   waitedMs?: number; // send to done, measured in the browser
   error?: string;
 };
@@ -93,7 +97,7 @@ export function reduce(s: Chat, a: Action): Chat {
         const thread = typeof data.thread_id === "string" ? data.thread_id : s.thread;
         const proposalId = typeof data.proposal_id === "number" ? data.proposal_id : null;
         const counted = parseCounted(data.counted);
-        const extra = { chips: strings(data.chips), resolved: strings(data.resolved), timing: parseTiming(data.timing) };
+        const extra = { chips: strings(data.chips), resolved: strings(data.resolved), timing: parseTiming(data.timing), chart: parseChart(data.chart) };
         return last({ ...s, thread }, (m) => ({ ...m, path: data.path as Path, proposalId, counted, ...extra, costPence: typeof data.cost_pence === "number" ? data.cost_pence : null, stage: undefined }));
       }
       if (name === "stage" && typeof data.text === "string") {
@@ -116,6 +120,18 @@ export function reduce(s: Chat, a: Action): Chat {
 const isInt = (v: unknown): v is number => Number.isSafeInteger(v);
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 4) : []);
 const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+
+/** The meta event's `chart`, only when its bars add up to its total exactly. */
+export function parseChart(raw: unknown): Chart | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const c = raw as Record<string, unknown>;
+  if (typeof c.title !== "string" || typeof c.currency !== "string" || !isInt(c.total_minor) || !Array.isArray(c.bars)) return undefined;
+  const bars = (c.bars as (Record<string, unknown> | null)[]).filter(
+    (b): b is { label: string; minor: number } => !!b && typeof b.label === "string" && isInt(b.minor),
+  );
+  if (bars.length < 2 || bars.length !== c.bars.length || bars.reduce((n, b) => n + b.minor, 0) !== c.total_minor) return undefined;
+  return { title: c.title, currency: c.currency, total_minor: c.total_minor, bars };
+}
 
 export function parseTiming(raw: unknown): Timing | undefined {
   if (!raw || typeof raw !== "object") return undefined;

@@ -1,6 +1,7 @@
 import { MotionConfig } from "motion/react";
-import { type ComponentType, useEffect, useState } from "react";
-import ArchMap from "./ArchMap";
+import Agent from "./Agent";
+import { type ReactNode, useEffect, useState } from "react";
+import { EvalChart, LearningChart, PromptStack, SECURITY_VISUAL, SystemChart, Tiers } from "./Diagrams";
 import { EgressFigure, ModelsFigure } from "./Figures";
 import Flow from "./Flow";
 import { GROUPS, type Group, NODES, REPO, STATUS_LABEL, type Status } from "./nodes";
@@ -10,63 +11,41 @@ import "./architecture.css";
 
 const [, ...CHAPTERS] = GROUPS as [Group, ...Group[]];
 
-const FIGURE: Partial<Record<Group["id"], ComponentType>> = {
-  models: ModelsFigure,
-  security: EgressFigure,
+const FIGURE: Partial<Record<Group["id"], (live: boolean) => ReactNode>> = {
+  knowledge: () => <Tiers />,
+  models: () => <ModelsFigure />,
+  context: () => <PromptStack />,
+  learning: (live) => <LearningChart live={live} />,
+  evals: (live) => <EvalChart live={live} />,
+  security: () => <EgressFigure />,
 };
 
 /** One chapter: its nodes, and the open node's detail beside them (wide) or under the node (phone). */
-function Chapter({ group, wide }: { group: Group; wide: boolean }) {
+function Chapter({ group, wide, live }: { group: Group; wide: boolean; live: boolean }) {
   const nodes = NODES.filter((n) => n.group === group.id);
   const [open, setOpen] = useState<string | null>(wide ? (nodes[0]?.id ?? null) : null);
   const shown = nodes.find((n) => n.id === open);
   const toggle = (id: string) => setOpen((o) => (o === id && !wide ? null : id));
-  const Fig = FIGURE[group.id];
+  const visual = (id: string) => SECURITY_VISUAL[id]?.();
   return (
     <section className={`ar-chapter ar-${group.id}`} id={`ar-${group.id}`} aria-labelledby={`ar-h-${group.id}`}>
       <div className="ar-chapter-text">
         <h2 id={`ar-h-${group.id}`}>{group.title}</h2>
         <p className="ar-lede">{group.lede}</p>
-        {group.id === "context" && <PromptStrip />}
-        {Fig && <Fig />}
+        {FIGURE[group.id]?.(live)}
       </div>
       <div className="ar-chapter-body">
         <ul className="ar-nodes" data-layout={group.id}>
           {nodes.map((n) => (
             <li key={n.id}>
               <NodeButton node={n} open={open === n.id} onToggle={() => toggle(n.id)} />
-              {!wide && open === n.id && <Detail node={n} id={`ar-d-${n.id}`} />}
+              {!wide && open === n.id && <Detail node={n} id={`ar-d-${n.id}`} visual={visual(n.id)} />}
             </li>
           ))}
         </ul>
-        {wide && shown && <Detail node={shown} id={`ar-d-${shown.id}`} />}
+        {wide && shown && <Detail node={shown} id={`ar-d-${shown.id}`} visual={visual(shown.id)} />}
       </div>
     </section>
-  );
-}
-
-/** The prompt's fixed order, with the part the KV cache reuses marked. */
-function PromptStrip() {
-  const parts: [string, boolean][] = [
-    ["System prefix", true],
-    ["Profile", true],
-    ["Memories", true],
-    ["Summary", false],
-    ["Last 3 turns", false],
-    ["This turn's facts", false],
-    ["Question", false],
-  ];
-  return (
-    <figure className="ar-strip">
-      <ol>
-        {parts.map(([label, cached]) => (
-          <li key={label} data-cached={cached || undefined}>
-            {label}
-          </li>
-        ))}
-      </ol>
-      <figcaption>The dark part is the stable prefix, reused from the KV cache; the rest follows in order.</figcaption>
-    </figure>
   );
 }
 
@@ -74,8 +53,8 @@ export default function Architecture() {
   const still = useStill();
   const wide = useMedia("(min-width: 900px)");
   const coarse = useMedia("(pointer: coarse)");
-  // the scroll scene needs room, a fine pointer and motion; everything else gets the stepped path
-  const scene = wide && !coarse && !still;
+  // motion that runs on its own needs room, a fine pointer and no reduced-motion preference
+  const live = wide && !coarse && !still;
   const [playKey, setPlayKey] = useState(0);
 
   useEffect(() => {
@@ -84,7 +63,7 @@ export default function Architecture() {
 
   const playFromHero = () => {
     setPlayKey((k) => k + 1);
-    if (!scene) document.getElementById("flow")?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+    if (!live) document.getElementById("flow")?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
   };
 
   return (
@@ -121,10 +100,35 @@ export default function Architecture() {
               </div>
             </div>
           </section>
-          <ArchMap wide={wide} />
-          <Flow scene={scene} wide={wide} still={still} playKey={playKey} />
+          <section className="ar-system" aria-labelledby="ar-h-system">
+            <div className="ar-system-head">
+              <h2 id="ar-h-system">The whole system, on one Mac</h2>
+              <p>
+                The dashed line is the Mac. Two hosts sit outside it: a read-only bank feed, and Gemini, which only
+                ever sees placeholders and only when you opt in. Point at a box to see what it does.
+              </p>
+            </div>
+            <SystemChart wide={wide} live={live} />
+            <nav className="ar-toc" aria-label="On this page">
+              <ul>
+                {GROUPS.map((g) => (
+                  <li key={g.id}>
+                    <a href={g.id === "flow" ? "#flow" : `#ar-${g.id}`}>
+                      {g.title}
+                      <span>{NODES.filter((n) => n.group === g.id).length}</span>
+                    </a>
+                  </li>
+                ))}
+                <li>
+                  <a href="#ar-next">What's next</a>
+                </li>
+              </ul>
+            </nav>
+          </section>
+          <Flow scene={live} wide={wide} still={still} playKey={playKey} />
+          <Agent wide={wide} live={live} />
           {CHAPTERS.map((g) => (
-            <Chapter key={`${g.id}-${wide}`} group={g} wide={wide} />
+            <Chapter key={`${g.id}-${wide}`} group={g} wide={wide} live={live} />
           ))}
           <WhatsNext />
         </main>
