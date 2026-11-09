@@ -2206,3 +2206,29 @@
   }
 }
 
+
+/* ===== UI wave: brand-board corners on the tally and the opener ===== */
+.pl-plane .lp-corners > i,
+.op .lp-corners > i {
+  margin: max(4px, calc(var(--lp-gutter) - 18px));
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+.pl-pct::after {
+  counter-reset: pct var(--pct, 0);
+  content: counter(pct) "%";
+  font-variant-numeric: tabular-nums;
+}
+.op > .lp-corners {
+  transition: color 0.2s ease;
+}
+.op[data-full] > .lp-corners {
+  color: var(--lp-black);
+}
+.lp-mark-ch {
+  display: inline-block;
+}
+.lp-bar-mark {
+  overflow: clip;
+  padding-bottom: 0.04em;
+}
