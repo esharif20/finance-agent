@@ -824,3 +824,17 @@ a:focus-visible > .lp-roll .lp-roll-in > span {
   border-radius: clamp(20px, 3vw, 36px) clamp(20px, 3vw, 36px) 0 0;
   overflow: clip;
 }
+
+/* a narrow phone (SE widths): the wordmark and the pill share the row without spilling over */
+@media (max-width: 400px) {
+  .lp-nav {
+    gap: 12px;
+  }
+  .lp-brand {
+    font-size: 1.0625rem;
+  }
+  .lp-nav .lp-pill {
+    padding: 0 16px;
+    font-size: 0.9375rem;
+  }
+}

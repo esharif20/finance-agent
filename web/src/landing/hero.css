@@ -747,7 +747,7 @@
   }
   .lp .lp-hero-scene > .lp-stage {
     transform: translateY(24%);
-    transition: transform 0.6s var(--lp-ease-out);
+    transition: transform 0.6s var(--lp-ease-out), opacity 0.4s var(--lp-ease-out);
   }
   .lp-hero-pin:not([data-phase="0"]) .lp-hero-scene > .lp-stage {
     transform: translateY(18%);
@@ -1144,8 +1144,9 @@
     width: 13px;
     height: 13px;
   }
+  /* the opening hand clears the buttons: Hero.tsx measures --fan-y */
   .lp-hero-pin[data-phase="0"] .lp-hero-scene > .lp-stage {
-    transform: translateY(24%);
+    transform: translateY(var(--fan-y, 24%));
   }
 }
 
@@ -1215,4 +1216,13 @@
    the primary colour) */
 .lp {
   --lp-violet: rgb(128 96 236 / 0.42);
+}
+
+/* a short phone: no worn list under the opening hand, and no hand at all if even that will not
+   fit under the buttons (Hero.tsx sets these); the row and the totals are unchanged */
+.lp-stage[data-nolist] .lp-worn-list {
+  visibility: hidden;
+}
+.lp-hero-pin[data-phase="0"] .lp-stage[data-short] {
+  opacity: 0;
 }

@@ -56,10 +56,11 @@ const span = (p: number, a: number, b: number) => ease(clamp01((p - a) / (b - a)
 
 /** The three stages of the move for card i: a fanned hand, a row with each account labelled, one
     stack over the combined view. `w` is a card's width; returns offsets from the stage centre. */
-function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }, ox = 0): Pose & { label: number } {
+function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }, ox = 0, fit = 1): Pose & { label: number } {
   const n = i - 1;
-  // desktop: the whole move happens right of the copy column (ox); a phone keeps it centred
-  const fan = { x: ox + (narrow ? n * w * 0.3 : n * w * 0.44), y: narrow ? -w * 0.1 - n * 22 : -w * 0.12 - n * 22, rz: narrow ? -2 + n * 8 : -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
+  // desktop: the whole move happens right of the copy column (ox); a phone keeps it centred, and
+  // its fanned hand shrinks by `fit` about the centre when the room under the buttons is short
+  const fan = { x: ox + (narrow ? n * w * 0.3 * fit : n * w * 0.44), y: narrow ? (-w * 0.1 - n * 22) * fit : -w * 0.12 - n * 22, rz: narrow ? -2 + n * 8 : -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
   const gap = narrow ? w * 0.14 : w * 0.1;
   // on a phone the row is a column, cards on the left and each label beside its card
   const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: ox + n * (w + gap), y: w * 0.02, rz: 0, rx: 0, ry: 0, z: 0 };
@@ -79,7 +80,7 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
     // gathering, each card turns right over once, back and all, one after the other
     ry: k("ry") + tilt.x * 12 + 360 * span(p, 0.48 + i * 0.05, 0.66 + i * 0.05),
     rz: k("rz"),
-    s: mix(mix(narrow ? 0.95 + (i === 2 ? 0.05 : 0) : 1.45, 1 + (narrow ? 0 : 0.06 * drift), a), narrow ? 0.82 : 1, b),
+    s: mix(mix(narrow ? (0.95 + (i === 2 ? 0.05 : 0)) * fit : 1.45, 1 + (narrow ? 0 : 0.06 * drift), a), narrow ? 0.82 : 1, b),
     layer: i,
     label: clamp01((p - 0.2) / 0.06) * (1 - clamp01((p - 0.47) / 0.05)),
   };
@@ -391,7 +392,36 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // a big screen keeps the composition to 1760px, centred (hero.css does the same for the copy)
       const w = Math.min(narrow ? r.width * 0.36 : Math.min(r.width, 1760) * (r.width >= 1680 ? 0.18 : 0.165), r.height * 0.27 * ASPECT, 360);
       el.style.setProperty("--cw", `${w.toFixed(1)}px`);
-      return { r, narrow, w, h: w / ASPECT };
+      // a phone's opening hand sits at least 24px under the buttons, with the worn list under it
+      // and above the bottom edge: the stage moves down by --fan-y, and the hand shrinks if it must
+      let fit = 1;
+      const frame = el.parentElement;
+      if (narrow && frame) {
+        const sr = frame.getBoundingClientRect();
+        const cta = frame.querySelector(".lp-actions")?.getBoundingClientRect();
+        const listH = el.querySelector<HTMLElement>(".lp-worn-list")?.offsetHeight || 84;
+        const top = (cta && cta.height ? cta.bottom - sr.top : sr.height * 0.55) + 24;
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (let i = 0; i < 3; i++) {
+          const q = pose(i, 0, w, true, { x: 0, y: 0 });
+          const t = (q.rz * Math.PI) / 180;
+          const half = ((w * Math.abs(Math.sin(t)) + (w / ASPECT) * Math.abs(Math.cos(t))) / 2) * q.s;
+          lo = Math.min(lo, q.y - half);
+          hi = Math.max(hi, q.y + half);
+        }
+        // a short screen drops the worn list before the hand gets small; if even the bare hand
+        // will not fit, the stage waits off this beat (data-short) and the cards come in with the row
+        const room = sr.height - 12 - top;
+        const withList = (room - listH - 18) / (hi - lo);
+        const short = withList < 0.6;
+        const raw = Math.min(1, short ? room / (hi - lo) : withList);
+        fit = Math.max(0.5, raw);
+        el.toggleAttribute("data-nolist", short);
+        el.toggleAttribute("data-short", raw < 0.6);
+        el.style.setProperty("--fan-y", `${(top - (sr.height / 2 + lo * fit)).toFixed(1)}px`);
+      }
+      return { r, narrow, w, h: w / ASPECT, fit };
     };
     let dims = size();
     const specs = Array.from(el.querySelectorAll<HTMLElement>(".lp-acard-slot > .lp-acard .lp-acard-spec"));
@@ -445,7 +475,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // view and the tab is visible (the IO and visibilitychange stop and wake the loop)
       const sway = narrow ? 0 : clamp01((since - 2200) / 1800) * (1 - clamp01((pv - 0.02) / 0.08) * 0.7);
       const ox = narrow ? 0 : Math.min(r.width, 1760) * 0.19;
-      const base = ACCOUNTS.accounts.map((_, i) => pose(i, pv, w, narrow, tilt, ox));
+      const base = ACCOUNTS.accounts.map((_, i) => pose(i, pv, w, narrow, tilt, ox, dims.fit));
       // hit test, front card first: the scaled card's box, a little generous
       let hit = -1;
       if (cur.in && pv < 0.56)
@@ -629,6 +659,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           })
         : null;
     ro?.observe(el);
+    // the buttons settle once the display face loads; the phone's hand is placed under them again
+    void document.fonts?.ready.then(() => {
+      sizeScene();
+      kick();
+    });
     const wake = () => kick();
     kicker.current = kick;
     window.addEventListener("pointermove", move);
