@@ -1173,3 +1173,114 @@ html[data-scrolling] .ambient i {
 :root[data-settled] .odometer[data-play] .odo-reel {
   animation: none;
 }
+
+/* ===== App pass: the landing and /architecture language in the app =====
+   Presentation only: figures, their rounding and the privacy blur are untouched. */
+:root {
+  --spec: rgb(255 255 255 / 0.85);
+  --caustic: rgb(14 150 170 / 0.06);
+  --meta: rgb(27 29 31 / 0.5);
+  --accent-mint: #2f8a4a;
+  --tone-in: rgb(47 138 74 / 0.08);
+  --tone-out: rgb(196 92 54 / 0.08);
+  --tone-in-rim: rgb(47 138 74 / 0.35);
+  --tone-out-rim: rgb(196 92 54 / 0.35);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --spec: rgb(255 255 255 / 0.09);
+    --caustic: rgb(60 175 205 / 0.07);
+    --meta: rgb(255 255 255 / 0.5);
+    --accent-mint: #9ae187;
+    --tone-in: rgb(154 225 135 / 0.07);
+    --tone-out: rgb(240 140 100 / 0.07);
+    --tone-in-rim: rgb(154 225 135 / 0.3);
+    --tone-out-rim: rgb(240 140 100 / 0.3);
+  }
+}
+
+/* page head: a meta row (the landing's rail) over a display-face title */
+.page-meta {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+.page-meta span:first-child {
+  color: var(--accent-mint);
+}
+.page-meta span + span::before {
+  content: "·";
+  margin-right: 10px;
+  color: var(--meta);
+}
+.page-head .text-title {
+  font-size: clamp(2rem, 1.4rem + 1.8vw, 2.75rem);
+  font-weight: 760;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.review-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--tone-in);
+  box-shadow: inset 0 0 0 1px var(--tone-in-rim);
+}
+
+/* card titles take the display face, as /architecture's tile heads do */
+.card-glass .text-heading {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+@layer components {
+  /* Liquid glass, deeper: a specular crown along the top edge and a faint caustic pooled at the
+     foot, over the existing three-layer depth and spotlight rim. Static: nothing here animates. */
+  .card-glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 46px at 28% 0%, var(--spec), transparent 72%),
+      radial-gradient(55% 64px at 74% 100%, var(--caustic), transparent 72%);
+  }
+}
+
+/* tinted tiles: money in reads mint, money out reads warm, each with a coloured rim and dot */
+.tone-tile {
+  position: relative;
+  background-image: linear-gradient(160deg, var(--tone-in), transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--tone-in-rim);
+}
+.tone-tile[data-tone="out"] {
+  background-image: linear-gradient(160deg, var(--tone-out), transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--tone-out-rim);
+}
+.tone-tile dt::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px 1px 0;
+  border-radius: 50%;
+  background: var(--accent-mint);
+}
+.tone-tile[data-tone="out"] dt::before {
+  background: rgb(222 120 82);
+}
+
+/* the active tab's marker carries the accent, faintly */
+[data-marker] {
+  box-shadow: inset 0 0 0 1px var(--tone-in-rim);
+}

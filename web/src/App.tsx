@@ -71,10 +71,17 @@ function Shell() {
             />
           ) : (
             <>
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <h1 className="text-title">{route.name === "settings" ? "Settings" : route.name === "briefing" ? "Briefing" : route.name === "know" ? "How well I know you" : route.name === "goals" ? "Goals" : route.name === "plan" ? "Plan" : route.name === "story" ? "Your month" : TABS.find((t) => t.id === tab)?.label}</h1>
+              <div className="page-head mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+                <div>
+                  {/* the landing's meta row, over the page title */}
+                  <p className="page-meta" aria-hidden="true">
+                    <span>{import.meta.env.VITE_DEMO === "1" ? "Synthetic household" : "Your ledger"}</span>
+                    <span>on this Mac</span>
+                  </p>
+                  <h1 className="text-title">{route.name === "settings" ? "Settings" : route.name === "briefing" ? "Briefing" : route.name === "know" ? "How well I know you" : route.name === "goals" ? "Goals" : route.name === "plan" ? "Plan" : route.name === "story" ? "Your month" : TABS.find((t) => t.id === tab)?.label}</h1>
+                </div>
                 {route.name === "overview" && review > 0 && (
-                  <a href="#review" className="text-sm font-semibold underline-offset-4 hover:underline">
+                  <a href="#review" className="review-pill text-sm font-semibold underline-offset-4 hover:underline">
                     {review} to review
                   </a>
                 )}
