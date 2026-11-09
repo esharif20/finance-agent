@@ -7,7 +7,7 @@ import { afterEach as clearAfter } from "vitest";
 
 // App keeps one QueryClient with a staleTime: each test starts from an empty cache
 clearAfter(() => queryClient.clear());
-import { SubscriptionsCard } from "@/components/SubscriptionsCard";
+import { SubscriptionsCard, SubscriptionsStrip } from "@/components/SubscriptionsCard";
 import { PrivacyProvider } from "@/lib/privacy";
 import type { Costs, Entry } from "@/lib/subscriptions";
 import { MANAGE_LINKS_STUB } from "./manageLinksStub";
@@ -307,6 +307,21 @@ describe("Overview card", () => {
     await userEvent.keyboard("h");
     expect(screen.queryAllByText(/£\d/, { selector: ".sr-only" })).toEqual([]);
     expect(document.querySelectorAll(".money").length).toBe(2);
+  });
+});
+
+describe("phone strip", () => {
+  it("shows the API's monthly total and the soonest next charge, and opens Subscriptions", async () => {
+    const c = costs();
+    c.items[0]!.next_due_on = "2026-04-09";
+    c.items[1]!.next_due_on = "2026-04-03";
+    serve(c);
+    wrap(<SubscriptionsStrip />);
+    expect(await screen.findByText("£22.98", { selector: ".sr-only" })).toBeInTheDocument();
+    expect(screen.getByText("Next: Spotify, 3 Apr")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Subscriptions/ })).toHaveAttribute("href", "#subscriptions");
+    await userEvent.keyboard("h");
+    expect(screen.queryAllByText(/£\d/, { selector: ".sr-only" })).toEqual([]);
   });
 });
 

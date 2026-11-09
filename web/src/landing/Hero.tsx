@@ -77,9 +77,9 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
     z: k("z"),
     rx: k("rx") + tilt.y * 8,
     // gathering, each card turns right over once, back and all, one after the other
-    ry: k("ry") + tilt.x * 12 + (narrow ? 0 : 360 * span(p, 0.48 + i * 0.05, 0.66 + i * 0.05)),
+    ry: k("ry") + tilt.x * 12 + 360 * span(p, 0.48 + i * 0.05, 0.66 + i * 0.05),
     rz: k("rz"),
-    s: mix(mix(narrow ? 1.1 : 1.45, 1 + (narrow ? 0 : 0.06 * drift), a), narrow ? 0.82 : 1, b),
+    s: mix(mix(narrow ? 0.95 + (i === 2 ? 0.05 : 0) : 1.45, 1 + (narrow ? 0 : 0.06 * drift), a), narrow ? 0.82 : 1, b),
     layer: i,
     label: clamp01((p - 0.2) / 0.06) * (1 - clamp01((p - 0.47) / 0.05)),
   };
@@ -298,7 +298,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const sheens = useRef<(HTMLSpanElement | null)[]>([]);
   const peek = useRef<HTMLDivElement>(null);
   const worn = useRef<(HTMLSpanElement | null)[]>([]);
+  const wornList = useRef<HTMLUListElement>(null);
   const combined = useRef<HTMLDivElement>(null);
+  const contact = useRef<HTMLSpanElement>(null);
   const [three, setThree] = useState(false);
   const playing = useRef(play);
   playing.current = play;
@@ -387,7 +389,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // the row of three must fit the frame; the CSS stand-ins take the same width through --cw.
       // Capped by height too, so a short window never squeezes the hand
       // a big screen keeps the composition to 1760px, centred (hero.css does the same for the copy)
-      const w = Math.min(narrow ? r.width * 0.4 : Math.min(r.width, 1760) * (r.width >= 1680 ? 0.18 : 0.165), r.height * 0.27 * ASPECT, 360);
+      const w = Math.min(narrow ? r.width * 0.36 : Math.min(r.width, 1760) * (r.width >= 1680 ? 0.18 : 0.165), r.height * 0.27 * ASPECT, 360);
       el.style.setProperty("--cw", `${w.toFixed(1)}px`);
       return { r, narrow, w, h: w / ASPECT };
     };
@@ -492,9 +494,28 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       worn.current.forEach((c, i) => {
         if (!c) return;
         const f = narrow ? span(pv, 0.08 + i * 0.02, 0.16 + i * 0.02) : span(pv, 0.42 + i * 0.03, 0.5 + i * 0.03);
+        // a phone shows the rows upright, as a list under the hand (below), not on the tilted cards
+        const show = narrow ? "none" : "";
+        if (c.style.display !== show) c.style.display = show;
         c.style.opacity = String(1 - f);
         c.style.setProperty("--in", f.toFixed(3));
       });
+      const wl = wornList.current;
+      if (wl) {
+        const on = narrow ? "" : "none";
+        if (wl.style.display !== on) wl.style.display = on;
+        if (narrow) {
+          // 14px under the lowest corner of the fanned hand: a card turned by rz reaches down by half
+          // of (w|sin rz| + h|cos rz|); the small rx/ry tilt only shortens it
+          const reach = (q: (typeof poses)[number]) => {
+            const t = (q.rz * Math.PI) / 180;
+            return q.y + ((dims.w * Math.abs(Math.sin(t)) + dims.h * Math.abs(Math.cos(t))) / 2) * q.s;
+          };
+          const bottom = Math.max(...poses.map(reach));
+          wl.style.transform = `translate3d(0, ${(bottom + 18).toFixed(1)}px, 0)`;
+          wl.style.opacity = String(1 - span(pv, 0.08, 0.16));
+        }
+      }
       // a light sweeps across the foil on the deal, then again every 7 s while the hand idles
       const sweep = clamp01(since > 2600 ? ((since - 2600) % 7000) / 1500 : (since - 1100) / 1500);
       const sweeping = sweep > 0 && sweep < 1 && hover < 0;
@@ -503,7 +524,11 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       poses.forEach((q, i) => {
         // the glass catches the light as the card turns: the specular band slides with its rotation
         const sp = specs[i];
-        if (sp) sp.style.transform = `translate3d(${(-q.ry * 1.4 - q.rz * 2 + q.rx * 0.8).toFixed(1)}%, 0, 0)`;
+        if (sp) {
+          sp.style.transform = `translate3d(${(-q.ry * 1.4 - q.rz * 2 + q.rx * 0.8).toFixed(1)}%, 0, 0)`;
+          // brighter as the card turns toward the light, dim face-on
+          sp.style.opacity = (0.45 + 0.55 * Math.abs(Math.sin(((q.ry + q.rx) * Math.PI) / 180))).toFixed(2);
+        }
         const f = floors.current[i];
         if (f) {
           f.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.rest + dims.h * 0.78}px, 0) scale(${(1.25 - 0.25 * q.deal) * q.s}, ${0.22 * q.s})`;
@@ -520,7 +545,10 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         if (sh) sh.style.transform = `translate3d(${(-tilt.x * 150).toFixed(1)}%, ${(-tilt.y * 50).toFixed(1)}%, 0) skewX(-14deg)`;
         const c = cards.current[i];
         if (c) {
-          c.style.transform = `translate(-50%, -50%) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${q.ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
+          // DOM cards: no turn-over while gathering (siblings that rotate past each other can cut
+          // through one another in Safari), and each card carries its own perspective in a flat stage
+          const ry = q.ry - 360 * span(pv, 0.48 + i * 0.05, 0.66 + i * 0.05);
+          c.style.transform = `translate(-50%, -50%) perspective(1600px) translate3d(${q.x}px, ${q.y}px, ${q.z}px) rotateX(${q.rx}deg) rotateY(${ry}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
           c.style.zIndex = String(q.layer + 1);
         }
         const l = labels.current[i];
@@ -531,6 +559,14 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
           l.style.opacity = String(q.label);
         }
       });
+      const cs = contact.current;
+      if (cs) {
+        const g = span(pv, 0.5, 0.72);
+        const lift = span(pv, 0.72, 1);
+        const top = poses[poses.length - 1];
+        if (top) cs.style.transform = `translate(-50%, -50%) translate3d(${top.x.toFixed(1)}px, ${(top.rest + dims.h * 0.75).toFixed(1)}px, 0) scale(${(1 + 0.25 * lift).toFixed(3)}, ${(1 - 0.2 * lift).toFixed(3)})`;
+        cs.style.opacity = (g * (1 - 0.4 * lift)).toFixed(3);
+      }
       const moving = Math.abs(goal.current - pv) > 0.0004;
       // idle sway alone renders at half rate
       const idleOnly = sway > 0 && !settling && !lifting && !sweeping && !moving;
@@ -715,6 +751,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
               ACCOUNTS.accounts.map((a, i) => (
                 <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
               ))}
+            {lite && <span ref={contact} className="lp-contact" />}
             {/* phones: no canvas at all; the cards are the DOM faces below, moved by transform */}
             {!lite && <canvas ref={canvas} className="lp-stage-canvas" />}
             {ACCOUNTS.accounts.map((a, i) => (
@@ -737,6 +774,18 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                 )}
               </div>
             ))}
+            {/* phones: the worn rows as an upright list under the hand, each dotted in its card's colour */}
+            <ul ref={wornList} className="lp-worn-list" aria-hidden="true" style={{ display: "none" }}>
+              {WORN.map((c, i) => (
+                <li key={c.merchant} className="lp-chip" style={{ "--h": HUES[i] } as React.CSSProperties}>
+                  <span className="lp-worn-dot" />
+                  <span className="lp-chip-tick" data-ok={c.ok ? "" : undefined} />
+                  <span>{c.merchant}</span>
+                  {c.amount && <Money value={c.amount} />}
+                  <em>{c.note}</em>
+                </li>
+              ))}
+            </ul>
             {ACCOUNTS.accounts.map((a, i) => (
               <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct" style={{ "--h": HUES[i] } as React.CSSProperties}>
                 <p className="lp-acct-name">{a.name}</p>

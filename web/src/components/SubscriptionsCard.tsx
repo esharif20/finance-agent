@@ -1,9 +1,50 @@
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRight, Repeat } from "lucide-react";
 import { fetchSubscriptionCosts } from "@/api/client";
 import { Money } from "@/components/Money";
 import { SUBS_KEY } from "@/components/SubscriptionPrompt";
 import { Card } from "@/components/ui/card";
 import { flagCount } from "@/lib/subscriptions";
+
+const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+/** The phone's quick way in, under the account cards: the monthly Subscriptions total as the API
+    gives it and the soonest next charge it lists (a pick, no maths); a tap opens Subscriptions. */
+export function SubscriptionsStrip() {
+  const { data } = useQuery({ queryKey: [...SUBS_KEY, "costs"], queryFn: fetchSubscriptionCosts });
+  if (!data || !Array.isArray(data.items) || !data.items.length) return null;
+  const subs = data.totals.find((t) => t.kind === "subscription")?.monthly;
+  const next = data.items
+    .filter((i) => i.next_due_on)
+    .sort((a, b) => (a.next_due_on as string).localeCompare(b.next_due_on as string))[0];
+  return (
+    <Card className="p-0 sm:p-0">
+      <a
+        href="#subscriptions"
+        className="subs-strip flex min-h-14 items-center gap-3 rounded-card px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-active" aria-hidden="true">
+          <Repeat className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-label font-semibold">Subscriptions</span>
+          {next?.next_due_on && (
+            <span className="block truncate text-meta text-muted-foreground">
+              Next: {next.display_name || next.merchant}, {SHORT.format(new Date(`${next.next_due_on}T00:00:00`))}
+            </span>
+          )}
+        </span>
+        {subs && (
+          <span className="text-right">
+            <Money value={subs} className="block text-row font-semibold tabular-nums" />
+            <span className="block text-meta text-muted-foreground">a month</span>
+          </span>
+        )}
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </a>
+    </Card>
+  );
+}
 
 /** The Overview card: what Subscriptions cost a month, what Bills cost, and how many flags. */
 export function SubscriptionsCard() {

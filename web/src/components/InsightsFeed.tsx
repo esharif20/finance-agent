@@ -43,7 +43,7 @@ function Row({ insight }: { insight: Insight }) {
   return (
     <motion.li
       layout={!reduce}
-      exit={{ opacity: 0 }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, x: 16, scale: 0.98 }}
       transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
       className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0"
     >
@@ -129,7 +129,7 @@ export function InsightsFeed() {
         </div>
       </div>
       {data.length ? (
-        <ul className="divide-y divide-border">
+        <ul className="fx-stagger divide-y divide-border">
           <AnimatePresence initial={false}>
             {data.map((i) => (
               <Row key={i.id} insight={i} />
@@ -137,7 +137,8 @@ export function InsightsFeed() {
           </AnimatePresence>
         </ul>
       ) : (
-        <p className="text-muted-foreground">
+        <p className="relative py-2 text-muted-foreground">
+          <span className="fx-empty" aria-hidden="true" />
           Nothing worth your attention yet. Insights appear once there's enough history to compare against your own
           normal.
         </p>

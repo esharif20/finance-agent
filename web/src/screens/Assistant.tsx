@@ -240,7 +240,7 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
       transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
       className={`flex ${mine ? "justify-end" : "justify-start"}`}
     >
-      <div className={`max-w-[88%] rounded-3xl px-4 py-3 ${mine ? "bg-primary text-primary-foreground" : "bg-card"}`}>
+      <div className={`max-w-[88%] rounded-3xl px-4 py-3 ${mine ? "bg-primary text-primary-foreground" : "bg-card"} ${!mine && m.text && !m.streaming ? "fx-shine" : ""}`}>
         {mine ? (
           <p className="whitespace-pre-wrap text-row">{m.text}</p>
         ) : (
@@ -249,6 +249,11 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
               <Reply text={m.text} />
             ) : m.error ? null : (
               <span className="text-label text-muted-foreground" data-testid="stage">
+                <span className="fx-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
                 {m.stage ?? "Reading your question…"}
               </span>
             )}
@@ -267,7 +272,7 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
             {!m.streaming && !!m.chips?.length && (
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Suggested questions">
                 {m.chips.map((c) => (
-                  <button key={c} type="button" disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
+                  <button key={c} type="button" data-magnetic disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
                     {c}
                   </button>
                 ))}
@@ -347,7 +352,8 @@ export function Assistant() {
       )}
       <ol aria-label="Conversation" aria-live="polite" aria-busy={chat.busy} className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
         {chat.messages.length === 0 && (
-          <li className="m-auto flex w-full max-w-xl flex-col items-center py-10 text-center sm:py-14">
+          <li className="relative m-auto flex w-full max-w-xl flex-col items-center py-10 text-center sm:py-14">
+            <span className="fx-empty" aria-hidden="true" />
             <span className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground" aria-hidden="true">
               <MessageCircle className="size-6" />
             </span>
@@ -355,7 +361,7 @@ export function Assistant() {
             <p className="mt-1 max-w-sm text-label text-muted-foreground">
               Every figure comes from your ledger. Changes only happen when you confirm them.
             </p>
-            <div className="mt-8 grid w-full gap-2 text-left sm:grid-cols-2" role="group" aria-label="Try asking">
+            <div className="fx-stagger mt-8 grid w-full gap-2 text-left sm:grid-cols-2" role="group" aria-label="Try asking">
               {STARTERS.map(([kind, q]) => (
                 <button
                   key={q}

@@ -48,6 +48,7 @@ export function TxnRow({
 
   return (
     <li
+      data-spot
       aria-label={`${t.description}, ${day(t.posted_on)}`}
       className={`txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised ${dated ? "sm:grid-cols-[96px_1fr_auto_auto]" : "sm:grid-cols-[1fr_auto_auto]"}`}
     >

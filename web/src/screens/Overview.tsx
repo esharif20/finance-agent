@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { animate, useReducedMotion } from "motion/react";
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   NoData,
   fetchAccounts,
@@ -13,7 +13,7 @@ import {
 import { ForecastPanel } from "@/components/ForecastPanel";
 import { GuidanceCards } from "@/components/GuidanceCard";
 import { InsightsFeed } from "@/components/InsightsFeed";
-import { SubscriptionsCard } from "@/components/SubscriptionsCard";
+import { SubscriptionsCard, SubscriptionsStrip } from "@/components/SubscriptionsCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { groupSpending } from "@/lib/categories";
@@ -57,10 +57,21 @@ function useSettle<T extends HTMLElement>(view: unknown, reduce: boolean | null)
   return ref;
 }
 
+// lg, where the grid has two columns (Tailwind's lg); false without matchMedia (tests)
+const LG = "(min-width: 1024px)";
+const lg = () => (typeof matchMedia === "function" ? matchMedia(LG) : undefined);
+const onLg = (f: () => void) => {
+  const q = lg();
+  q?.addEventListener("change", f);
+  return () => q?.removeEventListener("change", f);
+};
+const useWide = () => useSyncExternalStore(onLg, () => !!lg()?.matches, () => false);
+
 /** The Overview: the card stack chooses the Account in view (`account`, from the URL hash;
  * undefined is All accounts) and everything else follows it. */
 export function Overview({ account }: { account?: number }) {
   const reduce = useReducedMotion();
+  const wide = useWide();
   // undefined = the newest month; the switcher sets it. The bars and steppers show `picked` at once;
   // the rest of the view follows `chosen`, deferred, so the selection paints before that re-render
   const [picked, setChosen] = useState<string>();
@@ -200,6 +211,7 @@ export function Overview({ account }: { account?: number }) {
             onPreview={(id) => preview(undefined, id)}
             onHot={setHot}
           />
+          {!wide && <SubscriptionsStrip />}
           {/* relative: paints above the stack's WebGL canvas, which overflows below the cards */}
           <div ref={side} className="relative">
             {one ? (
@@ -208,6 +220,8 @@ export function Overview({ account }: { account?: number }) {
               <AccountShares summary={summary.data} accounts={accounts.data} hot={hot} onHot={setHot} />
             )}
           </div>
+          {/* two columns: the forecast sits on the right, so the columns end about level */}
+          {wide && <ForecastPanel />}
         </div>
         <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
           <div className="waiting flex flex-col gap-6" aria-busy={waiting} data-waiting={waiting}>
@@ -218,7 +232,7 @@ export function Overview({ account }: { account?: number }) {
           </div>
           <GuidanceCards />
           <InsightsFeed />
-          <ForecastPanel />
+          {!wide && <ForecastPanel />}
           <SubscriptionsCard />
           <div ref={top} className="waiting" data-waiting={waiting}>
             <TopMerchants spending={spending.data} />

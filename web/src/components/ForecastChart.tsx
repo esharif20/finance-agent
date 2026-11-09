@@ -18,7 +18,7 @@ export function ForecastChart({ months, currency = "GBP" }: { months: Band[]; cu
   if (!months.length) return null;
   const g = chartGeometry(months, W, H);
   const gbp = (minor: number) => ({ minor, currency });
-  const ticks = [g.max, 0, ...(g.min < 0 ? [g.min] : [])];
+  const ticks = [g.max, ...(g.min < 0 && g.max > 0 ? [0] : []), g.min];
   const hot = at === undefined ? undefined : months[at];
   const pt = at === undefined ? undefined : g.points[at];
   const pick = (e: React.PointerEvent<HTMLDivElement>) => {

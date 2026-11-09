@@ -21,7 +21,7 @@ export function Switch({ on, label, disabled, onChange }: { on: boolean; label: 
         className={`relative h-7 w-12 rounded-full transition-colors duration-200 ease-out ${on ? "bg-primary" : "bg-[var(--control)]"}`}
       >
         <span
-          className={`absolute top-0.5 left-0.5 size-6 rounded-full bg-card shadow-sm transition-transform duration-200 ease-out group-active:scale-[0.94] motion-reduce:transition-none ${on ? "translate-x-5" : ""}`}
+          className={`absolute top-0.5 left-0.5 size-6 rounded-full bg-card shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-active:scale-[0.94] motion-reduce:transition-none ${on ? "translate-x-5" : ""}`}
         />
       </span>
     </button>

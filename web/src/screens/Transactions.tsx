@@ -198,7 +198,7 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
               </span>
             )}
           </p>
-          <ul aria-label="Transactions">
+          <ul aria-label="Transactions" className="fx-stagger">
             {page.data.items.map((t, i) => (
               <Fragment key={t.id}>
                 {byMonth && (i === 0 || monthKey(t.posted_on) !== monthKey(page.data.items[i - 1]?.posted_on ?? "")) && (

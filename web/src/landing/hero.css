@@ -977,3 +977,242 @@
     font-size: 4.2rem;
   }
 }
+
+/* ===== round 6: the app's ambient light on the landing =====
+   The demo app's own field tokens (--field-a/b/c/d in index.css: blue 210, teal 172, sky 198,
+   apricot 22), so the page and the app read as one product. In the hero three of them travel
+   slow Lissajous paths: x and y on different periods (translate and transform are separate
+   animations) and a breath in scale on a third, all compositor-only. The card hues stay as the
+   pools under the hand. Paused off screen; still on phones and under reduced motion. */
+.lp-aura {
+  width: 80vmax;
+  margin: -40vmax 0 0 -40vmax;
+  opacity: 0.5;
+  background: radial-gradient(closest-side, var(--lp-violet), transparent);
+  animation:
+    lp-lx 53s ease-in-out infinite alternate,
+    lp-ly 37s ease-in-out infinite alternate,
+    lp-breathe 23s ease-in-out infinite alternate;
+}
+.lp-aura-0 {
+  left: 8%;
+  top: 18%;
+}
+.lp-aura-1 {
+  left: 92%;
+  top: 72%;
+  background: radial-gradient(closest-side, var(--field-b), transparent);
+  animation-duration: 47s, 61s, 29s;
+  animation-delay: -21s, -9s, -4s;
+}
+.lp-aura-2 {
+  left: 70%;
+  top: 0%;
+  background: radial-gradient(closest-side, var(--field-c), transparent);
+  opacity: 0.4;
+  animation-duration: 59s, 43s, 31s;
+  animation-delay: -33s, -17s, -12s;
+}
+/* the hint of warmth: the app's apricot field, small and still */
+.lp-aura-3 {
+  left: 34%;
+  top: 104%;
+  width: 54vmax;
+  margin: -27vmax 0 0 -27vmax;
+  opacity: 0.35;
+  background: radial-gradient(closest-side, var(--field-d), transparent);
+  animation: none;
+}
+@keyframes lp-lx {
+  from { translate: -9vmax 0; }
+  to { translate: 9vmax 0; }
+}
+@keyframes lp-ly {
+  from { transform: translate3d(0, -6vmax, 0); }
+  to { transform: translate3d(0, 7vmax, 0); }
+}
+@keyframes lp-breathe {
+  from { scale: 0.92; }
+  to { scale: 1.12; }
+}
+.lp-hero[data-off] .lp-aura {
+  animation-play-state: paused;
+}
+@media (max-width: 899.98px), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .lp-aura {
+    animation: none;
+  }
+}
+/* the card pools sit back a little so the fields lead */
+.lp-wash {
+  opacity: 0.8;
+}
+
+/* the same fields, still and faint, in the corners of the sections below, so the whole page
+   carries the app's light */
+.lp-ask,
+.lp-learn,
+.lp-open,
+.st-gate,
+.st-principles,
+.hw,
+.lp-what,
+.lp-verbs,
+.lp-promises {
+  position: relative;
+  isolation: isolate;
+}
+.lp-ask::after,
+.lp-learn::after,
+.lp-open::after,
+.st-gate::after,
+.st-principles::after,
+.hw::after,
+.lp-what::after,
+.lp-verbs::after,
+.lp-promises::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(48% 38% at 96% 4%, var(--field-b), transparent 72%),
+    radial-gradient(44% 36% at 4% 98%, var(--lp-violet), transparent 72%);
+  opacity: 0.22;
+}
+.lp-learn::after,
+.hw::after,
+.lp-promises::after,
+.st-principles::after {
+  background:
+    radial-gradient(48% 38% at 4% 4%, var(--lp-violet), transparent 72%),
+    radial-gradient(44% 36% at 96% 98%, var(--field-b), transparent 72%);
+}
+
+/* ===== round 7: the phone hand, closer to desktop (DOM cards only; desktop's WebGL is unchanged)
+   Two-faced cards that turn right over without going blank, a back face with a stripe, the
+   specular band brightening as a card turns (Hero.tsx), a contact shadow under the stack, and all
+   three worn rows round the fan, clear of the copy. Transform and opacity only. */
+.lp-hero[data-lite] .lp-acard {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.lp-acard-rear {
+  position: absolute;
+  inset: 0;
+  border-radius: 7% / 11%;
+  overflow: clip;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background:
+    linear-gradient(180deg, transparent 16%, rgb(0 0 0 / 0.72) 16% 32%, transparent 32%),
+    linear-gradient(140deg, oklch(0.46 0.1 var(--h)), oklch(0.26 0.07 var(--h)));
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.3);
+}
+.lp-contact {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: calc(var(--cw, 140px) * 1.3);
+  aspect-ratio: 3.2;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 0.75), rgb(0 0 0 / 0.3) 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 899.98px), (pointer: coarse) {
+  /* three rows round the fan: the middle card's above it, the outer two below theirs */
+  .lp-worn[data-at="l"],
+  .lp-worn[data-at="c"] {
+    display: block;
+  }
+  .lp-stage[data-phase] .lp-worn[data-at="c"] {
+    translate: -50% 0;
+  }
+  .lp .lp-hero .lp-chip {
+    gap: 5px;
+    padding: 4px 9px 4px 4px;
+    font-size: 0.625rem;
+  }
+  .lp .lp-hero .lp-chip-tick {
+    width: 13px;
+    height: 13px;
+  }
+  .lp-hero-pin[data-phase="0"] .lp-hero-scene > .lp-stage {
+    transform: translateY(24%);
+  }
+}
+
+/* DOM cards stack by z-index in a flat stage, each with its own perspective (Hero.tsx), so Safari
+   never intersects one card's plane with another's while they gather */
+.lp-stage {
+  perspective: none;
+  transform-style: flat;
+}
+
+/* phones: the worn rows stand upright in a list under the hand, sharing one left edge (the 16px
+   gutter), each with a dot in its card's colour; they rise in, staggered, as the hand is dealt */
+.lp-worn-list {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  z-index: 3;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+@media (max-width: 719.98px) {
+  .lp-worn-list {
+    display: flex;
+  }
+}
+.lp .lp-hero .lp-worn-list .lp-chip {
+  max-width: 100%;
+  white-space: nowrap;
+  transform: none;
+  rotate: none;
+}
+.lp-worn-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: oklch(0.7 0.13 var(--h));
+}
+.lp-stage[data-play] .lp-worn-list > li {
+  animation: lp-wl 0.5s var(--hero-ease) backwards;
+}
+.lp-stage[data-play] .lp-worn-list > li:nth-child(2) {
+  animation-delay: 70ms;
+}
+.lp-stage[data-play] .lp-worn-list > li:nth-child(3) {
+  animation-delay: 140ms;
+}
+@keyframes lp-wl {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-stage[data-play] .lp-worn-list > li {
+    animation: none;
+  }
+}
+
+/* the purple of the pair: a soft violet glow beside the app's turquoise field (an accent, never
+   the primary colour) */
+.lp {
+  --lp-violet: rgb(128 96 236 / 0.42);
+}
