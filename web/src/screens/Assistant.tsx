@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { Magnet, ShinyText } from "@/components/bits";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Check, ChevronDown, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, MessageCircle, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
 import { CloudToggle } from "@/components/CloudToggle";
@@ -246,9 +247,16 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
         ) : (
           <>
             {m.text ? (
-              <Reply text={m.text} />
+              <ShinyText disabled={m.streaming}>
+                <Reply text={m.text} />
+              </ShinyText>
             ) : m.error ? null : (
               <span className="text-label text-muted-foreground" data-testid="stage">
+                <span className="fx-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
                 {m.stage ?? "Reading your question…"}
               </span>
             )}
@@ -267,9 +275,11 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
             {!m.streaming && !!m.chips?.length && (
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Suggested questions">
                 {m.chips.map((c) => (
-                  <button key={c} type="button" disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
-                    {c}
-                  </button>
+                  <Magnet key={c}>
+                    <button type="button" disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
+                      {c}
+                    </button>
+                  </Magnet>
                 ))}
               </div>
             )}
@@ -284,12 +294,21 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
 // the public demo answers on the deterministic path only: no local model, no cloud
 const DEMO = import.meta.env.VITE_DEMO === "1";
 
+/** First questions for an empty chat: each one maps to a read tool, in the app and in the demo. */
+const STARTERS: [string, string][] = [
+  ["Spending", "How much did I spend last month?"],
+  ["A category", "What did I spend on Eating out last month?"],
+  ["Subscriptions", "Which subscriptions do I pay for?"],
+  ["Insights", "Anything unusual this month?"],
+];
+
 export function Assistant() {
   const chat = useChat(); // lives above the router: a turn in flight survives a tab change
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
   const [cloud, setCloud] = useState(false);
+  const [sent, setSent] = useState(0);
   const spend = useQuery({
     queryKey: ["spend"],
     enabled: !DEMO,
@@ -322,7 +341,9 @@ export function Assistant() {
   function say(text: string) {
     // cloud rides along only once the toggle is on; switching off a thread that used it sends false
     const optIn = cloud && !capped ? true : chat.messages.some((m) => m.path === "cloud") ? false : undefined;
-    return sendMessage(text, optIn);
+    const ok = sendMessage(text, optIn);
+    if (ok) setSent((n) => n + 1);
+    return ok;
   }
   function send(e: React.FormEvent) {
     e.preventDefault();
@@ -336,11 +357,29 @@ export function Assistant() {
       )}
       <ol aria-label="Conversation" aria-live="polite" aria-busy={chat.busy} className="flex flex-1 flex-col gap-3 p-4 sm:p-6">
         {chat.messages.length === 0 && (
-          <li className="m-auto max-w-sm py-16 text-center">
-            <p className="text-heading">Ask about your money</p>
-            <p className="mt-1 text-label text-muted-foreground">
+          <li className="relative m-auto flex w-full max-w-xl flex-col items-center py-10 text-center sm:py-14">
+            <span className="fx-empty" aria-hidden="true" />
+            <span className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground" aria-hidden="true">
+              <MessageCircle className="size-6" />
+            </span>
+            <p className="mt-4 text-heading">Ask about your money</p>
+            <p className="mt-1 max-w-sm text-label text-muted-foreground">
               Every figure comes from your ledger. Changes only happen when you confirm them.
             </p>
+            <div className="fx-stagger mt-8 grid w-full gap-2 text-left sm:grid-cols-2" role="group" aria-label="Try asking">
+              {STARTERS.map(([kind, q]) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={chat.busy}
+                  onClick={() => say(q)}
+                  className="group flex min-h-16 flex-col justify-between gap-1 rounded-2xl border border-border bg-raised px-4 py-3 text-left transition-[transform,background-color,border-color] duration-150 ease-out hover:border-ring hover:bg-active active:scale-[0.98] disabled:opacity-50 motion-reduce:transition-none"
+                >
+                  <span className="text-meta font-semibold uppercase tracking-wider text-muted-foreground">{kind}</span>
+                  <span className="text-row font-medium">{q}</span>
+                </button>
+              ))}
+            </div>
           </li>
         )}
         {chat.messages.map((m, i) => (
@@ -371,7 +410,18 @@ export function Assistant() {
           disabled={chat.busy || !draft.trim()}
           className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-[0.97] disabled:opacity-40"
         >
-          <ArrowUp className="size-5" aria-hidden="true" />
+          {/* each send lifts the arrow out the top and a fresh one rises in: the message went */}
+          <span className="relative inline-flex overflow-hidden">
+            <motion.span
+              key={sent}
+              initial={sent && !reduceMotion ? { y: 14, opacity: 0 } : false}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ type: "spring", duration: 0.35, bounce: 0 }}
+              className="inline-flex"
+            >
+              <ArrowUp className="size-5" aria-hidden="true" />
+            </motion.span>
+          </span>
         </button>
       </form>
     </Card>

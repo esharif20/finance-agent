@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useId, type ReactNode } from "react";
+import { onHashLink } from "@/lib/route";
 
 export type Tab = { id: string; label: string; icon?: ReactNode; badge?: number };
 
@@ -30,6 +31,7 @@ export function NavTabs({
         <a
           key={id}
           href={`#${id}`}
+          onClick={onHashLink}
           aria-current={tab === id ? "page" : undefined}
           data-tip={tip ? label : undefined}
           className={`${item} relative ${tab === id ? "" : "[@media(hover:hover)]:hover:bg-active"}`}

@@ -39,7 +39,7 @@ export function Promises() {
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const tl = gsap.timeline({
-          scrollTrigger: { trigger: ref.current, start: "top bottom", end: "center center", scrub: 0.4 },
+          scrollTrigger: { trigger: ref.current, start: "top bottom", end: "center center", scrub: 0.6 },
         });
         gsap.utils.toArray<HTMLElement>(".lp-bar-fill", ref.current).forEach((bar, i) => {
           const chars = bar.querySelectorAll(".lp-mark-ch");

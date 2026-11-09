@@ -5,8 +5,7 @@ import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { routeTable, viewFor } from "@/main";
-import { formatMoney } from "@/lib/money";
-import { ANSWER } from "./story/story.fixture";
+import { ACCOUNTS } from "./accounts.fixture";
 import { HEADLINE, HEADLINE_LINES, Hero } from "./Hero";
 
 const web = path.resolve(import.meta.dirname, "../..");
@@ -52,7 +51,7 @@ describe("hero headline", () => {
     vi.stubGlobal("IntersectionObserver", NoObserver);
     render(<Hero />);
     const h1 = screen.getByRole("heading", { level: 1, name: HEADLINE });
-    expect(h1.querySelectorAll(".hp-line")).toHaveLength(HEADLINE_LINES.length);
+    expect(h1.querySelectorAll(".lp-flex-line")).toHaveLength(HEADLINE_LINES.length);
     expect(h1.querySelectorAll("[data-l]").length).toBe(HEADLINE.replace(/ /g, "").length);
   });
 
@@ -61,14 +60,38 @@ describe("hero headline", () => {
     const { container } = render(<Hero />);
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.textContent).toBe(HEADLINE);
-    // the finished poster: the whole question and the fixture's figure, not a count mid-way
-    expect(screen.getByText(ANSWER.question, { selector: ".hp-q-typed" })).toBeTruthy();
-    expect(container.querySelector(".hp-fig")?.textContent).toBe(formatMoney(ANSWER.total));
+    expect(container.querySelector(".lp-stage")).toBeNull();
+    // the still composition: every account and the combined total
+    for (const a of ACCOUNTS.accounts) expect(screen.getAllByText(a.name).length).toBeGreaterThan(0);
+    expect(container.querySelector(".lp-combined")).toBeTruthy();
     // nothing is held mid-move: no inline transform, opacity or clip on the hero
     for (const el of container.querySelectorAll<HTMLElement>("*")) {
       expect(el.style.transform || "none").toBe("none");
       expect(el.style.clipPath).toBe("");
     }
+  });
+});
+
+describe("hero on phones", () => {
+  // a phone: coarse pointer, no reduced motion
+  const phone = (q: string) => ({ ...mediaStub(false)(q), matches: q.includes("pointer: coarse") });
+
+  it("draws the cards as live DOM: no canvas, no video, no raster frames", () => {
+    vi.stubGlobal("matchMedia", phone);
+    vi.stubGlobal("IntersectionObserver", NoObserver);
+    const { container } = render(<Hero />);
+    expect(container.querySelector("canvas")).toBeNull();
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelectorAll(".lp-acard-slot .lp-acard")).toHaveLength(ACCOUNTS.accounts.length);
+    // every balance is live text
+    for (const a of ACCOUNTS.accounts) expect(screen.getAllByText(a.name).length).toBeGreaterThan(0);
+    // no light layers or hover peek on touch: a few transformed divs only
+    expect(container.querySelector(".lp-acard-light, .lp-acard-back, .lp-acard-floor, .lp-peek")).toBeNull();
+    // each card wears its own made-up row, inside its slot, so the row moves with the card
+    expect(container.querySelectorAll(".lp-acard-slot > .lp-worn")).toHaveLength(ACCOUNTS.accounts.length);
+    // the old scattered planes are gone: no trace tile, no board, no ghost figures
+    expect(container.querySelector(".lp-trace, .lp-hero-board, .lp-hero-ghost")).toBeNull();
   });
 });
 

@@ -8,6 +8,7 @@ import { Learns } from "./Learns";
 import { Opener } from "./Opener";
 import { Preloader } from "./Preloader";
 import { Promises } from "./Promises";
+import { Verbs } from "./Verbs";
 import { Story } from "./story/Story";
 import { Terminal } from "./terminal/Terminal";
 import { ANSWER, OVERVIEW } from "./story/story.fixture";
@@ -123,6 +124,7 @@ export default function Landing() {
       </header>
       <main id="lp-main">
         <Hero delay={0.05} play={play} />
+        <Verbs />
         <Ask />
         <Story />
         <HowItWorks />

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Settings as SettingsIcon } from "lucide-react";
+import { ChevronLeft, Eye, EyeOff, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconSwap } from "@/components/IconSwap";
 import { NavTabs, type Tab } from "@/components/NavTabs";
@@ -84,9 +84,18 @@ export function TopBar({ tabs, tab, settings }: { tabs: readonly Tab[]; tab: str
     >
       <a
         href={demo ? "/" : "#overview"}
-        aria-label={demo ? "Finance Agent home" : undefined}
-        className="mr-1 flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-[scale,opacity] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:opacity-80"
+        aria-label={demo ? "Finance Agent, back to the home page" : undefined}
+        title={demo ? "Back to the home page" : undefined}
+        className="group mr-1 flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-[scale,opacity] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:opacity-80"
       >
+        {/* the demo's mark leaves the app for the landing page: a small back chevron says so on
+            every device (touch has no hover), and nudges left under a fine pointer */}
+        {demo && (
+          <ChevronLeft
+            aria-hidden="true"
+            className="-mr-1.5 size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out motion-reduce:transition-none [@media(hover:hover)]:group-hover:-translate-x-0.5"
+          />
+        )}
         <Mark />
         <span className="text-base font-semibold max-[419px]:sr-only sm:max-md:sr-only">Finance Agent</span>
       </a>

@@ -53,13 +53,13 @@ export function MonthCard({
       </div>
 
       <dl className="grid grid-cols-2 gap-4">
-        <div role="group" aria-label="Money in" className="rounded-[10px] bg-raised p-4">
+        <div role="group" aria-label="Money in" data-tone="in" className="tone-tile rounded-[10px] bg-raised p-4">
           <dt className="text-label text-muted-foreground">Money in</dt>
           <dd className="mt-0.5">
             <Money value={money_in} countUp className="figure text-figure" />
           </dd>
         </div>
-        <div role="group" aria-label="Money out" className="rounded-[10px] bg-raised p-4">
+        <div role="group" aria-label="Money out" data-tone="out" className="tone-tile rounded-[10px] bg-raised p-4">
           <dt className="text-label text-muted-foreground">Money out</dt>
           <dd className="mt-0.5">
             <Money value={money_out} countUp className="figure text-figure" />

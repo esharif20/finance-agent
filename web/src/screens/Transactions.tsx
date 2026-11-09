@@ -15,7 +15,9 @@ import { CountTick } from "@/components/CountTick";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { monthKey, monthLabel } from "@/lib/txnText";
-import { TxnRow } from "./TxnRow";
+import { TxnRow, day } from "./TxnRow";
+
+const weekday = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
 
 const PAGE = 100;
 const KINDS = ["Spending", "Income", "Refund", "Fee", "Transfer"];
@@ -204,7 +206,15 @@ export function Transactions({ scope = {}, page: size = PAGE }: { scope?: TxnFil
                     {monthLabel(monthKey(t.posted_on))}
                   </li>
                 )}
+                {!byMonth && t.posted_on !== page.data.items[i - 1]?.posted_on && (
+                  <li aria-hidden="true" className={`flex items-baseline gap-2 px-3 pb-1 text-label ${i === 0 ? "pt-1" : "mt-2 border-t border-border pt-4"}`}>
+                    <span className="font-semibold">{weekday(t.posted_on)}</span>
+                    <span className="text-muted-foreground">{day(t.posted_on)}</span>
+                  </li>
+                )}
                 <TxnRow
+                  index={i}
+                  dated={byMonth}
                   t={t}
                   mask={accountName(t.account_id)?.masked_number}
                   groups={groups}

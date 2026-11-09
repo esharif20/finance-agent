@@ -293,6 +293,7 @@ function OneAtATime() {
       aria-live="polite"
       className={`min-h-6 text-sm ${note?.bad ? "rounded-[10px] bg-warning px-3 py-1.5 text-warning-foreground" : "text-muted-foreground"}`}
     >
+      {note && !note.bad && <CircleCheck key={note.text} className="fx-pop mr-1.5 inline size-4 align-[-3px] text-positive" aria-hidden="true" />}
       {note?.text}
     </p>
   );
@@ -301,7 +302,8 @@ function OneAtATime() {
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <Card className="flex flex-col items-center gap-3 py-14 text-center">
-          <CircleCheck className="size-10 text-positive" aria-hidden="true" />
+          <span className="fx-empty" aria-hidden="true" />
+          <CircleCheck className="fx-pop size-10 text-positive" aria-hidden="true" />
           <h2 className="text-heading">Nothing to review</h2>
           <p className="max-w-sm text-muted-foreground">
             New decisions appear here after a sync or an import. Until then, everything is filed.
@@ -334,7 +336,7 @@ function OneAtATime() {
 
       {status}
 
-      <Card data-still aria-labelledby="review-title" className="flex flex-col gap-5">
+      <Card key={item.id} data-still aria-labelledby="review-title" className="fx-enter flex flex-col gap-5">
         <div className="flex flex-col gap-1">
           <p className="text-sm text-muted-foreground">
             {label}
