@@ -2,7 +2,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Architecture from "./Architecture";
-import { FLOW, SAMPLE } from "./nodes";
+import { FLOW, NODES, SAMPLE } from "./nodes";
 
 const media = (reduce: boolean, wide: boolean) => (q: string) => ({
   matches: (reduce && q.includes("prefers-reduced-motion")) || (wide && q.includes("min-width")),
@@ -93,6 +93,15 @@ describe("architecture page", () => {
     render(<Architecture />);
     await userEvent.click(screen.getByRole("button", { name: /Gateway placeholders.+/ }));
     expect(screen.getByRole("region", { name: "Gateway placeholders" })).toHaveTextContent("{P1} at {M1} on {D1}");
+  });
+
+  it("shows the poster facts as their final numbers, and keeps the title one heading", () => {
+    setup(true, true);
+    render(<Architecture />);
+    const facts = within(screen.getByRole("list", { name: "At a glance" })).getAllByRole("listitem");
+    expect(facts.map((f) => f.querySelector(".ar-count")?.textContent)).toEqual([String(NODES.length), "2", "1", "0"]);
+    expect(screen.getByRole("heading", { level: 1, name: "How the Assistant answers" })).toBeInTheDocument();
+    expect(document.querySelector(".ar-way")).toHaveAttribute("href", "#ar-toc");
   });
 
   it("rests on the whole path, lit, with reduced motion", () => {

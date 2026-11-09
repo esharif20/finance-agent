@@ -46,8 +46,9 @@ export function Detail({ node, id, visual }: { node: ArchNode; id: string; visua
       className="ar-detail"
       role="region"
       aria-label={node.title}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      // the panel reveal from transitions.dev: a short rise through a 2px blur
+      initial={{ opacity: 0, y: 8, filter: "blur(2px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ duration: 0.24, ease: EASE }}
     >
       <div className="ar-detail-head">
