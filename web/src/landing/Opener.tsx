@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatMoney } from "@/lib/money";
 import { ACCOUNTS } from "./accounts.fixture";
+import { Corners } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
 
 const MIN_MS = 800;
@@ -61,6 +62,7 @@ export function Opener({ still, onGone, go = (u: string) => window.location.assi
   return (
     <div ref={root} className="op" data-still={still ? "" : undefined} data-full={full ? "" : undefined} role="status" tabIndex={-1}>
       <div className="op-water" />
+      <Corners tl="Opening the demo" tr="The household's total" bl="Synthetic data" br="Nothing you do is kept" />
       <div className="op-body">
         <Tally text={TOTAL} landed={landed} className="pl-count op-count" />
         <p className="op-note">Making your copy of the made-up household…</p>

@@ -1,7 +1,7 @@
 import { type MouseEvent, useCallback, useEffect, useState } from "react";
 import { Money } from "@/components/Money";
 import { Ask } from "./Ask";
-import { Field, Magnetic, Material, Rise, Roll, useStill } from "./fx";
+import { Corners, Field, Magnetic, Material, Rise, Roll, useSmoothWheel, useStill } from "./fx";
 import { Hero } from "./Hero";
 import { HowItWorks } from "./HowItWorks";
 import { Learns } from "./Learns";
@@ -54,6 +54,7 @@ function seenIntro() {
 
 export default function Landing() {
   const still = useStill();
+  useSmoothWheel(still);
   // the tally plays once a session; a returning visitor goes straight to the hero
   const [pre, setPre] = useState(() => !seenIntro());
   const [play, setPlay] = useState(false);
@@ -137,6 +138,7 @@ export default function Landing() {
             </Rise>
             <Rise still={still} delay={0.06} className="lp-slot lp-tile-import">
               <Material className="lp-tile">
+                <Corners tr="Read only" br="CSV works too" />
                 <h3 className="lp-h3">Connect your banks</h3>
                 <p>{FEATURES.import}</p>
                 <div className="lp-sync" aria-hidden="true">
@@ -156,12 +158,14 @@ export default function Landing() {
             </Rise>
             <Rise still={still} delay={0.12} className="lp-slot lp-tile-review">
               <Material className="lp-tile">
+                <Corners tr="One short queue" />
                 <h3 className="lp-h3">Review Queue</h3>
                 <p>{FEATURES.review}</p>
               </Material>
             </Rise>
             <Rise still={still} delay={0.18} className="lp-slot lp-tile-figure">
               <Material className="lp-tile">
+                <Corners tr="Made-up ledger" />
                 <h3 className="lp-h3">Overview</h3>
                 <p className="lp-figure">
                   <Money value={OVERVIEW.spent} />
@@ -171,6 +175,8 @@ export default function Landing() {
             </Rise>
             <Rise still={still} delay={0.24} className="lp-slot lp-tile-assistant">
               <Material className="lp-tile">
+                <span className="lp-halftone" aria-hidden="true" />
+                <Corners tr="Local model" />
                 <h3 className="lp-h3">An Assistant that never invents a figure</h3>
                 <p>{FEATURES.assistant}</p>
                 <div className="lp-mini-chat" aria-hidden="true">
@@ -184,6 +190,7 @@ export default function Landing() {
             </Rise>
             <Rise still={still} delay={0.3} className="lp-slot lp-tile-insights">
               <Material className="lp-tile">
+                <Corners tr="Every week" />
                 <h3 className="lp-h3">Insights</h3>
                 <ul className="lp-insight-cards">
                   {FEATURES.insights.map((l, i) => (
