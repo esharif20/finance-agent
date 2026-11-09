@@ -35,13 +35,19 @@ export function MotionFx() {
       const target = e?.target;
       if (!e || !(target instanceof Element)) return;
       const card = target.closest<HTMLElement>(".card-glass");
+      const spot = target.closest<HTMLElement>("[data-spot]");
       const m = reduce?.matches ? null : target.closest<HTMLElement>("[data-magnetic]:not(:disabled)");
       // reads first, then writes
       const cr = card?.getBoundingClientRect();
       const mr = m?.getBoundingClientRect();
+      const sr = spot?.getBoundingClientRect();
       if (card && cr) {
         card.style.setProperty("--mx", `${Math.round(e.clientX - cr.left)}px`);
         card.style.setProperty("--my", `${Math.round(e.clientY - cr.top)}px`);
+      }
+      if (spot && sr) {
+        spot.style.setProperty("--mx", `${Math.round(e.clientX - sr.left)}px`);
+        spot.style.setProperty("--my", `${Math.round(e.clientY - sr.top)}px`);
       }
       if (magnet && magnet !== m) release();
       if (m && mr) {

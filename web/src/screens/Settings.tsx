@@ -152,7 +152,7 @@ export function Settings() {
             disabled={asked.length === 0}
             data-magnetic className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
           >
-            {copied === "done" ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
+            {copied === "done" ? <Check className="fx-pop size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
             Copy list
           </button>
           <p role="status" className="text-sm text-muted-foreground">

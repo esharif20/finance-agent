@@ -1,8 +1,11 @@
-import { motion, type MotionValue, useScroll, useTransform } from "motion/react";
-import { type ReactNode, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { motion } from "motion/react";
+import { type PointerEvent, type ReactNode, useRef, useState } from "react";
 import { type Category, CategoryChip } from "@/components/CategoryChip";
 import { Money } from "@/components/Money";
-import { Field, Material } from "../fx";
+import { Field, finePointer } from "../fx";
 import { ANSWER, GROUPS, OVERVIEW, REVIEW } from "./story.fixture";
 
 /** #76: the pile shows at most this many frosted layers. */
@@ -64,6 +67,27 @@ function AnswerCard() {
         You spent <Money value={ANSWER.total} /> on eating out across {ANSWER.count} payments, up from{" "}
         <Money value={ANSWER.previous} /> in September.
       </p>
+      <div className="st-tool" aria-label={`From ${ANSWER.tool}, run on your ledger`}>
+        <code>
+          {ANSWER.tool}(category=&quot;Eating out&quot;, month=&quot;{OVERVIEW.month}&quot;)
+        </code>
+        <dl className="st-months">
+          <div style={{ "--share": ANSWER.previous.minor / ANSWER.total.minor } as React.CSSProperties}>
+            <dt>September</dt>
+            <dd>
+              <Money value={ANSWER.previous} />
+            </dd>
+            <i aria-hidden="true" />
+          </div>
+          <div style={{ "--share": 1 } as React.CSSProperties}>
+            <dt>{OVERVIEW.month}</dt>
+            <dd>
+              <Money value={ANSWER.total} />
+            </dd>
+            <i aria-hidden="true" />
+          </div>
+        </dl>
+      </div>
       <p className="st-source">From {ANSWER.tool}, run on your ledger</p>
     </>
   );
@@ -75,40 +99,43 @@ export const PILE: { title: string; body: () => ReactNode }[] = [
   { title: "Ask, and get figures it calculated.", body: AnswerCard },
 ].slice(0, MAX_LAYERS);
 
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-const stage = (v: number, [a, b]: [number, number]) => (b <= a ? 1 : ease(Math.min(1, Math.max(0, (v - a) / (b - a)))));
-
-/** Where card i comes in, as a share of the pinned scroll: the first is there when the pin
-    starts, the next two slide up over it in turn, and the last holds a long beat before the
-    pin lets go, so the release is the whole stage moving on together and nothing jumps. */
-export const ENTER: [number, number][] = [
-  [0, 0],
-  [0.14, 0.4],
-  [0.48, 0.74],
-];
-
-/** How many cards have landed on top of card i (0 to 2, continuous). */
-const over = (i: number, v: number) => ENTER.slice(i + 1).reduce((n, e) => n + stage(v, e), 0);
-
-/** One card on the pinned stage. It slides up from below the stage as its stage plays, then
-    recedes a step (up, smaller, dimmed) for each card that lands on top of it. */
-function Panel({ i, p, children }: { i: number; p: MotionValue<number>; children: ReactNode }) {
-  const transform = useTransform(p, (v) => {
-    const k = stage(v, ENTER[i] ?? [0, 0]);
-    const o = over(i, v);
-    // from below the stage's bottom edge, then up a step (in % of its own height) per card above
-    return `translate3d(0, calc(${((1 - k) * 80).toFixed(3)}svh - ${(o * 4).toFixed(3)}%), 0) scale(${(1 - o * 0.05).toFixed(4)})`;
+/** One card of the deck. Pointer effects after React Bits (github.com/DavidHDev/react-bits, MIT):
+    SpotlightCard (a soft light that follows the cursor), TiltedCard (a few degrees of tilt toward
+    it, eased with gsap.quickTo) and an animated border that runs round the card in front. Fine
+    pointers only; GSAP's timeline in Pinned moves the panel, these move only the card inside it. */
+function Panel({ i, children }: { i: number; children: ReactNode }) {
+  const card = useRef<HTMLElement>(null);
+  const tilt = useRef<{ x: (v: number) => void; y: (v: number) => void } | null>(null);
+  useGSAP(() => {
+    if (!card.current || !finePointer()) return;
+    tilt.current = {
+      x: gsap.quickTo(card.current, "rotationY", { duration: 0.5, ease: "power3.out" }),
+      y: gsap.quickTo(card.current, "rotationX", { duration: 0.5, ease: "power3.out" }),
+    };
   });
-  const veil = useTransform(p, (v) => over(i, v) * 0.3);
+  const move = (e: PointerEvent<HTMLElement>) => {
+    const el = card.current;
+    if (!el || e.pointerType !== "mouse") return;
+    const b = el.getBoundingClientRect();
+    const x = (e.clientX - b.left) / b.width;
+    const y = (e.clientY - b.top) / b.height;
+    el.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`);
+    el.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
+    tilt.current?.x((x - 0.5) * 7);
+    tilt.current?.y((0.5 - y) * 5);
+  };
+  const leave = () => {
+    tilt.current?.x(0);
+    tilt.current?.y(0);
+  };
   return (
-    <motion.div className="st-panel" data-layer={i} style={{ transform, zIndex: i + 1 }}>
-      <Material className="st-card-host" max={3}>
-        <article className="st-card" data-ui="">
-          {children}
-          <motion.span className="st-card-veil" style={{ opacity: veil }} aria-hidden="true" />
-        </article>
-      </Material>
-    </motion.div>
+    <div className="st-panel" data-layer={i} style={{ zIndex: i + 1 }}>
+      <article ref={card} className="st-card" data-ui="" onPointerMove={move} onPointerLeave={leave}>
+        <span className="st-card-spot" aria-hidden="true" />
+        {children}
+        <span className="st-card-veil" aria-hidden="true" />
+      </article>
+    </div>
   );
 }
 
@@ -149,18 +176,64 @@ function compact() {
   return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 899.98px), (pointer: coarse)").matches;
 }
 
-/** Desktop: one screen of stage, pinned while the three cards play their stages over it. */
+/** Desktop: one screen of stage, pinned (CSS sticky) while a GSAP timeline scrubbed by
+    ScrollTrigger deals the next card over the last: it rises from below, tipped back, and lands
+    flat while the one beneath steps back and dims. The step list on the left follows. */
 function Pinned({ title }: { title: ReactNode }) {
   const track = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
+  const [step, setStep] = useState(0);
+  useGSAP(
+    () => {
+      gsap.registerPlugin(ScrollTrigger);
+      const q = gsap.utils.selector(track);
+      const panels = q(".st-deck > .st-panel");
+      const veils = q(".st-deck .st-card-veil");
+      gsap.set(panels.slice(1), { yPercent: 118, rotationX: -18, transformPerspective: 1400 });
+      gsap.set(veils, { opacity: 0 });
+      const tl = gsap.timeline({
+        defaults: { ease: "power2.inOut", duration: 1 },
+        scrollTrigger: {
+          trigger: track.current,
+          start: "top top",
+          end: "bottom bottom",
+          scrub: 0.6,
+          onUpdate: (st) => setStep(st.progress < 0.3 ? 0 : st.progress < 0.68 ? 1 : 2),
+        },
+      });
+      tl.to(q(".st-steps-rail i"), { scaleY: 1, ease: "none", duration: 3.4 }, 0);
+      for (let k = 1; k < panels.length; k++) {
+        const at = 0.2 + (k - 1) * 1.3;
+        tl.to(panels[k] ?? [], { yPercent: 0, rotationX: 0, ease: "power3.out" }, at);
+        for (let j = 0; j < k; j++) {
+          const depth = k - j;
+          tl.to(panels[j] ?? [], { yPercent: -5 * depth, scale: 1 - 0.05 * depth }, at);
+          tl.to(veils[j] ?? [], { opacity: 0.22 * depth }, at);
+        }
+      }
+      tl.to({}, { duration: 0.6 }); // the last card holds before the pin lets go
+    },
+    { scope: track },
+  );
   return (
     <div ref={track} className="st-pile-track">
       <div className="st-pile-stage">
         <div className="lp-wrap st-pile-grid">
-          {title}
-          <div className="st-deck">
+          <div className="st-pile-side">
+            {title}
+            <ol className="st-steps" aria-hidden="true">
+              <span className="st-steps-rail">
+                <i />
+              </span>
+              {PILE.map((c, i) => (
+                <li key={c.title} data-on={step === i ? "" : undefined} data-done={step > i ? "" : undefined}>
+                  {c.title}
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="st-deck" data-step={step}>
             {PILE.map(({ title: t, body: Body }, i) => (
-              <Panel key={t} i={i} p={scrollYProgress}>
+              <Panel key={t} i={i}>
                 <h3 className="lp-h3 st-card-title">{t}</h3>
                 <Body />
               </Panel>

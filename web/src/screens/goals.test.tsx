@@ -1,6 +1,10 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "@/App";
+import { App, queryClient } from "@/App";
+import { afterEach as clearAfter } from "vitest";
+
+// App keeps one QueryClient with a staleTime: each test starts from an empty cache
+clearAfter(() => queryClient.clear());
 
 // synthetic
 const goal = (over: object) => ({

@@ -96,6 +96,15 @@ describe("InsightsFeed", () => {
     expect(amount.className).toContain("money");
   });
 
+  it("shows the top three, and the rest behind Show all", async () => {
+    feed = [1, 2, 3, 4, 5].map((id) => insight(id, { key: `Shop ${id}` }));
+    renderFeed();
+    expect(await screen.findByText("Shop 3")).toBeInTheDocument();
+    expect(screen.queryByText("Shop 4")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Show all 5" }));
+    expect(screen.getByText("Shop 5")).toBeInTheDocument();
+  });
+
   it("says so when there is nothing to show", async () => {
     feed = [];
     renderFeed();

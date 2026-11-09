@@ -49,7 +49,7 @@ describe("TopBar in the demo build", () => {
         </PrivacyProvider>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("link", { name: "Finance Agent home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Finance Agent, back to the home page" })).toHaveAttribute("href", "/");
     vi.unstubAllEnvs();
   });
 });

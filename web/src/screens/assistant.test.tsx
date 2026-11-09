@@ -52,6 +52,16 @@ describe("Assistant", () => {
     expect(fetchMock).not.toHaveBeenCalled(); // the first turn's fetch stays the first
   });
 
+  it("offers first questions in an empty chat, and asks one on a tap", async () => {
+    fetchMock.mockResolvedValueOnce(stream({ path: "deterministic", proposal_id: null }, "Here it is."));
+    ui();
+    const starters = screen.getByRole("group", { name: "Try asking" });
+    await userEvent.click(within(starters).getByRole("button", { name: /Which subscriptions do I pay for\?/ }));
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ message: "Which subscriptions do I pay for?" });
+    expect(await screen.findByText("Here it is.")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Try asking" })).toBeNull();
+  });
+
   it("streams a reply, labels the path and wraps figures for Hide amounts", async () => {
     fetchMock.mockResolvedValueOnce(stream({ path: "cache", proposal_id: null }, "You spent £42.50 on Groceries."));
     ui();

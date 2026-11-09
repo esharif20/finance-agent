@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/manrope";
+@import "@fontsource-variable/bricolage-grotesque/standard.css";
 
 /* Pocket tokens (docs/design/DIRECTIONS.md). Light first; true black in dark. */
 :root {
@@ -39,7 +40,9 @@
   --rim-hi: rgb(255 255 255 / 0.95);
   --rim-lo: rgb(27 29 31 / 0.05);
   --card-sheen: rgb(255 255 255 / 0.5);
-  --card-depth: 0 1px 2px rgb(27 29 31 / 0.04), 0 14px 32px -20px rgb(27 29 31 / 0.18);
+  /* depth in three layers (contact, key, ambient) and a faint floor line under the glass */
+  --card-depth: 0 1px 2px rgb(27 29 31 / 0.04), 0 6px 14px -8px rgb(27 29 31 / 0.08), 0 18px 40px -24px rgb(27 29 31 / 0.16);
+  --card-floor: rgb(27 29 31 / 0.035);
   --card-lift: 0 2px 4px rgb(27 29 31 / 0.05), 0 22px 44px -22px rgb(27 29 31 / 0.28);
   --glow-on: rgb(14 111 138 / 0.07);
   --rich-sheen: rgb(14 150 170 / 0.07);
@@ -82,7 +85,8 @@
     --rim-hi: rgb(255 255 255 / 0.22);
     --rim-lo: rgb(255 255 255 / 0.03);
     --card-sheen: rgb(255 255 255 / 0.035);
-    --card-depth: 0 1px 1px rgb(0 0 0 / 0.5), 0 18px 40px -22px rgb(0 0 0 / 0.9);
+    --card-depth: 0 1px 1px rgb(0 0 0 / 0.5), 0 8px 18px -10px rgb(0 0 0 / 0.6), 0 22px 48px -26px rgb(0 0 0 / 0.9);
+    --card-floor: rgb(0 0 0 / 0.35);
     --card-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 28px 56px -24px rgb(0 0 0 / 0.95), 0 0 0 1px rgb(92 195 220 / 0.1);
     --glow-on: rgb(120 205 230 / 0.075);
     --rich-sheen: rgb(60 175 205 / 0.11);
@@ -94,6 +98,7 @@
 
 @theme inline {
   --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-card: var(--card);
   --color-raised: var(--raised);
@@ -257,6 +262,39 @@
 .figure {
   font-variant-numeric: proportional-nums;
 }
+/* The product's display face (the landing and /architecture headings) on the app's page titles
+   and big figures only; rows, labels and columns stay Manrope. Pence keep the body face. */
+.figure,
+.text-title,
+.account-card[data-front="true"] .account-balance {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+.figure .money-minor {
+  font-family: var(--font-sans);
+}
+
+/* Panel reveal (adapted from transitions.dev): a panel that opens under its row rises 4px out
+   of a 2px blur. @starting-style, not keyframes, so a quick close-and-open retargets. */
+.panel-reveal {
+  transition:
+    opacity 200ms var(--ease-out),
+    translate 240ms var(--ease-out),
+    filter 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    translate: 0 -4px;
+    filter: blur(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-reveal {
+    transition: opacity 150ms ease;
+    @starting-style {
+      opacity: 0;
+    }
+  }
+}
 .money-minor {
   font-size: max(0.58em, 11px);
   font-weight: 500;
@@ -293,7 +331,7 @@
       linear-gradient(180deg, var(--card-sheen), transparent 120px);
     -webkit-backdrop-filter: blur(16px) saturate(1.4);
     backdrop-filter: blur(16px) saturate(1.4);
-    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-depth);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), inset 0 -1px 0 var(--card-floor), var(--card-depth);
     transition:
       transform 280ms var(--ease-out),
       box-shadow 280ms var(--ease-out),
@@ -323,15 +361,22 @@
     }
     .card-glass:not([data-still]):hover {
       transform: translateY(-2px);
-      box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-lift);
+      box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), inset 0 -1px 0 var(--card-floor), var(--card-lift);
     }
+    /* Spotlight border (after React Bits' SpotlightCard, MIT): the rim brightens where the
+       pointer is. --mx/--my are non-inherited, so the rim asks for its card's values. */
     .card-glass:hover::before {
+      --mx: inherit;
+      --my: inherit;
       opacity: 1;
+      background:
+        radial-gradient(220px circle at var(--mx) var(--my), var(--rich-rim), transparent 70%),
+        linear-gradient(150deg, var(--rim-hi), var(--rim-lo) 34%, transparent 60%, var(--rim-lo));
     }
   }
   .card-glass:not([data-still]):has(:focus-visible) {
     transform: translateY(-2px);
-    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), var(--card-lift);
+    box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 1px 0 var(--card-highlight), inset 0 -1px 0 var(--card-floor), var(--card-lift);
   }
   .card-glass:has(:focus-visible)::before {
     opacity: 1;
@@ -1121,4 +1166,271 @@ html[data-scrolling] .ambient i {
   .ambient i {
     will-change: auto;
   }
+}
+
+/* after the first tab switch, entrance animations do not replay (App.tsx sets data-settled) */
+:root[data-settled] .account-mini,
+:root[data-settled] .odometer[data-play] .odo-reel {
+  animation: none;
+}
+
+/* ===== App pass: the landing and /architecture language in the app =====
+   Presentation only: figures, their rounding and the privacy blur are untouched. */
+:root {
+  --spec: rgb(255 255 255 / 0.85);
+  --caustic: rgb(14 150 170 / 0.06);
+  --meta: rgb(27 29 31 / 0.5);
+  --accent-mint: #2f8a4a;
+  --tone-in: rgb(47 138 74 / 0.08);
+  --tone-out: rgb(196 92 54 / 0.08);
+  --tone-in-rim: rgb(47 138 74 / 0.35);
+  --tone-out-rim: rgb(196 92 54 / 0.35);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --spec: rgb(255 255 255 / 0.09);
+    --caustic: rgb(60 175 205 / 0.07);
+    --meta: rgb(255 255 255 / 0.5);
+    --accent-mint: #9ae187;
+    --tone-in: rgb(154 225 135 / 0.07);
+    --tone-out: rgb(240 140 100 / 0.07);
+    --tone-in-rim: rgb(154 225 135 / 0.3);
+    --tone-out-rim: rgb(240 140 100 / 0.3);
+  }
+}
+
+/* page head: a meta row (the landing's rail) over a display-face title */
+.page-meta {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+.page-meta span:first-child {
+  color: var(--accent-mint);
+}
+.page-meta span + span::before {
+  content: "·";
+  margin-right: 10px;
+  color: var(--meta);
+}
+.page-head .text-title {
+  font-size: clamp(2rem, 1.4rem + 1.8vw, 2.75rem);
+  font-weight: 760;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.review-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--tone-in);
+  box-shadow: inset 0 0 0 1px var(--tone-in-rim);
+}
+
+/* card titles take the display face, as /architecture's tile heads do */
+.card-glass .text-heading {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+@layer components {
+  /* Liquid glass, deeper: a specular crown along the top edge and a faint caustic pooled at the
+     foot, over the existing three-layer depth and spotlight rim. Static: nothing here animates. */
+  .card-glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 46px at 28% 0%, var(--spec), transparent 72%),
+      radial-gradient(55% 64px at 74% 100%, var(--caustic), transparent 72%);
+  }
+}
+
+/* tinted tiles: money in reads mint, money out reads warm, each with a coloured rim and dot */
+.tone-tile {
+  position: relative;
+  background-image: linear-gradient(160deg, var(--tone-in), transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--tone-in-rim);
+}
+.tone-tile[data-tone="out"] {
+  background-image: linear-gradient(160deg, var(--tone-out), transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--tone-out-rim);
+}
+.tone-tile dt::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px 1px 0;
+  border-radius: 50%;
+  background: var(--accent-mint);
+}
+.tone-tile[data-tone="out"] dt::before {
+  background: rgb(222 120 82);
+}
+
+/* the active tab's marker carries the accent, faintly */
+[data-marker] {
+  box-shadow: inset 0 0 0 1px var(--tone-in-rim);
+}
+
+/* ===== React Bits-style touches across the app (presentation only; transform and opacity are
+   the only animated properties; all of it stands still under reduced motion) ===== */
+/* animated list: rows rise in once, staggered, when the list first mounts */
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+.fx-stagger > * {
+  animation: fx-rise 0.42s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.fx-stagger > :nth-child(2) { animation-delay: 40ms; }
+.fx-stagger > :nth-child(3) { animation-delay: 80ms; }
+.fx-stagger > :nth-child(4) { animation-delay: 120ms; }
+.fx-stagger > :nth-child(5) { animation-delay: 160ms; }
+.fx-stagger > :nth-child(6) { animation-delay: 200ms; }
+.fx-stagger > :nth-child(n + 7) { animation-delay: 240ms; }
+/* one element entering (a new review item) */
+.fx-enter {
+  animation: fx-rise 0.36s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+/* a pop when something is chosen or done: a pressed thumb, a filed review item */
+@keyframes fx-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.28) rotate(-8deg); }
+  100% { transform: scale(1); }
+}
+[aria-pressed="true"] > svg,
+.fx-pop {
+  animation: fx-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* hover spotlight on list rows: MotionFx sets --mx/--my on the [data-spot] under the mouse */
+@media (hover: hover) and (pointer: fine) {
+  [data-spot]:hover {
+    background-image: radial-gradient(260px circle at var(--mx) var(--my), color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%);
+  }
+}
+/* shiny text: one sheen passes over a reply as it lands (a translated band, clipped to the bubble) */
+.fx-shine {
+  position: relative;
+  overflow: clip;
+}
+.fx-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in oklab, var(--foreground) 10%, transparent) 50%, transparent 70%);
+  transform: translate3d(-110%, 0, 0);
+  animation: fx-sweep 1.1s cubic-bezier(0.45, 0, 0.2, 1) 0.1s both;
+}
+@keyframes fx-sweep {
+  to { transform: translate3d(110%, 0, 0); }
+}
+/* the typing indicator: three dots on a wave */
+.fx-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.fx-dots > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: fx-dot 1s ease-in-out infinite;
+}
+.fx-dots > i:nth-child(2) { animation-delay: 0.15s; }
+.fx-dots > i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes fx-dot {
+  0%, 60%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translate3d(0, -4px, 0);
+    opacity: 1;
+  }
+}
+/* empty states: a slow, faint field drifting behind the message */
+.fx-empty {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: clip;
+  border-radius: inherit;
+  pointer-events: none;
+}
+:has(> .fx-empty) {
+  isolation: isolate;
+}
+.fx-empty::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: 26rem;
+  aspect-ratio: 1;
+  margin: -13rem 0 0 -13rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--field-b), transparent);
+  opacity: 0.35;
+  pointer-events: none;
+  animation: fx-drift 18s ease-in-out infinite alternate;
+}
+@keyframes fx-drift {
+  from { transform: translate3d(-18%, -8%, 0) scale(0.9); }
+  to { transform: translate3d(18%, 10%, 0) scale(1.1); }
+}
+/* the phone's subscriptions strip under the account cards: a press that gives */
+.subs-strip {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.subs-strip:active {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-stagger > *,
+  .fx-enter,
+  .fx-pop,
+  [aria-pressed="true"] > svg,
+  .fx-shine::after,
+  .fx-dots > i,
+  .fx-empty::after {
+    animation: none;
+  }
+  .fx-shine::after {
+    opacity: 0;
+  }
+  .subs-strip:active {
+    transform: none;
+  }
+}
+
+/* Phones: the Overview never scrolls sideways. Grid columns may shrink below their content (the
+   rail and the strip scroll or truncate inside them), the rail never reaches past its 16px
+   bleed, and the page clips whatever still pokes past the edge. */
+[class*="grid-cols-[7fr_5fr]"] > * {
+  min-width: 0;
+}
+.account-rail {
+  max-width: calc(100% + 32px);
+}
+body:has(.account-rail) {
+  overflow-x: clip;
 }

@@ -27,7 +27,7 @@
 }
 /* the pin: one screen of stage held for about two more screens of scroll, three stages on it */
 .st-pile-track {
-  height: 290svh;
+  height: 240svh;
 }
 .st-pile-stage {
   position: sticky;
@@ -562,4 +562,160 @@
 }
 .st[data-still] .st-card {
   will-change: auto;
+}
+
+/* ===== the deck, round 2: fuller cards, pointer light and tilt, a step list that follows =====
+   Pointer effects after React Bits (SpotlightCard, TiltedCard, an animated border), MIT. */
+.st-pile-side {
+  display: grid;
+  gap: 40px;
+  align-content: center;
+}
+.st-steps {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding-left: 22px;
+  list-style: none;
+}
+.st-steps-rail {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.14);
+  overflow: clip;
+}
+.st-steps-rail i {
+  position: absolute;
+  inset: 0;
+  background: var(--lp-mint);
+  transform: scaleY(0);
+  transform-origin: top;
+}
+.st-steps li {
+  font-family: var(--lp-display);
+  font-size: clamp(1.1rem, 0.8rem + 0.7vw, 1.45rem);
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: rgb(255 255 255 / 0.32);
+  transform: translateX(0);
+  transition:
+    color 0.35s var(--lp-ease-out),
+    transform 0.45s var(--lp-ease-out);
+}
+.st-steps li[data-done] {
+  color: rgb(255 255 255 / 0.55);
+}
+.st-steps li[data-on] {
+  color: var(--lp-white);
+  transform: translateX(8px);
+}
+.st-pile[data-mode="pin"] .st-card {
+  min-height: 0;
+  transform-style: preserve-3d;
+  box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.8);
+}
+.st-pile[data-mode="pin"] .st-deck {
+  perspective: 1400px;
+}
+/* SpotlightCard: a soft light where the cursor is */
+.st-card-spot {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgb(255 255 255 / 0.45), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .st-card:hover .st-card-spot {
+    opacity: 1;
+  }
+  /* the animated border runs round the card in front */
+  .st-pile[data-mode="pin"] .st-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 2px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--st-a), transparent 0 62%, rgb(10 10 10 / 0.85) 80%, transparent 96%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .st-deck[data-step="0"] .st-panel[data-layer="0"] .st-card::after,
+  .st-deck[data-step="1"] .st-panel[data-layer="1"] .st-card::after,
+  .st-deck[data-step="2"] .st-panel[data-layer="2"] .st-card::after {
+    opacity: 1;
+    animation: st-spin 5s linear infinite;
+  }
+}
+@property --st-a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes st-spin {
+  to {
+    --st-a: 360deg;
+  }
+}
+.st-card > :not(.st-card-spot, .st-card-veil) {
+  position: relative;
+}
+/* the answer card: the tool call that made its figures, and the two months it compared */
+.st-tool {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgb(10 10 10 / 0.08);
+}
+.st-tool code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.st-months {
+  display: grid;
+  gap: 10px;
+}
+.st-months > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  font-weight: 600;
+}
+.st-months dd {
+  font-variant-numeric: tabular-nums;
+}
+.st-months i {
+  grid-column: 1 / -1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--lp-black);
+  transform: scaleX(var(--share));
+  transform-origin: 0 50%;
+}
+.st-months > div:first-child i {
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-card::after {
+    animation: none !important;
+  }
 }

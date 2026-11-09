@@ -18,13 +18,25 @@ describe("chartGeometry", () => {
       expect(p.yLower).toBeGreaterThanOrEqual(p.y);
     }
   });
-  it("keeps the whole band inside the box and includes zero", () => {
+  it("keeps the whole band inside the box", () => {
     const g = chartGeometry(months, 300, 100);
     for (const p of g.points) {
       expect(p.yLower).toBeLessThanOrEqual(100);
       expect(p.yUpper).toBeGreaterThanOrEqual(0);
     }
-    expect(g.y(0)).toBeLessThanOrEqual(100);
+  });
+  it("fits the band, so it fills most of the box instead of a strip at the top", () => {
+    const g = chartGeometry(months, 300, 100);
+    const top = Math.min(...g.points.map((p) => p.yUpper));
+    const bottom = Math.max(...g.points.map((p) => p.yLower));
+    expect(bottom - top).toBeGreaterThan(55);
+    expect(g.min).toBeGreaterThan(0);
+  });
+  it("reaches below zero when a month does, so the dip stays visible", () => {
+    const g = chartGeometry([{ month: "2026-04", point: -5000, lower: -20000, upper: 10000 }, ...months], 300, 100);
+    expect(g.min).toBeLessThanOrEqual(-20000);
+    expect(g.y(0)).toBeGreaterThan(0);
+    expect(g.y(0)).toBeLessThan(100);
   });
   it("draws a band polygon and a line path with one vertex per month", () => {
     const g = chartGeometry(months, 300, 100);

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SpotlightCard, useAnimatedItem } from "@/components/bits";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { useState } from "react";
@@ -10,6 +11,7 @@ import { confidenceWord, typeTitle } from "@/lib/insights";
 import { cn } from "@/lib/utils";
 
 export const INSIGHTS_KEY = ["insights"] as const;
+const TOP = 3; // the Overview shows the top three; the rest are a tap away
 
 const round =
   "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] [@media(hover:hover)]:hover:bg-active disabled:opacity-50";
@@ -31,8 +33,9 @@ export function Explained({ text }: { text: string }) {
   );
 }
 
-function Row({ insight }: { insight: Insight }) {
+function Row({ insight, index }: { insight: Insight; index: number }) {
   const reduce = useReducedMotion();
+  const enter = useAnimatedItem(index);
   const client = useQueryClient();
   const done = { onSettled: () => void client.invalidateQueries({ queryKey: INSIGHTS_KEY }) };
   const rate = useMutation({ mutationFn: (liked: boolean) => rateInsight(insight.id, liked), ...done });
@@ -42,9 +45,10 @@ function Row({ insight }: { insight: Insight }) {
   const n = insight.evidence.length;
   return (
     <motion.li
+      {...enter}
       layout={!reduce}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, x: 16, scale: 0.98 }}
+      transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1], ...enter.transition }}
       className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0"
     >
       <div className="flex items-start justify-between gap-3">
@@ -106,11 +110,12 @@ function Row({ insight }: { insight: Insight }) {
 /** The ranked Insights on the Overview: each explained, rateable and dismissable (#153). */
 export function InsightsFeed() {
   const [asking, setAsking] = useState(false);
+  const [all, setAll] = useState(false);
   const { data: raw } = useQuery({ queryKey: INSIGHTS_KEY, queryFn: fetchInsights });
   if (!Array.isArray(raw)) return null; // loading, or offline: the Overview says so elsewhere
   const data = raw.filter((i) => typeof i?.explanation === "string"); // an older server may answer otherwise
   return (
-    <Card data-still aria-labelledby="insights-title">
+    <SpotlightCard data-still aria-labelledby="insights-title">
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <h2 id="insights-title" className="text-heading">
           Insights
@@ -130,19 +135,31 @@ export function InsightsFeed() {
       </div>
       {data.length ? (
         <ul className="divide-y divide-border">
-          <AnimatePresence initial={false}>
-            {data.map((i) => (
-              <Row key={i.id} insight={i} />
+          <AnimatePresence>
+            {(all ? data : data.slice(0, TOP)).map((i, n) => (
+              <Row key={i.id} insight={i} index={n} />
             ))}
           </AnimatePresence>
         </ul>
-      ) : (
-        <p className="text-muted-foreground">
+      ) : null}
+      {data.length > TOP && (
+        <button
+          type="button"
+          aria-expanded={all}
+          onClick={() => setAll((v) => !v)}
+          className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline"
+        >
+          {all ? "Show fewer" : `Show all ${data.length}`}
+        </button>
+      )}
+      {!data.length && (
+        <p className="relative py-2 text-muted-foreground">
+          <span className="fx-empty" aria-hidden="true" />
           Nothing worth your attention yet. Insights appear once there's enough history to compare against your own
           normal.
         </p>
       )}
       {asking && <WhatIfDialog onClose={() => setAsking(false)} />}
-    </Card>
+    </SpotlightCard>
   );
 }

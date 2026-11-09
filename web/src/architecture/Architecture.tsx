@@ -88,7 +88,10 @@ export default function Architecture() {
     <MotionConfig reducedMotion="user">
       <div className="ar">
         <header className="ar-bar">
-          <a className="ar-word" href="/">
+          <a className="ar-word" href="/" aria-label="Finance Agent, back to the home page">
+            <span className="ar-home" aria-hidden="true">
+              ←<span className="ar-home-text"> Back to the site</span>
+            </span>
             Finance Agent
           </a>
           <nav aria-label="Site">

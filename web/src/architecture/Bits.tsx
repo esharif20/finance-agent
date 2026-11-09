@@ -2,7 +2,7 @@
    SplitText (word reveal), CountUp and Magnet, rewritten on GSAP and trimmed to what this page
    uses. Each one renders its final state first, so a phone, reduced motion or a test sees the
    plain words and numbers; the motion is only added on a live screen. */
-import { type ReactNode, useRef } from "react";
+import { Fragment, type ReactNode, useRef } from "react";
 import { gsap, useGSAP } from "./smooth";
 
 /** A heading whose words rise in once, on load. The words stay one string for screen readers. */
@@ -18,10 +18,14 @@ export function SplitWords({ text, live, as: Tag = "h1", id }: { text: string; l
   return (
     <Tag ref={ref} id={id} aria-label={text}>
       {text.split(" ").map((w, i) => (
-        // the mask clips each word while it rises into place
-        <span key={`${w}-${i}`} className="ar-split" aria-hidden="true">
-          <span className="ar-split-w">{w}</span>{" "}
-        </span>
+        // the mask clips each word while it rises into place; the space sits between the masks,
+        // since a trailing space inside an inline-block collapses and ran the words together
+        <Fragment key={`${w}-${i}`}>
+          {i > 0 && " "}
+          <span className="ar-split" aria-hidden="true">
+            <span className="ar-split-w">{w}</span>
+          </span>
+        </Fragment>
       ))}
     </Tag>
   );
