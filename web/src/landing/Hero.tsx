@@ -1,4 +1,7 @@
-import { motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from "motion/react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useMotionValue, useMotionValueEvent } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Money } from "@/components/Money";
 import { ASPECT } from "@/lib/cardArt";
@@ -6,9 +9,8 @@ import type { Pose } from "@/lib/cardPoses";
 import { formatMoney } from "@/lib/money";
 import type { CardScene } from "@/three/cardScene";
 import { ACCOUNTS } from "./accounts.fixture";
-import { Field, finePointer, Flex, liteDevice, Magnetic, Roll, useStill } from "./fx";
+import { finePointer, Flex, liteDevice, Magnetic, Roll, useStill } from "./fx";
 import { digitsIn, Tally } from "./Preloader";
-import { OVERVIEW, REVIEW } from "./story/story.fixture";
 import "./hero.css";
 
 export const HEADLINE = "An AI agent for your money, on your own Mac.";
@@ -16,15 +18,6 @@ export const HEADLINE_LINES = ["An AI agent for your money,", "on your own Mac."
 const LINE =
   "It watches every account, spots what changed, answers with figures it has checked, and learns what you care about. It suggests; you decide. Nothing leaves your Mac unless you say so.";
 
-// What makes it an agent; every line is something the app does today
-const CAPS = [
-  { name: "Watches", tip: "Syncs in the background and spots a new subscription from its first charge." },
-  { name: "Plans", tip: "Works out which lookups a question needs before any model is asked." },
-  { name: "Checks", tip: "Every figure in a reply must match your ledger, or it isn’t shown." },
-  { name: "Remembers", tip: "Keeps what you tell it to remember, where you can read and delete it." },
-  { name: "Learns", tip: "Ranks Insights by what you mark useful, not by what you click." },
-  { name: "Suggests", tip: "Proposes a change and waits for you to press Confirm. It never moves money." },
-];
 
 const gbp = (minor: number) => ({ minor, currency: "GBP" });
 // Generic faces in the app's hues (oklch), none between 235 and 290
@@ -32,14 +25,27 @@ const HUES = [150, 28, 192];
 const TOTAL = formatMoney(gbp(ACCOUNTS.balance));
 const MONTH = new Date(`${ACCOUNTS.month}-01T12:00:00Z`).toLocaleString("en-GB", { month: "long", timeZone: "UTC" });
 
-// the ledger behind the cards: rows from the same made-up month, on a plane of their own
-const ROWS = [...REVIEW.map((r) => ({ name: r.merchant, amount: r.amount })), ...OVERVIEW.top.map((c) => ({ name: c.name, amount: c.amount }))];
+/** The hero's three beats, each a statement that scrolls past the pinned cards: the hand is dealt,
+    laid out as one ledger, then added up. The panel's meta row names the stage in words. */
+const BEATS = [
+  { stage: "Dealt from three accounts" },
+  {
+    stage: "Laid out as one ledger",
+    title: "Every account, read into one ledger.",
+    body: "Balances, money in and money out for each account, synced in the background and checked against what came before.",
+  },
+  {
+    stage: "Added up and checked",
+    title: "One total, worked out by code, not guessed.",
+    body: "Transfers between your own accounts are paired and kept out of spending, so nothing counts twice.",
+  },
+];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** Key frames the playhead rests on going forward: the row with every balance, then the totals. */
 const HOLDS = [
-  { at: 0.34, ms: 420 },
-  { at: 0.66, ms: 900 },
+  { at: 0.3, ms: 420 },
+  { at: 0.78, ms: 900 },
 ];
 const ease = (v: number) => v * v * (3 - 2 * v);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -49,13 +55,13 @@ const span = (p: number, a: number, b: number) => ease(clamp01((p - a) / (b - a)
     stack over the combined view. `w` is a card's width; returns offsets from the stage centre. */
 function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: number; y: number }): Pose & { label: number } {
   const n = i - 1;
-  const fan = { x: narrow ? n * w * 0.16 : w * 0.62 + n * w * 0.2, y: narrow ? w * 0.62 - n * 14 : -n * 18, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
+  const fan = { x: narrow ? n * w * 0.16 : n * w * 0.3, y: narrow ? -w * 0.1 - n * 14 : -w * 0.12 - n * 18, rz: -6 + n * 11, rx: 14, ry: -20, z: i * 34 };
   const gap = narrow ? w * 0.14 : w * 0.1;
   // on a phone the row is a column, cards on the left and each label beside its card
-  const row = narrow ? { x: -w * 0.36, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: -w * 0.08, rz: 0, rx: 0, ry: 0, z: 0 };
+  const row = narrow ? { x: -w * 0.42, y: n * (w / ASPECT + gap) - w * 0.1, rz: 0, rx: 0, ry: 0, z: 0 } : { x: n * (w + gap), y: -w * 0.08, rz: 0, rx: 0, ry: 0, z: 0 };
   const stack = { x: narrow ? n * 8 : n * 14, y: narrow ? -w * 0.86 + n * 10 : -w * 0.34 + n * 12, rz: n * -2, rx: 18, ry: 0, z: i * 6 };
-  const a = span(p, 0.08, 0.3);
-  const b = span(p, 0.44, 0.62);
+  const a = span(p, 0.06, 0.26);
+  const b = span(p, 0.56, 0.74);
   const k = (key: keyof typeof row) => mix(mix(fan[key], row[key], a), stack[key], b);
   return {
     x: k("x"),
@@ -64,9 +70,9 @@ function pose(i: number, p: number, w: number, narrow: boolean, tilt: { x: numbe
     rx: k("rx") + tilt.y * 8,
     ry: k("ry") + tilt.x * 12,
     rz: k("rz"),
-    s: mix(1, narrow ? 0.82 : 0.78, b),
+    s: mix(mix(narrow ? 1.1 : 1.32, 1, a), narrow ? 0.82 : 0.78, b),
     layer: i,
-    label: clamp01((p - 0.24) / 0.06) * (1 - clamp01((p - 0.42) / 0.05)),
+    label: clamp01((p - 0.2) / 0.06) * (1 - clamp01((p - 0.54) / 0.05)),
   };
 }
 
@@ -275,7 +281,6 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const rows = useRef<HTMLUListElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const labels = useRef<(HTMLDivElement | null)[]>([]);
   const floors = useRef<(HTMLSpanElement | null)[]>([]);
@@ -285,17 +290,45 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   const playing = useRef(play);
   playing.current = play;
   const [landed, setLanded] = useState(0);
-  // one scroll driver: the raw scroll progress is the target, and the frame loop below moves a
-  // playhead `p` after it (see PLAYHEAD), so every stage plays in full however fast the scroll
-  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
+  const [lite] = useState(liteDevice);
+  // one scroll driver: GSAP ScrollTrigger (stepped by Lenis's tick on desktop) writes the raw
+  // progress through the hero to `goal`; the frame loop below moves a playhead `p` after it (see
+  // PLAYHEAD), so every stage plays in full however fast the scroll
+  const goal = useRef(0);
+  const kicker = useRef<(() => void) | null>(null);
+  const video = useRef<HTMLVideoElement>(null);
   const p = useMotionValue(0);
-  // the hand-off: as the next chapter slides over, the hero sinks back (slower than the page,
-  // a little smaller, dimmer), so the totals recede rather than cut. Transform and opacity only.
-  const { scrollYProgress: leaving } = useScroll({ target: track, offset: ["end end", "end start"] });
-  const exit = useTransform(leaving, (v) => `translate3d(0, ${(v * 38).toFixed(2)}vh, 0) scale(${(1 - v * 0.08).toFixed(4)})`);
-  const fade = useTransform(leaving, [0, 1], [1, 0.25]);
+  useGSAP(
+    () => {
+      if (still) return;
+      gsap.registerPlugin(ScrollTrigger); // here, not at import: it reads matchMedia on register
+      let seek = 0;
+      const st = ScrollTrigger.create({
+        trigger: track.current,
+        start: "top top",
+        end: "bottom bottom",
+        onUpdate: (self) => {
+          goal.current = self.progress;
+          kicker.current?.();
+          // phones: the pre-rendered card sequence, scrubbed one seek per frame
+          const v = video.current;
+          if (v && !seek)
+            seek = requestAnimationFrame(() => {
+              seek = 0;
+              if (v.duration) v.currentTime = goal.current * (v.duration - 0.04);
+              p.set(goal.current);
+            });
+        },
+      });
+      return () => {
+        cancelAnimationFrame(seek);
+        st.kill();
+      };
+    },
+    { dependencies: [still] },
+  );
   const [phase, setPhase] = useState(0);
-  useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.6 ? 1 : 2));
+  useMotionValueEvent(p, "change", (v) => setPhase(v < 0.1 ? 0 : v < 0.68 ? 1 : 2));
 
   // the odometer rolls up as the combined view arrives, a wheel every 70 ms
   const rolled = phase >= 2;
@@ -321,8 +354,9 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const size = () => {
       const r = el.getBoundingClientRect();
       const narrow = r.width < 720;
-      // a bigger hand on desktop; hero.css sizes the slots to match (min(28vw, 440px))
-      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.28, 440);
+      // the row of three must fit the panel; the CSS stand-ins take the same width through --cw
+      const w = Math.min(narrow ? r.width * 0.5 : r.width * 0.3, 320);
+      el.style.setProperty("--cw", `${w.toFixed(1)}px`);
       return { r, narrow, w, h: w / ASPECT };
     };
     let dims = size();
@@ -342,7 +376,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     const advance = (now: number) => {
       const dt = last ? Math.min(64, now - last) : 16;
       last = now;
-      const target = scrollYProgress.get();
+      const target = goal.current;
       let v = p.get();
       if (held) {
         if (target < held.at || now - held.since >= (HOLDS.find((h) => h.at === held?.at)?.ms ?? 0)) held = null;
@@ -385,7 +419,6 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
         return { ...q, rest: q.y, deal: k, y: q.y + u * w * 2.1, z: q.z - u * 520, rz: q.rz * k + u * (14 - i * 14), rx: q.rx + u * 64, ry: q.ry + u * (i - 1) * 18, s: q.s * (0.78 + 0.22 * k) };
       });
       // depth field: the ledger plane drifts up slower than the cards and sinks back as they merge
-      if (rows.current) rows.current.style.transform = `translate3d(${tilt.x * -40}px, ${-pv * 22 + tilt.y * -24}vh, ${-260 - pv * 200}px)`;
       const sweep = clamp01((since - 1100) / 1500);
       const sweeping = sweep > 0 && sweep < 1;
       // contact shadows on the floor under the fan; they gather as each card lands, gone once the hand opens
@@ -433,7 +466,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       // the last card lands at 160 + 2 * 170 + 1400 ms; the WebGL sweep ends at 1100 + 1500 ms
       const dealing = !dealt || since < 2800;
       const idling = sway > 0;
-      const moving = held !== null || Math.abs(scrollYProgress.get() - pv) > 0.0004;
+      const moving = held !== null || Math.abs(goal.current - pv) > 0.0004;
       if (dealing || idling || moving || settling || (scene && !drawn)) raf = requestAnimationFrame(frame);
     };
     const kick = () => {
@@ -455,7 +488,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
       sizeScene();
       kick();
     };
-    const offP = scrollYProgress.on("change", kick);
+    kicker.current = kick;
     window.addEventListener("pointermove", move);
     window.addEventListener("resize", resize);
     if (canvas.current && !liteDevice() && webgl()) {
@@ -476,7 +509,7 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
     kick();
     return () => {
       alive = false;
-      offP();
+      kicker.current = null;
       cancelAnimationFrame(raf);
       io.disconnect();
       window.removeEventListener("pointermove", move);
@@ -486,31 +519,17 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
   }, [still, p, playing]);
 
   return (
-    <section ref={track} className="lp-hero" data-still={still ? "" : undefined} aria-labelledby="lp-title">
-      <motion.div className="lp-hero-pin" style={still ? undefined : { transform: exit, opacity: fade, transformOrigin: "50% 100%" }}>
-        <Field tone="night" />
-        {still ? <span className="lp-ledger-still" aria-hidden="true" /> : <LedgerField />}
-        <div className="lp-halo" aria-hidden="true" data-phase={phase} />
-        <div className="lp-grain" aria-hidden="true" />
-        <div className="lp-hero-copy" data-phase={phase}>
+    <section ref={track} className="lp-hero" data-still={still ? "" : undefined} data-lite={lite ? "" : undefined} aria-labelledby="lp-title">
+      <div className="lp-hero-ground" aria-hidden="true">
+        {!still && <LedgerField />}
+      </div>
+      <div className="lp-hero-grid">
+        <div className="lp-hero-beat lp-hero-lead" data-on={still || phase === 0 ? "" : undefined}>
           <h1 id="lp-title" className="lp-display" style={{ "--hd": `${delay}s` } as React.CSSProperties}>
             <Flex lines={HEADLINE_LINES} label={HEADLINE} still={still} play={play} delay={delay} />
           </h1>
-          <motion.div
-            className="lp-hero-foot"
-            initial={still ? false : { opacity: 0, y: 16 }}
-            animate={play ? { opacity: 1, y: 0 } : undefined}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: delay + 0.55 }}
-          >
+          <div className="lp-hero-foot" data-play={play || still ? "" : undefined}>
             <p className="lp-lede">{LINE}</p>
-            <ul className="lp-caps" aria-label="What it does on its own">
-              {CAPS.map((c) => (
-                <li key={c.name} tabIndex={0}>
-                  <span className="lp-cap-name">{c.name}</span>
-                  <span className="lp-cap-tip">{c.tip}</span>
-                </li>
-              ))}
-            </ul>
             <div className="lp-actions">
               <Magnetic href="/app" className="lp-pill lp-pill-primary">
                 <Roll text="Open the demo" />
@@ -519,58 +538,66 @@ export function Hero({ delay = 0, play = true }: { delay?: number; play?: boolea
                 <Roll text="See what it does" />
               </a>
             </div>
-          </motion.div>
-        </div>
-        {still ? (
-          <StillStage />
-        ) : (
-          <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
-            <ul ref={rows} className="lp-rows">
-              {ROWS.map((r, i) => (
-                <li key={r.name} style={{ "--i": i } as React.CSSProperties}>
-                  <span>{r.name}</span>
-                  <Money value={r.amount} />
-                </li>
-              ))}
-            </ul>
-            {ACCOUNTS.accounts.map((a, i) => (
-              <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
-            ))}
-            {ACCOUNTS.accounts.map((a, i) => (
-              <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
-            ))}
-            <canvas ref={canvas} className="lp-stage-canvas" />
-            {ACCOUNTS.accounts.map((a, i) => (
-              <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
-                <CardFace i={i} name={a.name} />
-                <span className="lp-acard-light">
-                  <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
-                </span>
-              </div>
-            ))}
-            {ACCOUNTS.accounts.map((a, i) => (
-              <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
-                <p className="lp-acct-name">{a.name}</p>
-                <p className="lp-acct-bal">
-                  <Money value={gbp(a.balance)} />
-                </p>
-                <p className="lp-acct-flow">
-                  <span>
-                    In <Money value={gbp(a.in)} />
-                  </span>
-                  <span>
-                    Out <Money value={gbp(a.out)} />
-                  </span>
-                </p>
-              </div>
-            ))}
-            <Combined landed={landed} />
           </div>
-        )}
-        <p className="lp-sr">
-          {ACCOUNTS.accounts.map((a) => `${a.name}: ${formatMoney(gbp(a.balance))}.`).join(" ")} Together: {TOTAL}.
-        </p>
-      </motion.div>
+        </div>
+        <figure className="lp-hero-panel">
+          <figcaption className="lp-hero-meta">
+            <span>The made-up household</span>
+            <span>{BEATS[still ? 2 : phase]?.stage}</span>
+          </figcaption>
+          {still ? (
+            <StillStage />
+          ) : lite ? (
+            <div className="lp-stage lp-stage-film" data-phase={phase} aria-hidden="true">
+              <video ref={video} src="/hero/cards.mp4" poster="/hero/cards.webp" muted playsInline preload="auto" />
+            </div>
+          ) : (
+            <div ref={stage} className="lp-stage" data-three={three ? "" : undefined} data-phase={phase} data-play={play ? "" : undefined} aria-hidden="true">
+              {ACCOUNTS.accounts.map((a, i) => (
+                <span key={a.name} ref={(n) => void (floors.current[i] = n)} className="lp-acard-floor" style={{ "--h": HUES[i] } as React.CSSProperties} />
+              ))}
+              {ACCOUNTS.accounts.map((a, i) => (
+                <span key={a.name} ref={(n) => void (backs.current[i] = n)} className="lp-acard-back" style={{ "--h": HUES[i] } as React.CSSProperties} />
+              ))}
+              <canvas ref={canvas} className="lp-stage-canvas" />
+              {ACCOUNTS.accounts.map((a, i) => (
+                <div key={a.name} ref={(n) => void (cards.current[i] = n)} className="lp-acard-slot" style={{ "--i": i } as React.CSSProperties}>
+                  <CardFace i={i} name={a.name} />
+                  <span className="lp-acard-light">
+                    <span ref={(n) => void (sheens.current[i] = n)} className="lp-acard-sheen" />
+                  </span>
+                </div>
+              ))}
+              {ACCOUNTS.accounts.map((a, i) => (
+                <div key={a.name} ref={(n) => void (labels.current[i] = n)} className="lp-acct">
+                  <p className="lp-acct-name">{a.name}</p>
+                  <p className="lp-acct-bal">
+                    <Money value={gbp(a.balance)} />
+                  </p>
+                  <p className="lp-acct-flow">
+                    <span>
+                      In <Money value={gbp(a.in)} />
+                    </span>
+                    <span>
+                      Out <Money value={gbp(a.out)} />
+                    </span>
+                  </p>
+                </div>
+              ))}
+              <Combined landed={landed} />
+            </div>
+          )}
+        </figure>
+        {BEATS.slice(1).map((b, k) => (
+          <div key={b.stage} className="lp-hero-beat" data-on={still || phase === k + 1 ? "" : undefined}>
+            <h2 className="lp-hero-say">{b.title}</h2>
+            <p className="lp-hero-say-body">{b.body}</p>
+          </div>
+        ))}
+      </div>
+      <p className="lp-sr">
+        {ACCOUNTS.accounts.map((a) => `${a.name}: ${formatMoney(gbp(a.balance))}.`).join(" ")} Together: {TOTAL}.
+      </p>
     </section>
   );
 }

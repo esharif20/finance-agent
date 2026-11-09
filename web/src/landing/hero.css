@@ -224,3 +224,212 @@
     scale: none;
   }
 }
+
+/* ===== the hero, as /architecture's night band: three beats scroll past a pinned panel =====
+   The ground is black in both themes with the same 22px dot texture /architecture uses; the cards
+   sit in one tinted panel (its night-1 tone) under a meta row. The panel holds; the statements on
+   the left scroll by and the one in step with the cards is in full ink. Nothing but the cards moves. */
+.lp .lp-hero {
+  height: auto;
+  background-color: var(--lp-black);
+  background-image: radial-gradient(circle at 1px 1px, rgb(201 207 198 / 0.13) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+  color: var(--lp-white);
+}
+.lp .lp-hero-ground {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  margin-bottom: -100svh;
+  pointer-events: none;
+}
+.lp .lp-hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  column-gap: clamp(32px, 4vw, 72px);
+  padding-inline: var(--lp-gutter);
+}
+.lp .lp-hero-beat {
+  grid-column: 1;
+  display: grid;
+  align-content: center;
+  gap: 20px;
+  min-height: 100svh;
+  padding-block: 96px 48px;
+  opacity: 0.3;
+  transition: opacity 0.6s var(--lp-ease-out);
+}
+.lp .lp-hero-beat[data-on] {
+  opacity: 1;
+}
+.lp .lp-hero-lead {
+  grid-row: 1;
+  align-content: end;
+  padding-bottom: clamp(48px, 10svh, 112px);
+}
+.lp .lp-hero-beat:nth-of-type(2) {
+  grid-row: 2;
+}
+.lp .lp-hero-beat:nth-of-type(3) {
+  grid-row: 3;
+}
+.lp .lp-hero .lp-display {
+  font-size: clamp(2.6rem, 0.4rem + 4.3vw, 4.9rem);
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+}
+.lp .lp-hero .lp-flex-line {
+  display: inline;
+}
+.lp .lp-hero .lp-flex-line::after {
+  content: " ";
+}
+.lp .lp-hero-foot {
+  margin-top: 8px;
+  transition:
+    opacity 0.7s var(--lp-ease-out) 0.5s,
+    transform 0.7s var(--lp-ease-out) 0.5s;
+}
+.lp .lp-hero-foot:not([data-play]) {
+  opacity: 0;
+  transform: translateY(16px);
+}
+.lp .lp-hero .lp-lede {
+  max-width: 38ch;
+  font-size: var(--lp-step-body);
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.82);
+}
+.lp-hero-say {
+  max-width: 15ch;
+  font-family: var(--lp-display);
+  font-size: clamp(1.9rem, 0.9rem + 2.3vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.lp-hero-say-body {
+  max-width: 40ch;
+  font-size: var(--lp-step-body);
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.78);
+}
+
+/* the panel: pinned for the whole hero, a meta row over a tinted stage */
+.lp .lp-hero-panel {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: start;
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100svh;
+  min-height: 560px;
+  margin: 0;
+  padding: 92px 0 clamp(16px, 3svh, 32px);
+}
+.lp-hero-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.62);
+}
+.lp .lp-hero-panel .lp-stage {
+  position: relative;
+  inset: auto;
+  border-radius: clamp(16px, 1.6vw, 24px);
+  background: #161915;
+  overflow: clip;
+}
+.lp .lp-hero .lp-acard-slot {
+  width: var(--cw, 240px);
+}
+.lp .lp-hero .lp-combined {
+  bottom: clamp(16px, 3svh, 28px);
+  width: min(480px, calc(100% - 32px));
+  padding: 22px 26px;
+  background: #232722;
+  box-shadow: none;
+}
+.lp .lp-hero .lp-combined .lp-combined-total {
+  font-size: clamp(2.4rem, 1.4rem + 2.6vw, 3.75rem);
+}
+.lp-stage-film video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* reduced motion: the finished composition in the panel, every statement in full ink */
+.lp .lp-hero[data-still] .lp-hero-panel {
+  position: relative;
+  height: auto;
+}
+.lp .lp-hero[data-still] .lp-hero-still {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 20px;
+  border-radius: 24px;
+  background: #161915;
+}
+
+/* phones and tablets: the panel pins under the bar and the statements pass beneath it */
+@media (max-width: 899.98px) {
+  .lp .lp-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp .lp-hero-beat {
+    min-height: 0;
+    padding-block: 0;
+  }
+  .lp .lp-hero-lead {
+    padding: 112px 0 32px;
+  }
+  .lp .lp-hero-panel {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+    z-index: 2;
+    top: 60px;
+    height: auto;
+    min-height: 0;
+    padding: 8px 0 0;
+    background: var(--lp-black);
+  }
+  .lp .lp-hero-panel .lp-stage {
+    aspect-ratio: 420 / 640;
+    width: min(100%, calc(52svh * 420 / 640));
+    justify-self: center;
+  }
+  .lp .lp-hero-beat:nth-of-type(2),
+  .lp .lp-hero-beat:nth-of-type(3) {
+    grid-column: 1;
+    align-content: end;
+    min-height: 95svh;
+    padding-bottom: 8svh;
+  }
+  .lp .lp-hero-beat:nth-of-type(2) {
+    grid-row: 2;
+  }
+  .lp .lp-hero-beat:nth-of-type(3) {
+    grid-row: 3;
+  }
+  .lp .lp-hero[data-still] .lp-hero-panel {
+    grid-row: 2;
+  }
+  .lp .lp-hero[data-still] .lp-hero-beat:nth-of-type(2) {
+    grid-row: 3;
+    min-height: 0;
+    padding-top: 40px;
+  }
+  .lp .lp-hero[data-still] .lp-hero-beat:nth-of-type(3) {
+    grid-row: 4;
+    min-height: 0;
+    padding-top: 32px;
+  }
+}

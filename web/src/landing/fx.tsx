@@ -206,9 +206,9 @@ export function Material({ className = "", max = 7, children }: { className?: st
   );
 }
 
-/** Variable type that breathes: on load each letter sweeps from hairline to its weight in a wave,
-    and the letters nearest the pointer swell in weight and width (Codrops variable-font hover).
-    Screen readers get the sentence once; the letters are a drawing of it. */
+/** Variable type that breathes in once: on load each letter sweeps from hairline to its weight in a
+    wave. It holds still after that, pointer or not. Screen readers get the sentence once; the
+    letters are a drawing of it. */
 export function Flex({
   lines,
   label,
@@ -224,54 +224,7 @@ export function Flex({
   delay?: number;
   className?: string;
 }) {
-  const [live] = useState(() => !still && finePointer());
   const root = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const host = root.current?.closest("section");
-    if (!live || !host || !root.current) return;
-    const letters = [...root.current.querySelectorAll<HTMLElement>("[data-l]")];
-    let raf = 0;
-    let px = -1e4;
-    let py = -1e4;
-    // letter centres are read once and kept until a scroll or resize moves them, so a pointer
-    // move never forces a layout read per letter
-    let at: { x: number; y: number }[] | null = null;
-    const forget = () => void (at = null);
-    const paint = () => {
-      raf = 0;
-      at ??= letters.map((l) => {
-        const b = l.getBoundingClientRect();
-        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-      });
-      letters.forEach((l, i) => {
-        const c = at?.[i];
-        const f = c ? Math.max(0, 1 - Math.hypot(c.x - px, c.y - py) / 340) ** 2 : 0;
-        const v = f > 0 ? `"wght" ${Math.round(560 + 240 * f)}` : "";
-        if (l.style.fontVariationSettings !== v) l.style.fontVariationSettings = v;
-      });
-    };
-    const move = (e: globalThis.PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
-      px = e.clientX;
-      py = e.clientY;
-      if (!raf) raf = requestAnimationFrame(paint);
-    };
-    const out = () => {
-      px = py = -1e4;
-      if (!raf) raf = requestAnimationFrame(paint);
-    };
-    host.addEventListener("pointermove", move);
-    host.addEventListener("pointerleave", out);
-    window.addEventListener("scroll", forget, { passive: true });
-    window.addEventListener("resize", forget);
-    return () => {
-      window.removeEventListener("scroll", forget);
-      window.removeEventListener("resize", forget);
-      cancelAnimationFrame(raf);
-      host.removeEventListener("pointermove", move);
-      host.removeEventListener("pointerleave", out);
-    };
-  }, [live]);
   let n = 0;
   if (still)
     return (
