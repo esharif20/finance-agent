@@ -7,9 +7,20 @@ import Flow from "./Flow";
 import { GROUPS, type Group, NODES, REPO, STATUS_LABEL, type Status } from "./nodes";
 import { Detail, NodeButton, StatusTag, useMedia, useStill } from "./parts";
 import WhatsNext from "./WhatsNext";
+import Wayfinder from "./Wayfinder";
+import { CountUp, Magnet, SplitWords } from "./Bits";
+import { useSmoothScroll } from "./smooth";
 import "./architecture.css";
 
 const [, ...CHAPTERS] = GROUPS as [Group, ...Group[]];
+
+/** The poster row under the hero: four facts that hold for the local app, each with its source. */
+const FACTS: { n: number; label: string; meta: string; tone: string }[] = [
+  { n: NODES.length, label: "parts, each with its decision and what was turned down", meta: "All chapters", tone: "mint" },
+  { n: 2, label: "hosts outside the Mac: a read-only bank feed, and Gemini if you opt in", meta: "ADR 0013, 0016", tone: "cyan" },
+  { n: 1, label: "retry for a reply that misquotes a figure, then a plain table", meta: "ADR 0007", tone: "lemon" },
+  { n: 0, label: "tools that can pay or move money. Writes wait for your confirm", meta: "By design", tone: "orange" },
+];
 
 const FIGURE: Partial<Record<Group["id"], (live: boolean) => ReactNode>> = {
   knowledge: () => <Tiers />,
@@ -21,7 +32,7 @@ const FIGURE: Partial<Record<Group["id"], (live: boolean) => ReactNode>> = {
 };
 
 /** One chapter: its nodes, and the open node's detail beside them (wide) or under the node (phone). */
-function Chapter({ group, wide, live }: { group: Group; wide: boolean; live: boolean }) {
+function Chapter({ group, wide, live, index }: { group: Group; wide: boolean; live: boolean; index: number }) {
   const nodes = NODES.filter((n) => n.group === group.id);
   const [open, setOpen] = useState<string | null>(wide ? (nodes[0]?.id ?? null) : null);
   const shown = nodes.find((n) => n.id === open);
@@ -29,6 +40,12 @@ function Chapter({ group, wide, live }: { group: Group; wide: boolean; live: boo
   const visual = (id: string) => SECURITY_VISUAL[id]?.();
   return (
     <section className={`ar-chapter ar-${group.id}`} id={`ar-${group.id}`} aria-labelledby={`ar-h-${group.id}`}>
+      <p className="ar-meta" aria-hidden="true">
+        <span>
+          {String(index).padStart(2, "0")} / {String(GROUPS.length).padStart(2, "0")}
+        </span>
+        <span>{nodes.length} parts</span>
+      </p>
       <div className="ar-chapter-text">
         <h2 id={`ar-h-${group.id}`}>{group.title}</h2>
         <p className="ar-lede">{group.lede}</p>
@@ -56,6 +73,7 @@ export default function Architecture() {
   // motion that runs on its own needs room, a fine pointer and no reduced-motion preference
   const live = wide && !coarse && !still;
   const [playKey, setPlayKey] = useState(0);
+  useSmoothScroll(live);
 
   useEffect(() => {
     document.title = "How Finance Agent works";
@@ -80,16 +98,18 @@ export default function Architecture() {
         </header>
         <main>
           <section className="ar-hero" aria-labelledby="ar-title">
-            <h1 id="ar-title">How the Assistant answers</h1>
+            <SplitWords id="ar-title" text="How the Assistant answers" live={live} />
             <div className="ar-hero-text">
               <p className="ar-sub">
                 Code plans the turn, the Engine computes every figure, and one model call writes the words. Open any
                 part to see the decision, why it was made, and what was turned down.
               </p>
               <div className="ar-hero-foot">
-                <button type="button" className="ar-pill ar-pill-big" onClick={playFromHero}>
-                  Play a question
-                </button>
+                <Magnet live={live}>
+                  <button type="button" className="ar-pill ar-pill-big" onClick={playFromHero}>
+                    Play a question
+                  </button>
+                </Magnet>
                 <ul className="ar-key" aria-label="Status key">
                   {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
                     <li key={s}>
@@ -100,6 +120,15 @@ export default function Architecture() {
               </div>
             </div>
           </section>
+          <ul className="ar-facts" aria-label="At a glance">
+            {FACTS.map((f) => (
+              <li key={f.meta} className={`ar-fact ar-tone-${f.tone}`}>
+                <span className="ar-fact-meta">{f.meta}</span>
+                <CountUp to={f.n} live={live} />
+                <span className="ar-fact-label">{f.label}</span>
+              </li>
+            ))}
+          </ul>
           <section className="ar-system" aria-labelledby="ar-h-system">
             <div className="ar-system-head">
               <h2 id="ar-h-system">The whole system, on one Mac</h2>
@@ -109,7 +138,7 @@ export default function Architecture() {
               </p>
             </div>
             <SystemChart wide={wide} live={live} />
-            <nav className="ar-toc" aria-label="On this page">
+            <nav className="ar-toc" id="ar-toc" aria-label="On this page">
               <ul>
                 {GROUPS.map((g) => (
                   <li key={g.id}>
@@ -127,10 +156,11 @@ export default function Architecture() {
           </section>
           <Flow scene={live} wide={wide} still={still} playKey={playKey} />
           <Agent wide={wide} live={live} />
-          {CHAPTERS.map((g) => (
-            <Chapter key={`${g.id}-${wide}`} group={g} wide={wide} live={live} />
+          {CHAPTERS.map((g, i) => (
+            <Chapter key={`${g.id}-${wide}`} group={g} wide={wide} live={live} index={i + 2} />
           ))}
           <WhatsNext />
+          <Wayfinder still={still} />
         </main>
         <footer className="ar-foot">
           <p>
