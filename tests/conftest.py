@@ -1,3 +1,4 @@
+import os
 import socket
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -78,6 +79,9 @@ def _never_touch_real_data(
     monkeypatch.setenv(
         storage.DB_ENV, str(tmp_path_factory.mktemp("data") / "ledger.db")
     )
+    # set_keyring below covers this process; subprocesses read this variable instead
+    if "PYTHON_KEYRING_BACKEND" not in os.environ:
+        monkeypatch.setenv("PYTHON_KEYRING_BACKEND", "keyring.backends.fail.Keyring")
     inside_repo = storage._inside_repo  # pyright: ignore[reportPrivateUsage]
 
     def guarded(path: Path) -> bool:
