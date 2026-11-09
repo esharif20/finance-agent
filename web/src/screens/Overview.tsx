@@ -225,10 +225,11 @@ export function Overview({ account }: { account?: number }) {
               <AccountShares summary={summary.data} accounts={accounts.data} hot={hot} onHot={setHot} />
             )}
           </div>
-          {/* two columns: the forecast, subscriptions and merchants sit on the right, so the columns
-              end about level (measured: within about 6% at 1440 and 1920) */}
+          {/* two columns: guidance (when there is any), the forecast and merchants sit on the right,
+              subscriptions under the insights, so the columns end about level whether or not a
+              guidance card shows (measured at 1440 and 1920) */}
+          {wide && <GuidanceCards />}
           {wide && <ForecastPanel />}
-          {wide && <SubscriptionsCard />}
           {wide && merchants}
         </div>
         <div className="flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
@@ -238,10 +239,10 @@ export function Overview({ account }: { account?: number }) {
             </MonthCard>
             <SpendingDonut spending={spending.data} account={account} />
           </div>
-          <GuidanceCards />
+          {!wide && <GuidanceCards />}
           <InsightsFeed />
           {!wide && <ForecastPanel />}
-          {!wide && <SubscriptionsCard />}
+          <SubscriptionsCard />
           {!wide && merchants}
         </div>
       </div>

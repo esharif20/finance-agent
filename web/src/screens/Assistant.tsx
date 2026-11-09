@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Magnet, ShinyText } from "@/components/bits";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowUp, Check, ChevronDown, MessageCircle, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -240,13 +241,15 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
       transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
       className={`flex ${mine ? "justify-end" : "justify-start"}`}
     >
-      <div className={`max-w-[88%] rounded-3xl px-4 py-3 ${mine ? "bg-primary text-primary-foreground" : "bg-card"} ${!mine && m.text && !m.streaming ? "fx-shine" : ""}`}>
+      <div className={`max-w-[88%] rounded-3xl px-4 py-3 ${mine ? "bg-primary text-primary-foreground" : "bg-card"}`}>
         {mine ? (
           <p className="whitespace-pre-wrap text-row">{m.text}</p>
         ) : (
           <>
             {m.text ? (
-              <Reply text={m.text} />
+              <ShinyText disabled={m.streaming}>
+                <Reply text={m.text} />
+              </ShinyText>
             ) : m.error ? null : (
               <span className="text-label text-muted-foreground" data-testid="stage">
                 <span className="fx-dots" aria-hidden="true">
@@ -272,9 +275,11 @@ function Bubble({ m, decision, busy, onDecide, onChip, thread, cloudIndex }: { m
             {!m.streaming && !!m.chips?.length && (
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Suggested questions">
                 {m.chips.map((c) => (
-                  <button key={c} type="button" data-magnetic disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
-                    {c}
-                  </button>
+                  <Magnet key={c}>
+                    <button type="button" disabled={busy} onClick={() => onChip(c)} className="min-h-9 rounded-full border border-border bg-raised px-3.5 text-label font-medium transition-[transform,background-color] duration-150 ease-out hover:bg-active active:scale-[0.97] disabled:opacity-50 motion-reduce:transition-none">
+                      {c}
+                    </button>
+                  </Magnet>
                 ))}
               </div>
             )}

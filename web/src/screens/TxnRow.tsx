@@ -1,4 +1,6 @@
 import { ChevronDown } from "lucide-react";
+import { motion } from "motion/react";
+import { useAnimatedItem } from "@/components/bits";
 import { useId, useState } from "react";
 import type { CategoryGroup, SplitOut, Txn } from "@/api/client";
 import { AlwaysAskToggle } from "@/components/AlwaysAskToggle";
@@ -29,14 +31,18 @@ export function TxnRow({
   groups,
   onCategory,
   dated = true,
+  index = 0,
 }: {
   t: Txn;
+  /** its place in the list, for the staggered entrance */
+  index?: number;
   mask?: string;
   /** false under a day heading: the date stays for screen readers, not on screen */
   dated?: boolean;
   groups: CategoryGroup[];
   onCategory: (c: Category, all: boolean) => void;
 }) {
+  const enter = useAnimatedItem(index);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<{ parts?: SplitOut["parts"] } | null>(null);
   const [partsOpen, setPartsOpen] = useState(false);
@@ -47,7 +53,8 @@ export function TxnRow({
   const toReview = t.category?.[0] === "To review";
 
   return (
-    <li
+    <motion.li
+      {...enter}
       data-spot
       aria-label={`${t.description}, ${day(t.posted_on)}`}
       className={`txn-row grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-[12px] px-3 py-3 hover:bg-raised ${dated ? "sm:grid-cols-[96px_1fr_auto_auto]" : "sm:grid-cols-[1fr_auto_auto]"}`}
@@ -136,6 +143,6 @@ export function TxnRow({
           {t.merchant_id !== null && t.merchant && <AlwaysAskToggle merchantId={t.merchant_id} name={t.merchant} />}
         </div>
       )}
-    </li>
+    </motion.li>
   );
 }
