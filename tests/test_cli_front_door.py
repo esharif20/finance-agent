@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from finance_agent.cli import banner, demo, doctor, main, models
+from finance_agent.cli import banner, demo, doctor, launcher, main, models
 from finance_agent.identity import current_user
 from finance_agent.storage import DEFAULT_DB
 from synthetic_lloyds import generate_histories, render_export
@@ -611,3 +611,46 @@ def test_status_reads_cloud_spend_only_from_an_existing_meter(
         assert status.cloud_line(now).startswith("£0.00 of £9 this month")
     finally:
         keychain.delete_item(keychain.GEMINI_SERVICE, keychain.GEMINI_ACCOUNT)
+
+
+def test_fa_demo_opens_the_hosted_site_straight_away(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr(launcher, "_open_browser", opened.append)
+
+    def no_local(*_a: object, **_k: object) -> int:
+        raise AssertionError("plain `fa demo` built the local demo")
+
+    monkeypatch.setattr(demo, "run", no_local)
+    assert main(["demo"]) == 0
+    assert opened == [demo.HOSTED] and demo.HOSTED in capsys.readouterr().out
+
+
+def test_fa_demo_local_and_persona_still_build_the_local_demo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[int | None] = []
+
+    def local(persona: int | None, open_browser: bool) -> int:
+        seen.append(persona)
+        return 0
+
+    def quiet(_u: str) -> None: ...
+
+    monkeypatch.setattr(demo, "run", local)
+    monkeypatch.setattr(launcher, "_open_browser", quiet)
+    assert main(["demo", "--local"]) == 0
+    assert main(["demo", "--persona", "2"]) == 0
+    assert seen == [None, 2]
+
+
+def test_fa_demo_no_open_prints_the_hosted_link(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def boom(_u: str) -> None:
+        raise AssertionError("opened a browser")
+
+    monkeypatch.setattr(launcher, "_open_browser", boom)
+    assert main(["demo", "--no-open"]) == 0
+    assert demo.HOSTED in capsys.readouterr().out

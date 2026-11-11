@@ -60,6 +60,14 @@ def list_personas() -> int:
     return 0
 
 
+def hosted(open_browser: bool = True) -> int:
+    """Plain `fa demo`: open the public demo at once, nothing to build or start."""
+    print(f"Finance Agent demo: {HOSTED}")
+    if open_browser:
+        launcher._open_browser(HOSTED)  # pyright: ignore[reportPrivateUsage]
+    return 0
+
+
 def _hosted(open_browser: bool, open_url: Callable[[str], object], why: str) -> int:
     print(f"{why} Using the hosted demo instead: {HOSTED}")
     if open_browser:
