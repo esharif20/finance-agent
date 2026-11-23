@@ -230,8 +230,11 @@ def _up() -> int:
     """`fa` and `fa up`: the banner and a one-line status, then the UI."""
     from datetime import UTC, datetime
 
-    from finance_agent.cli import banner, status
+    from finance_agent.cli import banner, status, touch_id
 
+    if not touch_id.confirm():  # before any Keychain read (#352)
+        print("fa: Touch ID or the Mac password is needed to open it", file=sys.stderr)
+        return 1
     try:
         engine = open_db(create=False)
     except (OSError, ValueError) as e:
