@@ -11,6 +11,11 @@ from finance_agent.cli import touch_id
 REAL_CONFIRM = touch_id.confirm  # conftest stubs the module attribute per test
 
 
+@pytest.fixture(autouse=True)
+def _on_macos(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")  # CI runs on Linux
+
+
 @pytest.mark.parametrize("argv", [[], ["up"]])
 def test_a_refusal_exits_before_the_database_is_opened(
     argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -114,3 +119,17 @@ def test_local_authentication_raising_never_opens_the_database(
     monkeypatch.setattr(cli, "open_db", open_db)
     assert cli.main(["up"]) == 1
     assert opened == []
+
+
+def test_off_macos_there_is_no_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    # no Keychain or Touch ID to guard; the Linux smoke test runs `fa`
+    monkeypatch.setattr(sys, "platform", "linux")
+    opened: list[bool] = []
+
+    def open_db(**_: object) -> object:
+        opened.append(True)
+        raise OSError("stop here")
+
+    monkeypatch.setattr(cli, "open_db", open_db)  # conftest's stub raises if asked
+    assert cli.main(["up"]) == 1
+    assert opened == [True]

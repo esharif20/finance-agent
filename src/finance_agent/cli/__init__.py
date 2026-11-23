@@ -232,7 +232,8 @@ def _up() -> int:
 
     from finance_agent.cli import banner, status, touch_id
 
-    if not touch_id.confirm():  # before any Keychain read (#352)
+    # before any Keychain read (#352); the Keychain and Touch ID exist only on macOS
+    if sys.platform == "darwin" and not touch_id.confirm():
         print("fa: Touch ID or the Mac password is needed to open it", file=sys.stderr)
         return 1
     try:
