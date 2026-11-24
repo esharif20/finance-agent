@@ -94,10 +94,11 @@ try {
     if (accounts.length < 3) fail(`${scheme}: ${accounts.length} accounts, want 3 or more`);
     if (shots) await page.screenshot({ path: `${shots}/demo-overview-${scheme}.png`, fullPage: true });
 
-    // a change, then Reset: the Persona's first figures come back
+    // a change, then Reset: the Persona's first figures come back. Spending only: a Transfer
+    // takes no Category, and late in a month the biggest outgoing can be one
     const first = { net: await net(), donut: await donut() };
     const { items } = await api(`/api/transactions?month=${summary.month}&limit=50`);
-    const biggest = items.filter((t: { amount: { minor: number } }) => t.amount.minor < 0).sort((a: { amount: { minor: number } }, b: { amount: { minor: number } }) => a.amount.minor - b.amount.minor)[0];
+    const biggest = items.filter((t: { amount: { minor: number }; kind: string | null }) => t.amount.minor < 0 && t.kind === "Spending").sort((a: { amount: { minor: number } }, b: { amount: { minor: number } }) => a.amount.minor - b.amount.minor)[0];
     const moved = await page.request.post(`${base}/api/corrections`, {
       headers: { origin: base },
       data: { transaction_id: biggest.id, category: ["Travel", "Holidays"] },
