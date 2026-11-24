@@ -70,12 +70,18 @@ def _no_real_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(watch, "osascript", silent)
 
 
+def _no_touch_id(reason: str = "") -> bool:
+    raise AssertionError("a test reached the real Touch ID gate; monkeypatch it")
+
+
 @pytest.fixture(autouse=True)
 def _never_touch_real_data(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Every test (and any subprocess it spawns) defaults to a temp database,
     and opening anything under the real data directory fails the test."""
+    # no real Touch ID sheet in tests; a test that reaches the gate sets its own
+    monkeypatch.setattr("finance_agent.cli.touch_id.confirm", _no_touch_id)
     monkeypatch.setenv(
         storage.DB_ENV, str(tmp_path_factory.mktemp("data") / "ledger.db")
     )

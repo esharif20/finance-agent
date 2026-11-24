@@ -10,6 +10,7 @@ dependencies = [
     "langsmith>=0.14.17",
     "numpy>=2.5",
     "pydantic>=2.14.3",
+    "pyobjc-framework-localauthentication>=13.0 ; sys_platform == 'darwin'",
     "scipy>=1.18.1",
     "sqlalchemy>=2.1.8",
     "sqlcipher3-wheels>=0.5.7",
